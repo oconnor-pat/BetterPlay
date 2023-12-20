@@ -11,8 +11,18 @@ const Stack = createNativeStackNavigator();
 function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="LandingPage">
-        <Stack.Screen name="LandingPage" component={LandingPage} />
+      <Stack.Navigator
+        initialRouteName="LandingPage"
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: '#02131D',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}>
+        <Stack.Screen name="OMHL" component={LandingPage} />
         {/*         <Stack.Screen name="Homefeed" component={Homefeed} />
         <Stack.Screen name="Profile" component={Profile} />
         <Stack.Screen name="Discover" component={Discover} /> */}
