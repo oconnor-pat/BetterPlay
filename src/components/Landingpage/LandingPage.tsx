@@ -1,4 +1,4 @@
-import React, {useState, useRef} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {
   View,
   Text,
@@ -84,12 +84,26 @@ function LandingPage() {
     password: '',
   });
 
-  const loginInputRef = useRef<TextInput>(null);
+  const loginUsernameInputRef = useRef<TextInput>(null);
+  const loginPasswordInputRef = useRef<TextInput>(null);
 
   const registerNameInputRef = useRef<TextInput>(null);
   const registerEmailInputRef = useRef<TextInput>(null);
   const registerUsernameInputRef = useRef<TextInput>(null);
   const registerPasswordInputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (showLoginForm) {
+      if (loginUsernameInputRef.current) {
+        loginUsernameInputRef.current.focus();
+      }
+    }
+    if (showRegisterForm) {
+      if (registerNameInputRef.current) {
+        registerNameInputRef.current.focus();
+      }
+    }
+  }, [showLoginForm, showRegisterForm]);
 
   const handleRegistration = async () => {
     // Implement registration logic for React Native
@@ -108,6 +122,7 @@ function LandingPage() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 130 : 0}
       style={styles.container}>
       <TouchableWithoutFeedback onPress={dismissForms}>
         <View style={styles.container}>
@@ -118,9 +133,6 @@ function LandingPage() {
               onPress={() => {
                 setShowLoginForm(true);
                 setShowRegisterForm(false);
-                if (loginInputRef.current) {
-                  loginInputRef.current.focus();
-                }
               }}>
               <Text style={styles.buttonText}>Login</Text>
             </TouchableOpacity>
@@ -129,9 +141,6 @@ function LandingPage() {
               onPress={() => {
                 setShowLoginForm(false);
                 setShowRegisterForm(true);
-                if (registerNameInputRef.current) {
-                  registerNameInputRef.current.focus();
-                }
               }}>
               <Text style={styles.buttonText}>Register</Text>
             </TouchableOpacity>
@@ -146,8 +155,7 @@ function LandingPage() {
                 onChangeText={text =>
                   setLoginData({...loginData, username: text})
                 }
-                ref={loginInputRef}
-                autoFocus={true}
+                ref={loginUsernameInputRef}
               />
               <TextInput
                 style={styles.input}
@@ -157,7 +165,7 @@ function LandingPage() {
                 onChangeText={text =>
                   setLoginData({...loginData, password: text})
                 }
-                ref={loginInputRef}
+                ref={loginPasswordInputRef}
               />
               <TouchableOpacity
                 style={styles.loginButton}
@@ -179,7 +187,6 @@ function LandingPage() {
                   setRegistrationData({...registrationData, name: text})
                 }
                 ref={registerNameInputRef}
-                autoFocus={true}
               />
               <TextInput
                 style={styles.input}
