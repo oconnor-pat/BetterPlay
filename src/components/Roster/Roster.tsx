@@ -6,29 +6,26 @@ import {useNavigation, NavigationProp} from '@react-navigation/native';
 interface RosterItem {
   id: string;
   name: string;
-  email: string;
   attending: boolean;
   paid: boolean;
 }
 
 type RootStackParamList = {
-  Profile: {userId: string}; // Add other screens here
+  Profile: {userId: string};
   Roster: undefined;
 };
 
 // Mock data for testing
-const rosterData = [
+const rosterData: RosterItem[] = [
   {
     id: '1',
     name: 'John Doe',
-    email: 'john@example.com',
     attending: true,
     paid: false,
   },
   {
     id: '2',
     name: 'Jane Doe',
-    email: 'jane@example.com',
     attending: false,
     paid: true,
   },
@@ -65,6 +62,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#fff',
   },
+
+  attendingText: {
+    color: 'green',
+  },
+
+  notAttendingText: {
+    color: 'red',
+  },
+
+  paidText: {
+    color: 'green',
+  },
+
+  notPaidText: {
+    color: 'red',
+  },
+
   viewProfileButton: {
     backgroundColor: '#b11313',
     borderRadius: 5,
@@ -87,24 +101,27 @@ const Roster: React.FC = () => {
   };
 
   useEffect(() => {
-    // In a real app, you would fetch roster data from your backend
+    // TODO: eventually set up to use real roster data from backend
     setRoster(rosterData);
   }, []);
 
   const renderItem = ({item}: {item: RosterItem}) => (
-    <View style={styles.row}>
-      <Text style={styles.cell}>{item.name}</Text>
-      <Text style={styles.cell}>{item.email}</Text>
-      <Text style={styles.cell}>
-        {item.attending ? 'Attending' : 'Not Attending'}
-      </Text>
-      <Text style={styles.cell}>{item.paid ? 'Paid' : 'Not Paid'}</Text>
-      <TouchableOpacity
-        style={styles.viewProfileButton}
-        onPress={() => handleViewProfile(item.id)}>
-        <Text style={styles.buttonText}>View Profile</Text>
-      </TouchableOpacity>
-    </View>
+    <TouchableOpacity onPress={() => handleViewProfile(item.id)}>
+      <View style={styles.row}>
+        <Text style={styles.cell}>{item.name}</Text>
+        {item.attending ? (
+          <Text style={[styles.cell, styles.paidText]}>Attending</Text>
+        ) : (
+          <Text style={[styles.cell, styles.notPaidText]}>Not Attending</Text>
+        )}
+        {item.paid ? (
+          <Text style={[styles.cell, styles.paidText]}>Paid</Text>
+        ) : (
+          <Text style={[styles.cell, styles.notPaidText]}>Not Paid</Text>
+        )}
+        <Text style={styles.cell}>MM/DD/YYYY</Text>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -112,9 +129,9 @@ const Roster: React.FC = () => {
       {/* Header row */}
       <View style={styles.headerRow}>
         <Text style={styles.headerCell}>Name</Text>
-        <Text style={styles.headerCell}>Email</Text>
         <Text style={styles.headerCell}>Attending</Text>
         <Text style={styles.headerCell}>Paid</Text>
+        <Text style={styles.headerCell}>Next Session</Text>
       </View>
 
       {/* Roster data */}
