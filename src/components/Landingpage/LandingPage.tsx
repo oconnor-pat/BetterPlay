@@ -9,6 +9,12 @@ import {
   Platform,
   TouchableWithoutFeedback,
 } from 'react-native';
+import {NavigationProp, useNavigation} from '@react-navigation/native';
+
+// Interfaces
+type RootStackParamList = {
+  Roster: undefined;
+};
 
 // Styles
 const styles = StyleSheet.create({
@@ -92,6 +98,9 @@ function LandingPage() {
   const registerUsernameInputRef = useRef<TextInput>(null);
   const registerPasswordInputRef = useRef<TextInput>(null);
 
+  // Then use it like this:
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+
   useEffect(() => {
     if (showLoginForm) {
       if (loginUsernameInputRef.current) {
@@ -106,11 +115,61 @@ function LandingPage() {
   }, [showLoginForm, showRegisterForm]);
 
   const handleRegistration = async () => {
-    // Implement registration logic for React Native
+    try {
+      // Makes a POST request to the registration endpoint on server
+      const response = await fetch(
+        'https://bew-584382a4b042.herokuapp.com/auth/register',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(registrationData),
+        },
+      );
+
+      const responseData = await response.json();
+
+      // Handle the response, e.g., show success message or error
+      console.log(responseData);
+
+      // If registration is successful, navigate to Roster
+      if (responseData.success) {
+        navigation.navigate('Roster');
+      }
+    } catch (error) {
+      // Handle network errors or other exceptions
+      console.error('Error during registration:', error as Error);
+    }
   };
 
   const handleLogin = async () => {
-    // Implement login logic for React Native
+    try {
+      // Make a POST request to the login endpoint on your server
+      const response = await fetch(
+        'https://bew-584382a4b042.herokuapp.com/auth/login',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(loginData),
+        },
+      );
+
+      const responseData = await response.json();
+
+      // Handle the response, e.g., store user token in AsyncStorage or show error
+      console.log(responseData);
+
+      // If registration is successful, navigate to Roster
+      if (responseData.success) {
+        navigation.navigate('Roster');
+      }
+    } catch (error) {
+      // Handle network errors or other exceptions
+      console.error('Error during login:', (error as Error).message);
+    }
   };
 
   // Dismiss keyboard when user taps outside of a TextInput
