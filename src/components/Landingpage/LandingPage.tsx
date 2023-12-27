@@ -72,7 +72,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 10,
     padding: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#A9A9A9',
+  },
+  errorMessage: {
+    color: '#b11313',
+    marginTop: 10,
+  },
+  successMessage: {
+    color: '#447bbe',
+    marginTop: 10,
   },
 });
 
@@ -90,6 +98,10 @@ function LandingPage() {
     password: '',
   });
 
+  //Error messages
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   const loginUsernameInputRef = useRef<TextInput>(null);
   const loginPasswordInputRef = useRef<TextInput>(null);
 
@@ -100,6 +112,14 @@ function LandingPage() {
 
   // Then use it like this:
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+
+  // Reset form states when navigating away from this screen
+  useEffect(() => {
+    setShowLoginForm(false);
+    setShowRegisterForm(false);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }, [navigation]);
 
   useEffect(() => {
     if (showLoginForm) {
@@ -135,11 +155,22 @@ function LandingPage() {
 
       // If registration is successful, navigate to Roster
       if (responseData.success) {
+        setSuccessMessage('User created successfully!');
+        setErrorMessage(null);
         navigation.navigate('Roster');
+      } else {
+        if (responseData.message.includes('Email already in use')) {
+          setErrorMessage('Email already in use. Please use another email.');
+        } else {
+          setErrorMessage(responseData.message);
+        }
+        setSuccessMessage(null);
       }
     } catch (error) {
       // Handle network errors or other exceptions
       console.error('Error during registration:', error as Error);
+      setErrorMessage('Failed to create new user. Please try again.');
+      setSuccessMessage(null);
     }
   };
 
@@ -164,11 +195,18 @@ function LandingPage() {
 
       // If registration is successful, navigate to Roster
       if (responseData.success) {
+        setSuccessMessage('User logged in successfully!');
+        setErrorMessage(null);
         navigation.navigate('Roster');
+      } else {
+        setErrorMessage(responseData.message);
+        setSuccessMessage(null);
       }
     } catch (error) {
       // Handle network errors or other exceptions
       console.error('Error during login:', (error as Error).message);
+      setErrorMessage('Failed to login. Please try again.');
+      setSuccessMessage(null);
     }
   };
 
@@ -176,6 +214,8 @@ function LandingPage() {
   const dismissForms = () => {
     setShowLoginForm(false);
     setShowRegisterForm(false);
+    setErrorMessage(null);
+    setSuccessMessage(null);
   };
 
   return (
@@ -215,6 +255,7 @@ function LandingPage() {
                   setLoginData({...loginData, username: text})
                 }
                 ref={loginUsernameInputRef}
+                autoCapitalize="none"
               />
               <TextInput
                 style={styles.input}
@@ -225,6 +266,7 @@ function LandingPage() {
                   setLoginData({...loginData, password: text})
                 }
                 ref={loginPasswordInputRef}
+                autoCapitalize="none"
               />
               <TouchableOpacity
                 style={styles.loginButton}
@@ -246,6 +288,7 @@ function LandingPage() {
                   setRegistrationData({...registrationData, name: text})
                 }
                 ref={registerNameInputRef}
+                autoCapitalize="none"
               />
               <TextInput
                 style={styles.input}
@@ -255,6 +298,7 @@ function LandingPage() {
                   setRegistrationData({...registrationData, email: text})
                 }
                 ref={registerEmailInputRef}
+                autoCapitalize="none"
               />
               <TextInput
                 style={styles.input}
@@ -264,6 +308,7 @@ function LandingPage() {
                   setRegistrationData({...registrationData, username: text})
                 }
                 ref={registerUsernameInputRef}
+                autoCapitalize="none"
               />
               <TextInput
                 style={styles.input}
@@ -274,6 +319,7 @@ function LandingPage() {
                   setRegistrationData({...registrationData, password: text})
                 }
                 ref={registerPasswordInputRef}
+                autoCapitalize="none"
               />
               <TouchableOpacity
                 style={styles.registerButton}
@@ -283,6 +329,12 @@ function LandingPage() {
                 <Text style={styles.buttonText}>Register</Text>
               </TouchableOpacity>
             </View>
+          )}
+          {errorMessage && (
+            <Text style={styles.errorMessage}>{errorMessage}</Text>
+          )}
+          {successMessage && (
+            <Text style={styles.successMessage}>{successMessage}</Text>
           )}
         </View>
       </TouchableWithoutFeedback>
