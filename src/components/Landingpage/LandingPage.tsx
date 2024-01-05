@@ -13,7 +13,7 @@ import {NavigationProp, useNavigation} from '@react-navigation/native';
 
 // Interfaces
 type RootStackParamList = {
-  Roster: undefined;
+  Roster: {username: string};
 };
 
 // Styles
@@ -58,6 +58,18 @@ const styles = StyleSheet.create({
     width: 100,
     borderRadius: 10,
     backgroundColor: '#b11313',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginCancelButton: {
+    height: 35,
+    width: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  registerCancelButton: {
+    height: 35,
+    width: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -110,7 +122,7 @@ function LandingPage() {
   const registerUsernameInputRef = useRef<TextInput>(null);
   const registerPasswordInputRef = useRef<TextInput>(null);
 
-  // Then use it like this:
+  // Process login and registration
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   // Reset form states when navigating away from this screen
@@ -138,7 +150,7 @@ function LandingPage() {
     try {
       // Makes a POST request to the registration endpoint on server
       const response = await fetch(
-        'https://bew-584382a4b042.herokuapp.com/auth/register',
+        'https://omhl-be-9801a7de15ab.herokuapp.com/auth/register',
         {
           method: 'POST',
           headers: {
@@ -157,7 +169,7 @@ function LandingPage() {
       if (responseData.success) {
         setSuccessMessage('User created successfully!');
         setErrorMessage(null);
-        navigation.navigate('Roster');
+        navigation.navigate('Roster', {username: registrationData.username});
       } else {
         if (responseData.message.includes('Email already in use')) {
           setErrorMessage('Email already in use. Please use another email.');
@@ -178,7 +190,7 @@ function LandingPage() {
     try {
       // Make a POST request to the login endpoint on your server
       const response = await fetch(
-        'https://bew-584382a4b042.herokuapp.com/auth/login',
+        'https://omhl-be-9801a7de15ab.herokuapp.com/auth/login',
         {
           method: 'POST',
           headers: {
@@ -197,7 +209,7 @@ function LandingPage() {
       if (responseData.success) {
         setSuccessMessage('User logged in successfully!');
         setErrorMessage(null);
-        navigation.navigate('Roster');
+        navigation.navigate('Roster', {username: loginData.username});
       } else {
         setErrorMessage(responseData.message);
         setSuccessMessage(null);
@@ -218,6 +230,16 @@ function LandingPage() {
     setSuccessMessage(null);
   };
 
+  // Close each form and reset state
+  const cancelForm = () => {
+    setShowLoginForm(false);
+    setShowRegisterForm(false);
+    setLoginData({username: '', password: ''});
+    setRegistrationData({name: '', email: '', username: '', password: ''});
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -225,7 +247,7 @@ function LandingPage() {
       style={styles.container}>
       <TouchableWithoutFeedback onPress={dismissForms}>
         <View style={styles.container}>
-          <Text style={styles.title}>Welcome to Old Man Hockey!</Text>
+          <Text style={styles.title}>Welcome!</Text>
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={styles.loginButton}
@@ -274,6 +296,13 @@ function LandingPage() {
                   handleLogin();
                 }}>
                 <Text style={styles.buttonText}>Login</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.loginCancelButton}
+                onPress={() => {
+                  cancelForm();
+                }}>
+                <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -327,6 +356,13 @@ function LandingPage() {
                   handleRegistration();
                 }}>
                 <Text style={styles.buttonText}>Register</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.registerCancelButton}
+                onPress={() => {
+                  cancelForm();
+                }}>
+                <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           )}

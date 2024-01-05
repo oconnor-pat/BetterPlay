@@ -1,6 +1,11 @@
 import React, {useState, useEffect} from 'react';
 import {View, Text, FlatList, StyleSheet, TouchableOpacity} from 'react-native';
-import {useNavigation, NavigationProp} from '@react-navigation/native';
+import {
+  useNavigation,
+  NavigationProp,
+  useRoute,
+  RouteProp,
+} from '@react-navigation/native';
 
 // Interfaces
 interface RosterItem {
@@ -10,9 +15,9 @@ interface RosterItem {
   paid: boolean;
 }
 
-type RootStackParamList = {
+export type RootStackParamList = {
   Profile: {userId: string};
-  Roster: undefined;
+  Roster: {username: string};
 };
 
 // Mock data for testing
@@ -23,13 +28,6 @@ const rosterData: RosterItem[] = [
     attending: true,
     paid: false,
   },
-  {
-    id: '2',
-    name: 'Jane Doe',
-    attending: false,
-    paid: true,
-  },
-  // Add more data as needed
 ];
 
 // Styles
@@ -93,7 +91,15 @@ const Roster: React.FC = () => {
   // Initialize roster state with empty array of RosterItem
   const [roster, setRoster] = useState<RosterItem[]>([]);
 
+  // Get the navigation prop from the hook
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+
+  // Get the route prop from the hook
+  type RosterScreenRouteProp = RouteProp<RootStackParamList, 'Roster'>;
+
+  // Get the username from the route params
+  const route = useRoute<RosterScreenRouteProp>();
+  const {username} = route.params;
 
   const handleViewProfile = (userId: string) => {
     // Navigate to the profile component with the user ID
@@ -108,7 +114,7 @@ const Roster: React.FC = () => {
   const renderItem = ({item}: {item: RosterItem}) => (
     <TouchableOpacity onPress={() => handleViewProfile(item.id)}>
       <View style={styles.row}>
-        <Text style={styles.cell}>{item.name}</Text>
+        <Text style={styles.cell}>{username}</Text>
         {item.attending ? (
           <Text style={[styles.cell, styles.paidText]}>Attending</Text>
         ) : (
@@ -119,7 +125,7 @@ const Roster: React.FC = () => {
         ) : (
           <Text style={[styles.cell, styles.notPaidText]}>Not Paid</Text>
         )}
-        <Text style={styles.cell}>MM/DD/YYYY</Text>
+        <Text style={styles.cell}>MM/DD/YY</Text>
       </View>
     </TouchableOpacity>
   );
