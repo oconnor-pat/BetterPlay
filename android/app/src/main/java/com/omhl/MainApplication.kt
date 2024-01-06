@@ -1,4 +1,4 @@
-package com.omhl
+package com.BetterPlay
 
 import android.app.Application
 import com.facebook.react.PackageList
