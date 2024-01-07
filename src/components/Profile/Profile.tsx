@@ -17,8 +17,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#02131D',
   },
   avatar: {
-    width: 10,
-    height: 10,
+    width: 100,
+    height: 100,
     borderRadius: 50,
     marginBottom: 16,
   },
@@ -41,6 +41,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    textAlign: 'center',
   },
 });
 
