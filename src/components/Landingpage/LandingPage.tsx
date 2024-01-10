@@ -272,6 +272,7 @@ function LandingPage() {
               <TextInput
                 style={styles.input}
                 placeholder="Username"
+                placeholderTextColor={'#000'}
                 value={loginData.username}
                 onChangeText={text =>
                   setLoginData({...loginData, username: text})
@@ -282,6 +283,7 @@ function LandingPage() {
               <TextInput
                 style={styles.input}
                 placeholder="Password"
+                placeholderTextColor={'#000'}
                 secureTextEntry
                 value={loginData.password}
                 onChangeText={text =>
@@ -312,6 +314,7 @@ function LandingPage() {
               <TextInput
                 style={styles.input}
                 placeholder="Name"
+                placeholderTextColor={'#000'}
                 value={registrationData.name}
                 onChangeText={text =>
                   setRegistrationData({...registrationData, name: text})
@@ -322,6 +325,7 @@ function LandingPage() {
               <TextInput
                 style={styles.input}
                 placeholder="Email"
+                placeholderTextColor={'#000'}
                 value={registrationData.email}
                 onChangeText={text =>
                   setRegistrationData({...registrationData, email: text})
@@ -332,6 +336,7 @@ function LandingPage() {
               <TextInput
                 style={styles.input}
                 placeholder="Username"
+                placeholderTextColor={'#000'}
                 value={registrationData.username}
                 onChangeText={text =>
                   setRegistrationData({...registrationData, username: text})
@@ -342,6 +347,7 @@ function LandingPage() {
               <TextInput
                 style={styles.input}
                 placeholder="Password"
+                placeholderTextColor={'#000'}
                 secureTextEntry
                 value={registrationData.password}
                 onChangeText={text =>
