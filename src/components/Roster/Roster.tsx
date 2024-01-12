@@ -134,7 +134,7 @@ const Roster: React.FC = () => {
     <View style={styles.container}>
       {/* Header row */}
       <View style={styles.headerRow}>
-        <Text style={styles.headerCell}>Name</Text>
+        <Text style={styles.headerCell}>Username</Text>
         <Text style={styles.headerCell}>Attending</Text>
         <Text style={styles.headerCell}>Paid</Text>
         <Text style={styles.headerCell}>Next Session</Text>
