@@ -3,7 +3,7 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import Profile from '../BetterPlay/src/components/Profile/Profile';
 import Roster from '../BetterPlay/src/components/Roster/Roster';
-//import Discover from './components/Discover/Discover';
+import CommunityNotes from './src/components/Communitynotes/CommunityNotes';
 import LandingPage from '../BetterPlay/src/components/Landingpage/LandingPage';
 
 const Stack = createNativeStackNavigator();
@@ -25,7 +25,7 @@ function App() {
         <Stack.Screen name="BetterPlay" component={LandingPage} />
         <Stack.Screen name="Roster" component={Roster} />
         <Stack.Screen name="Profile" component={Profile} />
-        {/* <Stack.Screen name="Discover" component={Discover} /> */}
+        <Stack.Screen name="CommunityNotes" component={CommunityNotes} />
       </Stack.Navigator>
     </NavigationContainer>
   );

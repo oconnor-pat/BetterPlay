@@ -45,10 +45,11 @@ const styles = StyleSheet.create({
   },
 });
 
-const getUserData = async (userId: string) => {
+// Function to get the user data
+const fetchUserData = async (username: string) => {
   try {
     const response = await fetch(
-      `https://bew-584382a4b042.herokuapp.com/users/${userId}`,
+      `https://omhl-be-9801a7de15ab.herokuapp.com/_id/${username}`,
       {
         method: 'GET',
         headers: {
@@ -71,20 +72,20 @@ const getUserData = async (userId: string) => {
 
 const Profile: React.FC<{}> = () => {
   const route = useRoute<ProfileScreenRouteProp>();
-  const {userId} = route.params;
+  const {_id: username} = route.params;
 
   // State to manage the user data
   const [userData, setUserData] = useState<{
-    name: string;
+    username: string;
     email: string;
   } | null>(null);
 
   // Fetch the user data
   useEffect(() => {
-    getUserData(userId)
+    fetchUserData(username)
       .then(data => setUserData(data))
       .catch(error => console.error(error));
-  }, [userId]);
+  }, [username]);
 
   // State to manage the selected user image
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -136,7 +137,7 @@ const Profile: React.FC<{}> = () => {
         )}
 
         {/* User Name */}
-        <Text style={styles.userName}>{userData?.name}</Text>
+        <Text style={styles.userName}>{userData?.username}</Text>
 
         {/* Email Address */}
         <Text style={styles.emailText}>{userData?.email}</Text>

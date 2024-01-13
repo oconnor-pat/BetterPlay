@@ -1,34 +1,25 @@
 import React, {useState, useEffect} from 'react';
 import {View, Text, FlatList, StyleSheet, TouchableOpacity} from 'react-native';
-import {
-  useNavigation,
-  NavigationProp,
-  useRoute,
-  RouteProp,
-} from '@react-navigation/native';
+import {useNavigation, NavigationProp} from '@react-navigation/native';
 
 // Interfaces
 interface RosterItem {
   id: string;
-  name: string;
-  attending: boolean;
-  paid: boolean;
+  username: string;
+  attending: string;
+  paid: string;
+  nextSession: string;
+}
+
+interface User {
+  _id: string;
+  username: string;
 }
 
 export type RootStackParamList = {
-  Profile: {userId: string};
-  Roster: {username: string};
+  Profile: {_id: any};
+  Roster: undefined;
 };
-
-// Mock data for testing
-const rosterData: RosterItem[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    attending: true,
-    paid: false,
-  },
-];
 
 // Styles
 const styles = StyleSheet.create({
@@ -87,6 +78,39 @@ const styles = StyleSheet.create({
   },
 });
 
+// Function to get the roster data
+const fetchRosterData = async () => {
+  try {
+    const response = await fetch(
+      'https://omhl-be-9801a7de15ab.herokuapp.com/users',
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    // Add mock data for the other fields
+    const rosterWithMockData = data.users.map((user: User) => ({
+      id: user._id,
+      username: user.username,
+      attending: 'Yes',
+      paid: 'No',
+      nextSession: 'Session 1',
+    }));
+    return rosterWithMockData;
+  } catch (error) {
+    console.error('Error fetching roster data:', error);
+    throw error;
+  }
+};
+
 const Roster: React.FC = () => {
   // Initialize roster state with empty array of RosterItem
   const [roster, setRoster] = useState<RosterItem[]>([]);
@@ -94,38 +118,24 @@ const Roster: React.FC = () => {
   // Get the navigation prop from the hook
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
-  // Get the route prop from the hook
-  type RosterScreenRouteProp = RouteProp<RootStackParamList, 'Roster'>;
-
-  // Get the username from the route params
-  const route = useRoute<RosterScreenRouteProp>();
-  const {username} = route.params;
-
-  const handleViewProfile = (userId: string) => {
+  const handleViewProfile = (_id: any) => {
     // Navigate to the profile component with the user ID
-    navigation.navigate('Profile', {userId});
+    navigation.navigate('Profile', {_id});
   };
 
   useEffect(() => {
-    // TODO: eventually set up to use real roster data from backend
-    setRoster(rosterData);
+    fetchRosterData()
+      .then(data => setRoster(data))
+      .catch(error => console.error(error));
   }, []);
 
   const renderItem = ({item}: {item: RosterItem}) => (
     <TouchableOpacity onPress={() => handleViewProfile(item.id)}>
       <View style={styles.row}>
-        <Text style={styles.cell}>{username}</Text>
-        {item.attending ? (
-          <Text style={[styles.cell, styles.paidText]}>Attending</Text>
-        ) : (
-          <Text style={[styles.cell, styles.notPaidText]}>Not Attending</Text>
-        )}
-        {item.paid ? (
-          <Text style={[styles.cell, styles.paidText]}>Paid</Text>
-        ) : (
-          <Text style={[styles.cell, styles.notPaidText]}>Not Paid</Text>
-        )}
-        <Text style={styles.cell}>MM/DD/YY</Text>
+        <Text style={styles.cell}>{item.username}</Text>
+        <Text style={styles.cell}>{item.attending}</Text>
+        <Text style={styles.cell}>{item.paid}</Text>
+        <Text style={styles.cell}>{item.nextSession}</Text>
       </View>
     </TouchableOpacity>
   );
