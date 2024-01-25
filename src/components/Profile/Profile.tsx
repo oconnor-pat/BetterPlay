@@ -1,6 +1,6 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity} from 'react-native';
-import {useRoute, RouteProp} from '@react-navigation/native';
+import {useRoute, RouteProp, useFocusEffect} from '@react-navigation/native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
 import {RootStackParamList} from '../Roster/Roster';
@@ -81,11 +81,13 @@ const Profile: React.FC<{}> = () => {
   } | null>(null);
 
   // Fetch the user data
-  useEffect(() => {
-    fetchUserData(username)
-      .then(data => setUserData(data))
-      .catch(error => console.error(error));
-  }, [username]);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUserData(username)
+        .then(data => setUserData(data))
+        .catch(error => console.error(error));
+    }, [username]),
+  );
 
   // State to manage the selected user image
   const [selectedImage, setSelectedImage] = useState<string | null>(null);

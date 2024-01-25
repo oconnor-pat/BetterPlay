@@ -23,18 +23,23 @@ interface Post {
 const styles = StyleSheet.create({
   container: {
     padding: 20,
+    backgroundColor: '#02131D',
+    flex: 1,
   },
   title: {
     fontSize: 24,
     marginBottom: 20,
+    color: '#fff',
   },
   postContainer: {
     marginVertical: 10,
     padding: 20,
+    backgroundColor: '#333',
   },
   postText: {
     fontSize: 18,
     marginBottom: 5,
+    color: '#fff',
   },
   commentInput: {
     height: 30,
@@ -42,6 +47,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 5,
     padding: 5,
+    color: '#fff',
   },
   commentContainer: {
     marginLeft: 10,
