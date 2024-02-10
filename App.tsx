@@ -33,22 +33,11 @@ function App() {
               name="LandingPage"
               component={LandingPage}
               options={{headerShown: false}}
-              initialParams={{setUserData: setUserData}}
             />
             <Stack.Screen
-              name="Roster"
+              name="Main"
               component={BottomNavBar}
               options={{headerBackTitle: 'Sign Out', headerTitle: ''}}
-            />
-            <Stack.Screen
-              name="Profile"
-              component={BottomNavBar}
-              options={{headerBackTitle: 'Sign Out'}}
-            />
-            <Stack.Screen
-              name="CommunityNotes"
-              component={BottomNavBar}
-              options={{headerBackTitle: 'Sign Out'}}
             />
           </Stack.Navigator>
         </NavigationContainer>

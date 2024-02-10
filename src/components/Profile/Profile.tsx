@@ -46,10 +46,10 @@ const styles = StyleSheet.create({
 });
 
 // Function to get the user data
-const fetchUserData = async (username: string) => {
+const fetchUserData = async (_id: string) => {
   try {
     const response = await fetch(
-      `https://omhl-be-9801a7de15ab.herokuapp.com/_id/${username}`,
+      `https://omhl-be-9801a7de15ab.herokuapp.com/_id/${_id}`,
       {
         method: 'GET',
         headers: {
@@ -72,7 +72,7 @@ const fetchUserData = async (username: string) => {
 
 const Profile: React.FC<{}> = () => {
   const route = useRoute<ProfileScreenRouteProp>();
-  const {_id: username} = route.params;
+  const {_id} = route.params;
 
   // State to manage the user data
   const [userData, setUserData] = useState<{
@@ -83,10 +83,10 @@ const Profile: React.FC<{}> = () => {
   // Fetch the user data
   useFocusEffect(
     React.useCallback(() => {
-      fetchUserData(username)
-        .then(data => setUserData(data))
+      fetchUserData(_id)
+        .then(data => setUserData({username: data.username, email: data.email}))
         .catch(error => console.error(error));
-    }, [username]),
+    }, [_id]),
   );
 
   // State to manage the selected user image

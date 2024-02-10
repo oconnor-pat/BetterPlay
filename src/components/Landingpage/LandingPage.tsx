@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect} from 'react';
+import React, {useState, useRef, useEffect, useContext} from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,12 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
+import UserContext from '../UserContext';
 
 // Interfaces
 type RootStackParamList = {
   Roster: {username: string};
+  Main: {screen: string; params: {username: string}};
 };
 
 // Styles
@@ -97,6 +99,15 @@ const styles = StyleSheet.create({
 });
 
 function LandingPage() {
+  // User context
+  const userContext = useContext(UserContext);
+
+  if (!userContext) {
+    throw new Error('LandingPage must be used within a UserProvider');
+  }
+
+  const {setUserData} = userContext;
+
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [registrationData, setRegistrationData] = useState({
@@ -169,7 +180,11 @@ function LandingPage() {
       if (responseData.success) {
         setSuccessMessage('User created successfully!');
         setErrorMessage(null);
-        navigation.navigate('Roster', {username: registrationData.username});
+        setUserData(responseData.user);
+        navigation.navigate('Main', {
+          screen: 'Profile',
+          params: {username: registrationData.username},
+        });
       } else {
         if (responseData.message.includes('Email already in use')) {
           setErrorMessage('Email already in use. Please use another email.');
@@ -209,7 +224,11 @@ function LandingPage() {
       if (responseData.success) {
         setSuccessMessage('User logged in successfully!');
         setErrorMessage(null);
-        navigation.navigate('Roster', {username: loginData.username});
+        setUserData(responseData.user);
+        navigation.navigate('Main', {
+          screen: 'Roster',
+          params: {username: loginData.username},
+        });
       } else {
         setErrorMessage(responseData.message);
         setSuccessMessage(null);
