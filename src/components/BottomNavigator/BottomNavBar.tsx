@@ -55,7 +55,11 @@ const BottomNavBar: React.FC = () => {
   return (
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Roster" component={Roster} />
-      <Tab.Screen name="Profile" component={Profile} />
+      <Tab.Screen
+        name="Profile"
+        component={Profile}
+        initialParams={{_id: 'your_username'}} // replace 'your_username' with the actual username
+      />
       <Tab.Screen name="CommunityNotes" component={CommunityNotes} />
     </Tab.Navigator>
   );
