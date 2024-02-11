@@ -1,12 +1,8 @@
-import React, {useState} from 'react';
+import React, {useContext, useState} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity} from 'react-native';
-import {useRoute, RouteProp, useFocusEffect} from '@react-navigation/native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
-import {RootStackParamList} from '../Roster/Roster';
-
-// Types
-type ProfileScreenRouteProp = RouteProp<RootStackParamList, 'Profile'>;
+import UserContext, {UserContextType} from '../UserContext';
 
 // Styles
 const styles = StyleSheet.create({
@@ -26,12 +22,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#fff',
+    color: '#333',
+    backgroundColor: '#fff',
   },
   emailText: {
     fontSize: 16,
     marginBottom: 16,
-    color: '#fff',
+    color: '#333',
+    backgroundColor: '#fff',
   },
   changePhotoButton: {
     backgroundColor: '#b11313',
@@ -45,49 +43,9 @@ const styles = StyleSheet.create({
   },
 });
 
-// Function to get the user data
-const fetchUserData = async (_id: string) => {
-  try {
-    const response = await fetch(
-      `https://omhl-be-9801a7de15ab.herokuapp.com/_id/${_id}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error fetching user data:', error);
-    throw error;
-  }
-};
-
 const Profile: React.FC<{}> = () => {
-  const route = useRoute<ProfileScreenRouteProp>();
-  const {_id} = route.params;
-
-  // State to manage the user data
-  const [userData, setUserData] = useState<{
-    username: string;
-    email: string;
-  } | null>(null);
-
-  // Fetch the user data
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchUserData(_id)
-        .then(data => setUserData({username: data.username, email: data.email}))
-        .catch(error => console.error(error));
-    }, [_id]),
-  );
+  // Access the user data from the context
+  const {userData} = useContext(UserContext) as UserContextType;
 
   // State to manage the selected user image
   const [selectedImage, setSelectedImage] = useState<string | null>(null);

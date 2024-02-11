@@ -2,9 +2,11 @@ import React from 'react';
 
 type UserData = {
   _id: string;
+  username: string;
+  email: string;
 };
 
-interface UserContextType {
+export interface UserContextType {
   userData: UserData | null;
   setUserData: React.Dispatch<React.SetStateAction<UserData | null>>;
 }

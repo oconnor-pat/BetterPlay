@@ -9,12 +9,14 @@ import UserContext from './src/components/UserContext';
 // Types
 type UserData = {
   _id: string;
+  username: string;
+  email: string;
 };
 
 const Stack = createStackNavigator();
 
 function App() {
-  // User context
+  // State to manage the user data
   const [userData, setUserData] = useState<UserData | null>(null);
 
   return (
