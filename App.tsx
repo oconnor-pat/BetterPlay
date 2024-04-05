@@ -2,9 +2,9 @@ import React, {useState} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import LandingPage from './src/components/Landingpage/LandingPage';
-import BottomNavBar from './src/components/BottomNavigator/BottomNavBar';
 import {StatusBar} from 'react-native';
 import UserContext from './src/components/UserContext';
+import BottomNavigator from './src/components/BottomNavigator/BottomNavigator';
 
 // Types
 type UserData = {
@@ -37,9 +37,9 @@ function App() {
               options={{headerShown: false}}
             />
             <Stack.Screen
-              name="Main"
-              component={BottomNavBar}
-              options={{headerBackTitle: 'Sign Out', headerTitle: ''}}
+              name="BottomNavigator"
+              component={BottomNavigator}
+              options={{headerShown: false}}
             />
           </Stack.Navigator>
         </NavigationContainer>

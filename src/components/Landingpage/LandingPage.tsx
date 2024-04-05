@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 import UserContext from '../UserContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Interfaces
 type RootStackParamList = {
   Roster: {username: string};
-  Main: {screen: string; params: {username: string}};
+  BottomNavigator: {screen: string; params: {username: string}};
 };
 
 // Styles
@@ -106,7 +107,7 @@ function LandingPage() {
     throw new Error('LandingPage must be used within a UserProvider');
   }
 
-  const {setUserData} = userContext;
+  const {userData, setUserData} = userContext;
 
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
@@ -171,6 +172,7 @@ function LandingPage() {
         },
       );
 
+      // Parse the response
       const responseData = await response.json();
 
       // Handle the response, e.g., show success message or error
@@ -178,10 +180,13 @@ function LandingPage() {
 
       // If registration is successful, navigate to Roster
       if (responseData.success) {
+        // Store JWT token in AsyncStorage
+        await AsyncStorage.setItem('userToken', responseData.token);
+
         setSuccessMessage('User created successfully!');
         setErrorMessage(null);
         setUserData(responseData.user);
-        navigation.navigate('Main', {
+        navigation.navigate('BottomNavigator', {
           screen: 'Profile',
           params: {username: registrationData.username},
         });
@@ -199,6 +204,12 @@ function LandingPage() {
       setErrorMessage('Failed to create new user. Please try again.');
       setSuccessMessage(null);
     }
+    setUserData({
+      ...userData,
+      username: registrationData.username,
+      email: registrationData.email,
+      _id: '',
+    });
   };
 
   const handleLogin = async () => {
@@ -217,26 +228,46 @@ function LandingPage() {
 
       const responseData = await response.json();
 
-      // Handle the response, e.g., store user token in AsyncStorage or show error
-      console.log(responseData);
+      // Log the response data and token to the console
+      console.log('Response data:', responseData);
+      console.log('Token:', responseData.token);
 
-      // If registration is successful, navigate to Roster
+      // If login is successful, navigate to Roster
       if (responseData.success) {
+        // Check if token exists in the response
+        if (!responseData.token) {
+          console.error('No token in response', responseData);
+          return;
+        }
+
+        // Store JWT token in AsyncStorage
+        await AsyncStorage.setItem('userToken', responseData.token);
+
         setSuccessMessage('User logged in successfully!');
         setErrorMessage(null);
-        setUserData(responseData.user);
-        navigation.navigate('Main', {
+
+        // Update the user context
+        setUserData({
+          ...userData,
+          ...responseData.user,
+        });
+
+        // Navigate to Roster
+        navigation.navigate('BottomNavigator', {
           screen: 'Roster',
           params: {username: loginData.username},
         });
       } else {
-        setErrorMessage(responseData.message);
+        // Handle login failure
+        setErrorMessage(
+          responseData.message || 'Failed to log in. Please try again.',
+        );
         setSuccessMessage(null);
       }
     } catch (error) {
       // Handle network errors or other exceptions
-      console.error('Error during login:', (error as Error).message);
-      setErrorMessage('Failed to login. Please try again.');
+      console.error('Error during login:', error);
+      setErrorMessage('Failed to log in. Please try again.');
       setSuccessMessage(null);
     }
   };

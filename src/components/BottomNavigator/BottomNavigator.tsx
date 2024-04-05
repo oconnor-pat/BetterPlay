@@ -51,7 +51,7 @@ const screenOptions = ({route}: {route: any}) => ({
   ),
 });
 
-const BottomNavBar: React.FC = () => {
+const BottomNavigator: React.FC = () => {
   return (
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Roster" component={Roster} />
@@ -65,4 +65,4 @@ const BottomNavBar: React.FC = () => {
   );
 };
 
-export default BottomNavBar;
+export default BottomNavigator;

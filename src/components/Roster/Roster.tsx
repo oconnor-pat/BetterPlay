@@ -1,6 +1,9 @@
 import React, {useState, useEffect} from 'react';
 import {View, Text, FlatList, StyleSheet, TouchableOpacity} from 'react-native';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import CustomHeader from '../CustomHeader';
+import {LandingPageParamList} from '../CustomHeader';
 
 // Interfaces
 interface RosterItem {
@@ -76,6 +79,11 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
   },
+  customHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
 });
 
 // Function to get the roster data
@@ -117,6 +125,9 @@ const Roster: React.FC = () => {
 
   // Get the navigation prop from the hook
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  // Get the navigation prop from the hook for the custom header
+  const LaningPageNavigation =
+    useNavigation<NavigationProp<LandingPageParamList>>();
 
   const handleViewProfile = (_id: any) => {
     // Navigate to the profile component with the user ID
@@ -141,7 +152,11 @@ const Roster: React.FC = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <CustomHeader
+        navigation={LaningPageNavigation}
+        style={styles.customHeader}
+      />
       {/* Header row */}
       <View style={styles.headerRow}>
         <Text style={styles.headerCell}>Username</Text>
@@ -156,7 +171,7 @@ const Roster: React.FC = () => {
         renderItem={renderItem}
         keyExtractor={item => item.id}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 

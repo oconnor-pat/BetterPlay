@@ -9,6 +9,10 @@ import {
   FlatList,
   StyleSheet,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import CustomHeader from '../CustomHeader';
+import {LandingPageParamList} from '../CustomHeader';
+import {NavigationProp, useNavigation} from '@react-navigation/native';
 
 interface Comment {
   text: string;
@@ -58,6 +62,10 @@ const CommunityNotes: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPostText, setNewPostText] = useState<string>('');
 
+  // Navigation
+  const LandingPageNavigation =
+    useNavigation<NavigationProp<LandingPageParamList>>();
+
   const addPost = () => {
     if (newPostText.trim() !== '') {
       setPosts([...posts, {id: Date.now(), text: newPostText, comments: []}]);
@@ -76,7 +84,8 @@ const CommunityNotes: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <CustomHeader navigation={LandingPageNavigation} />
       <Text style={styles.title}>Community Notes</Text>
 
       <TextInput
@@ -110,7 +119,7 @@ const CommunityNotes: React.FC = () => {
           </View>
         )}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 

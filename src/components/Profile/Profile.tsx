@@ -3,6 +3,10 @@ import {View, Text, StyleSheet, Image, TouchableOpacity} from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
 import UserContext, {UserContextType} from '../UserContext';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import CustomHeader from '../CustomHeader';
+import {LandingPageParamList} from '../CustomHeader';
+import {NavigationProp, useNavigation} from '@react-navigation/native';
 
 // Styles
 const styles = StyleSheet.create({
@@ -22,14 +26,16 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
+    color: 'red',
     backgroundColor: '#fff',
+    padding: 10,
   },
   emailText: {
     fontSize: 16,
     marginBottom: 16,
-    color: '#333',
+    color: 'red',
     backgroundColor: '#fff',
+    padding: 10,
   },
   changePhotoButton: {
     backgroundColor: '#b11313',
@@ -46,9 +52,14 @@ const styles = StyleSheet.create({
 const Profile: React.FC<{}> = () => {
   // Access the user data from the context
   const {userData} = useContext(UserContext) as UserContextType;
+  console.log(userData);
 
   // State to manage the selected user image
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  // Navigation
+  const LandingPageNavigation =
+    useNavigation<NavigationProp<LandingPageParamList>>();
 
   // Function to handle the image picker
   const handleChoosePhoto = () => {
@@ -89,7 +100,8 @@ const Profile: React.FC<{}> = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <CustomHeader navigation={LandingPageNavigation} />
       <View>
         {/* Avatar */}
         {selectedImage && (
@@ -116,7 +128,7 @@ const Profile: React.FC<{}> = () => {
           <Text style={styles.buttonText}>Take Photo</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
