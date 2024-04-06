@@ -1,4 +1,4 @@
-import React, {useContext, useState} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity} from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
@@ -6,7 +6,15 @@ import UserContext, {UserContextType} from '../UserContext';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import CustomHeader from '../CustomHeader';
 import {LandingPageParamList} from '../CustomHeader';
-import {NavigationProp, useNavigation} from '@react-navigation/native';
+import {
+  NavigationProp,
+  useNavigation,
+  useRoute,
+  RouteProp,
+} from '@react-navigation/native';
+
+// Types
+type ProfileScreenRouteProp = RouteProp<{Profile: {_id: string}}, 'Profile'>;
 
 // Styles
 const styles = StyleSheet.create({
@@ -50,9 +58,30 @@ const styles = StyleSheet.create({
 });
 
 const Profile: React.FC<{}> = () => {
+  // Inside your Profile component
+  const route = useRoute<ProfileScreenRouteProp>();
+  const {_id} = route.params;
+
   // Access the user data from the context
-  const {userData} = useContext(UserContext) as UserContextType;
+  const {userData, setUserData} = useContext(UserContext) as UserContextType;
   console.log(userData);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const response = await fetch(
+        'https://omhl-be-9801a7de15ab.herokuapp.com/users',
+      );
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        const foundUser = data.find((user: any) => user._id === _id);
+        setUserData(foundUser);
+      } else {
+        console.log('Error fetching data');
+      }
+    };
+
+    fetchUserData();
+  }, [_id, setUserData, userData]);
 
   // State to manage the selected user image
   const [selectedImage, setSelectedImage] = useState<string | null>(null);

@@ -129,9 +129,9 @@ const Roster: React.FC = () => {
   const LaningPageNavigation =
     useNavigation<NavigationProp<LandingPageParamList>>();
 
-  const handleViewProfile = (_id: any) => {
+  const handleViewProfile = (userId: string) => {
     // Navigate to the profile component with the user ID
-    navigation.navigate('Profile', {_id});
+    navigation.navigate('Profile', {_id: userId});
   };
 
   useEffect(() => {

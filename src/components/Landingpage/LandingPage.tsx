@@ -234,6 +234,8 @@ function LandingPage() {
 
       // If login is successful, navigate to Roster
       if (responseData.success) {
+        // Save user data to context
+        setUserData(responseData.user);
         // Check if token exists in the response
         if (!responseData.token) {
           console.error('No token in response', responseData);
@@ -245,12 +247,6 @@ function LandingPage() {
 
         setSuccessMessage('User logged in successfully!');
         setErrorMessage(null);
-
-        // Update the user context
-        setUserData({
-          ...userData,
-          ...responseData.user,
-        });
 
         // Navigate to Roster
         navigation.navigate('BottomNavigator', {
