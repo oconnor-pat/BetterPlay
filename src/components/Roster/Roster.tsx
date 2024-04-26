@@ -56,19 +56,27 @@ const styles = StyleSheet.create({
   },
 
   attendingText: {
+    flex: 1,
     color: 'green',
+    textAlign: 'center',
   },
 
   notAttendingText: {
+    flex: 1,
     color: 'red',
+    textAlign: 'center',
   },
 
   paidText: {
+    flex: 1,
     color: 'green',
+    textAlign: 'center',
   },
 
   notPaidText: {
+    flex: 1,
     color: 'red',
+    textAlign: 'center',
   },
 
   viewProfileButton: {
@@ -144,8 +152,22 @@ const Roster: React.FC = () => {
     <TouchableOpacity onPress={() => handleViewProfile(item.id)}>
       <View style={styles.row}>
         <Text style={styles.cell}>{item.username}</Text>
-        <Text style={styles.cell}>{item.attending}</Text>
-        <Text style={styles.cell}>{item.paid}</Text>
+        <Text
+          style={
+            item.attending.toLowerCase() === 'yes'
+              ? styles.attendingText
+              : styles.notAttendingText
+          }>
+          {item.attending}
+        </Text>
+        <Text
+          style={
+            item.paid.toLowerCase() === 'yes'
+              ? styles.paidText
+              : styles.notPaidText
+          }>
+          {item.paid}
+        </Text>
         <Text style={styles.cell}>{item.nextSession}</Text>
       </View>
     </TouchableOpacity>

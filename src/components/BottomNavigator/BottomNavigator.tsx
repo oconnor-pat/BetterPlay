@@ -10,6 +10,8 @@ import {
   faStickyNote,
   faQuestion,
 } from '@fortawesome/free-solid-svg-icons';
+import {useContext} from 'react';
+import UserContext from '../UserContext';
 
 const Tab = createBottomTabNavigator();
 
@@ -52,13 +54,15 @@ const screenOptions = ({route}: {route: any}) => ({
 });
 
 const BottomNavigator: React.FC = () => {
+  const userId = useContext(UserContext);
+
   return (
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Roster" component={Roster} />
       <Tab.Screen
         name="Profile"
         component={Profile}
-        initialParams={{_id: 'your_username'}} // replace 'your_username' with the actual username
+        initialParams={{_id: userId}}
       />
       <Tab.Screen name="CommunityNotes" component={CommunityNotes} />
     </Tab.Navigator>

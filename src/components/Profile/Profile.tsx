@@ -12,9 +12,14 @@ import {
   useRoute,
   RouteProp,
 } from '@react-navigation/native';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types
-type ProfileScreenRouteProp = RouteProp<{Profile: {_id: string}}, 'Profile'>;
+type ProfileScreenRouteProp = RouteProp<
+  {Profile: {_id: string; username: string; email: string}},
+  'Profile'
+>;
 
 // Styles
 const styles = StyleSheet.create({
@@ -58,6 +63,8 @@ const styles = StyleSheet.create({
 });
 
 const Profile: React.FC<{}> = () => {
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
   // Inside your Profile component
   const route = useRoute<ProfileScreenRouteProp>();
   const {_id} = route.params;
@@ -68,27 +75,71 @@ const Profile: React.FC<{}> = () => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const response = await fetch(
-        'https://omhl-be-9801a7de15ab.herokuapp.com/users',
-      );
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        const foundUser = data.find((user: any) => user._id === _id);
-        setUserData(foundUser);
-      } else {
-        console.log('Error fetching data');
+      if (!_id) {
+        console.log('Invalid user ID');
+        return;
+      }
+
+      console.log('Fetching user data for ID:', _id); // Log the user ID
+
+      try {
+        const response = await fetch(
+          `https://omhl-be-9801a7de15ab.herokuapp.com/user/${_id}`,
+        );
+        const data = await response.json(); // Parse the JSON data
+
+        console.log('Fetch response:', data); // Log the parsed data
+
+        if (data.user) {
+          setUserData(data.user);
+          setSelectedImage(data.user.profilePicUrl);
+        } else {
+          console.log('User not found');
+        }
+      } catch (error) {
+        console.error('Error during fetch:', error); // Log any errors during the fetch
       }
     };
 
     fetchUserData();
-  }, [_id, setUserData, userData]);
-
-  // State to manage the selected user image
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  }, [_id, setUserData, setSelectedImage]);
 
   // Navigation
   const LandingPageNavigation =
     useNavigation<NavigationProp<LandingPageParamList>>();
+
+  // Function to update the user's profile picture
+  const updateUserProfilePic = (imageUrl: string) => {
+    axios
+      .put(`https://omhl-be-9801a7de15ab.herokuapp.com/users/${_id}`, {
+        profilePicUrl: imageUrl,
+      })
+      .then(response => {
+        // The user's data has been updated
+        console.log('User data updated: ', response.data);
+
+        // Merge the server's response with the existing user data
+        const updatedUserData = {
+          ...userData,
+          ...response.data,
+          profilePicUrl: imageUrl,
+        };
+
+        // Update the user data in the context
+        setUserData(updatedUserData);
+
+        // Save the profile picture URL to AsyncStorage
+        AsyncStorage.setItem('@profilePicUrl', imageUrl).catch(error => {
+          console.log(
+            'Error saving profile picture URL to AsyncStorage: ',
+            error,
+          );
+        });
+      })
+      .catch(error => {
+        console.log('Error updating user data: ', error);
+      });
+  };
 
   // Function to handle the image picker
   const handleChoosePhoto = () => {
@@ -104,12 +155,65 @@ const Profile: React.FC<{}> = () => {
         const firstAsset = response.assets[0];
         if (firstAsset && firstAsset.uri) {
           setSelectedImage(firstAsset.uri);
+
+          // Create a new FormData object
+          let formData = new FormData();
+          formData.append('image', {
+            uri: firstAsset.uri,
+            type: 'image/jpeg', // or 'image/png'
+            name: 'userProfilePic.jpg', // or '.png'
+          });
+
+          // Upload the image
+          axios
+            .post(
+              'https://omhl-be-9801a7de15ab.herokuapp.com/upload',
+              formData,
+              {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                },
+              },
+            )
+            .then(uploadResponse => {
+              // The image has been uploaded, and the server has returned a URL
+              const imageUrl = uploadResponse.data.url;
+
+              // Store the image URL in the state
+              setSelectedImage(imageUrl);
+
+              // Update the user's profile picture
+              updateUserProfilePic(imageUrl);
+            })
+            .catch(error => {
+              console.log('Error uploading image: ', error);
+            });
         }
       }
     });
   };
 
-  // Function to handle the camera
+  // Get the user profile picture URL from AsyncStorage
+  useEffect(() => {
+    // Get the profile picture URL from AsyncStorage
+    const getProfilePictureUrl = async () => {
+      try {
+        const url = await AsyncStorage.getItem('@profilePicUrl');
+        if (url !== null) {
+          setSelectedImage(url);
+        }
+      } catch (error) {
+        console.log(
+          'Error getting profile picture URL from AsyncStorage: ',
+          error,
+        );
+      }
+    };
+
+    getProfilePictureUrl();
+  }, [_id]);
+
+  // Function to handle taking a photo
   const handleTakePhoto = () => {
     const options: ImagePicker.CameraOptions = {
       mediaType: 'photo',
@@ -123,6 +227,39 @@ const Profile: React.FC<{}> = () => {
         const firstAsset = response.assets[0];
         if (firstAsset && firstAsset.uri) {
           setSelectedImage(firstAsset.uri);
+
+          // New FormData object
+          let formData = new FormData();
+          formData.append('image', {
+            uri: firstAsset.uri,
+            type: 'image/jpeg',
+            name: 'userProfilePic.jpg',
+          });
+
+          // Upload the image
+          axios
+            .post(
+              'https://omhl-be-9801a7de15ab.herokuapp.com/upload',
+              formData,
+              {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                },
+              },
+            )
+            .then(uploadResponse => {
+              // The image has been uploaded, and the server has returned a URL
+              const imageUrl = uploadResponse.data.url;
+
+              // Store the image URL in the state
+              setSelectedImage(imageUrl);
+
+              // Update the user's profile picture
+              updateUserProfilePic(imageUrl);
+            })
+            .catch(error => {
+              console.log('Error uploading image: ', error);
+            });
         }
       }
     });

@@ -16,7 +16,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Interfaces
 type RootStackParamList = {
   Roster: {username: string};
-  BottomNavigator: {screen: string; params: {username: string}};
+  BottomNavigator: {
+    screen: string;
+    params: {
+      Profile: {_id: string; username: string; email: string};
+    };
+  };
 };
 
 // Styles
@@ -188,7 +193,13 @@ function LandingPage() {
         setUserData(responseData.user);
         navigation.navigate('BottomNavigator', {
           screen: 'Profile',
-          params: {username: registrationData.username},
+          params: {
+            Profile: {
+              _id: responseData.user._id,
+              username: responseData.user.username,
+              email: responseData.user.email,
+            },
+          },
         });
       } else {
         if (responseData.message.includes('Email already in use')) {
@@ -251,7 +262,13 @@ function LandingPage() {
         // Navigate to Roster
         navigation.navigate('BottomNavigator', {
           screen: 'Roster',
-          params: {username: loginData.username},
+          params: {
+            Profile: {
+              _id: responseData.user._id,
+              username: loginData.username,
+              email: responseData.user.email,
+            },
+          },
         });
       } else {
         // Handle login failure
