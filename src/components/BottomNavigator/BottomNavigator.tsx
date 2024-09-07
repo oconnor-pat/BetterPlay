@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useContext} from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import Roster from '../Roster/Roster';
 import Profile from '../Profile/Profile';
@@ -10,35 +10,31 @@ import {
   faStickyNote,
   faQuestion,
 } from '@fortawesome/free-solid-svg-icons';
-import {useContext} from 'react';
+import {UserContextType} from '../UserContext';
 import UserContext from '../UserContext';
+import {IconDefinition} from '@fortawesome/fontawesome-svg-core';
 
+// Tab Navigator
 const Tab = createBottomTabNavigator();
 
-const iconMap: Record<string, any> = {
+// Icon Mapping
+const iconMap: Record<string, IconDefinition> = {
   Roster: faUsers,
   Profile: faUser,
   CommunityNotes: faStickyNote,
 };
 
-const TabBarIcon = (props: {icon: any; color: string; size: number}) => {
+// Tab Icon Component
+const TabBarIcon = (props: {
+  icon: IconDefinition;
+  color: string;
+  size: number;
+}) => {
   const {icon, color, size} = props;
   return <FontAwesomeIcon icon={icon} size={size} color={color} />;
 };
 
-const TabBarIconComponent = ({
-  route,
-  color,
-  size,
-}: {
-  route: any;
-  color: string;
-  size: number;
-}) => {
-  const icon = iconMap[route.name] || faQuestion;
-  return <TabBarIcon icon={icon} color={color} size={size} />;
-};
-
+// Screen Options for Tab Navigator
 const screenOptions = ({route}: {route: any}) => ({
   headerShown: false,
   tabBarLabel: () => null,
@@ -48,13 +44,22 @@ const screenOptions = ({route}: {route: any}) => ({
     paddingBottom: 10,
     paddingTop: 10,
   },
-  tabBarIcon: (props: {color: string; size: number}) => (
-    <TabBarIconComponent route={route} {...props} />
-  ),
+  tabBarIcon: (props: {color: string; size: number}) => {
+    const icon = iconMap[route.name] || faQuestion;
+    return <TabBarIcon icon={icon} color={props.color} size={props.size} />;
+  },
 });
 
+// Bottom Tab Navigator Component
 const BottomNavigator: React.FC = () => {
-  const userId = useContext(UserContext);
+  // Destructure user data from UserContext
+  const {userData} = useContext(UserContext) as UserContextType;
+
+  if (!userData) {
+    throw new Error('BottomNavigator must be used within a UserProvider');
+  }
+
+  const userId = userData?._id;
 
   return (
     <Tab.Navigator screenOptions={screenOptions}>

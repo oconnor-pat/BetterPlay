@@ -54,31 +54,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#fff',
   },
-
   attendingText: {
     flex: 1,
     color: 'green',
     textAlign: 'center',
   },
-
   notAttendingText: {
     flex: 1,
     color: 'red',
     textAlign: 'center',
   },
-
   paidText: {
     flex: 1,
     color: 'green',
     textAlign: 'center',
   },
-
   notPaidText: {
     flex: 1,
     color: 'red',
     textAlign: 'center',
   },
-
   viewProfileButton: {
     backgroundColor: '#b11313',
     borderRadius: 5,
@@ -116,9 +111,9 @@ const fetchRosterData = async () => {
     const rosterWithMockData = data.users.map((user: User) => ({
       id: user._id,
       username: user.username,
-      attending: 'Yes',
-      paid: 'No',
-      nextSession: 'Session 1',
+      attending: 'Yes', // Mock data (replace with real data if available)
+      paid: 'No', // Mock data (replace with real data if available)
+      nextSession: 'Session 1', // Mock data (replace with real data if available)
     }));
     return rosterWithMockData;
   } catch (error) {
@@ -128,13 +123,13 @@ const fetchRosterData = async () => {
 };
 
 const Roster: React.FC = () => {
-  // Initialize roster state with empty array of RosterItem
+  // Initialize roster state with an empty array of RosterItem
   const [roster, setRoster] = useState<RosterItem[]>([]);
 
   // Get the navigation prop from the hook
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   // Get the navigation prop from the hook for the custom header
-  const LaningPageNavigation =
+  const LandingPageNavigation =
     useNavigation<NavigationProp<LandingPageParamList>>();
 
   const handleViewProfile = (userId: string) => {
@@ -176,7 +171,7 @@ const Roster: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <CustomHeader
-        navigation={LaningPageNavigation}
+        navigation={LandingPageNavigation}
         style={styles.customHeader}
       />
       {/* Header row */}

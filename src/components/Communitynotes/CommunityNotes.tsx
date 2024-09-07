@@ -1,5 +1,3 @@
-// CommunityNotes.tsx
-
 import React, {useState} from 'react';
 import {
   View,
@@ -56,11 +54,15 @@ const styles = StyleSheet.create({
   commentContainer: {
     marginLeft: 10,
   },
+  commentText: {
+    color: '#fff',
+  },
 });
 
 const CommunityNotes: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPostText, setNewPostText] = useState<string>('');
+  const [commentText, setCommentText] = useState<{[key: number]: string}>({}); // State to store individual post comment input
 
   // Navigation
   const LandingPageNavigation =
@@ -69,18 +71,22 @@ const CommunityNotes: React.FC = () => {
   const addPost = () => {
     if (newPostText.trim() !== '') {
       setPosts([...posts, {id: Date.now(), text: newPostText, comments: []}]);
-      setNewPostText('');
+      setNewPostText(''); // Clear input after posting
     }
   };
 
-  const addComment = (postId: number, commentText: string) => {
-    setPosts(prevPosts => {
-      return prevPosts.map(post =>
-        post.id === postId
-          ? {...post, comments: [...post.comments, {text: commentText}]}
-          : post,
-      );
-    });
+  const addComment = (postId: number) => {
+    const text = commentText[postId]?.trim();
+    if (text) {
+      setPosts(prevPosts => {
+        return prevPosts.map(post =>
+          post.id === postId
+            ? {...post, comments: [...post.comments, {text}]}
+            : post,
+        );
+      });
+      setCommentText(prevCommentText => ({...prevCommentText, [postId]: ''})); // Clear the comment input for the specific post
+    }
   };
 
   return (
@@ -91,6 +97,7 @@ const CommunityNotes: React.FC = () => {
       <TextInput
         style={styles.commentInput}
         placeholder="Enter your post"
+        placeholderTextColor="#aaa"
         value={newPostText}
         onChangeText={text => setNewPostText(text)}
       />
@@ -102,17 +109,26 @@ const CommunityNotes: React.FC = () => {
         renderItem={({item}) => (
           <View style={styles.postContainer}>
             <Text style={styles.postText}>{item.text}</Text>
+
+            {/* Input to add a comment */}
             <TextInput
               style={styles.commentInput}
               placeholder="Add a comment"
-              onChangeText={text => addComment(item.id, text)}
+              placeholderTextColor="#aaa"
+              value={commentText[item.id] || ''}
+              onChangeText={text =>
+                setCommentText(prev => ({...prev, [item.id]: text}))
+              }
             />
+            <Button title="Add Comment" onPress={() => addComment(item.id)} />
+
+            {/* List of comments */}
             <FlatList
               data={item.comments}
-              keyExtractor={comment => comment.text}
+              keyExtractor={(_, index) => index.toString()}
               renderItem={({item: comment}) => (
                 <View style={styles.commentContainer}>
-                  <Text>{comment.text}</Text>
+                  <Text style={styles.commentText}>{comment.text}</Text>
                 </View>
               )}
             />
