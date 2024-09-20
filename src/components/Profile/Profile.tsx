@@ -5,7 +5,6 @@ import {ImagePickerResponse} from 'react-native-image-picker';
 import UserContext, {UserContextType} from '../UserContext';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import CustomHeader from '../CustomHeader';
-import {LandingPageParamList} from '../CustomHeader';
 import {
   NavigationProp,
   useNavigation,
@@ -71,7 +70,6 @@ const Profile: React.FC = () => {
 
   // Access the user data from the context
   const {userData, setUserData} = useContext(UserContext) as UserContextType;
-  console.log(userData);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -80,15 +78,11 @@ const Profile: React.FC = () => {
         return;
       }
 
-      console.log('Fetching user data for ID:', _id);
-
       try {
         const response = await fetch(
           `https://omhl-be-9801a7de15ab.herokuapp.com/user/${_id}`,
         );
         const data = await response.json();
-
-        console.log('Fetch response:', data);
 
         if (data.user) {
           setUserData(data.user);
@@ -105,133 +99,100 @@ const Profile: React.FC = () => {
   }, [_id, setUserData]);
 
   // Navigation
-  const LandingPageNavigation =
-    useNavigation<NavigationProp<LandingPageParamList>>();
+  const LandingPageNavigation = useNavigation<NavigationProp<any>>();
 
-  // Function to update the user's profile picture
+  // Function to update the user's profile picture in the backend
   const updateUserProfilePic = (imageUrl: string) => {
     axios
-      .put(`https://omhl-be-9801a7de15ab.herokuapp.com/users/${_id}`, {
-        profilePicUrl: imageUrl,
+      .put('https://omhl-be-9801a7de15ab.herokuapp.com/user/profile-pic', {
+        userId: _id,
+        profilePicUrl: imageUrl, // S3 URL returned from Lambda
       })
-      .then(response => {
-        console.log('User data updated: ', response.data);
-
+      .then(() => {
         const updatedUserData = {
           ...userData,
-          ...response.data,
           profilePicUrl: imageUrl,
         };
-
         setUserData(updatedUserData);
-
-        // Save the profile picture URL to AsyncStorage
         AsyncStorage.setItem('@profilePicUrl', imageUrl).catch(error => {
-          console.log(
+          console.error(
             'Error saving profile picture URL to AsyncStorage: ',
             error,
           );
         });
       })
       .catch(error => {
-        console.log('Error updating user data: ', error);
+        console.error('Error updating user data: ', error);
       });
   };
 
-  // Function to handle the image picker
+  // Function to handle the image picker and send base64 image
   const handleChoosePhoto = () => {
     const options: ImagePicker.ImageLibraryOptions = {
       mediaType: 'photo',
+      includeBase64: true, // Includes base64 in the response
     };
 
     ImagePicker.launchImageLibrary(options, (response: ImagePickerResponse) => {
-      if (response.didCancel) {
-        console.log('User cancelled image picker');
-      } else if (response.errorMessage) {
-        console.log('ImagePicker Error: ', response.errorMessage);
-      } else if (response.assets) {
+      if (response.assets) {
         const firstAsset = response.assets[0];
-        if (firstAsset && firstAsset.uri) {
-          uploadImage(firstAsset.uri); // Use the new upload function
+        if (firstAsset && firstAsset.base64) {
+          uploadImageToLambda(firstAsset.base64, firstAsset.fileName); // base64 string and fileName
         }
       }
     });
+  };
+
+  // Function to handle the image upload to Lambda
+  const uploadImageToLambda = async (base64Image: string, fileName: string) => {
+    try {
+      const lambdaResponse = await axios.post(
+        'https://8nxzl6o6fd.execute-api.us-east-2.amazonaws.com/default/uploadImageFunction', // Lambda function URL
+        {
+          image: base64Image,
+          fileName: fileName,
+        },
+      );
+
+      const imageUrl = lambdaResponse.data.url; // S3 URL returned from Lambda
+      setSelectedImage(imageUrl);
+      updateUserProfilePic(imageUrl); // Saves the S3 URL in backend
+    } catch (error) {
+      console.error('Error uploading image to Lambda:', error);
+    }
   };
 
   // Function to handle taking a photo
   const handleTakePhoto = () => {
     const options: ImagePicker.CameraOptions = {
       mediaType: 'photo',
+      includeBase64: true, // Includes base64 in the response for camera as well
     };
 
     ImagePicker.launchCamera(options, (response: ImagePickerResponse) => {
-      if (response.didCancel) {
-        console.log('User cancelled image picker');
-      } else if (response.errorMessage) {
-        console.log('ImagePicker Error: ', response.errorMessage);
-      } else if (response.assets) {
+      if (response.assets) {
         const firstAsset = response.assets[0];
-        if (firstAsset && firstAsset.uri) {
-          uploadImage(firstAsset.uri); // Use the new upload function
+        if (firstAsset && firstAsset.base64) {
+          uploadImageToLambda(firstAsset.base64, firstAsset.fileName); // base64 string and fileName
         }
       }
     });
-  };
-
-  // Function to handle image upload
-  const uploadImage = async (uri: string) => {
-    const formData = new FormData();
-
-    try {
-      // Fetch the image as a blob
-      const response = await fetch(uri);
-      const blob = await response.blob(); // Convert image to blob
-
-      formData.append('image', blob, 'userProfilePic.jpg'); // Append blob to formData
-
-      axios
-        .post('https://omhl-be-9801a7de15ab.herokuapp.com/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        })
-        .then(uploadResponse => {
-          const imageUrl = uploadResponse.data.url;
-
-          setSelectedImage(imageUrl); // Update the selected image
-          updateUserProfilePic(imageUrl); // Update the profile picture
-        })
-        .catch(error => {
-          console.log('Error uploading image: ', error);
-        });
-    } catch (error) {
-      console.error('Error converting image to blob:', error);
-    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <CustomHeader navigation={LandingPageNavigation} />
       <View>
-        {/* Avatar */}
         {selectedImage && (
           <Image source={{uri: selectedImage}} style={styles.avatar} />
         )}
-
-        {/* User Name */}
         <Text style={styles.userName}>{userData?.username}</Text>
-
-        {/* Email Address */}
         <Text style={styles.emailText}>{userData?.email}</Text>
-
-        {/* Change Photo Button */}
         <TouchableOpacity
           style={styles.changePhotoButton}
           onPress={handleChoosePhoto}>
           <Text style={styles.buttonText}>Select Photo</Text>
         </TouchableOpacity>
-
-        {/* Take Photo Button */}
         <TouchableOpacity
           style={styles.changePhotoButton}
           onPress={handleTakePhoto}>

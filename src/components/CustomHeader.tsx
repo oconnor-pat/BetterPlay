@@ -3,23 +3,17 @@ import {Button, View, StyleSheet, StyleProp, ViewStyle} from 'react-native';
 import {NavigationProp} from '@react-navigation/native';
 
 // Types
-export type LandingPageParamList = {
-  LandingPage: undefined;
+export type CustomHeaderProps = {
+  navigation: NavigationProp<any>;
+  style?: StyleProp<ViewStyle>;
 };
 
-export type CustomHeaderNavigationProp = NavigationProp<LandingPageParamList>;
-
-export interface CustomHeaderProps {
-  navigation: CustomHeaderNavigationProp;
-  style?: StyleProp<ViewStyle>;
-}
-
-const CustomHeader: React.FC<CustomHeaderProps> = ({navigation}) => {
+const CustomHeader: React.FC<CustomHeaderProps> = ({navigation, style}) => {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       <Button
         title="Sign Out"
-        onPress={() => navigation.navigate('LandingPage')}
+        onPress={() => navigation.navigate('LandingPage')} // Navigates to the LandingPage
       />
     </View>
   );
