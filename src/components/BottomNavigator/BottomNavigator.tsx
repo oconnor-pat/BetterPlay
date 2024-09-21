@@ -1,6 +1,8 @@
 import React, {useContext} from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import Roster from '../Roster/Roster';
+import {createStackNavigator} from '@react-navigation/stack';
+import EventList from '../Event-list/EventList';
+import EventRoster from '../Event-roster/EventRoster';
 import Profile from '../Profile/Profile';
 import CommunityNotes from '../Communitynotes/CommunityNotes';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -14,27 +16,23 @@ import {UserContextType} from '../UserContext';
 import UserContext from '../UserContext';
 import {IconDefinition} from '@fortawesome/fontawesome-svg-core';
 
-// Tab Navigator
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
-// Icon Mapping
-const iconMap: Record<string, IconDefinition> = {
-  Roster: faUsers,
-  Profile: faUser,
-  CommunityNotes: faStickyNote,
-};
-
-// Tab Icon Component
-const TabBarIcon = (props: {
+// Move TabBarIcon outside of BottomNavigator
+const TabBarIcon = ({
+  icon,
+  color,
+  size,
+}: {
   icon: IconDefinition;
   color: string;
   size: number;
 }) => {
-  const {icon, color, size} = props;
   return <FontAwesomeIcon icon={icon} size={size} color={color} />;
 };
 
-// Screen Options for Tab Navigator
+// Screen options outside of BottomNavigator
 const screenOptions = ({route}: {route: any}) => ({
   headerShown: false,
   tabBarLabel: () => null,
@@ -45,14 +43,32 @@ const screenOptions = ({route}: {route: any}) => ({
     paddingTop: 10,
   },
   tabBarIcon: (props: {color: string; size: number}) => {
+    const iconMap: Record<string, IconDefinition> = {
+      Event: faUsers,
+      Profile: faUser,
+      CommunityNotes: faStickyNote,
+    };
+
     const icon = iconMap[route.name] || faQuestion;
     return <TabBarIcon icon={icon} color={props.color} size={props.size} />;
   },
 });
 
-// Bottom Tab Navigator Component
+// Stack Navigator for Event-related screens
+const EventStack = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {backgroundColor: '#02131D'},
+        headerTintColor: '#fff',
+      }}>
+      <Stack.Screen name="EventList" component={EventList} />
+      <Stack.Screen name="EventRoster" component={EventRoster} />
+    </Stack.Navigator>
+  );
+};
+
 const BottomNavigator: React.FC = () => {
-  // Destructure user data from UserContext
   const {userData} = useContext(UserContext) as UserContextType;
 
   if (!userData) {
@@ -63,7 +79,7 @@ const BottomNavigator: React.FC = () => {
 
   return (
     <Tab.Navigator screenOptions={screenOptions}>
-      <Tab.Screen name="Roster" component={Roster} />
+      <Tab.Screen name="Event" component={EventStack} />
       <Tab.Screen
         name="Profile"
         component={Profile}
