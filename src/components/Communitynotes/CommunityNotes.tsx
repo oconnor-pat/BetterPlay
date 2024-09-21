@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import CustomHeader from '../CustomHeader';
-import {LandingPageParamList} from '../CustomHeader';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 
 interface Comment {
@@ -62,36 +61,34 @@ const styles = StyleSheet.create({
 const CommunityNotes: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPostText, setNewPostText] = useState<string>('');
-  const [commentText, setCommentText] = useState<{[key: number]: string}>({}); // State to store individual post comment input
+  const [commentText, setCommentText] = useState<{[key: number]: string}>({});
 
-  // Navigation
-  const LandingPageNavigation =
-    useNavigation<NavigationProp<LandingPageParamList>>();
+  const navigation = useNavigation<NavigationProp<any>>();
 
   const addPost = () => {
     if (newPostText.trim() !== '') {
       setPosts([...posts, {id: Date.now(), text: newPostText, comments: []}]);
-      setNewPostText(''); // Clear input after posting
+      setNewPostText('');
     }
   };
 
   const addComment = (postId: number) => {
     const text = commentText[postId]?.trim();
     if (text) {
-      setPosts(prevPosts => {
-        return prevPosts.map(post =>
+      setPosts(prevPosts =>
+        prevPosts.map(post =>
           post.id === postId
             ? {...post, comments: [...post.comments, {text}]}
             : post,
-        );
-      });
-      setCommentText(prevCommentText => ({...prevCommentText, [postId]: ''})); // Clear the comment input for the specific post
+        ),
+      );
+      setCommentText(prev => ({...prev, [postId]: ''}));
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomHeader navigation={LandingPageNavigation} />
+      <CustomHeader navigation={navigation} />
       <Text style={styles.title}>Community Notes</Text>
 
       <TextInput
@@ -110,7 +107,6 @@ const CommunityNotes: React.FC = () => {
           <View style={styles.postContainer}>
             <Text style={styles.postText}>{item.text}</Text>
 
-            {/* Input to add a comment */}
             <TextInput
               style={styles.commentInput}
               placeholder="Add a comment"
@@ -122,7 +118,6 @@ const CommunityNotes: React.FC = () => {
             />
             <Button title="Add Comment" onPress={() => addComment(item.id)} />
 
-            {/* List of comments */}
             <FlatList
               data={item.comments}
               keyExtractor={(_, index) => index.toString()}

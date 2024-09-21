@@ -2,8 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {View, Text, FlatList, StyleSheet, TouchableOpacity} from 'react-native';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import CustomHeader from '../CustomHeader';
-import {LandingPageParamList} from '../CustomHeader';
+import CustomHeader from '../CustomHeader'; // No need for LandingPageParamList
 
 // Interfaces
 interface RosterItem {
@@ -13,16 +12,6 @@ interface RosterItem {
   paid: string;
   nextSession: string;
 }
-
-interface User {
-  _id: string;
-  username: string;
-}
-
-export type RootStackParamList = {
-  Profile: {_id: any};
-  Roster: undefined;
-};
 
 // Styles
 const styles = StyleSheet.create({
@@ -54,42 +43,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#fff',
   },
-  attendingText: {
-    flex: 1,
-    color: 'green',
-    textAlign: 'center',
-  },
-  notAttendingText: {
-    flex: 1,
-    color: 'red',
-    textAlign: 'center',
-  },
-  paidText: {
-    flex: 1,
-    color: 'green',
-    textAlign: 'center',
-  },
-  notPaidText: {
-    flex: 1,
-    color: 'red',
-    textAlign: 'center',
-  },
-  viewProfileButton: {
-    backgroundColor: '#b11313',
-    borderRadius: 5,
-    padding: 8,
-  },
-  buttonText: {
-    color: '#fff',
-  },
-  customHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
 });
 
-// Function to get the roster data
+// Fetch roster data
 const fetchRosterData = async () => {
   try {
     const response = await fetch(
@@ -107,15 +63,13 @@ const fetchRosterData = async () => {
     }
 
     const data = await response.json();
-    // Add mock data for the other fields
-    const rosterWithMockData = data.users.map((user: User) => ({
+    return data.users.map((user: {_id: string; username: string}) => ({
       id: user._id,
       username: user.username,
-      attending: 'Yes', // Mock data (replace with real data if available)
-      paid: 'No', // Mock data (replace with real data if available)
-      nextSession: 'Session 1', // Mock data (replace with real data if available)
+      attending: 'Yes',
+      paid: 'No',
+      nextSession: 'Session 1',
     }));
-    return rosterWithMockData;
   } catch (error) {
     console.error('Error fetching roster data:', error);
     throw error;
@@ -123,17 +77,10 @@ const fetchRosterData = async () => {
 };
 
 const Roster: React.FC = () => {
-  // Initialize roster state with an empty array of RosterItem
   const [roster, setRoster] = useState<RosterItem[]>([]);
-
-  // Get the navigation prop from the hook
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  // Get the navigation prop from the hook for the custom header
-  const LandingPageNavigation =
-    useNavigation<NavigationProp<LandingPageParamList>>();
+  const navigation = useNavigation<NavigationProp<any>>();
 
   const handleViewProfile = (userId: string) => {
-    // Navigate to the profile component with the user ID
     navigation.navigate('Profile', {_id: userId});
   };
 
@@ -147,22 +94,8 @@ const Roster: React.FC = () => {
     <TouchableOpacity onPress={() => handleViewProfile(item.id)}>
       <View style={styles.row}>
         <Text style={styles.cell}>{item.username}</Text>
-        <Text
-          style={
-            item.attending.toLowerCase() === 'yes'
-              ? styles.attendingText
-              : styles.notAttendingText
-          }>
-          {item.attending}
-        </Text>
-        <Text
-          style={
-            item.paid.toLowerCase() === 'yes'
-              ? styles.paidText
-              : styles.notPaidText
-          }>
-          {item.paid}
-        </Text>
+        <Text style={styles.cell}>{item.attending}</Text>
+        <Text style={styles.cell}>{item.paid}</Text>
         <Text style={styles.cell}>{item.nextSession}</Text>
       </View>
     </TouchableOpacity>
@@ -170,11 +103,7 @@ const Roster: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomHeader
-        navigation={LandingPageNavigation}
-        style={styles.customHeader}
-      />
-      {/* Header row */}
+      <CustomHeader navigation={navigation} />
       <View style={styles.headerRow}>
         <Text style={styles.headerCell}>Username</Text>
         <Text style={styles.headerCell}>Attending</Text>
@@ -182,7 +111,6 @@ const Roster: React.FC = () => {
         <Text style={styles.headerCell}>Next Session</Text>
       </View>
 
-      {/* Roster data */}
       <FlatList
         data={roster}
         renderItem={renderItem}
