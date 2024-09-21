@@ -2,7 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {View, Text, FlatList, StyleSheet, TouchableOpacity} from 'react-native';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import CustomHeader from '../CustomHeader'; // No need for LandingPageParamList
+import CustomHeader from '../CustomHeader';
 
 // Interfaces
 interface RosterItem {
@@ -43,6 +43,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#fff',
   },
+  attendingText: {
+    flex: 1,
+    color: 'green',
+    textAlign: 'center',
+  },
+  notAttendingText: {
+    flex: 1,
+    color: 'red',
+    textAlign: 'center',
+  },
+  paidText: {
+    flex: 1,
+    color: 'green',
+    textAlign: 'center',
+  },
+  notPaidText: {
+    flex: 1,
+    color: 'red',
+    textAlign: 'center',
+  },
 });
 
 // Fetch roster data
@@ -66,9 +86,9 @@ const fetchRosterData = async () => {
     return data.users.map((user: {_id: string; username: string}) => ({
       id: user._id,
       username: user.username,
-      attending: 'Yes',
-      paid: 'No',
-      nextSession: 'Session 1',
+      attending: 'Yes', // Mock data, adjust this based on real data
+      paid: 'No', // Mock data, adjust this based on real data
+      nextSession: 'Session 1', // Mock data, adjust this based on real data
     }));
   } catch (error) {
     console.error('Error fetching roster data:', error);
@@ -94,8 +114,22 @@ const Roster: React.FC = () => {
     <TouchableOpacity onPress={() => handleViewProfile(item.id)}>
       <View style={styles.row}>
         <Text style={styles.cell}>{item.username}</Text>
-        <Text style={styles.cell}>{item.attending}</Text>
-        <Text style={styles.cell}>{item.paid}</Text>
+        <Text
+          style={
+            item.attending.toLowerCase() === 'yes'
+              ? styles.attendingText
+              : styles.notAttendingText
+          }>
+          {item.attending}
+        </Text>
+        <Text
+          style={
+            item.paid.toLowerCase() === 'yes'
+              ? styles.paidText
+              : styles.notPaidText
+          }>
+          {item.paid}
+        </Text>
         <Text style={styles.cell}>{item.nextSession}</Text>
       </View>
     </TouchableOpacity>
@@ -104,6 +138,7 @@ const Roster: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <CustomHeader navigation={navigation} />
+      {/* Header row */}
       <View style={styles.headerRow}>
         <Text style={styles.headerCell}>Username</Text>
         <Text style={styles.headerCell}>Attending</Text>
@@ -111,6 +146,7 @@ const Roster: React.FC = () => {
         <Text style={styles.headerCell}>Next Session</Text>
       </View>
 
+      {/* Roster data */}
       <FlatList
         data={roster}
         renderItem={renderItem}
