@@ -48,7 +48,7 @@ const EventRoster: React.FC = () => {
       <Text style={styles.customText}>Event ID: {eventId}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Enter your username"
+        placeholder="Enter your name"
         value={username}
         onChangeText={setUsername}
       />
