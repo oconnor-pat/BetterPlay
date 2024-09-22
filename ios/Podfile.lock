@@ -1061,6 +1061,8 @@ PODS:
     - React-perflogger (= 0.73.1)
   - RNCAsyncStorage (1.23.1):
     - React-Core
+  - RNCPicker (2.8.1):
+    - React-Core
   - RNGestureHandler (2.16.0):
     - glog
     - RCT-Folly (= 2022.05.16.00)
@@ -1077,7 +1079,7 @@ PODS:
     - React-RCTImage
   - RNSVG (14.1.0):
     - React-Core
-  - RNVectorIcons (10.0.3):
+  - RNVectorIcons (10.2.0):
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
@@ -1138,6 +1140,7 @@ DEPENDENCIES:
   - React-utils (from `../node_modules/react-native/ReactCommon/react/utils`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
+  - "RNCPicker (from `../node_modules/@react-native-picker/picker`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
@@ -1253,6 +1256,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
+  RNCPicker:
+    :path: "../node_modules/@react-native-picker/picker"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
   RNReanimated:
@@ -1319,14 +1324,15 @@ SPEC CHECKSUMS:
   React-utils: debda2c206770ee2785bdebb7f16d8db9f18838a
   ReactCommon: ddb128564dcbfa0287d3d1a2d10f8c7457c971f6
   RNCAsyncStorage: 826b603ae9c0f88b5ac4e956801f755109fa4d5c
+  RNCPicker: 0b6860a6b208d4046227d2f626ad0722f99a969c
   RNGestureHandler: 727b656d5a3fa247aac2c8cc70b8757356066451
   RNReanimated: a954c5b84dc88431f80e1d00f612f13d38e1b5d6
   RNScreens: 79c1020e7f52f4edde5ad96540f6e33c8b9b3b6c
   RNSVG: ba3e7232f45e34b7b47e74472386cf4e1a676d0a
-  RNVectorIcons: 210f910e834e3485af40693ad4615c1ec22fc02b
+  RNVectorIcons: 48aa8b1a17c7f82461df43783b0818cad38a2bcf
   SocketRocket: f32cd54efbe0f095c4d7594881e52619cfe80b17
   Yoga: 4f53dc50008d626fa679c7a1cb4bed898f8c0bde
 
-PODFILE CHECKSUM: a7447ef749fe5f5b7235f54f4fcdaa924f1fafbb
+PODFILE CHECKSUM: 3be9c0c1429fcbf9f900b54c5357729d2e7815dd
 
 COCOAPODS: 1.15.2

@@ -8,8 +8,6 @@ import {
   StyleSheet,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import CustomHeader from '../CustomHeader';
-import {NavigationProp, useNavigation} from '@react-navigation/native';
 
 interface Comment {
   text: string;
@@ -28,9 +26,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 25,
     marginBottom: 20,
     color: '#fff',
+    textAlign: 'center',
   },
   postContainer: {
     marginVertical: 10,
@@ -63,8 +62,6 @@ const CommunityNotes: React.FC = () => {
   const [newPostText, setNewPostText] = useState<string>('');
   const [commentText, setCommentText] = useState<{[key: number]: string}>({});
 
-  const navigation = useNavigation<NavigationProp<any>>();
-
   const addPost = () => {
     if (newPostText.trim() !== '') {
       setPosts([...posts, {id: Date.now(), text: newPostText, comments: []}]);
@@ -88,7 +85,6 @@ const CommunityNotes: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomHeader navigation={navigation} />
       <Text style={styles.title}>Community Notes</Text>
 
       <TextInput

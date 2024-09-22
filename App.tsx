@@ -2,9 +2,9 @@ import React, {useState} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import LandingPage from './src/components/Landingpage/LandingPage';
+import BottomNavigator from './src/components/BottomNavigator/BottomNavigator';
 import {StatusBar} from 'react-native';
 import UserContext from './src/components/UserContext';
-import BottomNavigator from './src/components/BottomNavigator/BottomNavigator';
 
 // Types
 type UserData = {
@@ -16,7 +16,6 @@ type UserData = {
 const Stack = createStackNavigator();
 
 function App() {
-  // State to manage the user data
   const [userData, setUserData] = useState<UserData | null>(null);
 
   return (
@@ -30,16 +29,23 @@ function App() {
               headerStyle: {
                 backgroundColor: '#02131D',
               },
+              headerTintColor: '#fff',
+              headerTitleAlign: 'center',
+              headerBackTitleVisible: false,
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
             }}>
             <Stack.Screen
               name="LandingPage"
               component={LandingPage}
-              options={{headerShown: false}}
+              options={{headerShown: false}} // No header for landing page
             />
+            {/* Hide header for BottomNavigator which contains EventList */}
             <Stack.Screen
               name="BottomNavigator"
               component={BottomNavigator}
-              options={{headerShown: false}}
+              options={{headerShown: false}} // No header for BottomNavigator
             />
           </Stack.Navigator>
         </NavigationContainer>

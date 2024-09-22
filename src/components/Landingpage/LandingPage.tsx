@@ -15,7 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Interfaces
 type RootStackParamList = {
-  Roster: {username: string};
+  EventList: {username: string};
   BottomNavigator: {
     screen: string;
     params: {
@@ -183,7 +183,7 @@ function LandingPage() {
       // Handle the response, e.g., show success message or error
       console.log(responseData);
 
-      // If registration is successful, navigate to Roster
+      // If registration is successful, navigate to Profile
       if (responseData.success) {
         // Store JWT token in AsyncStorage
         await AsyncStorage.setItem('userToken', responseData.token);
@@ -243,7 +243,7 @@ function LandingPage() {
       console.log('Response data:', responseData);
       console.log('Token:', responseData.token);
 
-      // If login is successful, navigate to Roster
+      // If login is successful, navigate to EventList
       if (responseData.success) {
         // Save user data to context
         setUserData(responseData.user);
@@ -259,9 +259,9 @@ function LandingPage() {
         setSuccessMessage('User logged in successfully!');
         setErrorMessage(null);
 
-        // Navigate to Roster
+        // Navigate to EventList
         navigation.navigate('BottomNavigator', {
-          screen: 'Roster',
+          screen: 'EventList',
           params: {
             Profile: {
               _id: responseData.user._id,

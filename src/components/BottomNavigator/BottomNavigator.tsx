@@ -62,7 +62,11 @@ const EventStack = () => {
         headerStyle: {backgroundColor: '#02131D'},
         headerTintColor: '#fff',
       }}>
-      <Stack.Screen name="EventList" component={EventList} />
+      <Stack.Screen
+        name="EventList"
+        component={EventList}
+        options={{headerShown: false}}
+      />
       <Stack.Screen name="EventRoster" component={EventRoster} />
     </Stack.Navigator>
   );
