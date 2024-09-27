@@ -7,12 +7,14 @@ import {
   StyleSheet,
   Modal,
   TextInput,
+  Alert,
+  Platform,
 } from 'react-native';
-import {useNavigation, NavigationProp} from '@react-navigation/native';
-import {Alert} from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {faPlus} from '@fortawesome/free-solid-svg-icons';
+import {useNavigation, NavigationProp} from '@react-navigation/native';
 
 export type RootStackParamList = {
   EventList: undefined;
@@ -82,7 +84,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     position: 'absolute',
-    top: 50, // Adjust this to ensure it doesn't overlap with the status bar
+    top: 50,
     right: 20,
     zIndex: 1,
   },
@@ -128,24 +130,36 @@ const EventList: React.FC = () => {
     eventType: '',
   });
 
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [time, setTime] = useState<Date | undefined>(new Date());
+
   const navigation = useNavigation<NavigationProp<any>>();
 
-  const updateRoster = (eventId: string, playerAdded: boolean) => {
-    setEventData(prevData =>
-      prevData.map(event =>
-        event.id === eventId
-          ? {
-              ...event,
-              rosterSpotsFilled:
-                event.rosterSpotsFilled + (playerAdded ? 1 : -1),
-            }
-          : event,
-      ),
-    );
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setDate(selectedDate);
+      setNewEvent({...newEvent, date: selectedDate.toDateString()});
+    }
   };
 
-  const handleEventPress = (eventId: string, eventType: string) => {
-    navigation.navigate('EventRoster', {eventId, eventType, updateRoster});
+  const onTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(false);
+    if (selectedTime) {
+      const roundedTime = new Date(
+        Math.ceil(selectedTime.getTime() / 15 / 1000) * 15 * 1000,
+      );
+      setTime(roundedTime);
+      setNewEvent({
+        ...newEvent,
+        time: roundedTime.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      });
+    }
   };
 
   const handleSaveNewEvent = () => {
@@ -157,7 +171,7 @@ const EventList: React.FC = () => {
       newEvent.totalSpots &&
       newEvent.eventType
     ) {
-      const id = (eventData.length + 1).toString(); // Generate a new ID
+      const id = (eventData.length + 1).toString();
       setEventData(prevData => [
         ...prevData,
         {
@@ -186,7 +200,25 @@ const EventList: React.FC = () => {
     }
   };
 
-  const renderEventCard = ({item}: {item: any}) => (
+  const handleEventPress = (eventId: string, eventType: string) => {
+    navigation.navigate('EventRoster', {eventId, eventType, updateRoster});
+  };
+
+  const updateRoster = (eventId: string, playerAdded: boolean) => {
+    setEventData(prevData =>
+      prevData.map(event =>
+        event.id === eventId
+          ? {
+              ...event,
+              rosterSpotsFilled:
+                event.rosterSpotsFilled + (playerAdded ? 1 : -1),
+            }
+          : event,
+      ),
+    );
+  };
+
+  const renderEventCard = ({item}: {item: Event}) => (
     <TouchableOpacity
       style={styles.card}
       onPress={() => handleEventPress(item.id, item.eventType)}>
@@ -202,7 +234,6 @@ const EventList: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Title at the top */}
       <Text style={styles.title}>Event List</Text>
 
       <FlatList
@@ -211,14 +242,12 @@ const EventList: React.FC = () => {
         keyExtractor={item => item.id}
       />
 
-      {/* Add Button */}
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => setModalVisible(true)}>
         <FontAwesomeIcon icon={faPlus} size={20} color="#fff" />
       </TouchableOpacity>
 
-      {/* Modal for Adding New Event */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={styles.modalView}>
           <Text style={styles.modalHeader}>Create New Event</Text>
@@ -235,18 +264,36 @@ const EventList: React.FC = () => {
             value={newEvent.location}
             onChangeText={text => setNewEvent({...newEvent, location: text})}
           />
-          <TextInput
+
+          <TouchableOpacity
             style={styles.modalInput}
-            placeholder="Time"
-            value={newEvent.time}
-            onChangeText={text => setNewEvent({...newEvent, time: text})}
-          />
-          <TextInput
+            onPress={() => setShowDatePicker(true)}>
+            <Text>{newEvent.date ? newEvent.date : 'Select Event Date'}</Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={date || new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onDateChange}
+            />
+          )}
+
+          <TouchableOpacity
             style={styles.modalInput}
-            placeholder="Date"
-            value={newEvent.date}
-            onChangeText={text => setNewEvent({...newEvent, date: text})}
-          />
+            onPress={() => setShowTimePicker(true)}>
+            <Text>{newEvent.time ? newEvent.time : 'Select Event Time'}</Text>
+          </TouchableOpacity>
+          {showTimePicker && (
+            <DateTimePicker
+              value={time || new Date()}
+              mode="time"
+              minuteInterval={15}
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onTimeChange}
+            />
+          )}
+
           <TextInput
             style={styles.modalInput}
             placeholder="Roster Size"

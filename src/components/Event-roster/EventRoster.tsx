@@ -6,8 +6,8 @@ import {
   Button,
   StyleSheet,
   FlatList,
-  Alert,
   TouchableOpacity,
+  Alert,
   Modal,
 } from 'react-native';
 import {RouteProp, useRoute} from '@react-navigation/native';
@@ -28,6 +28,20 @@ type EventRosterRouteProp = RouteProp<
 const positionOptions = {
   Hockey: ['Center', 'Winger', 'Defenseman', 'Goalie'],
   'Figure Skating': ['Skater', 'Coach', 'Judge'],
+  Football: [
+    'Quarterback',
+    'Running Back',
+    'Full Back',
+    'Tight End',
+    'Wide Receiver',
+    'Center',
+    'Offensive Guard',
+    'Offensive Tackle',
+    'Defensive End',
+    'Linebacker',
+    'Cornerback',
+    'Safety',
+  ],
   Default: ['Participant'],
 };
 
@@ -194,12 +208,12 @@ const EventRoster: React.FC = () => {
         onChangeText={setUsername}
       />
 
+      {/* Paid Status Dropdown */}
       <TouchableOpacity
         style={styles.dropdown}
         onPress={() => setPaidStatusModalVisible(true)}>
         <Text>{paidStatus ? paidStatus : 'Select Paid Status'}</Text>
       </TouchableOpacity>
-
       <Modal visible={paidStatusModalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -226,12 +240,12 @@ const EventRoster: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Jersey Color Dropdown */}
       <TouchableOpacity
         style={styles.dropdown}
         onPress={() => setJerseyColorModalVisible(true)}>
         <Text>{jerseyColor ? jerseyColor : 'Select Jersey Color'}</Text>
       </TouchableOpacity>
-
       <Modal
         visible={jerseyColorModalVisible}
         transparent
@@ -261,12 +275,12 @@ const EventRoster: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Position Dropdown */}
       <TouchableOpacity
         style={styles.dropdown}
         onPress={() => setPositionModalVisible(true)}>
         <Text>{position ? position : 'Select Position'}</Text>
       </TouchableOpacity>
-
       <Modal visible={positionModalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
