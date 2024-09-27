@@ -7,6 +7,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, RouteProp} from '@react-navigation/native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 
 // Types
 type ProfileScreenRouteProp = RouteProp<
@@ -19,8 +20,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    alignItems: 'center',
     backgroundColor: '#02131D',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 25,
+    color: '#fff',
+    textAlign: 'center',
+    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    zIndex: -1,
   },
   avatar: {
     width: 100,
@@ -57,7 +74,6 @@ const styles = StyleSheet.create({
 
 const Profile: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
   const route = useRoute<ProfileScreenRouteProp>();
   const {_id} = route.params;
 
@@ -166,23 +182,29 @@ const Profile: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View>
-        {selectedImage && (
-          <Image source={{uri: selectedImage}} style={styles.avatar} />
-        )}
-        <Text style={styles.userName}>{userData?.username}</Text>
-        <Text style={styles.emailText}>{userData?.email}</Text>
-        <TouchableOpacity
-          style={styles.changePhotoButton}
-          onPress={handleChoosePhoto}>
-          <Text style={styles.buttonText}>Select Photo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.changePhotoButton}
-          onPress={handleTakePhoto}>
-          <Text style={styles.buttonText}>Take Photo</Text>
-        </TouchableOpacity>
+      {/* Header container for hamburger and centered title */}
+      <View style={styles.header}>
+        <HamburgerMenu />
+        <Text style={styles.title}>Profile</Text>
       </View>
+
+      {selectedImage ? (
+        <Image source={{uri: selectedImage}} style={styles.avatar} />
+      ) : null}
+
+      <Text style={styles.userName}>{userData?.username}</Text>
+      <Text style={styles.emailText}>{userData?.email}</Text>
+
+      <TouchableOpacity
+        style={styles.changePhotoButton}
+        onPress={handleChoosePhoto}>
+        <Text style={styles.buttonText}>Select Photo</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.changePhotoButton}
+        onPress={handleTakePhoto}>
+        <Text style={styles.buttonText}>Take Photo</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };

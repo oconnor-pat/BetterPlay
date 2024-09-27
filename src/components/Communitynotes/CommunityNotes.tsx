@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 
 interface Comment {
   text: string;
@@ -21,15 +22,26 @@ interface Post {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    padding: 16,
     backgroundColor: '#02131D',
     flex: 1,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   title: {
     fontSize: 25,
-    marginBottom: 20,
     color: '#fff',
     textAlign: 'center',
+    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    zIndex: -1,
   },
   postContainer: {
     marginVertical: 10,
@@ -85,7 +97,11 @@ const CommunityNotes: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Community Notes</Text>
+      {/* Header container for hamburger and centered title */}
+      <View style={styles.header}>
+        <HamburgerMenu />
+        <Text style={styles.title}>Community Notes</Text>
+      </View>
 
       <TextInput
         style={styles.commentInput}

@@ -15,6 +15,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {faPlus} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
+import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 
 export type RootStackParamList = {
   EventList: undefined;
@@ -66,11 +67,17 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#02131D',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   title: {
     fontSize: 25,
-    marginBottom: 20,
     color: '#fff',
     textAlign: 'center',
+    flex: 1,
   },
   card: {
     backgroundColor: '#333',
@@ -83,9 +90,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   addButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     zIndex: 1,
   },
   modalView: {
@@ -234,19 +240,22 @@ const EventList: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Event List</Text>
+      {/* Header container for hamburger and plus button */}
+      <View style={styles.header}>
+        <HamburgerMenu />
+        <Text style={styles.title}>Event List</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setModalVisible(true)}>
+          <FontAwesomeIcon icon={faPlus} size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       <FlatList
         data={eventData}
         renderItem={renderEventCard}
         keyExtractor={item => item.id}
       />
-
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => setModalVisible(true)}>
-        <FontAwesomeIcon icon={faPlus} size={20} color="#fff" />
-      </TouchableOpacity>
 
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={styles.modalView}>
