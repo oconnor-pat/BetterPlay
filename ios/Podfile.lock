@@ -890,13 +890,13 @@ PODS:
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
-  - react-native-image-picker (7.1.2):
+  - react-native-image-picker (7.2.3):
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
-  - react-native-maps (1.18.0):
+  - react-native-maps (1.20.1):
     - React-Core
-  - react-native-safe-area-context (4.10.1):
+  - react-native-safe-area-context (4.14.1):
     - React-Core
   - React-nativeconfig (0.73.1)
   - React-NativeModulesApple (0.73.1):
@@ -1065,27 +1065,45 @@ PODS:
     - React-jsi (= 0.73.1)
     - React-logger (= 0.73.1)
     - React-perflogger (= 0.73.1)
-  - RNCAsyncStorage (1.23.1):
+  - RNCAsyncStorage (1.24.0):
     - React-Core
-  - RNCPicker (2.8.1):
+  - RNCPicker (2.10.2):
     - React-Core
   - RNDateTimePicker (8.2.0):
     - React-Core
-  - RNGestureHandler (2.16.0):
+  - RNGestureHandler (2.21.2):
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
-  - RNReanimated (3.9.0):
+  - RNReanimated (3.16.6):
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
     - ReactCommon/turbomodule/core
-  - RNScreens (3.31.1):
+    - RNReanimated/reanimated (= 3.16.6)
+    - RNReanimated/worklets (= 3.16.6)
+  - RNReanimated/reanimated (3.16.6):
+    - glog
+    - RCT-Folly (= 2022.05.16.00)
+    - React-Core
+    - ReactCommon/turbomodule/core
+    - RNReanimated/reanimated/apple (= 3.16.6)
+  - RNReanimated/reanimated/apple (3.16.6):
+    - glog
+    - RCT-Folly (= 2022.05.16.00)
+    - React-Core
+    - ReactCommon/turbomodule/core
+  - RNReanimated/worklets (3.16.6):
+    - glog
+    - RCT-Folly (= 2022.05.16.00)
+    - React-Core
+    - ReactCommon/turbomodule/core
+  - RNScreens (3.35.0):
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
     - React-RCTImage
-  - RNSVG (14.1.0):
+  - RNSVG (14.2.0):
     - React-Core
   - RNVectorIcons (10.2.0):
     - glog
@@ -1319,9 +1337,9 @@ SPEC CHECKSUMS:
   React-logger: e0c1e918d9588a9f39c9bc62d9d6bfe9ca238d9d
   React-Mapbuffer: 9731a0a63ebaf8976014623c4d637744d7353a7c
   react-native-geolocation: c15fa78a481451620baff55cfc2e04a52e033dd7
-  react-native-image-picker: 994a97b28e7f2c2197e21801569bb19f6e494e38
-  react-native-maps: 2e6e9896195781327ee15b33e3e84bf73c08207a
-  react-native-safe-area-context: dcab599c527c2d7de2d76507a523d20a0b83823d
+  react-native-image-picker: 19724166be03268b0609044bf794c19bd2c496b5
+  react-native-maps: ee1e65647460c3d41e778071be5eda10e3da6225
+  react-native-safe-area-context: 141eca0fd4e4191288dfc8b96a7c7e1c2983447a
   React-nativeconfig: 37aecd26d64b79327c3f10e43b2e9a6c425e0a60
   React-NativeModulesApple: 9ca6d2eaa1dd5606588262195b46d0774bdec83a
   React-perflogger: 5ffc4d6ccb74eaac7b8b2867e58a447232483d6d
@@ -1342,13 +1360,13 @@ SPEC CHECKSUMS:
   React-runtimescheduler: 93a4c84e46a85c3fc9678abd4f6923b785226ea7
   React-utils: debda2c206770ee2785bdebb7f16d8db9f18838a
   ReactCommon: ddb128564dcbfa0287d3d1a2d10f8c7457c971f6
-  RNCAsyncStorage: 826b603ae9c0f88b5ac4e956801f755109fa4d5c
-  RNCPicker: 0b6860a6b208d4046227d2f626ad0722f99a969c
+  RNCAsyncStorage: ec53e44dc3e75b44aa2a9f37618a49c3bc080a7a
+  RNCPicker: d162737e03e48797110dbb60e5ddc03012e87e0b
   RNDateTimePicker: 40ffda97d071a98a10fdca4fa97e3977102ccd14
-  RNGestureHandler: 727b656d5a3fa247aac2c8cc70b8757356066451
-  RNReanimated: a954c5b84dc88431f80e1d00f612f13d38e1b5d6
-  RNScreens: 79c1020e7f52f4edde5ad96540f6e33c8b9b3b6c
-  RNSVG: ba3e7232f45e34b7b47e74472386cf4e1a676d0a
+  RNGestureHandler: f5160496947abe7f1351d39887cc99bbf5e72507
+  RNReanimated: 493854c0a7569a1e70637d1c9790d3cdf12e2922
+  RNScreens: f8d5311675a63b7a8a75f46fe5bc231002899650
+  RNSVG: 963a95f1f5d512a13d11ffd50d351c87fb5c6890
   RNVectorIcons: 48aa8b1a17c7f82461df43783b0818cad38a2bcf
   SocketRocket: f32cd54efbe0f095c4d7594881e52619cfe80b17
   Yoga: 4f53dc50008d626fa679c7a1cb4bed898f8c0bde
