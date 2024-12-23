@@ -13,7 +13,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import {faPlus} from '@fortawesome/free-solid-svg-icons';
+import {faPlus, faTrash, faCog} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 
@@ -122,6 +122,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 16,
   },
+  iconContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+  },
+  iconButton: {
+    marginLeft: 10,
+  },
 });
 
 const EventList: React.FC = () => {
@@ -224,18 +232,66 @@ const EventList: React.FC = () => {
     );
   };
 
+  const handleDeleteEvent = (eventId: string) => {
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to delete this event?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setEventData(prevData =>
+              prevData.filter(event => event.id !== eventId),
+            );
+          },
+        },
+      ],
+      {cancelable: true},
+    );
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setNewEvent({
+      name: event.name,
+      location: event.location,
+      time: event.time,
+      date: event.date,
+      totalSpots: event.totalSpots.toString(),
+      eventType: event.eventType,
+    });
+    setModalVisible(true);
+  };
+
   const renderEventCard = ({item}: {item: Event}) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => handleEventPress(item.id, item.eventType)}>
-      <Text style={styles.cardText}>{item.name}</Text>
-      <Text style={styles.cardText}>{item.location}</Text>
-      <Text style={styles.cardText}>{item.time}</Text>
-      <Text style={styles.cardText}>{item.date}</Text>
-      <Text style={styles.cardText}>
-        {item.rosterSpotsFilled}/{item.totalSpots} roster spots filled
-      </Text>
-    </TouchableOpacity>
+    <View style={styles.card}>
+      <TouchableOpacity
+        onPress={() => handleEventPress(item.id, item.eventType)}>
+        <Text style={styles.cardText}>{item.name}</Text>
+        <Text style={styles.cardText}>{item.location}</Text>
+        <Text style={styles.cardText}>{item.time}</Text>
+        <Text style={styles.cardText}>{item.date}</Text>
+        <Text style={styles.cardText}>
+          {item.rosterSpotsFilled}/{item.totalSpots} roster spots filled
+        </Text>
+      </TouchableOpacity>
+      <View style={styles.iconContainer}>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => handleEditEvent(item)}>
+          <FontAwesomeIcon icon={faCog} size={20} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => handleDeleteEvent(item.id)}>
+          <FontAwesomeIcon icon={faTrash} size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 
   return (
