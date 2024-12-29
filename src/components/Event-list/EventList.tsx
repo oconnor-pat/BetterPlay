@@ -130,6 +130,17 @@ const styles = StyleSheet.create({
   iconButton: {
     marginLeft: 10,
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  confirmButton: {
+    color: '#b11313',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 16,
+  },
 });
 
 const EventList: React.FC = () => {
@@ -152,27 +163,17 @@ const EventList: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
 
   const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
     if (selectedDate) {
       setDate(selectedDate);
-      setNewEvent({...newEvent, date: selectedDate.toDateString()});
     }
   };
 
   const onTimeChange = (event: any, selectedTime?: Date) => {
-    setShowTimePicker(false);
     if (selectedTime) {
       const roundedTime = new Date(
         Math.ceil(selectedTime.getTime() / 15 / 1000) * 15 * 1000,
       );
       setTime(roundedTime);
-      setNewEvent({
-        ...newEvent,
-        time: roundedTime.toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-      });
     }
   };
 
@@ -336,12 +337,22 @@ const EventList: React.FC = () => {
             <Text>{newEvent.date ? newEvent.date : 'Select Event Date'}</Text>
           </TouchableOpacity>
           {showDatePicker && (
-            <DateTimePicker
-              value={date || new Date()}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={onDateChange}
-            />
+            <View>
+              <DateTimePicker
+                value={date || new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={onDateChange}
+                textColor="#fff"
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  setNewEvent({...newEvent, date: date?.toDateString()});
+                  setShowDatePicker(false);
+                }}>
+                <Text style={styles.confirmButton}>Confirm Date</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           <TouchableOpacity
@@ -350,13 +361,29 @@ const EventList: React.FC = () => {
             <Text>{newEvent.time ? newEvent.time : 'Select Event Time'}</Text>
           </TouchableOpacity>
           {showTimePicker && (
-            <DateTimePicker
-              value={time || new Date()}
-              mode="time"
-              minuteInterval={15}
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={onTimeChange}
-            />
+            <View>
+              <DateTimePicker
+                value={time || new Date()}
+                mode="time"
+                minuteInterval={15}
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={onTimeChange}
+                textColor="#fff"
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  setNewEvent({
+                    ...newEvent,
+                    time: time?.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }),
+                  });
+                  setShowTimePicker(false);
+                }}>
+                <Text style={styles.confirmButton}>Confirm Time</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           <TextInput
@@ -372,18 +399,19 @@ const EventList: React.FC = () => {
             value={newEvent.eventType}
             onChangeText={text => setNewEvent({...newEvent, eventType: text})}
           />
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSaveNewEvent}>
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={handleSaveNewEvent}>
-            <Text style={styles.buttonText}>Save</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={() => setModalVisible(false)}>
-            <Text style={styles.buttonText}>Cancel</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={() => setModalVisible(false)}>
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
