@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {Picker} from '@react-native-picker/picker';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {faPlus, faTrash, faCog} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
@@ -37,6 +38,11 @@ interface Event {
   totalSpots: number;
   eventType: string;
 }
+
+// Dynamic array for roster sizes from 1 to 30
+const rosterSizeOptions: string[] = Array.from({length: 30}, (_, i) =>
+  (i + 1).toString(),
+);
 
 const initialEventData: Event[] = [
   {
@@ -112,6 +118,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#b11313',
     padding: 10,
     borderRadius: 5,
+    marginVertical: 5,
   },
   buttonText: {
     color: '#fff',
@@ -140,6 +147,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
     marginBottom: 16,
+    fontSize: 16,
   },
 });
 
@@ -151,8 +159,8 @@ const EventList: React.FC = () => {
     location: '',
     time: '',
     date: '',
-    totalSpots: '',
-    eventType: '',
+    totalSpots: '', // will be selected via modal
+    eventType: '', // will be selected via modal
   });
 
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -160,18 +168,26 @@ const EventList: React.FC = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [time, setTime] = useState<Date | undefined>(new Date());
 
+  // State for roster size and event type selectors
+  const [showRosterSizePicker, setShowRosterSizePicker] = useState(false);
+  const [tempRosterSize, setTempRosterSize] = useState(
+    newEvent.totalSpots || '',
+  );
+  const [showEventTypePicker, setShowEventTypePicker] = useState(false);
+  const [tempEventType, setTempEventType] = useState(newEvent.eventType || '');
+
   const navigation = useNavigation<NavigationProp<any>>();
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
+  const onDateChange = (evt: any, selectedDate?: Date) => {
     if (selectedDate) {
       setDate(selectedDate);
     }
   };
 
-  const onTimeChange = (event: any, selectedTime?: Date) => {
+  const onTimeChange = (evt: any, selectedTime?: Date) => {
     if (selectedTime) {
       const roundedTime = new Date(
-        Math.ceil(selectedTime.getTime() / 15 / 1000) * 15 * 1000,
+        Math.ceil(selectedTime.getTime() / (15 * 1000)) * 15 * 1000,
       );
       setTime(roundedTime);
     }
@@ -200,7 +216,6 @@ const EventList: React.FC = () => {
           eventType: newEvent.eventType,
         },
       ]);
-
       setModalVisible(false);
       setNewEvent({
         name: '',
@@ -210,6 +225,9 @@ const EventList: React.FC = () => {
         totalSpots: '',
         eventType: '',
       });
+      // Reset temporary picker values
+      setTempRosterSize('');
+      setTempEventType('');
     } else {
       Alert.alert('Missing Fields', 'Please fill in all fields.');
     }
@@ -238,10 +256,7 @@ const EventList: React.FC = () => {
       'Delete Event',
       'Are you sure you want to delete this event?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        {text: 'Cancel', style: 'cancel'},
         {
           text: 'Delete',
           style: 'destructive',
@@ -266,6 +281,8 @@ const EventList: React.FC = () => {
       eventType: event.eventType,
     });
     setModalVisible(true);
+    setTempRosterSize(event.totalSpots.toString());
+    setTempEventType(event.eventType);
   };
 
   const renderEventCard = ({item}: {item: Event}) => (
@@ -297,7 +314,7 @@ const EventList: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header container for hamburger and plus button */}
+      {/* Header */}
       <View style={styles.header}>
         <HamburgerMenu />
         <Text style={styles.title}>Event List</Text>
@@ -331,6 +348,7 @@ const EventList: React.FC = () => {
             onChangeText={text => setNewEvent({...newEvent, location: text})}
           />
 
+          {/* Event Date selector */}
           <TouchableOpacity
             style={styles.modalInput}
             onPress={() => setShowDatePicker(true)}>
@@ -355,6 +373,7 @@ const EventList: React.FC = () => {
             </View>
           )}
 
+          {/* Event Time selector */}
           <TouchableOpacity
             style={styles.modalInput}
             onPress={() => setShowTimePicker(true)}>
@@ -386,26 +405,84 @@ const EventList: React.FC = () => {
             </View>
           )}
 
-          <TextInput
+          {/* Roster Size selector using dynamic rosterSizeOptions */}
+          <TouchableOpacity
             style={styles.modalInput}
-            placeholder="Roster Size"
-            keyboardType="numeric"
-            value={newEvent.totalSpots}
-            onChangeText={text => setNewEvent({...newEvent, totalSpots: text})}
-          />
-          <TextInput
+            onPress={() => {
+              setShowRosterSizePicker(true);
+              setTempRosterSize(newEvent.totalSpots || '');
+            }}>
+            <Text>
+              {newEvent.totalSpots ? newEvent.totalSpots : 'Select Roster Size'}
+            </Text>
+          </TouchableOpacity>
+          {showRosterSizePicker && (
+            <View>
+              <Picker
+                selectedValue={tempRosterSize}
+                onValueChange={itemValue => setTempRosterSize(itemValue)}>
+                {rosterSizeOptions.map(value => (
+                  <Picker.Item
+                    key={value}
+                    label={value}
+                    value={value}
+                    color="#fff"
+                  />
+                ))}
+              </Picker>
+              <TouchableOpacity
+                onPress={() => {
+                  setNewEvent({...newEvent, totalSpots: tempRosterSize});
+                  setShowRosterSizePicker(false);
+                }}>
+                <Text style={styles.confirmButton}>Confirm Roster Size</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Event Type selector */}
+          <TouchableOpacity
             style={styles.modalInput}
-            placeholder="Event Type"
-            value={newEvent.eventType}
-            onChangeText={text => setNewEvent({...newEvent, eventType: text})}
-          />
+            onPress={() => {
+              setShowEventTypePicker(true);
+              setTempEventType(newEvent.eventType || '');
+            }}>
+            <Text>
+              {newEvent.eventType ? newEvent.eventType : 'Select Event Type'}
+            </Text>
+          </TouchableOpacity>
+          {showEventTypePicker && (
+            <View>
+              <Picker
+                selectedValue={tempEventType}
+                onValueChange={itemValue => setTempEventType(itemValue)}>
+                {['Hockey', 'Figure Skating', 'Soccer', 'Basketball'].map(
+                  value => (
+                    <Picker.Item
+                      key={value}
+                      label={value}
+                      value={value}
+                      color="#fff"
+                    />
+                  ),
+                )}
+              </Picker>
+              <TouchableOpacity
+                onPress={() => {
+                  setNewEvent({...newEvent, eventType: tempEventType});
+                  setShowEventTypePicker(false);
+                }}>
+                <Text style={styles.confirmButton}>Confirm Event Type</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={styles.saveButton}
               onPress={handleSaveNewEvent}>
               <Text style={styles.buttonText}>Save</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.saveButton}
               onPress={() => setModalVisible(false)}>

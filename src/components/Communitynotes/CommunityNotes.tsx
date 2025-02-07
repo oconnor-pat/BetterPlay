@@ -6,9 +6,12 @@ import {
   Button,
   FlatList,
   StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
+import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {faTrash} from '@fortawesome/free-solid-svg-icons';
 
 interface Comment {
   text: string;
@@ -47,6 +50,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     padding: 20,
     backgroundColor: '#333',
+    position: 'relative',
   },
   postText: {
     fontSize: 18,
@@ -66,6 +70,11 @@ const styles = StyleSheet.create({
   },
   commentText: {
     color: '#fff',
+  },
+  trashIcon: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
   },
 });
 
@@ -95,9 +104,12 @@ const CommunityNotes: React.FC = () => {
     }
   };
 
+  const deletePost = (postId: number) => {
+    setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header container for hamburger and centered title */}
       <View style={styles.header}>
         <HamburgerMenu />
         <Text style={styles.title}>Community Notes</Text>
@@ -139,6 +151,12 @@ const CommunityNotes: React.FC = () => {
                 </View>
               )}
             />
+
+            <TouchableOpacity
+              style={styles.trashIcon}
+              onPress={() => deletePost(item.id)}>
+              <FontAwesomeIcon icon={faTrash} size={24} color="#fff" />
+            </TouchableOpacity>
           </View>
         )}
       />
