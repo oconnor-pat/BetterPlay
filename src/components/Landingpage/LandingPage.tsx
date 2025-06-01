@@ -12,6 +12,7 @@ import {
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 import UserContext from '../UserContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {API_BASE_URL} from '../../config/api';
 
 // Interfaces
 type RootStackParamList = {
@@ -166,16 +167,13 @@ function LandingPage() {
   const handleRegistration = async () => {
     try {
       // Makes a POST request to the registration endpoint on server
-      const response = await fetch(
-        'https://omhl-be-9801a7de15ab.herokuapp.com/auth/register',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(registrationData),
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify(registrationData),
+      });
 
       // Parse the response
       const responseData = await response.json();
@@ -226,16 +224,13 @@ function LandingPage() {
   const handleLogin = async () => {
     try {
       // Make a POST request to the login endpoint on your server
-      const response = await fetch(
-        'https://omhl-be-9801a7de15ab.herokuapp.com/auth/login',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(loginData),
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify(loginData),
+      });
 
       const responseData = await response.json();
 

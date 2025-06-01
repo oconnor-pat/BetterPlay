@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useContext} from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {faPlus, faTrash, faCog} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
+import UserContext, {UserContextType} from '../UserContext';
 
 export type RootStackParamList = {
   EventList: undefined;
@@ -37,6 +38,7 @@ interface Event {
   rosterSpotsFilled: number;
   totalSpots: number;
   eventType: string;
+  createdBy: string;
 }
 
 // Dynamic array for roster sizes from 1 to 30
@@ -54,6 +56,7 @@ const initialEventData: Event[] = [
     rosterSpotsFilled: 0,
     totalSpots: 20,
     eventType: 'Hockey',
+    createdBy: '123', // sample creator id
   },
   {
     id: '2',
@@ -64,6 +67,7 @@ const initialEventData: Event[] = [
     rosterSpotsFilled: 0,
     totalSpots: 15,
     eventType: 'Figure Skating',
+    createdBy: '456', // another user id
   },
 ];
 
@@ -152,6 +156,7 @@ const styles = StyleSheet.create({
 });
 
 const EventList: React.FC = () => {
+  const {userData} = useContext(UserContext) as UserContextType;
   const [eventData, setEventData] = useState(initialEventData);
   const [modalVisible, setModalVisible] = useState(false);
   const [newEvent, setNewEvent] = useState({
@@ -214,6 +219,7 @@ const EventList: React.FC = () => {
           totalSpots: parseInt(newEvent.totalSpots, 10),
           rosterSpotsFilled: 0,
           eventType: newEvent.eventType,
+          createdBy: userData?._id || '', // set createdBy from userData
         },
       ]);
       setModalVisible(false);
@@ -251,7 +257,11 @@ const EventList: React.FC = () => {
     );
   };
 
-  const handleDeleteEvent = (eventId: string) => {
+  const handleDeleteEvent = (event: Event) => {
+    if (event.createdBy !== (userData?._id || '')) {
+      Alert.alert('Not Authorized', 'You can only delete events you created.');
+      return;
+    }
     Alert.alert(
       'Delete Event',
       'Are you sure you want to delete this event?',
@@ -261,9 +271,7 @@ const EventList: React.FC = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            setEventData(prevData =>
-              prevData.filter(event => event.id !== eventId),
-            );
+            setEventData(prevData => prevData.filter(e => e.id !== event.id));
           },
         },
       ],
@@ -305,7 +313,7 @@ const EventList: React.FC = () => {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.iconButton}
-          onPress={() => handleDeleteEvent(item.id)}>
+          onPress={() => handleDeleteEvent(item)}>
           <FontAwesomeIcon icon={faTrash} size={20} color="#fff" />
         </TouchableOpacity>
       </View>

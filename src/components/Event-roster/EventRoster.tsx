@@ -1,9 +1,9 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
+import axios from 'axios';
 import {
   View,
   Text,
   TextInput,
-  Button,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -18,7 +18,8 @@ type EventRosterRouteProp = RouteProp<
     EventRoster: {
       eventId: string;
       eventType: string;
-      updateRoster: (eventId: string, playerAdded: boolean) => void;
+      roster?: Player[];
+      updateRoster: (eventId: string, newRoster: Player[]) => void;
     };
   },
   'EventRoster'
@@ -83,20 +84,27 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 16,
   },
-  rosterItem: {
-    backgroundColor: '#333',
-    padding: 10,
-    marginBottom: 10,
-    borderRadius: 5,
-  },
-  rosterText: {
+  headerText: {
     color: '#fff',
+    fontSize: 20,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  playerCard: {
+    backgroundColor: '#333',
+    padding: 12,
+    marginBottom: 10,
+    borderRadius: 8,
+  },
+  playerText: {
+    color: '#fff',
+    fontSize: 16,
   },
   deleteButton: {
     backgroundColor: 'red',
-    padding: 5,
+    marginTop: 8,
+    paddingVertical: 5,
     borderRadius: 5,
-    marginTop: 5,
   },
   deleteButtonText: {
     color: '#fff',
@@ -136,7 +144,7 @@ const styles = StyleSheet.create({
   },
 });
 
-interface Player {
+export interface Player {
   username: string;
   paidStatus: string;
   jerseyColor: string;
@@ -147,26 +155,56 @@ const EventRoster: React.FC = () => {
   const route = useRoute<EventRosterRouteProp>();
   const {eventId, eventType, updateRoster} = route.params;
 
+  // Persist the roster in local state. Initially, it is empty until fetched from the API.
+  const [roster, setRoster] = useState<Player[]>([]);
   const [username, setUsername] = useState('');
   const [paidStatus, setPaidStatus] = useState('');
   const [jerseyColor, setJerseyColor] = useState('');
   const [position, setPosition] = useState('');
-  const [roster, setRoster] = useState<Player[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   const [paidStatusModalVisible, setPaidStatusModalVisible] = useState(false);
   const [jerseyColorModalVisible, setJerseyColorModalVisible] = useState(false);
   const [positionModalVisible, setPositionModalVisible] = useState(false);
 
-  const handleSave = () => {
+  // Fetch persisted roster data when the component mounts.
+  useEffect(() => {
+    const fetchRoster = async () => {
+      try {
+        // Replace with your backend URL and endpoint.
+        const response = await axios.get(
+          `https://your-backend.com/events/${eventId}/roster`,
+        );
+        setRoster(response.data.roster || []);
+      } catch (error) {
+        console.error('Error fetching roster:', error);
+      }
+    };
+    fetchRoster();
+  }, [eventId]);
+
+  // Persist the updated roster to the backend.
+  const persistRoster = async (updatedRoster: Player[]) => {
+    try {
+      // Replace with your backend URL and endpoint.
+      await axios.put(`https://your-backend.com/events/${eventId}/roster`, {
+        roster: updatedRoster,
+      });
+    } catch (error) {
+      console.error('Error updating roster in database:', error);
+    }
+  };
+
+  const handleSave = async () => {
     if (!username || !paidStatus || !jerseyColor || !position) {
       setErrorMessage('Please fill out all fields.');
       return;
     }
-
-    const newPlayer = {username, paidStatus, jerseyColor, position};
-    setRoster([...roster, newPlayer]);
-    updateRoster(eventId, true); // Increment roster spots filled
+    const newPlayer: Player = {username, paidStatus, jerseyColor, position};
+    const updatedRoster = [...roster, newPlayer];
+    setRoster(updatedRoster);
+    updateRoster(eventId, updatedRoster);
+    await persistRoster(updatedRoster);
     setUsername('');
     setPaidStatus('');
     setJerseyColor('');
@@ -174,7 +212,7 @@ const EventRoster: React.FC = () => {
     setErrorMessage('');
   };
 
-  const handleDelete = (index: number) => {
+  const handleDelete = async (index: number) => {
     Alert.alert(
       'Delete Player',
       'Are you sure you want to remove this player?',
@@ -183,19 +221,36 @@ const EventRoster: React.FC = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             const updatedRoster = roster.filter((_, i) => i !== index);
             setRoster(updatedRoster);
-            updateRoster(eventId, false); // Decrement roster spots filled
+            updateRoster(eventId, updatedRoster);
+            await persistRoster(updatedRoster);
           },
         },
       ],
     );
   };
 
+  const renderPlayerCard = ({item, index}: {item: Player; index: number}) => (
+    <View style={styles.playerCard}>
+      <Text style={styles.playerText}>
+        Name: {item.username} {'\n'}
+        Paid: {item.paidStatus} {'\n'}
+        Jersey: {item.jerseyColor} {'\n'}
+        Position: {item.position}
+      </Text>
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => handleDelete(index)}>
+        <Text style={styles.deleteButtonText}>Delete</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
-      <Text style={styles.customText}>Event ID: {eventId}</Text>
+      <Text style={styles.headerText}>Event ID: {eventId}</Text>
 
       {errorMessage ? (
         <Text style={styles.errorMessage}>{errorMessage}</Text>
@@ -305,24 +360,14 @@ const EventRoster: React.FC = () => {
         </View>
       </Modal>
 
-      <Button title="Save" onPress={handleSave} />
+      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+        <Text style={styles.buttonText}>Add Player</Text>
+      </TouchableOpacity>
 
       <FlatList
         data={roster}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({item, index}) => (
-          <View style={styles.rosterItem}>
-            <Text style={styles.rosterText}>
-              Name: {item.username} | Paid: {item.paidStatus} | Jersey:{' '}
-              {item.jerseyColor} | Position: {item.position}
-            </Text>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDelete(index)}>
-              <Text style={styles.deleteButtonText}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        keyExtractor={(_, index) => index.toString()}
+        renderItem={renderPlayerCard}
       />
     </View>
   );
