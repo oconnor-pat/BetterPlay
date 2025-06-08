@@ -41,12 +41,13 @@ function App() {
               component={LandingPage}
               options={{headerShown: false}} // No header for landing page
             />
-            {/* Hide header for BottomNavigator which contains EventList */}
-            <Stack.Screen
-              name="BottomNavigator"
-              component={BottomNavigator}
-              options={{headerShown: false}} // No header for BottomNavigator
-            />
+            {userData && (
+              <Stack.Screen
+                name="BottomNavigator"
+                component={BottomNavigator}
+                options={{headerShown: false}} // No header for BottomNavigator
+              />
+            )}
           </Stack.Navigator>
         </NavigationContainer>
       </UserContext.Provider>

@@ -76,7 +76,8 @@ const BottomNavigator: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
 
   if (!userData) {
-    throw new Error('BottomNavigator must be used within a UserProvider');
+    // Prevent crash during sign out navigation transition
+    return null;
   }
 
   const userId = userData?._id;

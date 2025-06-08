@@ -100,10 +100,29 @@ const Profile: React.FC = () => {
       }
 
       try {
+        const token = await AsyncStorage.getItem('token');
         const response = await fetch(
           `https://omhl-be-9801a7de15ab.herokuapp.com/user/${_id}`,
+          {
+            headers: {
+              Authorization: token ? `Bearer ${token}` : '',
+              'Content-Type': 'application/json',
+            },
+          },
         );
-        const data = await response.json();
+        const text = await response.text();
+        if (!response.ok) {
+          // Log status and response text for debugging
+          console.error(`Fetch failed with status ${response.status}:`, text);
+          throw new Error(`Fetch failed with status ${response.status}`);
+        }
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (jsonError) {
+          console.error('Failed to parse JSON. Response text:', text);
+          throw jsonError;
+        }
 
         if (data.user) {
           setUserData(data.user);
@@ -169,28 +188,36 @@ const Profile: React.FC = () => {
     }
   };
 
-  const updateUserProfilePic = (imageUrl: string) => {
-    axios
-      .put('https://omhl-be-9801a7de15ab.herokuapp.com/user/profile-pic', {
-        userId: _id,
-        profilePicUrl: imageUrl,
-      })
-      .then(() => {
-        const updatedUserData = {
-          ...userData,
+  const updateUserProfilePic = async (imageUrl: string) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      await axios.put(
+        'https://omhl-be-9801a7de15ab.herokuapp.com/user/profile-pic',
+        {
+          userId: _id,
           profilePicUrl: imageUrl,
-        };
-        setUserData(updatedUserData);
-        AsyncStorage.setItem('@profilePicUrl', imageUrl).catch(error => {
-          console.error(
-            'Error saving profile picture URL to AsyncStorage: ',
-            error,
-          );
-        });
-      })
-      .catch(error => {
-        console.error('Error updating user data: ', error);
+        },
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : '',
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+      const updatedUserData = {
+        ...userData,
+        profilePicUrl: imageUrl,
+      };
+      setUserData(updatedUserData);
+      AsyncStorage.setItem('@profilePicUrl', imageUrl).catch(error => {
+        console.error(
+          'Error saving profile picture URL to AsyncStorage: ',
+          error,
+        );
       });
+    } catch (error) {
+      console.error('Error updating user data: ', error);
+    }
   };
 
   return (
