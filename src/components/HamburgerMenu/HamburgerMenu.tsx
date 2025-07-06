@@ -1,23 +1,31 @@
 import React, {useState, useContext} from 'react';
-import {View, Text, TouchableOpacity, StyleSheet, Modal} from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  Switch,
+} from 'react-native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {faBars} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import UserContext from '../UserContext';
+import {useTheme} from '../ThemeContext/ThemeContext';
 
 const HamburgerMenu: React.FC = () => {
   const [menuVisible, setMenuVisible] = useState(false);
-  const {setUserData} = useContext(UserContext); // Access UserContext to manage user state
-  const navigation = useNavigation<NavigationProp<any>>(); // Use navigation to handle screen navigation
+  const {setUserData} = useContext(UserContext);
+  const navigation = useNavigation<NavigationProp<any>>();
+  const {darkMode, toggleDarkMode} = useTheme();
 
   const handleMenuToggle = () => {
-    setMenuVisible(!menuVisible); // Toggle the visibility of the modal
+    setMenuVisible(!menuVisible);
   };
 
   const handleOptionPress = (option: string) => {
-    setMenuVisible(false); // Close the menu after selecting an option
+    setMenuVisible(false);
     if (option === 'Sign Out') {
-      // Clear user data and navigate to the LandingPage
       setUserData(null);
       navigation.reset({
         index: 0,
@@ -32,20 +40,28 @@ const HamburgerMenu: React.FC = () => {
       <TouchableOpacity
         style={styles.hamburgerButton}
         onPress={handleMenuToggle}
-        activeOpacity={0.6} // Ensure visual feedback when the button is pressed
-      >
+        activeOpacity={0.6}>
         <FontAwesomeIcon icon={faBars} size={24} color="#fff" />
       </TouchableOpacity>
 
       {/* Modal for Menu */}
       <Modal transparent={true} visible={menuVisible} animationType="slide">
         <TouchableOpacity style={styles.overlay} onPress={handleMenuToggle}>
-          <View style={styles.menuContainer}>
+          <View>
             <TouchableOpacity
               style={styles.menuOption}
               onPress={() => handleOptionPress('Sign Out')}>
               <Text style={styles.menuText}>Sign Out</Text>
             </TouchableOpacity>
+            <View style={styles.menuOption}>
+              <Text style={styles.menuText}>Dark Mode</Text>
+              <Switch
+                value={darkMode}
+                onValueChange={toggleDarkMode}
+                thumbColor={darkMode ? '#fff' : '#02131D'}
+                trackColor={{false: '#767577', true: '#81b0ff'}}
+              />
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -74,6 +90,10 @@ const styles = StyleSheet.create({
     padding: 10,
     borderBottomColor: '#ccc',
     borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: 180,
   },
   menuText: {
     color: '#fff',

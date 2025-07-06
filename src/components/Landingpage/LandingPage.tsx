@@ -13,6 +13,7 @@ import {NavigationProp, useNavigation} from '@react-navigation/native';
 import UserContext from '../UserContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from '../../config/api';
+import {useTheme} from '../ThemeContext/ThemeContext';
 
 // Interfaces
 type RootStackParamList = {
@@ -25,86 +26,6 @@ type RootStackParamList = {
   };
 };
 
-// Styles
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#02131D',
-  },
-  formContainer: {
-    width: '50%',
-    padding: 20,
-    borderWidth: 1,
-    borderRadius: 5,
-    backgroundColor: '#f2f2f2',
-  },
-  title: {
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    marginTop: 100,
-    color: '#447bbe',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  loginButton: {
-    marginRight: 10,
-    height: 35,
-    width: 100,
-    borderRadius: 10,
-    backgroundColor: '#447bbe',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  registerButton: {
-    height: 35,
-    width: 100,
-    borderRadius: 10,
-    backgroundColor: '#b11313',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginCancelButton: {
-    height: 35,
-    width: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  registerCancelButton: {
-    height: 35,
-    width: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  input: {
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    marginBottom: 10,
-    padding: 10,
-    backgroundColor: '#A9A9A9',
-  },
-  errorMessage: {
-    color: '#b11313',
-    marginTop: 10,
-  },
-  successMessage: {
-    color: '#447bbe',
-    marginTop: 10,
-  },
-});
-
 function LandingPage() {
   // User context
   const userContext = useContext(UserContext);
@@ -114,6 +35,9 @@ function LandingPage() {
   }
 
   const {userData, setUserData} = userContext;
+
+  // Theme context
+  const {colors} = useTheme();
 
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
@@ -166,7 +90,6 @@ function LandingPage() {
 
   const handleRegistration = async () => {
     try {
-      // Makes a POST request to the registration endpoint on server
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
@@ -175,15 +98,9 @@ function LandingPage() {
         body: JSON.stringify(registrationData),
       });
 
-      // Parse the response
       const responseData = await response.json();
 
-      // Handle the response, e.g., show success message or error
-      console.log(responseData);
-
-      // If registration is successful, navigate to Profile
       if (responseData.success) {
-        // Store JWT token in AsyncStorage
         await AsyncStorage.setItem('userToken', responseData.token);
 
         setSuccessMessage('User created successfully!');
@@ -208,8 +125,6 @@ function LandingPage() {
         setSuccessMessage(null);
       }
     } catch (error) {
-      // Handle network errors or other exceptions
-      console.error('Error during registration:', error as Error);
       setErrorMessage('Failed to create new user. Please try again.');
       setSuccessMessage(null);
     }
@@ -223,7 +138,6 @@ function LandingPage() {
 
   const handleLogin = async () => {
     try {
-      // Make a POST request to the login endpoint on your server
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -234,27 +148,16 @@ function LandingPage() {
 
       const responseData = await response.json();
 
-      // Log the response data and token to the console
-      console.log('Response data:', responseData);
-      console.log('Token:', responseData.token);
-
-      // If login is successful, navigate to EventList
       if (responseData.success) {
-        // Save user data to context
         setUserData(responseData.user);
-        // Check if token exists in the response
         if (!responseData.token) {
-          console.error('No token in response', responseData);
           return;
         }
-
-        // Store JWT token in AsyncStorage
         await AsyncStorage.setItem('userToken', responseData.token);
 
         setSuccessMessage('User logged in successfully!');
         setErrorMessage(null);
 
-        // Navigate to EventList
         navigation.navigate('BottomNavigator', {
           screen: 'EventList',
           params: {
@@ -266,21 +169,17 @@ function LandingPage() {
           },
         });
       } else {
-        // Handle login failure
         setErrorMessage(
           responseData.message || 'Failed to log in. Please try again.',
         );
         setSuccessMessage(null);
       }
     } catch (error) {
-      // Handle network errors or other exceptions
-      console.error('Error during login:', error);
       setErrorMessage('Failed to log in. Please try again.');
       setSuccessMessage(null);
     }
   };
 
-  // Dismiss keyboard when user taps outside of a TextInput
   const dismissForms = () => {
     setShowLoginForm(false);
     setShowRegisterForm(false);
@@ -288,7 +187,6 @@ function LandingPage() {
     setSuccessMessage(null);
   };
 
-  // Close each form and reset state
   const cancelForm = () => {
     setShowLoginForm(false);
     setShowRegisterForm(false);
@@ -298,39 +196,177 @@ function LandingPage() {
     setSuccessMessage(null);
   };
 
+  // Themed styles using theme context colors
+  const themedStyles = StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    card: {
+      width: '98%',
+      maxWidth: 600,
+      minWidth: 320,
+      paddingHorizontal: 40,
+      paddingVertical: 24,
+      borderRadius: 16,
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderWidth: 1,
+      shadowColor: colors.text,
+      shadowOffset: {width: 0, height: 2},
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 6,
+      marginVertical: 16,
+      alignSelf: 'center',
+    },
+    cardTitle: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: colors.primary,
+      marginBottom: 18,
+      textAlign: 'center',
+      letterSpacing: 0.5,
+    },
+    input: {
+      height: 44,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      marginBottom: 14,
+      paddingHorizontal: 12,
+      backgroundColor: colors.inputBackground || '#A9A9A9',
+      color: colors.text,
+      fontSize: 16,
+    },
+    buttonRow: {
+      flexDirection: 'row',
+      justifyContent: 'center', // Center the buttons
+      alignItems: 'center',
+      marginTop: 10,
+      marginBottom: 4,
+    },
+    button: {
+      height: 44,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginHorizontal: 16, // Add horizontal margin for spacing
+      backgroundColor: colors.primary,
+      minWidth: 120,
+      maxWidth: 200,
+      paddingHorizontal: 24, // Ensure button is wide enough
+    },
+    buttonAlt: {
+      backgroundColor: colors.error || '#b11313',
+    },
+    buttonText: {
+      color: colors.buttonText || '#fff',
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    switchRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 24,
+      marginTop: 12,
+    },
+    switchButton: {
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: 8,
+      marginHorizontal: 8,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    switchButtonActive: {
+      backgroundColor: colors.primary,
+    },
+    switchButtonText: {
+      color: colors.primary,
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    switchButtonTextActive: {
+      color: colors.buttonText || '#fff',
+    },
+    errorMessage: {
+      color: colors.error || '#b11313',
+      marginTop: 10,
+      textAlign: 'center',
+    },
+    successMessage: {
+      color: colors.primary,
+      marginTop: 10,
+      textAlign: 'center',
+    },
+    title: {
+      textAlign: 'center',
+      fontSize: 28,
+      fontWeight: 'bold',
+      marginBottom: 12,
+      marginTop: 60,
+      color: colors.primary,
+      letterSpacing: 1,
+    },
+  });
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 130 : 0}
-      style={styles.container}>
+      style={themedStyles.container}>
       <TouchableWithoutFeedback onPress={dismissForms}>
-        <View style={styles.container}>
-          <Text style={styles.title}>Welcome!</Text>
-          <View style={styles.buttonContainer}>
+        <View style={themedStyles.container}>
+          <Text style={themedStyles.title}>Welcome!</Text>
+          <View style={themedStyles.switchRow}>
             <TouchableOpacity
-              style={styles.loginButton}
+              style={[
+                themedStyles.switchButton,
+                showLoginForm && themedStyles.switchButtonActive,
+              ]}
               onPress={() => {
                 setShowLoginForm(true);
                 setShowRegisterForm(false);
               }}>
-              <Text style={styles.buttonText}>Login</Text>
+              <Text
+                style={[
+                  themedStyles.switchButtonText,
+                  showLoginForm && themedStyles.switchButtonTextActive,
+                ]}>
+                Login
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.registerButton}
+              style={[
+                themedStyles.switchButton,
+                showRegisterForm && themedStyles.switchButtonActive,
+              ]}
               onPress={() => {
                 setShowLoginForm(false);
                 setShowRegisterForm(true);
               }}>
-              <Text style={styles.buttonText}>Register</Text>
+              <Text
+                style={[
+                  themedStyles.switchButtonText,
+                  showRegisterForm && themedStyles.switchButtonTextActive,
+                ]}>
+                Register
+              </Text>
             </TouchableOpacity>
           </View>
 
           {showLoginForm && (
-            <View>
+            <View style={themedStyles.card}>
+              <Text style={themedStyles.cardTitle}>Login</Text>
               <TextInput
-                style={styles.input}
+                style={themedStyles.input}
                 placeholder="Username"
-                placeholderTextColor={'#000'}
+                placeholderTextColor={colors.placeholder || '#888'}
                 value={loginData.username}
                 onChangeText={text =>
                   setLoginData({...loginData, username: text})
@@ -339,9 +375,9 @@ function LandingPage() {
                 autoCapitalize="none"
               />
               <TextInput
-                style={styles.input}
+                style={themedStyles.input}
                 placeholder="Password"
-                placeholderTextColor={'#000'}
+                placeholderTextColor={colors.placeholder || '#888'}
                 secureTextEntry
                 value={loginData.password}
                 onChangeText={text =>
@@ -350,29 +386,28 @@ function LandingPage() {
                 ref={loginPasswordInputRef}
                 autoCapitalize="none"
               />
-              <TouchableOpacity
-                style={styles.loginButton}
-                onPress={() => {
-                  handleLogin();
-                }}>
-                <Text style={styles.buttonText}>Login</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.loginCancelButton}
-                onPress={() => {
-                  cancelForm();
-                }}>
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
+              <View style={themedStyles.buttonRow}>
+                <TouchableOpacity
+                  style={themedStyles.button}
+                  onPress={handleLogin}>
+                  <Text style={themedStyles.buttonText}>Login</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[themedStyles.button, themedStyles.buttonAlt]}
+                  onPress={cancelForm}>
+                  <Text style={themedStyles.buttonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
           {showRegisterForm && (
-            <View>
+            <View style={themedStyles.card}>
+              <Text style={themedStyles.cardTitle}>Register</Text>
               <TextInput
-                style={styles.input}
+                style={themedStyles.input}
                 placeholder="Name"
-                placeholderTextColor={'#000'}
+                placeholderTextColor={colors.placeholder || '#888'}
                 value={registrationData.name}
                 onChangeText={text =>
                   setRegistrationData({...registrationData, name: text})
@@ -381,9 +416,9 @@ function LandingPage() {
                 autoCapitalize="none"
               />
               <TextInput
-                style={styles.input}
+                style={themedStyles.input}
                 placeholder="Email"
-                placeholderTextColor={'#000'}
+                placeholderTextColor={colors.placeholder || '#888'}
                 value={registrationData.email}
                 onChangeText={text =>
                   setRegistrationData({...registrationData, email: text})
@@ -392,9 +427,9 @@ function LandingPage() {
                 autoCapitalize="none"
               />
               <TextInput
-                style={styles.input}
+                style={themedStyles.input}
                 placeholder="Username"
-                placeholderTextColor={'#000'}
+                placeholderTextColor={colors.placeholder || '#888'}
                 value={registrationData.username}
                 onChangeText={text =>
                   setRegistrationData({...registrationData, username: text})
@@ -403,9 +438,9 @@ function LandingPage() {
                 autoCapitalize="none"
               />
               <TextInput
-                style={styles.input}
+                style={themedStyles.input}
                 placeholder="Password"
-                placeholderTextColor={'#000'}
+                placeholderTextColor={colors.placeholder || '#888'}
                 secureTextEntry
                 value={registrationData.password}
                 onChangeText={text =>
@@ -414,27 +449,25 @@ function LandingPage() {
                 ref={registerPasswordInputRef}
                 autoCapitalize="none"
               />
-              <TouchableOpacity
-                style={styles.registerButton}
-                onPress={() => {
-                  handleRegistration();
-                }}>
-                <Text style={styles.buttonText}>Register</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.registerCancelButton}
-                onPress={() => {
-                  cancelForm();
-                }}>
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
+              <View style={themedStyles.buttonRow}>
+                <TouchableOpacity
+                  style={themedStyles.button}
+                  onPress={handleRegistration}>
+                  <Text style={themedStyles.buttonText}>Register</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[themedStyles.button, themedStyles.buttonAlt]}
+                  onPress={cancelForm}>
+                  <Text style={themedStyles.buttonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           {errorMessage && (
-            <Text style={styles.errorMessage}>{errorMessage}</Text>
+            <Text style={themedStyles.errorMessage}>{errorMessage}</Text>
           )}
           {successMessage && (
-            <Text style={styles.successMessage}>{successMessage}</Text>
+            <Text style={themedStyles.successMessage}>{successMessage}</Text>
           )}
         </View>
       </TouchableWithoutFeedback>

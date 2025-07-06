@@ -1,4 +1,4 @@
-import React, {useState, useContext} from 'react';
+import React, {useState, useContext, useMemo} from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import {faPlus, faTrash, faCog} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
+import {useTheme} from '../ThemeContext/ThemeContext';
 
 export type RootStackParamList = {
   EventList: undefined;
@@ -71,92 +72,131 @@ const initialEventData: Event[] = [
   },
 ];
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#02131D',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 25,
-    color: '#fff',
-    textAlign: 'center',
-    flex: 1,
-  },
-  card: {
-    backgroundColor: '#333',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  cardText: {
-    color: '#fff',
-    marginBottom: 8,
-  },
-  addButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    zIndex: 1,
-  },
-  modalView: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#02131D',
-  },
-  modalInput: {
-    backgroundColor: '#fff',
-    padding: 8,
-    marginBottom: 16,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  saveButton: {
-    backgroundColor: '#b11313',
-    padding: 10,
-    borderRadius: 5,
-    marginVertical: 5,
-  },
-  buttonText: {
-    color: '#fff',
-    textAlign: 'center',
-  },
-  modalHeader: {
-    color: '#fff',
-    fontSize: 18,
-    marginBottom: 16,
-  },
-  iconContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-  },
-  iconButton: {
-    marginLeft: 10,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  confirmButton: {
-    color: '#b11313',
-    textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 16,
-    fontSize: 16,
-  },
-});
-
 const EventList: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
+  const {colors} = useTheme();
+
+  const themedStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          padding: 16,
+          backgroundColor: colors.background,
+        },
+        header: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 20,
+        },
+        title: {
+          fontSize: 25,
+          color: colors.text,
+          textAlign: 'center',
+          flex: 1,
+        },
+        card: {
+          backgroundColor: colors.card,
+          borderRadius: 8,
+          padding: 16,
+          marginBottom: 16,
+          borderWidth: 1,
+          borderColor: colors.border,
+          shadowColor: colors.text,
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.08,
+          shadowRadius: 6,
+          elevation: 3,
+        },
+        cardText: {
+          color: colors.text,
+          marginBottom: 8,
+          fontSize: 16,
+        },
+        addButton: {
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          zIndex: 1,
+          backgroundColor: colors.primary,
+          borderRadius: 8,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        modalView: {
+          flex: 1,
+          justifyContent: 'center',
+          padding: 20,
+          backgroundColor: colors.background,
+        },
+        modalInput: {
+          backgroundColor: colors.inputBackground || '#fff',
+          color: colors.text,
+          padding: 12,
+          marginBottom: 16,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+          fontSize: 16,
+        },
+        saveButton: {
+          backgroundColor: colors.primary,
+          padding: 12,
+          borderRadius: 8,
+          marginVertical: 5,
+          flex: 1,
+          alignItems: 'center',
+          marginHorizontal: 8,
+          minWidth: 100,
+        },
+        cancelButton: {
+          backgroundColor: colors.error || '#b11313',
+        },
+        buttonText: {
+          color: colors.buttonText || '#fff',
+          textAlign: 'center',
+          fontWeight: 'bold',
+          fontSize: 16,
+        },
+        modalHeader: {
+          color: colors.primary,
+          fontSize: 20,
+          marginBottom: 16,
+          textAlign: 'center',
+          fontWeight: 'bold',
+        },
+        iconContainer: {
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          marginTop: 10,
+        },
+        iconButton: {
+          marginLeft: 10,
+        },
+        buttonContainer: {
+          flexDirection: 'row',
+          justifyContent: 'center',
+          marginTop: 20,
+          alignItems: 'center',
+        },
+        confirmButton: {
+          color: colors.primary,
+          textAlign: 'center',
+          marginTop: 10,
+          marginBottom: 16,
+          fontSize: 16,
+          fontWeight: 'bold',
+        },
+        picker: {
+          backgroundColor: colors.inputBackground || '#fff',
+          color: colors.text,
+          borderRadius: 8,
+          marginBottom: 16,
+        },
+      }),
+    [colors],
+  );
+
   const [eventData, setEventData] = useState(initialEventData);
   const [modalVisible, setModalVisible] = useState(false);
   const [newEvent, setNewEvent] = useState({
@@ -231,7 +271,6 @@ const EventList: React.FC = () => {
         totalSpots: '',
         eventType: '',
       });
-      // Reset temporary picker values
       setTempRosterSize('');
       setTempEventType('');
     } else {
@@ -294,42 +333,46 @@ const EventList: React.FC = () => {
   };
 
   const renderEventCard = ({item}: {item: Event}) => (
-    <View style={styles.card}>
+    <View style={themedStyles.card}>
       <TouchableOpacity
         onPress={() => handleEventPress(item.id, item.eventType)}>
-        <Text style={styles.cardText}>{item.name}</Text>
-        <Text style={styles.cardText}>{item.location}</Text>
-        <Text style={styles.cardText}>{item.time}</Text>
-        <Text style={styles.cardText}>{item.date}</Text>
-        <Text style={styles.cardText}>
+        <Text style={themedStyles.cardText}>{item.name}</Text>
+        <Text style={themedStyles.cardText}>{item.location}</Text>
+        <Text style={themedStyles.cardText}>{item.time}</Text>
+        <Text style={themedStyles.cardText}>{item.date}</Text>
+        <Text style={themedStyles.cardText}>
           {item.rosterSpotsFilled}/{item.totalSpots} roster spots filled
         </Text>
       </TouchableOpacity>
-      <View style={styles.iconContainer}>
+      <View style={themedStyles.iconContainer}>
         <TouchableOpacity
-          style={styles.iconButton}
+          style={themedStyles.iconButton}
           onPress={() => handleEditEvent(item)}>
-          <FontAwesomeIcon icon={faCog} size={20} color="#fff" />
+          <FontAwesomeIcon icon={faCog} size={20} color={colors.text} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.iconButton}
+          style={themedStyles.iconButton}
           onPress={() => handleDeleteEvent(item)}>
-          <FontAwesomeIcon icon={faTrash} size={20} color="#fff" />
+          <FontAwesomeIcon icon={faTrash} size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={themedStyles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={themedStyles.header}>
         <HamburgerMenu />
-        <Text style={styles.title}>Event List</Text>
+        <Text style={themedStyles.title}>Event List</Text>
         <TouchableOpacity
-          style={styles.addButton}
+          style={themedStyles.addButton}
           onPress={() => setModalVisible(true)}>
-          <FontAwesomeIcon icon={faPlus} size={20} color="#fff" />
+          <FontAwesomeIcon
+            icon={faPlus}
+            size={20}
+            color={colors.buttonText || '#fff'}
+          />
         </TouchableOpacity>
       </View>
 
@@ -340,27 +383,32 @@ const EventList: React.FC = () => {
       />
 
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
-        <View style={styles.modalView}>
-          <Text style={styles.modalHeader}>Create New Event</Text>
+        <View style={themedStyles.modalView}>
+          <Text style={themedStyles.modalHeader}>Create New Event</Text>
 
           <TextInput
-            style={styles.modalInput}
+            style={themedStyles.modalInput}
             placeholder="Event Name"
+            placeholderTextColor={colors.placeholder || '#888'}
             value={newEvent.name}
             onChangeText={text => setNewEvent({...newEvent, name: text})}
           />
           <TextInput
-            style={styles.modalInput}
+            style={themedStyles.modalInput}
             placeholder="Location/Facility"
+            placeholderTextColor={colors.placeholder || '#888'}
             value={newEvent.location}
             onChangeText={text => setNewEvent({...newEvent, location: text})}
           />
 
           {/* Event Date selector */}
           <TouchableOpacity
-            style={styles.modalInput}
+            style={themedStyles.modalInput}
             onPress={() => setShowDatePicker(true)}>
-            <Text>{newEvent.date ? newEvent.date : 'Select Event Date'}</Text>
+            <Text
+              style={{color: newEvent.date ? colors.text : colors.placeholder}}>
+              {newEvent.date ? newEvent.date : 'Select Event Date'}
+            </Text>
           </TouchableOpacity>
           {showDatePicker && (
             <View>
@@ -369,23 +417,26 @@ const EventList: React.FC = () => {
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={onDateChange}
-                textColor="#fff"
+                textColor={colors.text}
               />
               <TouchableOpacity
                 onPress={() => {
                   setNewEvent({...newEvent, date: date?.toDateString()});
                   setShowDatePicker(false);
                 }}>
-                <Text style={styles.confirmButton}>Confirm Date</Text>
+                <Text style={themedStyles.confirmButton}>Confirm Date</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Event Time selector */}
           <TouchableOpacity
-            style={styles.modalInput}
+            style={themedStyles.modalInput}
             onPress={() => setShowTimePicker(true)}>
-            <Text>{newEvent.time ? newEvent.time : 'Select Event Time'}</Text>
+            <Text
+              style={{color: newEvent.time ? colors.text : colors.placeholder}}>
+              {newEvent.time ? newEvent.time : 'Select Event Time'}
+            </Text>
           </TouchableOpacity>
           {showTimePicker && (
             <View>
@@ -395,7 +446,7 @@ const EventList: React.FC = () => {
                 minuteInterval={15}
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={onTimeChange}
-                textColor="#fff"
+                textColor={colors.text}
               />
               <TouchableOpacity
                 onPress={() => {
@@ -408,19 +459,22 @@ const EventList: React.FC = () => {
                   });
                   setShowTimePicker(false);
                 }}>
-                <Text style={styles.confirmButton}>Confirm Time</Text>
+                <Text style={themedStyles.confirmButton}>Confirm Time</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Roster Size selector using dynamic rosterSizeOptions */}
           <TouchableOpacity
-            style={styles.modalInput}
+            style={themedStyles.modalInput}
             onPress={() => {
               setShowRosterSizePicker(true);
               setTempRosterSize(newEvent.totalSpots || '');
             }}>
-            <Text>
+            <Text
+              style={{
+                color: newEvent.totalSpots ? colors.text : colors.placeholder,
+              }}>
               {newEvent.totalSpots ? newEvent.totalSpots : 'Select Roster Size'}
             </Text>
           </TouchableOpacity>
@@ -428,13 +482,15 @@ const EventList: React.FC = () => {
             <View>
               <Picker
                 selectedValue={tempRosterSize}
-                onValueChange={itemValue => setTempRosterSize(itemValue)}>
+                onValueChange={itemValue => setTempRosterSize(itemValue)}
+                style={themedStyles.picker}
+                dropdownIconColor={colors.text}>
                 {rosterSizeOptions.map(value => (
                   <Picker.Item
                     key={value}
                     label={value}
                     value={value}
-                    color="#fff"
+                    color={colors.text}
                   />
                 ))}
               </Picker>
@@ -443,19 +499,24 @@ const EventList: React.FC = () => {
                   setNewEvent({...newEvent, totalSpots: tempRosterSize});
                   setShowRosterSizePicker(false);
                 }}>
-                <Text style={styles.confirmButton}>Confirm Roster Size</Text>
+                <Text style={themedStyles.confirmButton}>
+                  Confirm Roster Size
+                </Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Event Type selector */}
           <TouchableOpacity
-            style={styles.modalInput}
+            style={themedStyles.modalInput}
             onPress={() => {
               setShowEventTypePicker(true);
               setTempEventType(newEvent.eventType || '');
             }}>
-            <Text>
+            <Text
+              style={{
+                color: newEvent.eventType ? colors.text : colors.placeholder,
+              }}>
               {newEvent.eventType ? newEvent.eventType : 'Select Event Type'}
             </Text>
           </TouchableOpacity>
@@ -463,14 +524,16 @@ const EventList: React.FC = () => {
             <View>
               <Picker
                 selectedValue={tempEventType}
-                onValueChange={itemValue => setTempEventType(itemValue)}>
+                onValueChange={itemValue => setTempEventType(itemValue)}
+                style={themedStyles.picker}
+                dropdownIconColor={colors.text}>
                 {['Hockey', 'Figure Skating', 'Soccer', 'Basketball'].map(
                   value => (
                     <Picker.Item
                       key={value}
                       label={value}
                       value={value}
-                      color="#fff"
+                      color={colors.text}
                     />
                   ),
                 )}
@@ -480,21 +543,23 @@ const EventList: React.FC = () => {
                   setNewEvent({...newEvent, eventType: tempEventType});
                   setShowEventTypePicker(false);
                 }}>
-                <Text style={styles.confirmButton}>Confirm Event Type</Text>
+                <Text style={themedStyles.confirmButton}>
+                  Confirm Event Type
+                </Text>
               </TouchableOpacity>
             </View>
           )}
 
-          <View style={styles.buttonContainer}>
+          <View style={themedStyles.buttonContainer}>
             <TouchableOpacity
-              style={styles.saveButton}
+              style={themedStyles.saveButton}
               onPress={handleSaveNewEvent}>
-              <Text style={styles.buttonText}>Save</Text>
+              <Text style={themedStyles.buttonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.saveButton}
+              style={[themedStyles.saveButton, themedStyles.cancelButton]}
               onPress={() => setModalVisible(false)}>
-              <Text style={styles.buttonText}>Cancel</Text>
+              <Text style={themedStyles.buttonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>

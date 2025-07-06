@@ -1,4 +1,4 @@
-import React, {useContext, useEffect, useState} from 'react';
+import React, {useContext, useEffect, useState, useMemo} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity} from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
@@ -8,6 +8,7 @@ import {useRoute, RouteProp} from '@react-navigation/native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
+import {useTheme} from '../ThemeContext/ThemeContext';
 
 // Types
 type ProfileScreenRouteProp = RouteProp<
@@ -15,82 +16,104 @@ type ProfileScreenRouteProp = RouteProp<
   'Profile'
 >;
 
-// Styles
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#02131D',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 25,
-    color: '#fff',
-    textAlign: 'center',
-    flex: 1,
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    zIndex: -1,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: 'red',
-    backgroundColor: '#D3D3D3',
-    padding: 10,
-    textAlign: 'center',
-    overflow: 'hidden',
-    borderRadius: 10,
-    width: '50%',
-    alignSelf: 'center',
-  },
-  emailText: {
-    fontSize: 20,
-    marginBottom: 16,
-    color: 'red',
-    backgroundColor: '#D3D3D3',
-    padding: 10,
-    textAlign: 'center',
-    overflow: 'hidden',
-    borderRadius: 10,
-    width: '75%',
-    alignSelf: 'center',
-  },
-  changePhotoButton: {
-    backgroundColor: '#b11313',
-    padding: 8,
-    borderRadius: 20,
-    marginTop: 16,
-    width: '35%',
-    alignSelf: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 16,
-  },
-});
-
 const Profile: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const route = useRoute<ProfileScreenRouteProp>();
   const {_id} = route.params;
 
   const {userData, setUserData} = useContext(UserContext) as UserContextType;
+  const {colors} = useTheme();
+
+  // Themed styles
+  const themedStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          padding: 16,
+          backgroundColor: colors.background,
+        },
+        header: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 20,
+        },
+        title: {
+          fontSize: 25,
+          color: colors.primary,
+          textAlign: 'center',
+          flex: 1,
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          zIndex: -1,
+        },
+        profileRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 24,
+          marginTop: 8,
+        },
+        avatar: {
+          width: 90,
+          height: 90,
+          borderRadius: 45,
+          marginRight: 18,
+          backgroundColor: colors.card,
+        },
+        userInfo: {
+          flex: 1,
+          justifyContent: 'center',
+          backgroundColor: 'transparent',
+          paddingVertical: 0,
+          paddingHorizontal: 0,
+        },
+        userName: {
+          fontSize: 22,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 2,
+          textAlign: 'left',
+          letterSpacing: 0.2,
+          backgroundColor: 'transparent',
+        },
+        emailText: {
+          fontSize: 16,
+          color: colors.text,
+          opacity: 0.7,
+          textAlign: 'left',
+          letterSpacing: 0.1,
+          backgroundColor: 'transparent',
+        },
+        modernButton: {
+          backgroundColor: colors.card,
+          paddingVertical: 10,
+          paddingHorizontal: 24,
+          borderRadius: 8,
+          marginTop: 0,
+          marginHorizontal: 6,
+          borderWidth: 1,
+          borderColor: colors.border,
+          elevation: 0,
+        },
+        buttonText: {
+          color: colors.primary,
+          textAlign: 'center',
+          fontSize: 16,
+          fontWeight: '500',
+          letterSpacing: 0.2,
+        },
+        buttonRow: {
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginTop: 8,
+        },
+      }),
+    [colors],
+  );
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -112,7 +135,6 @@ const Profile: React.FC = () => {
         );
         const text = await response.text();
         if (!response.ok) {
-          // Log status and response text for debugging
           console.error(`Fetch failed with status ${response.status}:`, text);
           throw new Error(`Fetch failed with status ${response.status}`);
         }
@@ -221,30 +243,39 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={themedStyles.container}>
       {/* Header container for hamburger and centered title */}
-      <View style={styles.header}>
+      <View style={themedStyles.header}>
         <HamburgerMenu />
-        <Text style={styles.title}>Profile</Text>
+        <Text style={themedStyles.title}>Profile</Text>
       </View>
 
-      {selectedImage ? (
-        <Image source={{uri: selectedImage}} style={styles.avatar} />
-      ) : null}
+      {/* Profile info row */}
+      <View style={themedStyles.profileRow}>
+        {selectedImage ? (
+          <Image source={{uri: selectedImage}} style={themedStyles.avatar} />
+        ) : (
+          <View style={themedStyles.avatar} />
+        )}
+        <View style={themedStyles.userInfo}>
+          <Text style={themedStyles.userName}>{userData?.username}</Text>
+          <Text style={themedStyles.emailText}>{userData?.email}</Text>
+        </View>
+      </View>
 
-      <Text style={styles.userName}>{userData?.username}</Text>
-      <Text style={styles.emailText}>{userData?.email}</Text>
-
-      <TouchableOpacity
-        style={styles.changePhotoButton}
-        onPress={handleChoosePhoto}>
-        <Text style={styles.buttonText}>Select Photo</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.changePhotoButton}
-        onPress={handleTakePhoto}>
-        <Text style={styles.buttonText}>Take Photo</Text>
-      </TouchableOpacity>
+      {/* Modern button row, now centered */}
+      <View style={themedStyles.buttonRow}>
+        <TouchableOpacity
+          style={themedStyles.modernButton}
+          onPress={handleChoosePhoto}>
+          <Text style={themedStyles.buttonText}>Select Photo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={themedStyles.modernButton}
+          onPress={handleTakePhoto}>
+          <Text style={themedStyles.buttonText}>Take Photo</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };

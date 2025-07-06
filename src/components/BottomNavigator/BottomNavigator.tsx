@@ -15,11 +15,11 @@ import {
 import {UserContextType} from '../UserContext';
 import UserContext from '../UserContext';
 import {IconDefinition} from '@fortawesome/fontawesome-svg-core';
+import {useTheme} from '@react-navigation/native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-// Move TabBarIcon outside of BottomNavigator
 const TabBarIcon = ({
   icon,
   color,
@@ -32,27 +32,28 @@ const TabBarIcon = ({
   return <FontAwesomeIcon icon={icon} size={size} color={color} />;
 };
 
-// Screen options outside of BottomNavigator
-const screenOptions = ({route}: {route: any}) => ({
-  headerShown: false,
-  tabBarLabel: () => null,
-  tabBarStyle: {
-    backgroundColor: '#02131D',
-    borderTopColor: '#fff',
-    paddingBottom: 10,
-    paddingTop: 10,
-  },
-  tabBarIcon: (props: {color: string; size: number}) => {
+// Helper function to generate tabBarIcon renderer with theme colors
+function createTabBarIcon(colors: {primary: string; text: string}) {
+  // This function is stable and can be reused
+  return function tabBarIcon({
+    route,
+    focused,
+    size,
+  }: {
+    route: {name: string};
+    focused: boolean;
+    size: number;
+  }) {
     const iconMap: Record<string, IconDefinition> = {
       Event: faUsers,
       Profile: faUser,
       CommunityNotes: faStickyNote,
     };
-
     const icon = iconMap[route.name] || faQuestion;
-    return <TabBarIcon icon={icon} color={props.color} size={props.size} />;
-  },
-});
+    const iconColor = focused ? colors.primary : colors.text;
+    return <TabBarIcon icon={icon} color={iconColor} size={size} />;
+  };
+}
 
 // Stack Navigator for Event-related screens
 const EventStack = () => {
@@ -74,6 +75,7 @@ const EventStack = () => {
 
 const BottomNavigator: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
+  const {colors} = useTheme();
 
   if (!userData) {
     // Prevent crash during sign out navigation transition
@@ -81,6 +83,33 @@ const BottomNavigator: React.FC = () => {
   }
 
   const userId = userData?._id;
+
+  // Create a stable tabBarIcon renderer with current theme colors
+  const themedTabBarIcon = ({
+    route,
+    focused,
+    size,
+  }: {
+    route: {name: string};
+    focused: boolean;
+    size: number;
+  }) => createTabBarIcon(colors)({route, focused, size});
+
+  // Dynamic screen options using theme colors
+  const screenOptions = ({route}: {route: any}) => ({
+    headerShown: false,
+    tabBarLabel: () => null,
+    tabBarStyle: {
+      backgroundColor: colors.card,
+      borderTopColor: colors.border,
+      paddingBottom: 10,
+      paddingTop: 10,
+    },
+    tabBarIcon: (props: {color: string; size: number; focused: boolean}) =>
+      themedTabBarIcon({route, focused: props.focused, size: props.size}),
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: colors.text,
+  });
 
   return (
     <Tab.Navigator screenOptions={screenOptions}>
