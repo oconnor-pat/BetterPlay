@@ -1,4 +1,4 @@
-import React, {useState, useContext, useEffect, useMemo} from 'react';
+import React, {useState, useContext, useEffect, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -70,6 +70,16 @@ const CommunityNotes: React.FC = () => {
 
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
+
+  // --- Autofocus logic for reply input ---
+  const replyInputRefs = useRef<{[key: string]: TextInput | null}>({});
+
+  useEffect(() => {
+    if (replyingTo && replyInputRefs.current[replyingTo]) {
+      replyInputRefs.current[replyingTo]?.focus();
+    }
+  }, [replyingTo]);
+  // ---------------------------------------
 
   // Memoize styles to update when theme changes
   const styles = useMemo(
@@ -787,6 +797,11 @@ const CommunityNotes: React.FC = () => {
                     {replyingTo === comment._id ? (
                       <View style={styles.replyInputRow}>
                         <TextInput
+                          ref={ref => {
+                            if (ref) {
+                              replyInputRefs.current[comment._id!] = ref;
+                            }
+                          }}
                           style={styles.replyInput}
                           placeholder="Write a reply..."
                           placeholderTextColor={colors.border}
