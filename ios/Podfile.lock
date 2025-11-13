@@ -894,7 +894,7 @@ PODS:
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
-  - react-native-maps (1.20.1):
+  - react-native-maps (1.17.1):
     - React-Core
   - react-native-safe-area-context (4.14.1):
     - React-Core
@@ -1067,38 +1067,20 @@ PODS:
     - React-perflogger (= 0.73.1)
   - RNCAsyncStorage (1.24.0):
     - React-Core
-  - RNCPicker (2.10.2):
+  - RNCPicker (2.11.1):
     - React-Core
-  - RNDateTimePicker (8.2.0):
+  - RNDateTimePicker (8.4.2):
     - React-Core
-  - RNGestureHandler (2.21.2):
+  - RNGestureHandler (2.27.1):
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
-  - RNReanimated (3.16.6):
-    - glog
-    - RCT-Folly (= 2022.05.16.00)
-    - React-Core
-    - ReactCommon/turbomodule/core
-    - RNReanimated/reanimated (= 3.16.6)
-    - RNReanimated/worklets (= 3.16.6)
-  - RNReanimated/reanimated (3.16.6):
+  - RNReanimated (3.7.0):
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
     - ReactCommon/turbomodule/core
-    - RNReanimated/reanimated/apple (= 3.16.6)
-  - RNReanimated/reanimated/apple (3.16.6):
-    - glog
-    - RCT-Folly (= 2022.05.16.00)
-    - React-Core
-    - ReactCommon/turbomodule/core
-  - RNReanimated/worklets (3.16.6):
-    - glog
-    - RCT-Folly (= 2022.05.16.00)
-    - React-Core
-    - ReactCommon/turbomodule/core
-  - RNScreens (3.35.0):
+  - RNScreens (3.37.0):
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
@@ -1338,7 +1320,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: 9731a0a63ebaf8976014623c4d637744d7353a7c
   react-native-geolocation: c15fa78a481451620baff55cfc2e04a52e033dd7
   react-native-image-picker: 19724166be03268b0609044bf794c19bd2c496b5
-  react-native-maps: ee1e65647460c3d41e778071be5eda10e3da6225
+  react-native-maps: a469b8e9093ba8613ba238bde2d1152078b6a191
   react-native-safe-area-context: 141eca0fd4e4191288dfc8b96a7c7e1c2983447a
   React-nativeconfig: 37aecd26d64b79327c3f10e43b2e9a6c425e0a60
   React-NativeModulesApple: 9ca6d2eaa1dd5606588262195b46d0774bdec83a
@@ -1361,11 +1343,11 @@ SPEC CHECKSUMS:
   React-utils: debda2c206770ee2785bdebb7f16d8db9f18838a
   ReactCommon: ddb128564dcbfa0287d3d1a2d10f8c7457c971f6
   RNCAsyncStorage: ec53e44dc3e75b44aa2a9f37618a49c3bc080a7a
-  RNCPicker: d162737e03e48797110dbb60e5ddc03012e87e0b
-  RNDateTimePicker: 40ffda97d071a98a10fdca4fa97e3977102ccd14
-  RNGestureHandler: f5160496947abe7f1351d39887cc99bbf5e72507
-  RNReanimated: 493854c0a7569a1e70637d1c9790d3cdf12e2922
-  RNScreens: f8d5311675a63b7a8a75f46fe5bc231002899650
+  RNCPicker: 55f4c211f69edb5c7a0faf85933e36c3621ebf64
+  RNDateTimePicker: 5f8f466cebb540aabd442d485e4ce5b27cf54b23
+  RNGestureHandler: f8ba13177e1e20c9b671f0ff224a770e5f34542c
+  RNReanimated: 7d6d32f238f914f13d9d6fb45c0aef557f7f901e
+  RNScreens: 35138e05ce1d595482e8fc58eb2b9761d967d24a
   RNSVG: 963a95f1f5d512a13d11ffd50d351c87fb5c6890
   RNVectorIcons: 48aa8b1a17c7f82461df43783b0818cad38a2bcf
   SocketRocket: f32cd54efbe0f095c4d7594881e52619cfe80b17

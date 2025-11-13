@@ -13,6 +13,7 @@ import {
   ThemeProvider,
   useTheme,
 } from './src/components/ThemeContext/ThemeContext';
+import {EventProvider} from './src/Context/EventContext';
 
 // Types
 type UserData = {
@@ -34,34 +35,36 @@ const AppContent = () => {
         barStyle={darkMode ? 'light-content' : 'dark-content'}
       />
       <UserContext.Provider value={{userData, setUserData}}>
-        <NavigationContainer theme={darkMode ? DarkTheme : DefaultTheme}>
-          <Stack.Navigator
-            initialRouteName="LandingPage"
-            screenOptions={{
-              headerStyle: {
-                backgroundColor: darkMode ? '#000' : '#02131D',
-              },
-              headerTintColor: '#fff',
-              headerTitleAlign: 'center',
-              headerBackTitleVisible: false,
-              headerTitleStyle: {
-                fontWeight: 'bold',
-              },
-            }}>
-            <Stack.Screen
-              name="LandingPage"
-              component={LandingPage}
-              options={{headerShown: false}}
-            />
-            {userData && (
+        <EventProvider>
+          <NavigationContainer theme={darkMode ? DarkTheme : DefaultTheme}>
+            <Stack.Navigator
+              initialRouteName="LandingPage"
+              screenOptions={{
+                headerStyle: {
+                  backgroundColor: darkMode ? '#000' : '#02131D',
+                },
+                headerTintColor: '#fff',
+                headerTitleAlign: 'center',
+                headerBackTitleVisible: false,
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}>
               <Stack.Screen
-                name="BottomNavigator"
-                component={BottomNavigator}
+                name="LandingPage"
+                component={LandingPage}
                 options={{headerShown: false}}
               />
-            )}
-          </Stack.Navigator>
-        </NavigationContainer>
+              {userData && (
+                <Stack.Screen
+                  name="BottomNavigator"
+                  component={BottomNavigator}
+                  options={{headerShown: false}}
+                />
+              )}
+            </Stack.Navigator>
+          </NavigationContainer>
+        </EventProvider>
       </UserContext.Provider>
     </>
   );

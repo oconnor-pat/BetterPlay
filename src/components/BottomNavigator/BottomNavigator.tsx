@@ -1,8 +1,8 @@
 import React, {useContext} from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
-import EventList from '../Event-list/EventList';
-import EventRoster from '../Event-roster/EventRoster';
+import EventList from '../EventList/EventList';
+import EventRoster from '../EventRoster/EventRoster';
 import Profile from '../Profile/Profile';
 import CommunityNotes from '../Communitynotes/CommunityNotes';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -15,7 +15,7 @@ import {
 import {UserContextType} from '../UserContext';
 import UserContext from '../UserContext';
 import {IconDefinition} from '@fortawesome/fontawesome-svg-core';
-import {useTheme} from '@react-navigation/native';
+import {useTheme} from '../ThemeContext/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -57,11 +57,12 @@ function createTabBarIcon(colors: {primary: string; text: string}) {
 
 // Stack Navigator for Event-related screens
 const EventStack = () => {
+  const {colors} = useTheme();
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: {backgroundColor: '#02131D'},
-        headerTintColor: '#fff',
+        headerStyle: {backgroundColor: colors.card},
+        headerTintColor: colors.text,
       }}>
       <Stack.Screen
         name="EventList"

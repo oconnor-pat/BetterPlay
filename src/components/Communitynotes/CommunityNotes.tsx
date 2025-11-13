@@ -157,6 +157,12 @@ const CommunityNotes: React.FC = () => {
           alignItems: 'flex-start',
           marginBottom: 8,
         },
+        postUsername: {
+          color: colors.primary,
+          fontSize: 15,
+          fontWeight: 'bold',
+          marginBottom: 2,
+        },
         postText: {
           fontSize: 17,
           color: colors.text,
@@ -311,6 +317,9 @@ const CommunityNotes: React.FC = () => {
         editActionIcon: {
           marginLeft: 4,
           padding: 4,
+        },
+        flex1: {
+          flex: 1,
         },
       }),
     [colors],
@@ -636,16 +645,23 @@ const CommunityNotes: React.FC = () => {
           onRefresh={fetchPosts}
           renderItem={({item}) => (
             <View style={styles.postContainer}>
-              {/* Post header row with text and trash/edit icons */}
+              {/* Post header row with username, text and trash/edit icons */}
               <View style={styles.postHeaderRow}>
-                {editingPostId === item._id ? (
-                  <>
+                <View style={styles.flex1}>
+                  <Text style={styles.postUsername}>{item.username}</Text>
+                  {editingPostId === item._id ? (
                     <TextInput
                       style={styles.editInput}
                       value={editingPostText}
                       onChangeText={setEditingPostText}
                       autoFocus
                     />
+                  ) : (
+                    <Text style={styles.postText}>{item.text}</Text>
+                  )}
+                </View>
+                {editingPostId === item._id ? (
+                  <>
                     <TouchableOpacity
                       style={styles.editActionIcon}
                       onPress={() => saveEditPost(item._id)}>
@@ -665,33 +681,28 @@ const CommunityNotes: React.FC = () => {
                       />
                     </TouchableOpacity>
                   </>
-                ) : (
-                  <>
-                    <Text style={styles.postText}>{item.text}</Text>
-                    {userData && item.userId === userData._id ? (
-                      <View style={styles.rowCenter}>
-                        <TouchableOpacity
-                          style={styles.postEditIcon}
-                          onPress={() => startEditPost(item)}>
-                          <FontAwesomeIcon
-                            icon={faEdit}
-                            size={20}
-                            color={colors.primary}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.postTrashIcon}
-                          onPress={() => deletePost(item._id)}>
-                          <FontAwesomeIcon
-                            icon={faTrash}
-                            size={22}
-                            color={colors.text}
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
-                  </>
-                )}
+                ) : userData && item.userId === userData._id ? (
+                  <View style={styles.rowCenter}>
+                    <TouchableOpacity
+                      style={styles.postEditIcon}
+                      onPress={() => startEditPost(item)}>
+                      <FontAwesomeIcon
+                        icon={faEdit}
+                        size={20}
+                        color={colors.primary}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.postTrashIcon}
+                      onPress={() => deletePost(item._id)}>
+                      <FontAwesomeIcon
+                        icon={faTrash}
+                        size={22}
+                        color={colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
               </View>
 
               {/* Add Comment Input Row */}

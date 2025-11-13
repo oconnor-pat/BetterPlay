@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect, useContext} from 'react';
+import React, {useState, useRef, useEffect, useContext, useMemo} from 'react';
 import {
   View,
   Text,
@@ -29,15 +29,89 @@ type RootStackParamList = {
 function LandingPage() {
   // User context
   const userContext = useContext(UserContext);
-
   if (!userContext) {
     throw new Error('LandingPage must be used within a UserProvider');
   }
-
   const {userData, setUserData} = userContext;
 
-  // Theme context
+  // Theme
   const {colors} = useTheme();
+  const themedStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: colors.background,
+        },
+        title: {
+          textAlign: 'center',
+          fontSize: 20,
+          fontWeight: 'bold',
+          marginBottom: 20,
+          marginTop: 100,
+          color: colors.primary,
+        },
+        buttonContainer: {
+          flexDirection: 'row',
+          justifyContent: 'center',
+          marginBottom: 20,
+        },
+        loginButton: {
+          marginRight: 10,
+          height: 35,
+          width: 100,
+          borderRadius: 10,
+          backgroundColor: colors.primary,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        registerButton: {
+          height: 35,
+          width: 100,
+          borderRadius: 10,
+          backgroundColor: colors.border,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        loginCancelButton: {
+          height: 35,
+          width: 100,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        registerCancelButton: {
+          height: 35,
+          width: 100,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        buttonText: {
+          color: colors.text,
+          fontSize: 16,
+          fontWeight: 'bold',
+        },
+        input: {
+          height: 40,
+          borderColor: colors.border,
+          borderWidth: 1,
+          marginBottom: 10,
+          padding: 10,
+          backgroundColor: colors.card,
+          color: colors.text,
+        },
+        errorMessage: {
+          color: colors.text,
+          marginTop: 10,
+        },
+        successMessage: {
+          color: colors.primary,
+          marginTop: 10,
+        },
+      }),
+    [colors],
+  );
 
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
@@ -52,7 +126,7 @@ function LandingPage() {
     password: '',
   });
 
-  //Error messages
+  // Error messages
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -77,14 +151,10 @@ function LandingPage() {
 
   useEffect(() => {
     if (showLoginForm) {
-      if (loginUsernameInputRef.current) {
-        loginUsernameInputRef.current.focus();
-      }
+      loginUsernameInputRef.current?.focus();
     }
     if (showRegisterForm) {
-      if (registerNameInputRef.current) {
-        registerNameInputRef.current.focus();
-      }
+      registerNameInputRef.current?.focus();
     }
   }, [showLoginForm, showRegisterForm]);
 
@@ -92,17 +162,12 @@ function LandingPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(registrationData),
       });
-
       const responseData = await response.json();
-
       if (responseData.success) {
         await AsyncStorage.setItem('userToken', responseData.token);
-
         setSuccessMessage('User created successfully!');
         setErrorMessage(null);
         setUserData(responseData.user);
@@ -117,7 +182,7 @@ function LandingPage() {
           },
         });
       } else {
-        if (responseData.message.includes('Email already in use')) {
+        if (responseData.message?.includes('Email already in use')) {
           setErrorMessage('Email already in use. Please use another email.');
         } else {
           setErrorMessage(responseData.message);
@@ -125,6 +190,7 @@ function LandingPage() {
         setSuccessMessage(null);
       }
     } catch (error) {
+      console.error('Error during registration:', error as Error);
       setErrorMessage('Failed to create new user. Please try again.');
       setSuccessMessage(null);
     }
@@ -140,21 +206,18 @@ function LandingPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(loginData),
       });
-
       const responseData = await response.json();
 
       if (responseData.success) {
         setUserData(responseData.user);
         if (!responseData.token) {
+          console.error('No token in response', responseData);
           return;
         }
         await AsyncStorage.setItem('userToken', responseData.token);
-
         setSuccessMessage('User logged in successfully!');
         setErrorMessage(null);
 
@@ -175,6 +238,7 @@ function LandingPage() {
         setSuccessMessage(null);
       }
     } catch (error) {
+      console.error('Error during login:', error);
       setErrorMessage('Failed to log in. Please try again.');
       setSuccessMessage(null);
     }
@@ -196,125 +260,6 @@ function LandingPage() {
     setSuccessMessage(null);
   };
 
-  // Themed styles using theme context colors
-  const themedStyles = StyleSheet.create({
-    container: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors.background,
-    },
-    card: {
-      width: '98%',
-      maxWidth: 600,
-      minWidth: 320,
-      paddingHorizontal: 40,
-      paddingVertical: 24,
-      borderRadius: 16,
-      backgroundColor: colors.card,
-      borderColor: colors.border,
-      borderWidth: 1,
-      shadowColor: colors.text,
-      shadowOffset: {width: 0, height: 2},
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 6,
-      marginVertical: 16,
-      alignSelf: 'center',
-    },
-    cardTitle: {
-      fontSize: 22,
-      fontWeight: 'bold',
-      color: colors.primary,
-      marginBottom: 18,
-      textAlign: 'center',
-      letterSpacing: 0.5,
-    },
-    input: {
-      height: 44,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: 8,
-      marginBottom: 14,
-      paddingHorizontal: 12,
-      backgroundColor: colors.inputBackground || '#A9A9A9',
-      color: colors.text,
-      fontSize: 16,
-    },
-    buttonRow: {
-      flexDirection: 'row',
-      justifyContent: 'center', // Center the buttons
-      alignItems: 'center',
-      marginTop: 10,
-      marginBottom: 4,
-    },
-    button: {
-      height: 44,
-      borderRadius: 8,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginHorizontal: 16, // Add horizontal margin for spacing
-      backgroundColor: colors.primary,
-      minWidth: 120,
-      maxWidth: 200,
-      paddingHorizontal: 24, // Ensure button is wide enough
-    },
-    buttonAlt: {
-      backgroundColor: colors.error || '#b11313',
-    },
-    buttonText: {
-      color: colors.buttonText || '#fff',
-      fontSize: 16,
-      fontWeight: 'bold',
-    },
-    switchRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 24,
-      marginTop: 12,
-    },
-    switchButton: {
-      paddingHorizontal: 18,
-      paddingVertical: 10,
-      borderRadius: 8,
-      marginHorizontal: 8,
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.primary,
-    },
-    switchButtonActive: {
-      backgroundColor: colors.primary,
-    },
-    switchButtonText: {
-      color: colors.primary,
-      fontWeight: 'bold',
-      fontSize: 16,
-    },
-    switchButtonTextActive: {
-      color: colors.buttonText || '#fff',
-    },
-    errorMessage: {
-      color: colors.error || '#b11313',
-      marginTop: 10,
-      textAlign: 'center',
-    },
-    successMessage: {
-      color: colors.primary,
-      marginTop: 10,
-      textAlign: 'center',
-    },
-    title: {
-      textAlign: 'center',
-      fontSize: 28,
-      fontWeight: 'bold',
-      marginBottom: 12,
-      marginTop: 60,
-      color: colors.primary,
-      letterSpacing: 1,
-    },
-  });
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -323,50 +268,31 @@ function LandingPage() {
       <TouchableWithoutFeedback onPress={dismissForms}>
         <View style={themedStyles.container}>
           <Text style={themedStyles.title}>Welcome!</Text>
-          <View style={themedStyles.switchRow}>
+          <View style={themedStyles.buttonContainer}>
             <TouchableOpacity
-              style={[
-                themedStyles.switchButton,
-                showLoginForm && themedStyles.switchButtonActive,
-              ]}
+              style={themedStyles.loginButton}
               onPress={() => {
                 setShowLoginForm(true);
                 setShowRegisterForm(false);
               }}>
-              <Text
-                style={[
-                  themedStyles.switchButtonText,
-                  showLoginForm && themedStyles.switchButtonTextActive,
-                ]}>
-                Login
-              </Text>
+              <Text style={themedStyles.buttonText}>Login</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[
-                themedStyles.switchButton,
-                showRegisterForm && themedStyles.switchButtonActive,
-              ]}
+              style={themedStyles.registerButton}
               onPress={() => {
                 setShowLoginForm(false);
                 setShowRegisterForm(true);
               }}>
-              <Text
-                style={[
-                  themedStyles.switchButtonText,
-                  showRegisterForm && themedStyles.switchButtonTextActive,
-                ]}>
-                Register
-              </Text>
+              <Text style={themedStyles.buttonText}>Register</Text>
             </TouchableOpacity>
           </View>
 
           {showLoginForm && (
-            <View style={themedStyles.card}>
-              <Text style={themedStyles.cardTitle}>Login</Text>
+            <View>
               <TextInput
                 style={themedStyles.input}
                 placeholder="Username"
-                placeholderTextColor={colors.placeholder || '#888'}
+                placeholderTextColor={colors.text}
                 value={loginData.username}
                 onChangeText={text =>
                   setLoginData({...loginData, username: text})
@@ -377,7 +303,7 @@ function LandingPage() {
               <TextInput
                 style={themedStyles.input}
                 placeholder="Password"
-                placeholderTextColor={colors.placeholder || '#888'}
+                placeholderTextColor={colors.text}
                 secureTextEntry
                 value={loginData.password}
                 onChangeText={text =>
@@ -386,28 +312,25 @@ function LandingPage() {
                 ref={loginPasswordInputRef}
                 autoCapitalize="none"
               />
-              <View style={themedStyles.buttonRow}>
-                <TouchableOpacity
-                  style={themedStyles.button}
-                  onPress={handleLogin}>
-                  <Text style={themedStyles.buttonText}>Login</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[themedStyles.button, themedStyles.buttonAlt]}
-                  onPress={cancelForm}>
-                  <Text style={themedStyles.buttonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={themedStyles.loginButton}
+                onPress={handleLogin}>
+                <Text style={themedStyles.buttonText}>Login</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={themedStyles.loginCancelButton}
+                onPress={cancelForm}>
+                <Text style={themedStyles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
             </View>
           )}
 
           {showRegisterForm && (
-            <View style={themedStyles.card}>
-              <Text style={themedStyles.cardTitle}>Register</Text>
+            <View>
               <TextInput
                 style={themedStyles.input}
                 placeholder="Name"
-                placeholderTextColor={colors.placeholder || '#888'}
+                placeholderTextColor={colors.text}
                 value={registrationData.name}
                 onChangeText={text =>
                   setRegistrationData({...registrationData, name: text})
@@ -418,7 +341,7 @@ function LandingPage() {
               <TextInput
                 style={themedStyles.input}
                 placeholder="Email"
-                placeholderTextColor={colors.placeholder || '#888'}
+                placeholderTextColor={colors.text}
                 value={registrationData.email}
                 onChangeText={text =>
                   setRegistrationData({...registrationData, email: text})
@@ -429,7 +352,7 @@ function LandingPage() {
               <TextInput
                 style={themedStyles.input}
                 placeholder="Username"
-                placeholderTextColor={colors.placeholder || '#888'}
+                placeholderTextColor={colors.text}
                 value={registrationData.username}
                 onChangeText={text =>
                   setRegistrationData({...registrationData, username: text})
@@ -440,7 +363,7 @@ function LandingPage() {
               <TextInput
                 style={themedStyles.input}
                 placeholder="Password"
-                placeholderTextColor={colors.placeholder || '#888'}
+                placeholderTextColor={colors.text}
                 secureTextEntry
                 value={registrationData.password}
                 onChangeText={text =>
@@ -449,18 +372,16 @@ function LandingPage() {
                 ref={registerPasswordInputRef}
                 autoCapitalize="none"
               />
-              <View style={themedStyles.buttonRow}>
-                <TouchableOpacity
-                  style={themedStyles.button}
-                  onPress={handleRegistration}>
-                  <Text style={themedStyles.buttonText}>Register</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[themedStyles.button, themedStyles.buttonAlt]}
-                  onPress={cancelForm}>
-                  <Text style={themedStyles.buttonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={themedStyles.registerButton}
+                onPress={handleRegistration}>
+                <Text style={themedStyles.buttonText}>Register</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={themedStyles.registerCancelButton}
+                onPress={cancelForm}>
+                <Text style={themedStyles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
             </View>
           )}
           {errorMessage && (
