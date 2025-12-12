@@ -54,15 +54,10 @@ interface Event {
 const API_BASE_URL = 'http://localhost:8001';
 
 // Google Places API configuration
-const GOOGLE_PLACES_API_KEY = 'PASTE_YOUR_ACTUAL_API_KEY_HERE'; // Replace with your actual API key
+const GOOGLE_PLACES_API_KEY = 'AIzaSyB2whAJQnbVtkVlHp98SSGIO-FB_dcK6qY';
 
 // Check if API key is configured
-const isApiKeyConfigured =
-  GOOGLE_PLACES_API_KEY !== 'PASTE_YOUR_ACTUAL_API_KEY_HERE' &&
-  GOOGLE_PLACES_API_KEY !== 'YOUR_GOOGLE_PLACES_API_KEY';
-
-// TEMPORARY: Force autocomplete for testing (remove this line when you add real API key)
-// const isApiKeyConfigured = true;
+const isApiKeyConfigured = true;
 
 // Helper function to create empty event object
 const createEmptyEvent = () => ({
@@ -443,6 +438,51 @@ const EventList: React.FC = () => {
     [colors],
   );
 
+  // Memoize GooglePlacesAutocomplete styles to prevent infinite loop
+  const autocompleteStyles = useMemo(
+    () => ({
+      container: {
+        flex: 0,
+      },
+      textInputContainer: {
+        backgroundColor: 'transparent',
+      },
+      textInput: {
+        backgroundColor: colors.inputBackground || '#fff',
+        color: colors.text,
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+        fontSize: 16,
+      },
+      listView: {
+        backgroundColor: colors.card || '#fff',
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderTopWidth: 0,
+        borderRadius: 8,
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+        maxHeight: 200,
+      },
+      row: {
+        backgroundColor: colors.card || '#fff',
+        padding: 13,
+        minHeight: 44,
+        flexDirection: 'row' as const,
+      },
+      separator: {
+        height: 0.5,
+        backgroundColor: colors.border,
+      },
+      description: {
+        color: colors.text,
+      },
+    }),
+    [colors],
+  );
+
   const [eventData, setEventData] = useState<Event[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -792,11 +832,7 @@ const EventList: React.FC = () => {
           />
           {/* Location Input with Autocomplete */}
           <View style={themedStyles.autocompleteContainer}>
-            {(() => {
-              console.log('API Key configured:', isApiKeyConfigured);
-              console.log('Current API Key:', GOOGLE_PLACES_API_KEY);
-              return isApiKeyConfigured;
-            })() ? (
+            {isApiKeyConfigured ? (
               <GooglePlacesAutocomplete
                 placeholder="Location/Facility"
                 onPress={(data, details = null) => {
@@ -820,49 +856,12 @@ const EventList: React.FC = () => {
                   types: 'establishment|geocode',
                 }}
                 fetchDetails={true}
-                styles={{
-                  container: {
-                    flex: 0,
-                  },
-                  textInputContainer: {
-                    backgroundColor: 'transparent',
-                  },
-                  textInput: {
-                    ...themedStyles.modalInput,
-                  },
-                  listView: {
-                    backgroundColor: colors.card || '#fff',
-                    borderColor: colors.border,
-                    borderWidth: 1,
-                    borderTopWidth: 0,
-                    borderRadius: 8,
-                    borderTopLeftRadius: 0,
-                    borderTopRightRadius: 0,
-                    maxHeight: 200,
-                  },
-                  row: {
-                    backgroundColor: colors.card || '#fff',
-                    padding: 13,
-                    minHeight: 44,
-                    flexDirection: 'row',
-                  },
-                  separator: {
-                    height: 0.5,
-                    backgroundColor: colors.border,
-                  },
-                  description: {
-                    color: colors.text,
-                  },
-                }}
+                styles={autocompleteStyles}
                 onFail={error => {
                   console.warn('GooglePlacesAutocomplete error:', error);
                 }}
                 textInputProps={{
                   placeholderTextColor: colors.placeholder || '#888',
-                  value: newEvent.location,
-                  onChangeText: text => {
-                    setNewEvent({...newEvent, location: text});
-                  },
                 }}
                 enablePoweredByContainer={false}
                 debounce={200}

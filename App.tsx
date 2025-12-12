@@ -7,6 +7,7 @@ import {
 import {createStackNavigator} from '@react-navigation/stack';
 import LandingPage from './src/components/Landingpage/LandingPage';
 import BottomNavigator from './src/components/BottomNavigator/BottomNavigator';
+import Settings from './src/components/Settings/Settings';
 import {StatusBar} from 'react-native';
 import UserContext from './src/components/UserContext';
 import {
@@ -56,11 +57,21 @@ const AppContent = () => {
                 options={{headerShown: false}}
               />
               {userData && (
-                <Stack.Screen
-                  name="BottomNavigator"
-                  component={BottomNavigator}
-                  options={{headerShown: false}}
-                />
+                <>
+                  <Stack.Screen
+                    name="BottomNavigator"
+                    component={BottomNavigator}
+                    options={{headerShown: false}}
+                  />
+                  <Stack.Screen
+                    name="Settings"
+                    component={Settings}
+                    options={{
+                      headerShown: true,
+                      title: 'Settings',
+                    }}
+                  />
+                </>
               )}
             </Stack.Navigator>
           </NavigationContainer>

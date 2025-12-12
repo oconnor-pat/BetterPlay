@@ -4,7 +4,7 @@
   "scripts": {
     "android": "npm run emulator:pixel9 && npx react-native run-android",
     "emulator:pixel9": "emulator -avd Pixel_9_Pro || true",
-    "ios": "react-native run-ios --simulator='iPhone 16 Pro (18.1)'",
+    "ios": "react-native run-ios --simulator='iPhone 17 Pro (26.1)'",
     "lint": "eslint .",
     "start": "react-native start --port 8082",
     "test": "jest"

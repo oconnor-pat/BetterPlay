@@ -5,10 +5,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
-  Switch,
 } from 'react-native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import {faBars} from '@fortawesome/free-solid-svg-icons';
+import {faBars, faGear, faSignOut} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import UserContext from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
@@ -17,7 +16,7 @@ const HamburgerMenu: React.FC = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const {setUserData} = useContext(UserContext);
   const navigation = useNavigation<NavigationProp<any>>();
-  const {darkMode, toggleDarkMode} = useTheme();
+  const {colors} = useTheme();
 
   const handleMenuToggle = () => {
     setMenuVisible(!menuVisible);
@@ -31,6 +30,8 @@ const HamburgerMenu: React.FC = () => {
         index: 0,
         routes: [{name: 'LandingPage'}],
       });
+    } else if (option === 'Settings') {
+      navigation.navigate('Settings');
     }
   };
 
@@ -47,21 +48,19 @@ const HamburgerMenu: React.FC = () => {
       {/* Modal for Menu */}
       <Modal transparent={true} visible={menuVisible} animationType="slide">
         <TouchableOpacity style={styles.overlay} onPress={handleMenuToggle}>
-          <View>
+          <View style={[styles.menuContainer, {backgroundColor: colors.card}]}>
             <TouchableOpacity
-              style={styles.menuOption}
-              onPress={() => handleOptionPress('Sign Out')}>
-              <Text style={styles.menuText}>Sign Out</Text>
+              style={[styles.menuOption, {borderBottomColor: colors.border}]}
+              onPress={() => handleOptionPress('Settings')}>
+              <FontAwesomeIcon icon={faGear} size={20} color={colors.text} />
+              <Text style={[styles.menuText, {color: colors.text}]}>Settings</Text>
             </TouchableOpacity>
-            <View style={styles.menuOption}>
-              <Text style={styles.menuText}>Dark Mode</Text>
-              <Switch
-                value={darkMode}
-                onValueChange={toggleDarkMode}
-                thumbColor={darkMode ? '#fff' : '#02131D'}
-                trackColor={{false: '#767577', true: '#81b0ff'}}
-              />
-            </View>
+            <TouchableOpacity
+              style={[styles.menuOption, styles.lastOption]}
+              onPress={() => handleOptionPress('Sign Out')}>
+              <FontAwesomeIcon icon={faSignOut} size={20} color={colors.error} />
+              <Text style={[styles.menuText, {color: colors.error}]}>Sign Out</Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -78,26 +77,32 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 60,
   },
   menuContainer: {
-    backgroundColor: '#02131D',
-    padding: 20,
-    marginTop: 60,
-    alignItems: 'center',
+    marginHorizontal: 16,
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
   menuOption: {
-    padding: 10,
-    borderBottomColor: '#ccc',
+    padding: 16,
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    width: 180,
+    gap: 12,
+  },
+  lastOption: {
+    borderBottomWidth: 0,
   },
   menuText: {
-    color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
