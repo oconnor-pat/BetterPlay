@@ -1,11 +1,5 @@
 import React, {useState, useContext} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, Modal} from 'react-native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {faBars, faGear, faSignOut} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
@@ -53,13 +47,21 @@ const HamburgerMenu: React.FC = () => {
               style={[styles.menuOption, {borderBottomColor: colors.border}]}
               onPress={() => handleOptionPress('Settings')}>
               <FontAwesomeIcon icon={faGear} size={20} color={colors.text} />
-              <Text style={[styles.menuText, {color: colors.text}]}>Settings</Text>
+              <Text style={[styles.menuText, {color: colors.text}]}>
+                Settings
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.menuOption, styles.lastOption]}
               onPress={() => handleOptionPress('Sign Out')}>
-              <FontAwesomeIcon icon={faSignOut} size={20} color={colors.error} />
-              <Text style={[styles.menuText, {color: colors.error}]}>Sign Out</Text>
+              <FontAwesomeIcon
+                icon={faSignOut}
+                size={20}
+                color={colors.error}
+              />
+              <Text style={[styles.menuText, {color: colors.error}]}>
+                Sign Out
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

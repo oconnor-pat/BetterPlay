@@ -124,6 +124,9 @@ const Settings: React.FC = () => {
           color: colors.text,
           marginBottom: 8,
         },
+        loadingTitle: {
+          textAlign: 'center',
+        },
         subtitle: {
           fontSize: 14,
           color: colors.placeholder,
@@ -213,7 +216,7 @@ const Settings: React.FC = () => {
     return (
       <SafeAreaView style={themedStyles.container}>
         <View style={themedStyles.container}>
-          <Text style={[themedStyles.title, {textAlign: 'center'}]}>
+          <Text style={[themedStyles.title, themedStyles.loadingTitle]}>
             Loading...
           </Text>
         </View>
