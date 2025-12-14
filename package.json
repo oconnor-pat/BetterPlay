@@ -26,7 +26,7 @@
     "react": "18.2.0",
     "react-native": "0.73.1",
     "react-native-gesture-handler": "^2.14.1",
-    "react-native-get-random-values": "^2.0.0",
+    "react-native-get-random-values": "^1.11.0",
     "react-native-google-places-autocomplete": "^2.5.6",
     "react-native-image-picker": "^7.1.0",
     "react-native-maps": "^1.17.1",

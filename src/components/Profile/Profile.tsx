@@ -9,6 +9,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {useTheme} from '../ThemeContext/ThemeContext';
+import {API_BASE_URL} from '../../config/api';
 
 // Types
 type ProfileScreenRouteProp = RouteProp<
@@ -124,15 +125,12 @@ const Profile: React.FC = () => {
 
       try {
         const token = await AsyncStorage.getItem('token');
-        const response = await fetch(
-          `https://omhl-be-9801a7de15ab.herokuapp.com/user/${_id}`,
-          {
-            headers: {
-              Authorization: token ? `Bearer ${token}` : '',
-              'Content-Type': 'application/json',
-            },
+        const response = await fetch(`${API_BASE_URL}/user/${_id}`, {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : '',
+            'Content-Type': 'application/json',
           },
-        );
+        });
         const text = await response.text();
         if (!response.ok) {
           console.error(`Fetch failed with status ${response.status}:`, text);
