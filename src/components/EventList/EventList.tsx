@@ -24,6 +24,7 @@ import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
+import {API_BASE_URL} from '../../config/api';
 
 export type RootStackParamList = {
   EventList: undefined;
@@ -50,8 +51,6 @@ interface Event {
   latitude?: number;
   longitude?: number;
 }
-
-const API_BASE_URL = 'http://localhost:8001';
 
 // Google Places API configuration
 const GOOGLE_PLACES_API_KEY = 'AIzaSyB2whAJQnbVtkVlHp98SSGIO-FB_dcK6qY';

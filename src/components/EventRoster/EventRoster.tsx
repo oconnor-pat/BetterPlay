@@ -15,6 +15,7 @@ import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
 import {useEventContext} from '../../Context/EventContext';
 import UserContext, {UserContextType} from '../UserContext';
+import {API_BASE_URL} from '../../config/api';
 
 export interface Player {
   username: string;
@@ -44,8 +45,6 @@ const positionOptions: Record<string, string[]> = {
   Soccer: ['Forward', 'Midfielder', 'Defender', 'Goalkeeper'],
   Default: ['Player'],
 };
-
-const API_BASE_URL = 'http://localhost:8001'; // Change to your LAN IP if needed
 
 const getInitials = (name: string) => {
   if (!name) {

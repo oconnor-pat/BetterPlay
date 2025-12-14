@@ -22,6 +22,7 @@ import {
 import UserContext, {UserContextType} from '../UserContext';
 import axios from 'axios';
 import {useTheme} from '../ThemeContext/ThemeContext';
+import {API_BASE_URL} from '../../config/api';
 
 interface Reply {
   _id?: string;
@@ -45,8 +46,6 @@ interface Post {
   username: string;
   comments: Comment[];
 }
-
-const API_BASE_URL = 'http://localhost:8001';
 
 const CommunityNotes: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
