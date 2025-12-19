@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import {RouteProp, useRoute} from '@react-navigation/native';
 import {useTheme} from '../ThemeContext/ThemeContext';
@@ -16,6 +17,16 @@ import axios from 'axios';
 import {useEventContext} from '../../Context/EventContext';
 import UserContext, {UserContextType} from '../UserContext';
 import {API_BASE_URL} from '../../config/api';
+import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {
+  faChevronDown,
+  faChevronUp,
+  faUserPlus,
+  faUsers,
+  faCheck,
+  faTimes,
+  faFutbol,
+} from '@fortawesome/free-solid-svg-icons';
 
 export interface Player {
   username: string;
@@ -33,6 +44,7 @@ type EventRosterRouteProp = RouteProp<
       date?: string;
       time?: string;
       location?: string;
+      totalSpots?: number;
       roster?: Player[];
     };
   },
@@ -43,17 +55,67 @@ const positionOptions: Record<string, string[]> = {
   Basketball: ['Guard', 'Forward', 'Center'],
   Hockey: ['Forward', 'Defense', 'Goalie'],
   Soccer: ['Forward', 'Midfielder', 'Defender', 'Goalkeeper'],
+  'Figure Skating': ['Singles', 'Pairs', 'Ice Dance'],
+  Tennis: ['Singles', 'Doubles'],
+  Golf: ['Player'],
+  Football: [
+    'Quarterback',
+    'Running Back',
+    'Wide Receiver',
+    'Lineman',
+    'Defense',
+  ],
+  Rugby: ['Forward', 'Back'],
+  Baseball: ['Pitcher', 'Catcher', 'Infield', 'Outfield'],
+  Softball: ['Pitcher', 'Catcher', 'Infield', 'Outfield'],
+  Lacrosse: ['Attack', 'Midfield', 'Defense', 'Goalie'],
+  Volleyball: ['Setter', 'Outside Hitter', 'Middle Blocker', 'Libero'],
   Default: ['Player'],
 };
 
+const sportEmojis: Record<string, string> = {
+  Basketball: '🏀',
+  Hockey: '🏒',
+  Soccer: '⚽',
+  'Figure Skating': '⛸️',
+  Tennis: '🎾',
+  Golf: '⛳',
+  Football: '🏈',
+  Rugby: '🏉',
+  Baseball: '⚾',
+  Softball: '🥎',
+  Lacrosse: '🥍',
+  Volleyball: '🏐',
+};
+
+const jerseyColors: Record<string, string> = {
+  Red: '#E53935',
+  Blue: '#1E88E5',
+  Green: '#43A047',
+  White: '#FAFAFA',
+  Black: '#212121',
+  Yellow: '#FDD835',
+  Orange: '#FB8C00',
+  Purple: '#8E24AA',
+  Pink: '#D81B60',
+  Other: '#757575',
+};
+
+// Light colors need dark text and a border for visibility
+const lightJerseyColors = ['White', 'Yellow'];
+
+const isLightColor = (colorName: string) =>
+  lightJerseyColors.includes(colorName);
+
 const getInitials = (name: string) => {
   if (!name) {
-    return '';
+    return '?';
   }
   return name
     .split(' ')
     .map(part => part[0]?.toUpperCase())
-    .join('');
+    .join('')
+    .slice(0, 2);
 };
 
 const EventRoster: React.FC = () => {
@@ -65,6 +127,7 @@ const EventRoster: React.FC = () => {
     date,
     time,
     location,
+    totalSpots = 10,
     roster: initialRoster,
   } = route.params;
   const {colors} = useTheme();
@@ -72,7 +135,7 @@ const EventRoster: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
 
   const [roster, setRoster] = useState<Player[]>(initialRoster || []);
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(userData?.username || '');
   const [paidStatus, setPaidStatus] = useState('');
   const [jerseyColor, setJerseyColor] = useState('');
   const [position, setPosition] = useState('');
@@ -83,181 +146,550 @@ const EventRoster: React.FC = () => {
   const [positionModalVisible, setPositionModalVisible] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [addPlayerExpanded, setAddPlayerExpanded] = useState(false);
+
+  // Edit mode state
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editPaidStatus, setEditPaidStatus] = useState('');
+  const [editJerseyColor, setEditJerseyColor] = useState('');
+  const [editPosition, setEditPosition] = useState('');
+  const [editPaidStatusModalVisible, setEditPaidStatusModalVisible] =
+    useState(false);
+  const [editJerseyColorModalVisible, setEditJerseyColorModalVisible] =
+    useState(false);
+  const [editPositionModalVisible, setEditPositionModalVisible] =
+    useState(false);
+
+  // Check if current user is already on roster
+  const isUserOnRoster = useMemo(() => {
+    return roster.some(player => player.username === userData?.username);
+  }, [roster, userData?.username]);
+
+  // Calculate roster stats
+  const rosterStats = useMemo(() => {
+    const paidCount = roster.filter(p => p.paidStatus === 'Paid').length;
+    const unpaidCount = roster.filter(p => p.paidStatus === 'Unpaid').length;
+    const positionCounts: Record<string, number> = {};
+    const teamCounts: Record<string, number> = {};
+
+    roster.forEach(player => {
+      positionCounts[player.position] =
+        (positionCounts[player.position] || 0) + 1;
+      teamCounts[player.jerseyColor] =
+        (teamCounts[player.jerseyColor] || 0) + 1;
+    });
+
+    return {paidCount, unpaidCount, positionCounts, teamCounts};
+  }, [roster]);
 
   const themedStyles = useMemo(
     () =>
       StyleSheet.create({
         container: {
           flex: 1,
-          padding: 16,
           backgroundColor: colors.background,
         },
+        scrollContent: {
+          padding: 16,
+        },
+        // Event Header
         eventHeader: {
-          fontSize: 26,
-          fontWeight: 'bold',
-          color: colors.primary,
-          textAlign: 'center',
-          marginBottom: 10,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 16,
           marginTop: 8,
         },
+        eventEmoji: {
+          fontSize: 32,
+          marginRight: 10,
+        },
+        eventName: {
+          fontSize: 24,
+          fontWeight: 'bold',
+          color: colors.text,
+          flex: 1,
+          flexWrap: 'wrap',
+        },
+        // Event Card
         eventCard: {
           backgroundColor: colors.card,
-          borderRadius: 12,
-          padding: 18,
-          marginBottom: 20,
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 16,
           shadowColor: '#000',
           shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 4,
-          elevation: 2,
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          elevation: 3,
         },
-        eventTypeSubtitle: {
+        eventTypeRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 16,
+        },
+        eventTypeBadge: {
+          backgroundColor: colors.primary + '20',
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 20,
+        },
+        eventTypeText: {
           color: colors.primary,
-          fontSize: 20,
-          fontWeight: '700',
-          marginBottom: 12,
-          marginLeft: 2,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
+          fontSize: 14,
+          fontWeight: '600',
         },
-        eventDetail: {
+        eventDetailRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 8,
+        },
+        eventDetailIcon: {
+          fontSize: 16,
+          marginRight: 10,
+          width: 24,
+        },
+        eventDetailText: {
           color: colors.text,
           fontSize: 15,
-          marginBottom: 2,
+          flex: 1,
         },
-        sectionTitle: {
-          fontSize: 18,
-          fontWeight: '600',
-          color: colors.primary,
+        // Progress Bar
+        progressSection: {
+          marginTop: 16,
+          paddingTop: 16,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        },
+        progressHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           marginBottom: 10,
-          marginTop: 10,
+        },
+        progressLabel: {
+          fontSize: 14,
+          color: colors.text,
+          fontWeight: '500',
+        },
+        progressCount: {
+          fontSize: 16,
+          color: colors.primary,
+          fontWeight: '700',
+        },
+        progressBarBg: {
+          height: 10,
+          backgroundColor: colors.border,
+          borderRadius: 5,
+          overflow: 'hidden',
+        },
+        progressBarFill: {
+          height: '100%',
+          backgroundColor: colors.primary,
+          borderRadius: 5,
+        },
+        // Stats Section
+        statsSection: {
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          padding: 16,
+          marginBottom: 16,
+        },
+        statsSectionTitle: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 12,
+        },
+        statsRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+        },
+        statItem: {
+          alignItems: 'center',
+          flex: 1,
+        },
+        statValue: {
+          fontSize: 24,
+          fontWeight: '700',
+          color: colors.primary,
+        },
+        statLabel: {
+          fontSize: 12,
+          color: colors.placeholder,
+          marginTop: 4,
+        },
+        // Team Breakdown
+        teamBreakdown: {
+          marginTop: 12,
+          paddingTop: 12,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        },
+        teamRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+        },
+        teamBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 16,
+          borderWidth: 2,
+        },
+        teamBadgeText: {
+          fontSize: 12,
+          fontWeight: '600',
+          marginLeft: 6,
+          color: colors.text,
+        },
+        // Add Player Section
+        addPlayerSection: {
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          marginBottom: 16,
+          overflow: 'hidden',
+        },
+        addPlayerHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: 16,
+        },
+        addPlayerHeaderLeft: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        addPlayerTitle: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: colors.text,
+          marginLeft: 10,
+        },
+        addPlayerContent: {
+          padding: 16,
+          paddingTop: 0,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        },
+        alreadyJoinedBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary + '20',
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 20,
+          alignSelf: 'flex-start',
+          marginTop: 12,
+        },
+        alreadyJoinedText: {
+          color: colors.primary,
+          fontSize: 14,
+          fontWeight: '500',
+          marginLeft: 6,
         },
         input: {
           backgroundColor: colors.inputBackground,
           color: colors.text,
-          padding: 10,
-          marginBottom: 14,
-          borderRadius: 6,
+          padding: 14,
+          marginTop: 12,
+          marginBottom: 12,
+          borderRadius: 12,
           borderWidth: 1,
           borderColor: colors.border,
           fontSize: 16,
         },
         dropdown: {
           backgroundColor: colors.inputBackground,
-          padding: 10,
-          marginBottom: 14,
-          borderRadius: 6,
+          padding: 14,
+          marginBottom: 12,
+          borderRadius: 12,
           borderWidth: 1,
           borderColor: colors.border,
-          justifyContent: 'center',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        },
+        dropdownText: {
+          color: colors.text,
+          fontSize: 16,
+        },
+        placeholderText: {
+          color: colors.placeholder,
+          fontSize: 16,
         },
         saveButton: {
           backgroundColor: colors.primary,
-          padding: 12,
-          borderRadius: 8,
-          marginBottom: 18,
+          padding: 16,
+          borderRadius: 12,
           alignItems: 'center',
+          flexDirection: 'row',
+          justifyContent: 'center',
+          shadowColor: colors.primary,
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.3,
+          shadowRadius: 4,
+          elevation: 3,
+        },
+        saveButtonDisabled: {
+          backgroundColor: colors.border,
+          shadowOpacity: 0,
+          elevation: 0,
         },
         buttonText: {
           color: colors.buttonText,
-          textAlign: 'center',
-          fontWeight: 'bold',
+          fontWeight: '700',
           fontSize: 16,
+          marginLeft: 8,
         },
-        customText: {
+        errorMessage: {
+          color: colors.error,
+          marginBottom: 12,
+          marginTop: 12,
+          textAlign: 'center',
+          fontSize: 14,
+        },
+        // Roster Section
+        rosterSection: {
+          marginBottom: 16,
+        },
+        sectionHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 12,
+        },
+        sectionTitle: {
+          fontSize: 18,
+          fontWeight: '600',
           color: colors.text,
-          marginBottom: 14,
+          marginLeft: 8,
         },
+        // Player Card
         playerCard: {
           backgroundColor: colors.card,
           flexDirection: 'row',
           alignItems: 'center',
           padding: 14,
           marginBottom: 10,
-          borderRadius: 10,
+          borderRadius: 14,
           shadowColor: '#000',
           shadowOffset: {width: 0, height: 1},
           shadowOpacity: 0.06,
-          shadowRadius: 2,
-          elevation: 1,
+          shadowRadius: 3,
+          elevation: 2,
+        },
+        playerCardSelf: {
+          borderWidth: 2,
+          borderColor: colors.primary,
         },
         avatar: {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          backgroundColor: colors.primary,
+          width: 48,
+          height: 48,
+          borderRadius: 24,
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 14,
         },
+        avatarLight: {
+          borderWidth: 2,
+          borderColor: colors.border,
+        },
         avatarText: {
-          color: colors.buttonText,
+          color: '#fff',
           fontWeight: 'bold',
-          fontSize: 18,
+          fontSize: 16,
+        },
+        avatarTextDark: {
+          color: '#333',
         },
         playerInfo: {
           flex: 1,
         },
-        playerText: {
+        playerName: {
+          fontSize: 16,
+          fontWeight: '600',
           color: colors.text,
-          fontSize: 15,
-          marginBottom: 2,
+          marginBottom: 4,
+        },
+        playerActions: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        },
+        editButton: {
+          backgroundColor: colors.primary + '15',
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderRadius: 8,
+        },
+        editButtonText: {
+          color: colors.primary,
+          fontWeight: '600',
+          fontSize: 13,
+        },
+        playerDetails: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 6,
+        },
+        playerBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.background,
+          paddingHorizontal: 8,
+          paddingVertical: 4,
+          borderRadius: 12,
+        },
+        playerBadgeText: {
+          fontSize: 12,
+          color: colors.text,
+          marginLeft: 4,
+        },
+        paidBadge: {
+          backgroundColor: '#4CAF50' + '20',
+        },
+        paidBadgeText: {
+          color: '#4CAF50',
+        },
+        unpaidBadge: {
+          backgroundColor: colors.error + '20',
+        },
+        unpaidBadgeText: {
+          color: colors.error,
+        },
+        jerseyIndicator: {
+          width: 14,
+          height: 14,
+          borderRadius: 7,
+          borderWidth: 1,
+          borderColor: colors.border,
         },
         deleteButton: {
-          backgroundColor: colors.error,
-          paddingVertical: 7,
-          paddingHorizontal: 14,
-          borderRadius: 6,
+          backgroundColor: colors.error + '15',
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderRadius: 8,
           marginLeft: 10,
         },
         deleteButtonText: {
-          color: colors.buttonText,
-          textAlign: 'center',
-          fontWeight: 'bold',
-        },
-        modalContainer: {
-          flex: 1,
-          justifyContent: 'center',
-          backgroundColor: 'rgba(0,0,0,0.25)',
-        },
-        modalContent: {
-          backgroundColor: colors.card,
-          margin: 24,
-          padding: 22,
-          borderRadius: 12,
-        },
-        modalOption: {
-          padding: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-          textAlign: 'center',
-          color: colors.text,
-          fontSize: 16,
-        },
-        modalClose: {
-          marginTop: 12,
-          padding: 12,
-          backgroundColor: colors.primary,
-          borderRadius: 7,
-        },
-        modalCloseText: {
-          color: colors.buttonText,
-          textAlign: 'center',
-          fontWeight: 'bold',
-        },
-        errorMessage: {
           color: colors.error,
-          marginBottom: 16,
-          textAlign: 'center',
-        },
-        placeholderText: {
-          color: colors.placeholder,
+          fontWeight: '600',
+          fontSize: 13,
         },
         emptyState: {
           textAlign: 'center',
           color: colors.placeholder,
           fontSize: 16,
           marginTop: 30,
+          marginBottom: 30,
+        },
+        // Modal
+        modalOverlay: {
+          flex: 1,
+          justifyContent: 'center',
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          padding: 24,
+        },
+        modalContent: {
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          padding: 20,
+          maxHeight: '70%',
+        },
+        modalTitle: {
+          fontSize: 18,
+          fontWeight: '600',
+          color: colors.text,
+          textAlign: 'center',
+          marginBottom: 16,
+        },
+        modalOption: {
+          padding: 14,
+          borderRadius: 10,
+          marginBottom: 8,
+          backgroundColor: colors.background,
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        modalOptionSelected: {
+          backgroundColor: colors.primary + '20',
+          borderWidth: 1,
+          borderColor: colors.primary,
+        },
+        modalOptionText: {
+          color: colors.text,
+          fontSize: 16,
+          flex: 1,
+        },
+        modalOptionTextSelected: {
+          color: colors.primary,
+          fontWeight: '600',
+        },
+        modalOptionTextWithMargin: {
+          color: colors.text,
+          fontSize: 16,
+          flex: 1,
+          marginLeft: 12,
+        },
+        colorSwatch: {
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          marginRight: 12,
+          borderWidth: 2,
+          borderColor: colors.border,
+        },
+        modalClose: {
+          marginTop: 8,
+          padding: 14,
+          backgroundColor: colors.primary,
+          borderRadius: 12,
+          alignItems: 'center',
+        },
+        modalCloseText: {
+          color: colors.buttonText,
+          fontWeight: '700',
+          fontSize: 16,
+        },
+        modalScrollView: {
+          maxHeight: 300,
+        },
+        progressRemaining: {
+          fontSize: 14,
+          color: colors.text,
+          fontWeight: '500',
+          marginTop: 8,
+          textAlign: 'center',
+        },
+        statValueGreen: {
+          fontSize: 24,
+          fontWeight: '700',
+          color: '#4CAF50',
+        },
+        statValueError: {
+          fontSize: 24,
+          fontWeight: '700',
+          color: colors.error,
+        },
+        statsSectionTitleSmall: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 8,
+        },
+        jerseyDropdownRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        jerseyIndicatorLarge: {
+          width: 14,
+          height: 14,
+          borderRadius: 7,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginRight: 10,
         },
       }),
     [colors],
@@ -285,7 +717,7 @@ const EventRoster: React.FC = () => {
         roster: updatedRoster,
       });
     } catch (error) {
-      // handle error
+      console.error('Error persisting roster:', error);
     }
   };
 
@@ -295,17 +727,21 @@ const EventRoster: React.FC = () => {
       setErrorMessage('Please fill out all fields.');
       return;
     }
+    if (isUserOnRoster) {
+      setErrorMessage('You are already on this roster.');
+      return;
+    }
     const newPlayer: Player = {username, paidStatus, jerseyColor, position};
     const updatedRoster = [...roster, newPlayer];
     setRoster(updatedRoster);
     await persistRoster(updatedRoster);
     updateRosterSpots(eventId, updatedRoster.length);
 
-    setUsername('');
     setPaidStatus('');
     setJerseyColor('');
     setPosition('');
     setErrorMessage('');
+    setAddPlayerExpanded(false);
   };
 
   // Delete player (only allow logged-in user to remove themselves)
@@ -316,12 +752,12 @@ const EventRoster: React.FC = () => {
       return;
     }
     Alert.alert(
-      'Delete Player',
+      'Leave Event',
       'Are you sure you want to remove yourself from this event?',
       [
         {text: 'Cancel', style: 'cancel'},
         {
-          text: 'Delete',
+          text: 'Leave',
           style: 'destructive',
           onPress: async () => {
             const updatedRoster = roster.filter((_, i) => i !== index);
@@ -334,84 +770,465 @@ const EventRoster: React.FC = () => {
     );
   };
 
-  const renderPlayerCard = ({item, index}: {item: Player; index: number}) => (
-    <View style={themedStyles.playerCard}>
-      <View style={themedStyles.avatar}>
-        <Text style={themedStyles.avatarText}>
-          {getInitials(item.username)}
-        </Text>
+  // Open edit modal for current user
+  const handleEdit = () => {
+    const currentPlayer = roster.find(p => p.username === userData?.username);
+    if (currentPlayer) {
+      setEditPaidStatus(currentPlayer.paidStatus);
+      setEditJerseyColor(currentPlayer.jerseyColor);
+      setEditPosition(currentPlayer.position);
+      setEditModalVisible(true);
+    }
+  };
+
+  // Save edited player info
+  const handleSaveEdit = async () => {
+    if (!editPaidStatus || !editJerseyColor || !editPosition) {
+      Alert.alert('Error', 'Please fill out all fields.');
+      return;
+    }
+    const updatedRoster = roster.map(player =>
+      player.username === userData?.username
+        ? {
+            ...player,
+            paidStatus: editPaidStatus,
+            jerseyColor: editJerseyColor,
+            position: editPosition,
+          }
+        : player,
+    );
+    setRoster(updatedRoster);
+    await persistRoster(updatedRoster);
+    setEditModalVisible(false);
+  };
+
+  const renderPlayerCard = ({item, index}: {item: Player; index: number}) => {
+    const isSelf = item.username === userData?.username;
+    const jerseyColorHex = jerseyColors[item.jerseyColor] || jerseyColors.Other;
+    const isLight = isLightColor(item.jerseyColor);
+
+    return (
+      <View
+        style={[
+          themedStyles.playerCard,
+          isSelf && themedStyles.playerCardSelf,
+        ]}>
+        <View
+          style={[
+            themedStyles.avatar,
+            {backgroundColor: jerseyColorHex},
+            isLight && themedStyles.avatarLight,
+          ]}>
+          <Text
+            style={[
+              themedStyles.avatarText,
+              isLight && themedStyles.avatarTextDark,
+            ]}>
+            {getInitials(item.username)}
+          </Text>
+        </View>
+        <View style={themedStyles.playerInfo}>
+          <Text style={themedStyles.playerName}>
+            {item.username} {isSelf && '(You)'}
+          </Text>
+          <View style={themedStyles.playerDetails}>
+            {/* Position Badge */}
+            <View style={themedStyles.playerBadge}>
+              <FontAwesomeIcon icon={faFutbol} size={10} color={colors.text} />
+              <Text style={themedStyles.playerBadgeText}>{item.position}</Text>
+            </View>
+            {/* Paid Status Badge */}
+            <View
+              style={[
+                themedStyles.playerBadge,
+                item.paidStatus === 'Paid'
+                  ? themedStyles.paidBadge
+                  : themedStyles.unpaidBadge,
+              ]}>
+              <FontAwesomeIcon
+                icon={item.paidStatus === 'Paid' ? faCheck : faTimes}
+                size={10}
+                color={item.paidStatus === 'Paid' ? '#4CAF50' : colors.error}
+              />
+              <Text
+                style={[
+                  themedStyles.playerBadgeText,
+                  item.paidStatus === 'Paid'
+                    ? themedStyles.paidBadgeText
+                    : themedStyles.unpaidBadgeText,
+                ]}>
+                {item.paidStatus}
+              </Text>
+            </View>
+            {/* Jersey Color */}
+            <View style={themedStyles.playerBadge}>
+              <View
+                style={[
+                  themedStyles.jerseyIndicator,
+                  {backgroundColor: jerseyColorHex},
+                ]}
+              />
+              <Text style={themedStyles.playerBadgeText}>
+                {item.jerseyColor}
+              </Text>
+            </View>
+          </View>
+        </View>
+        {isSelf && (
+          <View style={themedStyles.playerActions}>
+            <TouchableOpacity
+              style={themedStyles.editButton}
+              onPress={handleEdit}>
+              <Text style={themedStyles.editButtonText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={themedStyles.deleteButton}
+              onPress={() => handleDelete(index)}>
+              <Text style={themedStyles.deleteButtonText}>Leave</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-      <View style={themedStyles.playerInfo}>
-        <Text style={themedStyles.playerText}>Name: {item.username}</Text>
-        <Text style={themedStyles.playerText}>Paid: {item.paidStatus}</Text>
-        <Text style={themedStyles.playerText}>Jersey: {item.jerseyColor}</Text>
-        <Text style={themedStyles.playerText}>Position: {item.position}</Text>
-      </View>
-      {item.username === userData?.username && (
-        <TouchableOpacity
-          style={themedStyles.deleteButton}
-          onPress={() => handleDelete(index)}>
-          <Text style={themedStyles.deleteButtonText}>Delete</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+    );
+  };
+
+  const progressPercentage = Math.min((roster.length / totalSpots) * 100, 100);
+  const spotsRemaining = Math.max(totalSpots - roster.length, 0);
+  const sportEmoji = sportEmojis[eventType] || '🎯';
 
   return (
-    <View style={themedStyles.container}>
-      {/* Event Name Header */}
-      <Text style={themedStyles.eventHeader}>{eventName}</Text>
+    <ScrollView
+      style={themedStyles.container}
+      contentContainerStyle={themedStyles.scrollContent}>
+      {/* Event Header */}
+      <View style={themedStyles.eventHeader}>
+        <Text style={themedStyles.eventEmoji}>{sportEmoji}</Text>
+        <Text style={themedStyles.eventName} numberOfLines={2}>
+          {eventName}
+        </Text>
+      </View>
 
       {/* Event Details Card */}
       <View style={themedStyles.eventCard}>
-        <Text style={themedStyles.eventTypeSubtitle}>{eventType}</Text>
-        {date && <Text style={themedStyles.eventDetail}>Date: {date}</Text>}
-        {time && <Text style={themedStyles.eventDetail}>Time: {time}</Text>}
+        <View style={themedStyles.eventTypeRow}>
+          <View style={themedStyles.eventTypeBadge}>
+            <Text style={themedStyles.eventTypeText}>{eventType}</Text>
+          </View>
+        </View>
+
+        {date && (
+          <View style={themedStyles.eventDetailRow}>
+            <Text style={themedStyles.eventDetailIcon}>📅</Text>
+            <Text style={themedStyles.eventDetailText}>{date}</Text>
+          </View>
+        )}
+        {time && (
+          <View style={themedStyles.eventDetailRow}>
+            <Text style={themedStyles.eventDetailIcon}>🕐</Text>
+            <Text style={themedStyles.eventDetailText}>{time}</Text>
+          </View>
+        )}
         {location && (
-          <Text style={themedStyles.eventDetail}>Location: {location}</Text>
+          <View style={themedStyles.eventDetailRow}>
+            <Text style={themedStyles.eventDetailIcon}>📍</Text>
+            <Text style={themedStyles.eventDetailText}>{location}</Text>
+          </View>
+        )}
+
+        {/* Progress Bar */}
+        <View style={themedStyles.progressSection}>
+          <View style={themedStyles.progressHeader}>
+            <Text style={themedStyles.progressLabel}>Roster Spots</Text>
+            <Text style={themedStyles.progressCount}>
+              {roster.length} / {totalSpots}
+            </Text>
+          </View>
+          <View style={themedStyles.progressBarBg}>
+            <View
+              style={[
+                themedStyles.progressBarFill,
+                {width: `${progressPercentage}%`},
+              ]}
+            />
+          </View>
+          <Text style={themedStyles.progressRemaining}>
+            {spotsRemaining > 0
+              ? `${spotsRemaining} spot${
+                  spotsRemaining !== 1 ? 's' : ''
+                } remaining`
+              : 'Roster is full!'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Stats Section */}
+      {roster.length > 0 && (
+        <View style={themedStyles.statsSection}>
+          <Text style={themedStyles.statsSectionTitle}>📊 Roster Stats</Text>
+          <View style={themedStyles.statsRow}>
+            <View style={themedStyles.statItem}>
+              <Text style={themedStyles.statValue}>{roster.length}</Text>
+              <Text style={themedStyles.statLabel}>Players</Text>
+            </View>
+            <View style={themedStyles.statItem}>
+              <Text style={themedStyles.statValueGreen}>
+                {rosterStats.paidCount}
+              </Text>
+              <Text style={themedStyles.statLabel}>Paid</Text>
+            </View>
+            <View style={themedStyles.statItem}>
+              <Text style={themedStyles.statValueError}>
+                {rosterStats.unpaidCount}
+              </Text>
+              <Text style={themedStyles.statLabel}>Unpaid</Text>
+            </View>
+          </View>
+
+          {/* Team Breakdown */}
+          {Object.keys(rosterStats.teamCounts).length > 1 && (
+            <View style={themedStyles.teamBreakdown}>
+              <Text style={themedStyles.statsSectionTitleSmall}>
+                Teams by Jersey
+              </Text>
+              <View style={themedStyles.teamRow}>
+                {Object.entries(rosterStats.teamCounts).map(
+                  ([color, count]) => (
+                    <View
+                      key={color}
+                      style={[
+                        themedStyles.teamBadge,
+                        {
+                          borderColor:
+                            jerseyColors[color] || jerseyColors.Other,
+                        },
+                      ]}>
+                      <View
+                        style={[
+                          themedStyles.jerseyIndicator,
+                          {
+                            backgroundColor:
+                              jerseyColors[color] || jerseyColors.Other,
+                          },
+                        ]}
+                      />
+                      <Text style={themedStyles.teamBadgeText}>
+                        {color}: {count}
+                      </Text>
+                    </View>
+                  ),
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Add Player Section (Collapsible) */}
+      <View style={themedStyles.addPlayerSection}>
+        <TouchableOpacity
+          style={themedStyles.addPlayerHeader}
+          onPress={() => setAddPlayerExpanded(!addPlayerExpanded)}
+          activeOpacity={0.7}>
+          <View style={themedStyles.addPlayerHeaderLeft}>
+            <FontAwesomeIcon
+              icon={faUserPlus}
+              size={18}
+              color={colors.primary}
+            />
+            <Text style={themedStyles.addPlayerTitle}>
+              {isUserOnRoster ? 'Already Joined' : 'Join This Event'}
+            </Text>
+          </View>
+          <FontAwesomeIcon
+            icon={addPlayerExpanded ? faChevronUp : faChevronDown}
+            size={16}
+            color={colors.placeholder}
+          />
+        </TouchableOpacity>
+
+        {addPlayerExpanded && (
+          <View style={themedStyles.addPlayerContent}>
+            {isUserOnRoster ? (
+              <View style={themedStyles.alreadyJoinedBadge}>
+                <FontAwesomeIcon
+                  icon={faCheck}
+                  size={14}
+                  color={colors.primary}
+                />
+                <Text style={themedStyles.alreadyJoinedText}>
+                  You're on the roster!
+                </Text>
+              </View>
+            ) : (
+              <>
+                {errorMessage ? (
+                  <Text style={themedStyles.errorMessage}>{errorMessage}</Text>
+                ) : null}
+
+                <TextInput
+                  style={themedStyles.input}
+                  placeholder="Your name"
+                  placeholderTextColor={colors.placeholder}
+                  value={username}
+                  onChangeText={setUsername}
+                />
+
+                {/* Paid Status Dropdown */}
+                <TouchableOpacity
+                  style={themedStyles.dropdown}
+                  onPress={() => setPaidStatusModalVisible(true)}>
+                  <Text
+                    style={
+                      paidStatus
+                        ? themedStyles.dropdownText
+                        : themedStyles.placeholderText
+                    }>
+                    {paidStatus || 'Select Paid Status'}
+                  </Text>
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    size={14}
+                    color={colors.placeholder}
+                  />
+                </TouchableOpacity>
+
+                {/* Jersey Color Dropdown */}
+                <TouchableOpacity
+                  style={themedStyles.dropdown}
+                  onPress={() => setJerseyColorModalVisible(true)}>
+                  <View style={themedStyles.jerseyDropdownRow}>
+                    {jerseyColor && (
+                      <View
+                        style={[
+                          themedStyles.jerseyIndicatorLarge,
+                          {
+                            backgroundColor:
+                              jerseyColors[jerseyColor] || jerseyColors.Other,
+                          },
+                        ]}
+                      />
+                    )}
+                    <Text
+                      style={
+                        jerseyColor
+                          ? themedStyles.dropdownText
+                          : themedStyles.placeholderText
+                      }>
+                      {jerseyColor || 'Select Jersey Color'}
+                    </Text>
+                  </View>
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    size={14}
+                    color={colors.placeholder}
+                  />
+                </TouchableOpacity>
+
+                {/* Position Dropdown */}
+                <TouchableOpacity
+                  style={themedStyles.dropdown}
+                  onPress={() => setPositionModalVisible(true)}>
+                  <Text
+                    style={
+                      position
+                        ? themedStyles.dropdownText
+                        : themedStyles.placeholderText
+                    }>
+                    {position || 'Select Position'}
+                  </Text>
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    size={14}
+                    color={colors.placeholder}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    themedStyles.saveButton,
+                    spotsRemaining === 0 && themedStyles.saveButtonDisabled,
+                  ]}
+                  onPress={handleSave}
+                  disabled={spotsRemaining === 0}>
+                  <FontAwesomeIcon
+                    icon={faUserPlus}
+                    size={16}
+                    color={colors.buttonText}
+                  />
+                  <Text style={themedStyles.buttonText}>
+                    {spotsRemaining === 0 ? 'Roster Full' : 'Join Event'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         )}
       </View>
 
-      {/* Add Player Section */}
-      <Text style={themedStyles.sectionTitle}>Add Player</Text>
-      {errorMessage ? (
-        <Text style={themedStyles.errorMessage}>{errorMessage}</Text>
-      ) : null}
+      {/* Rostered Players Section */}
+      <View style={themedStyles.rosterSection}>
+        <View style={themedStyles.sectionHeader}>
+          <FontAwesomeIcon icon={faUsers} size={18} color={colors.primary} />
+          <Text style={themedStyles.sectionTitle}>
+            Rostered Players ({roster.length})
+          </Text>
+        </View>
 
-      <TextInput
-        style={themedStyles.input}
-        placeholder="Enter your name"
-        placeholderTextColor={colors.placeholder}
-        value={username}
-        onChangeText={setUsername}
-      />
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primary} />
+        ) : roster.length === 0 ? (
+          <Text style={themedStyles.emptyState}>
+            No players have joined yet. Be the first!
+          </Text>
+        ) : (
+          <FlatList
+            data={roster}
+            renderItem={renderPlayerCard}
+            keyExtractor={(_, idx) => idx.toString()}
+            scrollEnabled={false}
+          />
+        )}
+      </View>
 
-      {/* Paid Status Dropdown */}
-      <TouchableOpacity
-        style={themedStyles.dropdown}
-        onPress={() => setPaidStatusModalVisible(true)}>
-        <Text
-          style={
-            paidStatus ? themedStyles.customText : themedStyles.placeholderText
-          }>
-          {paidStatus ? paidStatus : 'Select Paid Status'}
-        </Text>
-      </TouchableOpacity>
+      {/* Paid Status Modal */}
       <Modal
         visible={paidStatusModalVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setPaidStatusModalVisible(false)}>
-        <View style={themedStyles.modalContainer}>
+        <View style={themedStyles.modalOverlay}>
           <View style={themedStyles.modalContent}>
+            <Text style={themedStyles.modalTitle}>Payment Status</Text>
             {['Paid', 'Unpaid'].map(status => (
               <TouchableOpacity
                 key={status}
+                style={[
+                  themedStyles.modalOption,
+                  paidStatus === status && themedStyles.modalOptionSelected,
+                ]}
                 onPress={() => {
                   setPaidStatus(status);
                   setPaidStatusModalVisible(false);
                 }}>
-                <Text style={themedStyles.modalOption}>{status}</Text>
+                <FontAwesomeIcon
+                  icon={status === 'Paid' ? faCheck : faTimes}
+                  size={16}
+                  color={
+                    status === 'Paid'
+                      ? '#4CAF50'
+                      : paidStatus === status
+                      ? colors.primary
+                      : colors.text
+                  }
+                />
+                <Text
+                  style={[
+                    themedStyles.modalOptionTextWithMargin,
+                    paidStatus === status &&
+                      themedStyles.modalOptionTextSelected,
+                  ]}>
+                  {status}
+                </Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity
@@ -423,36 +1240,44 @@ const EventRoster: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Jersey Color Dropdown */}
-      <TouchableOpacity
-        style={themedStyles.dropdown}
-        onPress={() => setJerseyColorModalVisible(true)}>
-        <Text
-          style={
-            jerseyColor ? themedStyles.customText : themedStyles.placeholderText
-          }>
-          {jerseyColor ? jerseyColor : 'Select Jersey Color'}
-        </Text>
-      </TouchableOpacity>
+      {/* Jersey Color Modal */}
       <Modal
         visible={jerseyColorModalVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setJerseyColorModalVisible(false)}>
-        <View style={themedStyles.modalContainer}>
+        <View style={themedStyles.modalOverlay}>
           <View style={themedStyles.modalContent}>
-            {['Red', 'Blue', 'Green', 'White', 'Black', 'Yellow', 'Other'].map(
-              color => (
+            <Text style={themedStyles.modalTitle}>Jersey Color</Text>
+            <ScrollView style={themedStyles.modalScrollView}>
+              {Object.keys(jerseyColors).map(color => (
                 <TouchableOpacity
                   key={color}
+                  style={[
+                    themedStyles.modalOption,
+                    jerseyColor === color && themedStyles.modalOptionSelected,
+                  ]}
                   onPress={() => {
                     setJerseyColor(color);
                     setJerseyColorModalVisible(false);
                   }}>
-                  <Text style={themedStyles.modalOption}>{color}</Text>
+                  <View
+                    style={[
+                      themedStyles.colorSwatch,
+                      {backgroundColor: jerseyColors[color]},
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      themedStyles.modalOptionText,
+                      jerseyColor === color &&
+                        themedStyles.modalOptionTextSelected,
+                    ]}>
+                    {color}
+                  </Text>
                 </TouchableOpacity>
-              ),
-            )}
+              ))}
+            </ScrollView>
             <TouchableOpacity
               style={themedStyles.modalClose}
               onPress={() => setJerseyColorModalVisible(false)}>
@@ -462,36 +1287,47 @@ const EventRoster: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Position Dropdown */}
-      <TouchableOpacity
-        style={themedStyles.dropdown}
-        onPress={() => setPositionModalVisible(true)}>
-        <Text
-          style={
-            position ? themedStyles.customText : themedStyles.placeholderText
-          }>
-          {position ? position : 'Select Position'}
-        </Text>
-      </TouchableOpacity>
+      {/* Position Modal */}
       <Modal
         visible={positionModalVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setPositionModalVisible(false)}>
-        <View style={themedStyles.modalContainer}>
+        <View style={themedStyles.modalOverlay}>
           <View style={themedStyles.modalContent}>
-            {(positionOptions[eventType] || positionOptions.Default).map(
-              pos => (
-                <TouchableOpacity
-                  key={pos}
-                  onPress={() => {
-                    setPosition(pos);
-                    setPositionModalVisible(false);
-                  }}>
-                  <Text style={themedStyles.modalOption}>{pos}</Text>
-                </TouchableOpacity>
-              ),
-            )}
+            <Text style={themedStyles.modalTitle}>Select Position</Text>
+            <ScrollView style={themedStyles.modalScrollView}>
+              {(positionOptions[eventType] || positionOptions.Default).map(
+                pos => (
+                  <TouchableOpacity
+                    key={pos}
+                    style={[
+                      themedStyles.modalOption,
+                      position === pos && themedStyles.modalOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setPosition(pos);
+                      setPositionModalVisible(false);
+                    }}>
+                    <FontAwesomeIcon
+                      icon={faFutbol}
+                      size={16}
+                      color={
+                        position === pos ? colors.primary : colors.placeholder
+                      }
+                    />
+                    <Text
+                      style={[
+                        themedStyles.modalOptionTextWithMargin,
+                        position === pos &&
+                          themedStyles.modalOptionTextSelected,
+                      ]}>
+                      {pos}
+                    </Text>
+                  </TouchableOpacity>
+                ),
+              )}
+            </ScrollView>
             <TouchableOpacity
               style={themedStyles.modalClose}
               onPress={() => setPositionModalVisible(false)}>
@@ -501,26 +1337,261 @@ const EventRoster: React.FC = () => {
         </View>
       </Modal>
 
-      <TouchableOpacity style={themedStyles.saveButton} onPress={handleSave}>
-        <Text style={themedStyles.buttonText}>Add Player</Text>
-      </TouchableOpacity>
+      {/* Edit Player Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}>
+        <View style={themedStyles.modalOverlay}>
+          <View style={themedStyles.modalContent}>
+            <Text style={themedStyles.modalTitle}>✏️ Edit Your Info</Text>
 
-      {/* Rostered Players Section */}
-      <Text style={themedStyles.sectionTitle}>Rostered Players</Text>
-      {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} />
-      ) : roster.length === 0 ? (
-        <Text style={themedStyles.emptyState}>
-          No players have been rostered yet.
-        </Text>
-      ) : (
-        <FlatList
-          data={roster}
-          renderItem={renderPlayerCard}
-          keyExtractor={(_, idx) => idx.toString()}
-        />
-      )}
-    </View>
+            {/* Edit Paid Status */}
+            <TouchableOpacity
+              style={themedStyles.dropdown}
+              onPress={() => setEditPaidStatusModalVisible(true)}>
+              <Text
+                style={
+                  editPaidStatus
+                    ? themedStyles.dropdownText
+                    : themedStyles.placeholderText
+                }>
+                {editPaidStatus || 'Select Paid Status'}
+              </Text>
+              <FontAwesomeIcon
+                icon={faChevronDown}
+                size={14}
+                color={colors.placeholder}
+              />
+            </TouchableOpacity>
+
+            {/* Edit Jersey Color */}
+            <TouchableOpacity
+              style={themedStyles.dropdown}
+              onPress={() => setEditJerseyColorModalVisible(true)}>
+              <View style={themedStyles.jerseyDropdownRow}>
+                {editJerseyColor && (
+                  <View
+                    style={[
+                      themedStyles.jerseyIndicatorLarge,
+                      {
+                        backgroundColor:
+                          jerseyColors[editJerseyColor] || jerseyColors.Other,
+                      },
+                    ]}
+                  />
+                )}
+                <Text
+                  style={
+                    editJerseyColor
+                      ? themedStyles.dropdownText
+                      : themedStyles.placeholderText
+                  }>
+                  {editJerseyColor || 'Select Jersey Color'}
+                </Text>
+              </View>
+              <FontAwesomeIcon
+                icon={faChevronDown}
+                size={14}
+                color={colors.placeholder}
+              />
+            </TouchableOpacity>
+
+            {/* Edit Position */}
+            <TouchableOpacity
+              style={themedStyles.dropdown}
+              onPress={() => setEditPositionModalVisible(true)}>
+              <Text
+                style={
+                  editPosition
+                    ? themedStyles.dropdownText
+                    : themedStyles.placeholderText
+                }>
+                {editPosition || 'Select Position'}
+              </Text>
+              <FontAwesomeIcon
+                icon={faChevronDown}
+                size={14}
+                color={colors.placeholder}
+              />
+            </TouchableOpacity>
+
+            {/* Save & Cancel Buttons */}
+            <TouchableOpacity
+              style={themedStyles.saveButton}
+              onPress={handleSaveEdit}>
+              <FontAwesomeIcon
+                icon={faCheck}
+                size={18}
+                color={colors.buttonText}
+              />
+              <Text style={themedStyles.buttonText}>Save Changes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                themedStyles.modalClose,
+                {backgroundColor: colors.border},
+              ]}
+              onPress={() => setEditModalVisible(false)}>
+              <Text style={[themedStyles.modalCloseText, {color: colors.text}]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Paid Status Modal */}
+      <Modal
+        visible={editPaidStatusModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditPaidStatusModalVisible(false)}>
+        <View style={themedStyles.modalOverlay}>
+          <View style={themedStyles.modalContent}>
+            <Text style={themedStyles.modalTitle}>Payment Status</Text>
+            {['Paid', 'Unpaid'].map(status => (
+              <TouchableOpacity
+                key={status}
+                style={[
+                  themedStyles.modalOption,
+                  editPaidStatus === status && themedStyles.modalOptionSelected,
+                ]}
+                onPress={() => {
+                  setEditPaidStatus(status);
+                  setEditPaidStatusModalVisible(false);
+                }}>
+                <FontAwesomeIcon
+                  icon={status === 'Paid' ? faCheck : faTimes}
+                  size={16}
+                  color={
+                    status === 'Paid'
+                      ? '#4CAF50'
+                      : editPaidStatus === status
+                      ? colors.primary
+                      : colors.text
+                  }
+                />
+                <Text
+                  style={[
+                    themedStyles.modalOptionTextWithMargin,
+                    editPaidStatus === status &&
+                      themedStyles.modalOptionTextSelected,
+                  ]}>
+                  {status}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={themedStyles.modalClose}
+              onPress={() => setEditPaidStatusModalVisible(false)}>
+              <Text style={themedStyles.modalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Jersey Color Modal */}
+      <Modal
+        visible={editJerseyColorModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditJerseyColorModalVisible(false)}>
+        <View style={themedStyles.modalOverlay}>
+          <View style={themedStyles.modalContent}>
+            <Text style={themedStyles.modalTitle}>Jersey Color</Text>
+            <ScrollView style={themedStyles.modalScrollView}>
+              {Object.keys(jerseyColors).map(color => (
+                <TouchableOpacity
+                  key={color}
+                  style={[
+                    themedStyles.modalOption,
+                    editJerseyColor === color &&
+                      themedStyles.modalOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setEditJerseyColor(color);
+                    setEditJerseyColorModalVisible(false);
+                  }}>
+                  <View
+                    style={[
+                      themedStyles.colorSwatch,
+                      {backgroundColor: jerseyColors[color]},
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      themedStyles.modalOptionText,
+                      editJerseyColor === color &&
+                        themedStyles.modalOptionTextSelected,
+                    ]}>
+                    {color}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={themedStyles.modalClose}
+              onPress={() => setEditJerseyColorModalVisible(false)}>
+              <Text style={themedStyles.modalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Position Modal */}
+      <Modal
+        visible={editPositionModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditPositionModalVisible(false)}>
+        <View style={themedStyles.modalOverlay}>
+          <View style={themedStyles.modalContent}>
+            <Text style={themedStyles.modalTitle}>Select Position</Text>
+            <ScrollView style={themedStyles.modalScrollView}>
+              {(positionOptions[eventType] || positionOptions.Default).map(
+                pos => (
+                  <TouchableOpacity
+                    key={pos}
+                    style={[
+                      themedStyles.modalOption,
+                      editPosition === pos && themedStyles.modalOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setEditPosition(pos);
+                      setEditPositionModalVisible(false);
+                    }}>
+                    <FontAwesomeIcon
+                      icon={faFutbol}
+                      size={16}
+                      color={
+                        editPosition === pos
+                          ? colors.primary
+                          : colors.placeholder
+                      }
+                    />
+                    <Text
+                      style={[
+                        themedStyles.modalOptionTextWithMargin,
+                        editPosition === pos &&
+                          themedStyles.modalOptionTextSelected,
+                      ]}>
+                      {pos}
+                    </Text>
+                  </TouchableOpacity>
+                ),
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={themedStyles.modalClose}
+              onPress={() => setEditPositionModalVisible(false)}>
+              <Text style={themedStyles.modalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
   );
 };
 

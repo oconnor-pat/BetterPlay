@@ -30,7 +30,12 @@ export type RootStackParamList = {
   EventList: undefined;
   EventRoster: {
     eventId: string;
+    eventName: string;
     eventType: string;
+    date: string;
+    time: string;
+    location: string;
+    totalSpots: number;
     roster: any[];
   };
   Profile: {_id: string};
@@ -640,8 +645,17 @@ const EventList: React.FC = () => {
     }
   };
 
-  const handleEventPress = (eventId: string, eventType: string) => {
-    navigation.navigate('EventRoster', {eventId, eventType, roster: []});
+  const handleEventPress = (event: Event) => {
+    navigation.navigate('EventRoster', {
+      eventId: event._id,
+      eventName: event.name,
+      eventType: event.eventType,
+      date: event.date,
+      time: event.time,
+      location: event.location,
+      totalSpots: event.totalSpots,
+      roster: [],
+    });
   };
 
   const handleDeleteEvent = (event: Event) => {
@@ -808,7 +822,7 @@ const EventList: React.FC = () => {
         </TouchableOpacity>
         <TouchableOpacity
           style={[themedStyles.actionButton, themedStyles.joinButton]}
-          onPress={() => handleEventPress(item._id, item.eventType)}>
+          onPress={() => handleEventPress(item)}>
           <Text style={themedStyles.cardEmoji}>📲</Text>
           <Text
             style={[
