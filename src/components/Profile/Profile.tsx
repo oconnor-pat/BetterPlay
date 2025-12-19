@@ -39,6 +39,8 @@ const Profile: React.FC = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: 20,
+          backgroundColor: colors.background,
+          zIndex: 1,
         },
         title: {
           fontSize: 25,
@@ -241,7 +243,7 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={themedStyles.container}>
+    <SafeAreaView style={themedStyles.container} edges={['top']}>
       {/* Header container for hamburger and centered title */}
       <View style={themedStyles.header}>
         <HamburgerMenu />

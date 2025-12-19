@@ -96,6 +96,8 @@ const CommunityNotes: React.FC = () => {
           justifyContent: 'flex-start',
           marginTop: 8,
           marginBottom: 16,
+          backgroundColor: colors.background,
+          zIndex: 1,
         },
         hamburger: {
           marginRight: 12,
@@ -612,7 +614,7 @@ const CommunityNotes: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.hamburger}>
           <HamburgerMenu />

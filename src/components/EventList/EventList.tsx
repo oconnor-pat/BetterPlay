@@ -231,6 +231,8 @@ const EventList: React.FC = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: 20,
+          backgroundColor: colors.background,
+          zIndex: 1,
         },
         title: {
           fontSize: 25,
@@ -796,7 +798,7 @@ const EventList: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={themedStyles.container}>
+    <SafeAreaView style={themedStyles.container} edges={['top']}>
       {/* Header */}
       <View style={themedStyles.header}>
         <HamburgerMenu />
