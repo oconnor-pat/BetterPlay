@@ -69,7 +69,13 @@ const EventStack = () => {
         component={EventList}
         options={{headerShown: false}}
       />
-      <Stack.Screen name="EventRoster" component={EventRoster} />
+      <Stack.Screen
+        name="EventRoster"
+        component={EventRoster}
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack.Navigator>
   );
 };

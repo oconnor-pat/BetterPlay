@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {RouteProp, useRoute} from '@react-navigation/native';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
@@ -185,6 +186,10 @@ const EventRoster: React.FC = () => {
   const themedStyles = useMemo(
     () =>
       StyleSheet.create({
+        safeArea: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
         container: {
           flex: 1,
           backgroundColor: colors.background,
@@ -198,7 +203,6 @@ const EventRoster: React.FC = () => {
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: 16,
-          marginTop: 8,
         },
         eventEmoji: {
           fontSize: 32,
@@ -897,701 +901,708 @@ const EventRoster: React.FC = () => {
   const sportEmoji = sportEmojis[eventType] || '🎯';
 
   return (
-    <ScrollView
-      style={themedStyles.container}
-      contentContainerStyle={themedStyles.scrollContent}>
-      {/* Event Header */}
-      <View style={themedStyles.eventHeader}>
-        <Text style={themedStyles.eventEmoji}>{sportEmoji}</Text>
-        <Text style={themedStyles.eventName} numberOfLines={2}>
-          {eventName}
-        </Text>
-      </View>
-
-      {/* Event Details Card */}
-      <View style={themedStyles.eventCard}>
-        <View style={themedStyles.eventTypeRow}>
-          <View style={themedStyles.eventTypeBadge}>
-            <Text style={themedStyles.eventTypeText}>{eventType}</Text>
-          </View>
-        </View>
-
-        {date && (
-          <View style={themedStyles.eventDetailRow}>
-            <Text style={themedStyles.eventDetailIcon}>📅</Text>
-            <Text style={themedStyles.eventDetailText}>{date}</Text>
-          </View>
-        )}
-        {time && (
-          <View style={themedStyles.eventDetailRow}>
-            <Text style={themedStyles.eventDetailIcon}>🕐</Text>
-            <Text style={themedStyles.eventDetailText}>{time}</Text>
-          </View>
-        )}
-        {location && (
-          <View style={themedStyles.eventDetailRow}>
-            <Text style={themedStyles.eventDetailIcon}>📍</Text>
-            <Text style={themedStyles.eventDetailText}>{location}</Text>
-          </View>
-        )}
-
-        {/* Progress Bar */}
-        <View style={themedStyles.progressSection}>
-          <View style={themedStyles.progressHeader}>
-            <Text style={themedStyles.progressLabel}>Roster Spots</Text>
-            <Text style={themedStyles.progressCount}>
-              {roster.length} / {totalSpots}
-            </Text>
-          </View>
-          <View style={themedStyles.progressBarBg}>
-            <View
-              style={[
-                themedStyles.progressBarFill,
-                {width: `${progressPercentage}%`},
-              ]}
-            />
-          </View>
-          <Text style={themedStyles.progressRemaining}>
-            {spotsRemaining > 0
-              ? `${spotsRemaining} spot${
-                  spotsRemaining !== 1 ? 's' : ''
-                } remaining`
-              : 'Roster is full!'}
+    <SafeAreaView style={themedStyles.safeArea} edges={['top']}>
+      <ScrollView
+        style={themedStyles.container}
+        contentContainerStyle={themedStyles.scrollContent}>
+        {/* Event Header */}
+        <View style={themedStyles.eventHeader}>
+          <Text style={themedStyles.eventEmoji}>{sportEmoji}</Text>
+          <Text style={themedStyles.eventName} numberOfLines={2}>
+            {eventName}
           </Text>
         </View>
-      </View>
 
-      {/* Stats Section */}
-      {roster.length > 0 && (
-        <View style={themedStyles.statsSection}>
-          <Text style={themedStyles.statsSectionTitle}>📊 Roster Stats</Text>
-          <View style={themedStyles.statsRow}>
-            <View style={themedStyles.statItem}>
-              <Text style={themedStyles.statValue}>{roster.length}</Text>
-              <Text style={themedStyles.statLabel}>Players</Text>
-            </View>
-            <View style={themedStyles.statItem}>
-              <Text style={themedStyles.statValueGreen}>
-                {rosterStats.paidCount}
-              </Text>
-              <Text style={themedStyles.statLabel}>Paid</Text>
-            </View>
-            <View style={themedStyles.statItem}>
-              <Text style={themedStyles.statValueError}>
-                {rosterStats.unpaidCount}
-              </Text>
-              <Text style={themedStyles.statLabel}>Unpaid</Text>
+        {/* Event Details Card */}
+        <View style={themedStyles.eventCard}>
+          <View style={themedStyles.eventTypeRow}>
+            <View style={themedStyles.eventTypeBadge}>
+              <Text style={themedStyles.eventTypeText}>{eventType}</Text>
             </View>
           </View>
 
-          {/* Team Breakdown */}
-          {Object.keys(rosterStats.teamCounts).length > 1 && (
-            <View style={themedStyles.teamBreakdown}>
-              <Text style={themedStyles.statsSectionTitleSmall}>
-                Teams by Jersey
-              </Text>
-              <View style={themedStyles.teamRow}>
-                {Object.entries(rosterStats.teamCounts).map(
-                  ([color, count]) => (
-                    <View
-                      key={color}
-                      style={[
-                        themedStyles.teamBadge,
-                        {
-                          borderColor:
-                            jerseyColors[color] || jerseyColors.Other,
-                        },
-                      ]}>
-                      <View
-                        style={[
-                          themedStyles.jerseyIndicator,
-                          {
-                            backgroundColor:
-                              jerseyColors[color] || jerseyColors.Other,
-                          },
-                        ]}
-                      />
-                      <Text style={themedStyles.teamBadgeText}>
-                        {color}: {count}
-                      </Text>
-                    </View>
-                  ),
-                )}
-              </View>
+          {date && (
+            <View style={themedStyles.eventDetailRow}>
+              <Text style={themedStyles.eventDetailIcon}>📅</Text>
+              <Text style={themedStyles.eventDetailText}>{date}</Text>
             </View>
           )}
-        </View>
-      )}
+          {time && (
+            <View style={themedStyles.eventDetailRow}>
+              <Text style={themedStyles.eventDetailIcon}>🕐</Text>
+              <Text style={themedStyles.eventDetailText}>{time}</Text>
+            </View>
+          )}
+          {location && (
+            <View style={themedStyles.eventDetailRow}>
+              <Text style={themedStyles.eventDetailIcon}>📍</Text>
+              <Text style={themedStyles.eventDetailText}>{location}</Text>
+            </View>
+          )}
 
-      {/* Add Player Section (Collapsible) */}
-      <View style={themedStyles.addPlayerSection}>
-        <TouchableOpacity
-          style={themedStyles.addPlayerHeader}
-          onPress={() => setAddPlayerExpanded(!addPlayerExpanded)}
-          activeOpacity={0.7}>
-          <View style={themedStyles.addPlayerHeaderLeft}>
-            <FontAwesomeIcon
-              icon={faUserPlus}
-              size={18}
-              color={colors.primary}
-            />
-            <Text style={themedStyles.addPlayerTitle}>
-              {isUserOnRoster ? 'Already Joined' : 'Join This Event'}
+          {/* Progress Bar */}
+          <View style={themedStyles.progressSection}>
+            <View style={themedStyles.progressHeader}>
+              <Text style={themedStyles.progressLabel}>Roster Spots</Text>
+              <Text style={themedStyles.progressCount}>
+                {roster.length} / {totalSpots}
+              </Text>
+            </View>
+            <View style={themedStyles.progressBarBg}>
+              <View
+                style={[
+                  themedStyles.progressBarFill,
+                  {width: `${progressPercentage}%`},
+                ]}
+              />
+            </View>
+            <Text style={themedStyles.progressRemaining}>
+              {spotsRemaining > 0
+                ? `${spotsRemaining} spot${
+                    spotsRemaining !== 1 ? 's' : ''
+                  } remaining`
+                : 'Roster is full!'}
             </Text>
           </View>
-          <FontAwesomeIcon
-            icon={addPlayerExpanded ? faChevronUp : faChevronDown}
-            size={16}
-            color={colors.placeholder}
-          />
-        </TouchableOpacity>
+        </View>
 
-        {addPlayerExpanded && (
-          <View style={themedStyles.addPlayerContent}>
-            {isUserOnRoster ? (
-              <View style={themedStyles.alreadyJoinedBadge}>
-                <FontAwesomeIcon
-                  icon={faCheck}
-                  size={14}
-                  color={colors.primary}
-                />
-                <Text style={themedStyles.alreadyJoinedText}>
-                  You're on the roster!
-                </Text>
+        {/* Stats Section */}
+        {roster.length > 0 && (
+          <View style={themedStyles.statsSection}>
+            <Text style={themedStyles.statsSectionTitle}>📊 Roster Stats</Text>
+            <View style={themedStyles.statsRow}>
+              <View style={themedStyles.statItem}>
+                <Text style={themedStyles.statValue}>{roster.length}</Text>
+                <Text style={themedStyles.statLabel}>Players</Text>
               </View>
-            ) : (
-              <>
-                {errorMessage ? (
-                  <Text style={themedStyles.errorMessage}>{errorMessage}</Text>
-                ) : null}
+              <View style={themedStyles.statItem}>
+                <Text style={themedStyles.statValueGreen}>
+                  {rosterStats.paidCount}
+                </Text>
+                <Text style={themedStyles.statLabel}>Paid</Text>
+              </View>
+              <View style={themedStyles.statItem}>
+                <Text style={themedStyles.statValueError}>
+                  {rosterStats.unpaidCount}
+                </Text>
+                <Text style={themedStyles.statLabel}>Unpaid</Text>
+              </View>
+            </View>
 
-                <TextInput
-                  style={themedStyles.input}
-                  placeholder="Your name"
-                  placeholderTextColor={colors.placeholder}
-                  value={username}
-                  onChangeText={setUsername}
-                />
-
-                {/* Paid Status Dropdown */}
-                <TouchableOpacity
-                  style={themedStyles.dropdown}
-                  onPress={() => setPaidStatusModalVisible(true)}>
-                  <Text
-                    style={
-                      paidStatus
-                        ? themedStyles.dropdownText
-                        : themedStyles.placeholderText
-                    }>
-                    {paidStatus || 'Select Paid Status'}
-                  </Text>
-                  <FontAwesomeIcon
-                    icon={faChevronDown}
-                    size={14}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-
-                {/* Jersey Color Dropdown */}
-                <TouchableOpacity
-                  style={themedStyles.dropdown}
-                  onPress={() => setJerseyColorModalVisible(true)}>
-                  <View style={themedStyles.jerseyDropdownRow}>
-                    {jerseyColor && (
+            {/* Team Breakdown */}
+            {Object.keys(rosterStats.teamCounts).length > 1 && (
+              <View style={themedStyles.teamBreakdown}>
+                <Text style={themedStyles.statsSectionTitleSmall}>
+                  Teams by Jersey
+                </Text>
+                <View style={themedStyles.teamRow}>
+                  {Object.entries(rosterStats.teamCounts).map(
+                    ([color, count]) => (
                       <View
+                        key={color}
                         style={[
-                          themedStyles.jerseyIndicatorLarge,
+                          themedStyles.teamBadge,
                           {
-                            backgroundColor:
-                              jerseyColors[jerseyColor] || jerseyColors.Other,
+                            borderColor:
+                              jerseyColors[color] || jerseyColors.Other,
                           },
-                        ]}
-                      />
-                    )}
-                    <Text
-                      style={
-                        jerseyColor
-                          ? themedStyles.dropdownText
-                          : themedStyles.placeholderText
-                      }>
-                      {jerseyColor || 'Select Jersey Color'}
-                    </Text>
-                  </View>
-                  <FontAwesomeIcon
-                    icon={faChevronDown}
-                    size={14}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-
-                {/* Position Dropdown */}
-                <TouchableOpacity
-                  style={themedStyles.dropdown}
-                  onPress={() => setPositionModalVisible(true)}>
-                  <Text
-                    style={
-                      position
-                        ? themedStyles.dropdownText
-                        : themedStyles.placeholderText
-                    }>
-                    {position || 'Select Position'}
-                  </Text>
-                  <FontAwesomeIcon
-                    icon={faChevronDown}
-                    size={14}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    themedStyles.saveButton,
-                    spotsRemaining === 0 && themedStyles.saveButtonDisabled,
-                  ]}
-                  onPress={handleSave}
-                  disabled={spotsRemaining === 0}>
-                  <FontAwesomeIcon
-                    icon={faUserPlus}
-                    size={16}
-                    color={colors.buttonText}
-                  />
-                  <Text style={themedStyles.buttonText}>
-                    {spotsRemaining === 0 ? 'Roster Full' : 'Join Event'}
-                  </Text>
-                </TouchableOpacity>
-              </>
+                        ]}>
+                        <View
+                          style={[
+                            themedStyles.jerseyIndicator,
+                            {
+                              backgroundColor:
+                                jerseyColors[color] || jerseyColors.Other,
+                            },
+                          ]}
+                        />
+                        <Text style={themedStyles.teamBadgeText}>
+                          {color}: {count}
+                        </Text>
+                      </View>
+                    ),
+                  )}
+                </View>
+              </View>
             )}
           </View>
         )}
-      </View>
 
-      {/* Rostered Players Section */}
-      <View style={themedStyles.rosterSection}>
-        <View style={themedStyles.sectionHeader}>
-          <FontAwesomeIcon icon={faUsers} size={18} color={colors.primary} />
-          <Text style={themedStyles.sectionTitle}>
-            Rostered Players ({roster.length})
-          </Text>
+        {/* Add Player Section (Collapsible) */}
+        <View style={themedStyles.addPlayerSection}>
+          <TouchableOpacity
+            style={themedStyles.addPlayerHeader}
+            onPress={() => setAddPlayerExpanded(!addPlayerExpanded)}
+            activeOpacity={0.7}>
+            <View style={themedStyles.addPlayerHeaderLeft}>
+              <FontAwesomeIcon
+                icon={faUserPlus}
+                size={18}
+                color={colors.primary}
+              />
+              <Text style={themedStyles.addPlayerTitle}>
+                {isUserOnRoster ? 'Already Joined' : 'Join This Event'}
+              </Text>
+            </View>
+            <FontAwesomeIcon
+              icon={addPlayerExpanded ? faChevronUp : faChevronDown}
+              size={16}
+              color={colors.placeholder}
+            />
+          </TouchableOpacity>
+
+          {addPlayerExpanded && (
+            <View style={themedStyles.addPlayerContent}>
+              {isUserOnRoster ? (
+                <View style={themedStyles.alreadyJoinedBadge}>
+                  <FontAwesomeIcon
+                    icon={faCheck}
+                    size={14}
+                    color={colors.primary}
+                  />
+                  <Text style={themedStyles.alreadyJoinedText}>
+                    You're on the roster!
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {errorMessage ? (
+                    <Text style={themedStyles.errorMessage}>
+                      {errorMessage}
+                    </Text>
+                  ) : null}
+
+                  <TextInput
+                    style={themedStyles.input}
+                    placeholder="Your name"
+                    placeholderTextColor={colors.placeholder}
+                    value={username}
+                    onChangeText={setUsername}
+                  />
+
+                  {/* Paid Status Dropdown */}
+                  <TouchableOpacity
+                    style={themedStyles.dropdown}
+                    onPress={() => setPaidStatusModalVisible(true)}>
+                    <Text
+                      style={
+                        paidStatus
+                          ? themedStyles.dropdownText
+                          : themedStyles.placeholderText
+                      }>
+                      {paidStatus || 'Select Paid Status'}
+                    </Text>
+                    <FontAwesomeIcon
+                      icon={faChevronDown}
+                      size={14}
+                      color={colors.placeholder}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Jersey Color Dropdown */}
+                  <TouchableOpacity
+                    style={themedStyles.dropdown}
+                    onPress={() => setJerseyColorModalVisible(true)}>
+                    <View style={themedStyles.jerseyDropdownRow}>
+                      {jerseyColor && (
+                        <View
+                          style={[
+                            themedStyles.jerseyIndicatorLarge,
+                            {
+                              backgroundColor:
+                                jerseyColors[jerseyColor] || jerseyColors.Other,
+                            },
+                          ]}
+                        />
+                      )}
+                      <Text
+                        style={
+                          jerseyColor
+                            ? themedStyles.dropdownText
+                            : themedStyles.placeholderText
+                        }>
+                        {jerseyColor || 'Select Jersey Color'}
+                      </Text>
+                    </View>
+                    <FontAwesomeIcon
+                      icon={faChevronDown}
+                      size={14}
+                      color={colors.placeholder}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Position Dropdown */}
+                  <TouchableOpacity
+                    style={themedStyles.dropdown}
+                    onPress={() => setPositionModalVisible(true)}>
+                    <Text
+                      style={
+                        position
+                          ? themedStyles.dropdownText
+                          : themedStyles.placeholderText
+                      }>
+                      {position || 'Select Position'}
+                    </Text>
+                    <FontAwesomeIcon
+                      icon={faChevronDown}
+                      size={14}
+                      color={colors.placeholder}
+                    />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      themedStyles.saveButton,
+                      spotsRemaining === 0 && themedStyles.saveButtonDisabled,
+                    ]}
+                    onPress={handleSave}
+                    disabled={spotsRemaining === 0}>
+                    <FontAwesomeIcon
+                      icon={faUserPlus}
+                      size={16}
+                      color={colors.buttonText}
+                    />
+                    <Text style={themedStyles.buttonText}>
+                      {spotsRemaining === 0 ? 'Roster Full' : 'Join Event'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
         </View>
 
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} />
-        ) : roster.length === 0 ? (
-          <Text style={themedStyles.emptyState}>
-            No players have joined yet. Be the first!
-          </Text>
-        ) : (
-          <FlatList
-            data={roster}
-            renderItem={renderPlayerCard}
-            keyExtractor={(_, idx) => idx.toString()}
-            scrollEnabled={false}
-          />
-        )}
-      </View>
-
-      {/* Paid Status Modal */}
-      <Modal
-        visible={paidStatusModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPaidStatusModalVisible(false)}>
-        <View style={themedStyles.modalOverlay}>
-          <View style={themedStyles.modalContent}>
-            <Text style={themedStyles.modalTitle}>Payment Status</Text>
-            {['Paid', 'Unpaid'].map(status => (
-              <TouchableOpacity
-                key={status}
-                style={[
-                  themedStyles.modalOption,
-                  paidStatus === status && themedStyles.modalOptionSelected,
-                ]}
-                onPress={() => {
-                  setPaidStatus(status);
-                  setPaidStatusModalVisible(false);
-                }}>
-                <FontAwesomeIcon
-                  icon={status === 'Paid' ? faCheck : faTimes}
-                  size={16}
-                  color={
-                    status === 'Paid'
-                      ? '#4CAF50'
-                      : paidStatus === status
-                      ? colors.primary
-                      : colors.text
-                  }
-                />
-                <Text
-                  style={[
-                    themedStyles.modalOptionTextWithMargin,
-                    paidStatus === status &&
-                      themedStyles.modalOptionTextSelected,
-                  ]}>
-                  {status}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={themedStyles.modalClose}
-              onPress={() => setPaidStatusModalVisible(false)}>
-              <Text style={themedStyles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
+        {/* Rostered Players Section */}
+        <View style={themedStyles.rosterSection}>
+          <View style={themedStyles.sectionHeader}>
+            <FontAwesomeIcon icon={faUsers} size={18} color={colors.primary} />
+            <Text style={themedStyles.sectionTitle}>
+              Rostered Players ({roster.length})
+            </Text>
           </View>
-        </View>
-      </Modal>
 
-      {/* Jersey Color Modal */}
-      <Modal
-        visible={jerseyColorModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setJerseyColorModalVisible(false)}>
-        <View style={themedStyles.modalOverlay}>
-          <View style={themedStyles.modalContent}>
-            <Text style={themedStyles.modalTitle}>Jersey Color</Text>
-            <ScrollView style={themedStyles.modalScrollView}>
-              {Object.keys(jerseyColors).map(color => (
+          {loading ? (
+            <ActivityIndicator size="large" color={colors.primary} />
+          ) : roster.length === 0 ? (
+            <Text style={themedStyles.emptyState}>
+              No players have joined yet. Be the first!
+            </Text>
+          ) : (
+            <FlatList
+              data={roster}
+              renderItem={renderPlayerCard}
+              keyExtractor={(_, idx) => idx.toString()}
+              scrollEnabled={false}
+            />
+          )}
+        </View>
+
+        {/* Paid Status Modal */}
+        <Modal
+          visible={paidStatusModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPaidStatusModalVisible(false)}>
+          <View style={themedStyles.modalOverlay}>
+            <View style={themedStyles.modalContent}>
+              <Text style={themedStyles.modalTitle}>Payment Status</Text>
+              {['Paid', 'Unpaid'].map(status => (
                 <TouchableOpacity
-                  key={color}
+                  key={status}
                   style={[
                     themedStyles.modalOption,
-                    jerseyColor === color && themedStyles.modalOptionSelected,
+                    paidStatus === status && themedStyles.modalOptionSelected,
                   ]}
                   onPress={() => {
-                    setJerseyColor(color);
-                    setJerseyColorModalVisible(false);
+                    setPaidStatus(status);
+                    setPaidStatusModalVisible(false);
                   }}>
-                  <View
-                    style={[
-                      themedStyles.colorSwatch,
-                      {backgroundColor: jerseyColors[color]},
-                    ]}
+                  <FontAwesomeIcon
+                    icon={status === 'Paid' ? faCheck : faTimes}
+                    size={16}
+                    color={
+                      status === 'Paid'
+                        ? '#4CAF50'
+                        : paidStatus === status
+                        ? colors.primary
+                        : colors.text
+                    }
                   />
                   <Text
                     style={[
-                      themedStyles.modalOptionText,
-                      jerseyColor === color &&
+                      themedStyles.modalOptionTextWithMargin,
+                      paidStatus === status &&
                         themedStyles.modalOptionTextSelected,
                     ]}>
-                    {color}
+                    {status}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={themedStyles.modalClose}
-              onPress={() => setJerseyColorModalVisible(false)}>
-              <Text style={themedStyles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={themedStyles.modalClose}
+                onPress={() => setPaidStatusModalVisible(false)}>
+                <Text style={themedStyles.modalCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Position Modal */}
-      <Modal
-        visible={positionModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPositionModalVisible(false)}>
-        <View style={themedStyles.modalOverlay}>
-          <View style={themedStyles.modalContent}>
-            <Text style={themedStyles.modalTitle}>Select Position</Text>
-            <ScrollView style={themedStyles.modalScrollView}>
-              {(positionOptions[eventType] || positionOptions.Default).map(
-                pos => (
+        {/* Jersey Color Modal */}
+        <Modal
+          visible={jerseyColorModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setJerseyColorModalVisible(false)}>
+          <View style={themedStyles.modalOverlay}>
+            <View style={themedStyles.modalContent}>
+              <Text style={themedStyles.modalTitle}>Jersey Color</Text>
+              <ScrollView style={themedStyles.modalScrollView}>
+                {Object.keys(jerseyColors).map(color => (
                   <TouchableOpacity
-                    key={pos}
+                    key={color}
                     style={[
                       themedStyles.modalOption,
-                      position === pos && themedStyles.modalOptionSelected,
+                      jerseyColor === color && themedStyles.modalOptionSelected,
                     ]}
                     onPress={() => {
-                      setPosition(pos);
-                      setPositionModalVisible(false);
+                      setJerseyColor(color);
+                      setJerseyColorModalVisible(false);
                     }}>
-                    <FontAwesomeIcon
-                      icon={faFutbol}
-                      size={16}
-                      color={
-                        position === pos ? colors.primary : colors.placeholder
-                      }
+                    <View
+                      style={[
+                        themedStyles.colorSwatch,
+                        {backgroundColor: jerseyColors[color]},
+                      ]}
                     />
                     <Text
                       style={[
-                        themedStyles.modalOptionTextWithMargin,
-                        position === pos &&
+                        themedStyles.modalOptionText,
+                        jerseyColor === color &&
                           themedStyles.modalOptionTextSelected,
                       ]}>
-                      {pos}
+                      {color}
                     </Text>
                   </TouchableOpacity>
-                ),
-              )}
-            </ScrollView>
-            <TouchableOpacity
-              style={themedStyles.modalClose}
-              onPress={() => setPositionModalVisible(false)}>
-              <Text style={themedStyles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity
+                style={themedStyles.modalClose}
+                onPress={() => setJerseyColorModalVisible(false)}>
+                <Text style={themedStyles.modalCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Edit Player Modal */}
-      <Modal
-        visible={editModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditModalVisible(false)}>
-        <View style={themedStyles.modalOverlay}>
-          <View style={themedStyles.modalContent}>
-            <Text style={themedStyles.modalTitle}>✏️ Edit Your Info</Text>
-
-            {/* Edit Paid Status */}
-            <TouchableOpacity
-              style={themedStyles.dropdown}
-              onPress={() => setEditPaidStatusModalVisible(true)}>
-              <Text
-                style={
-                  editPaidStatus
-                    ? themedStyles.dropdownText
-                    : themedStyles.placeholderText
-                }>
-                {editPaidStatus || 'Select Paid Status'}
-              </Text>
-              <FontAwesomeIcon
-                icon={faChevronDown}
-                size={14}
-                color={colors.placeholder}
-              />
-            </TouchableOpacity>
-
-            {/* Edit Jersey Color */}
-            <TouchableOpacity
-              style={themedStyles.dropdown}
-              onPress={() => setEditJerseyColorModalVisible(true)}>
-              <View style={themedStyles.jerseyDropdownRow}>
-                {editJerseyColor && (
-                  <View
-                    style={[
-                      themedStyles.jerseyIndicatorLarge,
-                      {
-                        backgroundColor:
-                          jerseyColors[editJerseyColor] || jerseyColors.Other,
-                      },
-                    ]}
-                  />
+        {/* Position Modal */}
+        <Modal
+          visible={positionModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPositionModalVisible(false)}>
+          <View style={themedStyles.modalOverlay}>
+            <View style={themedStyles.modalContent}>
+              <Text style={themedStyles.modalTitle}>Select Position</Text>
+              <ScrollView style={themedStyles.modalScrollView}>
+                {(positionOptions[eventType] || positionOptions.Default).map(
+                  pos => (
+                    <TouchableOpacity
+                      key={pos}
+                      style={[
+                        themedStyles.modalOption,
+                        position === pos && themedStyles.modalOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setPosition(pos);
+                        setPositionModalVisible(false);
+                      }}>
+                      <FontAwesomeIcon
+                        icon={faFutbol}
+                        size={16}
+                        color={
+                          position === pos ? colors.primary : colors.placeholder
+                        }
+                      />
+                      <Text
+                        style={[
+                          themedStyles.modalOptionTextWithMargin,
+                          position === pos &&
+                            themedStyles.modalOptionTextSelected,
+                        ]}>
+                        {pos}
+                      </Text>
+                    </TouchableOpacity>
+                  ),
                 )}
+              </ScrollView>
+              <TouchableOpacity
+                style={themedStyles.modalClose}
+                onPress={() => setPositionModalVisible(false)}>
+                <Text style={themedStyles.modalCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Edit Player Modal */}
+        <Modal
+          visible={editModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setEditModalVisible(false)}>
+          <View style={themedStyles.modalOverlay}>
+            <View style={themedStyles.modalContent}>
+              <Text style={themedStyles.modalTitle}>✏️ Edit Your Info</Text>
+
+              {/* Edit Paid Status */}
+              <TouchableOpacity
+                style={themedStyles.dropdown}
+                onPress={() => setEditPaidStatusModalVisible(true)}>
                 <Text
                   style={
-                    editJerseyColor
+                    editPaidStatus
                       ? themedStyles.dropdownText
                       : themedStyles.placeholderText
                   }>
-                  {editJerseyColor || 'Select Jersey Color'}
+                  {editPaidStatus || 'Select Paid Status'}
                 </Text>
-              </View>
-              <FontAwesomeIcon
-                icon={faChevronDown}
-                size={14}
-                color={colors.placeholder}
-              />
-            </TouchableOpacity>
-
-            {/* Edit Position */}
-            <TouchableOpacity
-              style={themedStyles.dropdown}
-              onPress={() => setEditPositionModalVisible(true)}>
-              <Text
-                style={
-                  editPosition
-                    ? themedStyles.dropdownText
-                    : themedStyles.placeholderText
-                }>
-                {editPosition || 'Select Position'}
-              </Text>
-              <FontAwesomeIcon
-                icon={faChevronDown}
-                size={14}
-                color={colors.placeholder}
-              />
-            </TouchableOpacity>
-
-            {/* Save & Cancel Buttons */}
-            <TouchableOpacity
-              style={themedStyles.saveButton}
-              onPress={handleSaveEdit}>
-              <FontAwesomeIcon
-                icon={faCheck}
-                size={18}
-                color={colors.buttonText}
-              />
-              <Text style={themedStyles.buttonText}>Save Changes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                themedStyles.modalClose,
-                {backgroundColor: colors.border},
-              ]}
-              onPress={() => setEditModalVisible(false)}>
-              <Text style={[themedStyles.modalCloseText, {color: colors.text}]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Edit Paid Status Modal */}
-      <Modal
-        visible={editPaidStatusModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditPaidStatusModalVisible(false)}>
-        <View style={themedStyles.modalOverlay}>
-          <View style={themedStyles.modalContent}>
-            <Text style={themedStyles.modalTitle}>Payment Status</Text>
-            {['Paid', 'Unpaid'].map(status => (
-              <TouchableOpacity
-                key={status}
-                style={[
-                  themedStyles.modalOption,
-                  editPaidStatus === status && themedStyles.modalOptionSelected,
-                ]}
-                onPress={() => {
-                  setEditPaidStatus(status);
-                  setEditPaidStatusModalVisible(false);
-                }}>
                 <FontAwesomeIcon
-                  icon={status === 'Paid' ? faCheck : faTimes}
-                  size={16}
-                  color={
-                    status === 'Paid'
-                      ? '#4CAF50'
-                      : editPaidStatus === status
-                      ? colors.primary
-                      : colors.text
-                  }
+                  icon={faChevronDown}
+                  size={14}
+                  color={colors.placeholder}
                 />
+              </TouchableOpacity>
+
+              {/* Edit Jersey Color */}
+              <TouchableOpacity
+                style={themedStyles.dropdown}
+                onPress={() => setEditJerseyColorModalVisible(true)}>
+                <View style={themedStyles.jerseyDropdownRow}>
+                  {editJerseyColor && (
+                    <View
+                      style={[
+                        themedStyles.jerseyIndicatorLarge,
+                        {
+                          backgroundColor:
+                            jerseyColors[editJerseyColor] || jerseyColors.Other,
+                        },
+                      ]}
+                    />
+                  )}
+                  <Text
+                    style={
+                      editJerseyColor
+                        ? themedStyles.dropdownText
+                        : themedStyles.placeholderText
+                    }>
+                    {editJerseyColor || 'Select Jersey Color'}
+                  </Text>
+                </View>
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  size={14}
+                  color={colors.placeholder}
+                />
+              </TouchableOpacity>
+
+              {/* Edit Position */}
+              <TouchableOpacity
+                style={themedStyles.dropdown}
+                onPress={() => setEditPositionModalVisible(true)}>
                 <Text
-                  style={[
-                    themedStyles.modalOptionTextWithMargin,
-                    editPaidStatus === status &&
-                      themedStyles.modalOptionTextSelected,
-                  ]}>
-                  {status}
+                  style={
+                    editPosition
+                      ? themedStyles.dropdownText
+                      : themedStyles.placeholderText
+                  }>
+                  {editPosition || 'Select Position'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  size={14}
+                  color={colors.placeholder}
+                />
+              </TouchableOpacity>
+
+              {/* Save & Cancel Buttons */}
+              <TouchableOpacity
+                style={themedStyles.saveButton}
+                onPress={handleSaveEdit}>
+                <FontAwesomeIcon
+                  icon={faCheck}
+                  size={18}
+                  color={colors.buttonText}
+                />
+                <Text style={themedStyles.buttonText}>Save Changes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  themedStyles.modalClose,
+                  {backgroundColor: colors.border},
+                ]}
+                onPress={() => setEditModalVisible(false)}>
+                <Text
+                  style={[themedStyles.modalCloseText, {color: colors.text}]}>
+                  Cancel
                 </Text>
               </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={themedStyles.modalClose}
-              onPress={() => setEditPaidStatusModalVisible(false)}>
-              <Text style={themedStyles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Edit Jersey Color Modal */}
-      <Modal
-        visible={editJerseyColorModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditJerseyColorModalVisible(false)}>
-        <View style={themedStyles.modalOverlay}>
-          <View style={themedStyles.modalContent}>
-            <Text style={themedStyles.modalTitle}>Jersey Color</Text>
-            <ScrollView style={themedStyles.modalScrollView}>
-              {Object.keys(jerseyColors).map(color => (
+        {/* Edit Paid Status Modal */}
+        <Modal
+          visible={editPaidStatusModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setEditPaidStatusModalVisible(false)}>
+          <View style={themedStyles.modalOverlay}>
+            <View style={themedStyles.modalContent}>
+              <Text style={themedStyles.modalTitle}>Payment Status</Text>
+              {['Paid', 'Unpaid'].map(status => (
                 <TouchableOpacity
-                  key={color}
+                  key={status}
                   style={[
                     themedStyles.modalOption,
-                    editJerseyColor === color &&
+                    editPaidStatus === status &&
                       themedStyles.modalOptionSelected,
                   ]}
                   onPress={() => {
-                    setEditJerseyColor(color);
-                    setEditJerseyColorModalVisible(false);
+                    setEditPaidStatus(status);
+                    setEditPaidStatusModalVisible(false);
                   }}>
-                  <View
-                    style={[
-                      themedStyles.colorSwatch,
-                      {backgroundColor: jerseyColors[color]},
-                    ]}
+                  <FontAwesomeIcon
+                    icon={status === 'Paid' ? faCheck : faTimes}
+                    size={16}
+                    color={
+                      status === 'Paid'
+                        ? '#4CAF50'
+                        : editPaidStatus === status
+                        ? colors.primary
+                        : colors.text
+                    }
                   />
                   <Text
                     style={[
-                      themedStyles.modalOptionText,
-                      editJerseyColor === color &&
+                      themedStyles.modalOptionTextWithMargin,
+                      editPaidStatus === status &&
                         themedStyles.modalOptionTextSelected,
                     ]}>
-                    {color}
+                    {status}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={themedStyles.modalClose}
-              onPress={() => setEditJerseyColorModalVisible(false)}>
-              <Text style={themedStyles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={themedStyles.modalClose}
+                onPress={() => setEditPaidStatusModalVisible(false)}>
+                <Text style={themedStyles.modalCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Edit Position Modal */}
-      <Modal
-        visible={editPositionModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditPositionModalVisible(false)}>
-        <View style={themedStyles.modalOverlay}>
-          <View style={themedStyles.modalContent}>
-            <Text style={themedStyles.modalTitle}>Select Position</Text>
-            <ScrollView style={themedStyles.modalScrollView}>
-              {(positionOptions[eventType] || positionOptions.Default).map(
-                pos => (
+        {/* Edit Jersey Color Modal */}
+        <Modal
+          visible={editJerseyColorModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setEditJerseyColorModalVisible(false)}>
+          <View style={themedStyles.modalOverlay}>
+            <View style={themedStyles.modalContent}>
+              <Text style={themedStyles.modalTitle}>Jersey Color</Text>
+              <ScrollView style={themedStyles.modalScrollView}>
+                {Object.keys(jerseyColors).map(color => (
                   <TouchableOpacity
-                    key={pos}
+                    key={color}
                     style={[
                       themedStyles.modalOption,
-                      editPosition === pos && themedStyles.modalOptionSelected,
+                      editJerseyColor === color &&
+                        themedStyles.modalOptionSelected,
                     ]}
                     onPress={() => {
-                      setEditPosition(pos);
-                      setEditPositionModalVisible(false);
+                      setEditJerseyColor(color);
+                      setEditJerseyColorModalVisible(false);
                     }}>
-                    <FontAwesomeIcon
-                      icon={faFutbol}
-                      size={16}
-                      color={
-                        editPosition === pos
-                          ? colors.primary
-                          : colors.placeholder
-                      }
+                    <View
+                      style={[
+                        themedStyles.colorSwatch,
+                        {backgroundColor: jerseyColors[color]},
+                      ]}
                     />
                     <Text
                       style={[
-                        themedStyles.modalOptionTextWithMargin,
-                        editPosition === pos &&
+                        themedStyles.modalOptionText,
+                        editJerseyColor === color &&
                           themedStyles.modalOptionTextSelected,
                       ]}>
-                      {pos}
+                      {color}
                     </Text>
                   </TouchableOpacity>
-                ),
-              )}
-            </ScrollView>
-            <TouchableOpacity
-              style={themedStyles.modalClose}
-              onPress={() => setEditPositionModalVisible(false)}>
-              <Text style={themedStyles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity
+                style={themedStyles.modalClose}
+                onPress={() => setEditJerseyColorModalVisible(false)}>
+                <Text style={themedStyles.modalCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+
+        {/* Edit Position Modal */}
+        <Modal
+          visible={editPositionModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setEditPositionModalVisible(false)}>
+          <View style={themedStyles.modalOverlay}>
+            <View style={themedStyles.modalContent}>
+              <Text style={themedStyles.modalTitle}>Select Position</Text>
+              <ScrollView style={themedStyles.modalScrollView}>
+                {(positionOptions[eventType] || positionOptions.Default).map(
+                  pos => (
+                    <TouchableOpacity
+                      key={pos}
+                      style={[
+                        themedStyles.modalOption,
+                        editPosition === pos &&
+                          themedStyles.modalOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setEditPosition(pos);
+                        setEditPositionModalVisible(false);
+                      }}>
+                      <FontAwesomeIcon
+                        icon={faFutbol}
+                        size={16}
+                        color={
+                          editPosition === pos
+                            ? colors.primary
+                            : colors.placeholder
+                        }
+                      />
+                      <Text
+                        style={[
+                          themedStyles.modalOptionTextWithMargin,
+                          editPosition === pos &&
+                            themedStyles.modalOptionTextSelected,
+                        ]}>
+                        {pos}
+                      </Text>
+                    </TouchableOpacity>
+                  ),
+                )}
+              </ScrollView>
+              <TouchableOpacity
+                style={themedStyles.modalClose}
+                onPress={() => setEditPositionModalVisible(false)}>
+                <Text style={themedStyles.modalCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
