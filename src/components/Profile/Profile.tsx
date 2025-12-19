@@ -1,5 +1,13 @@
 import React, {useContext, useEffect, useState, useMemo} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity} from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  Switch,
+} from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
 import UserContext, {UserContextType} from '../UserContext';
@@ -10,6 +18,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
+import {useEventContext} from '../../Context/EventContext';
+import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {
+  faCalendarCheck,
+  faCalendarPlus,
+  faMoon,
+  faSun,
+  faCamera,
+  faImage,
+  faUsers,
+} from '@fortawesome/free-solid-svg-icons';
 
 // Types
 type ProfileScreenRouteProp = RouteProp<
@@ -23,95 +42,262 @@ const Profile: React.FC = () => {
   const {_id} = route.params;
 
   const {userData, setUserData} = useContext(UserContext) as UserContextType;
-  const {colors} = useTheme();
+  const {colors, darkMode, toggleDarkMode} = useTheme();
+  const {events} = useEventContext();
+
+  // Calculate user stats
+  const userStats = useMemo(() => {
+    const eventsCreated = events.filter(e => e.createdBy === _id).length;
+    const eventsJoined = events.filter(e => e.rosterSpotsFilled > 0).length;
+    return {eventsCreated, eventsJoined};
+  }, [events, _id]);
 
   // Themed styles
   const themedStyles = useMemo(
     () =>
       StyleSheet.create({
+        safeArea: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
         container: {
           flex: 1,
-          padding: 16,
           backgroundColor: colors.background,
+        },
+        scrollContent: {
+          padding: 16,
+          paddingBottom: 32,
         },
         header: {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: 20,
+          paddingHorizontal: 16,
+          paddingTop: 8,
           backgroundColor: colors.background,
           zIndex: 1,
         },
         title: {
           fontSize: 25,
+          fontWeight: '700',
           color: colors.primary,
           textAlign: 'center',
           flex: 1,
           position: 'absolute',
           left: 0,
           right: 0,
-          top: 0,
+          top: 8,
           zIndex: -1,
+        },
+        // Profile Card
+        profileCard: {
+          backgroundColor: colors.card,
+          borderRadius: 20,
+          padding: 24,
+          marginBottom: 16,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 3,
         },
         profileRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 24,
-          marginTop: 8,
+          marginBottom: 20,
+        },
+        avatarContainer: {
+          position: 'relative',
         },
         avatar: {
           width: 90,
           height: 90,
           borderRadius: 45,
-          marginRight: 18,
-          backgroundColor: colors.card,
+          backgroundColor: colors.border,
+        },
+        avatarPlaceholder: {
+          width: 90,
+          height: 90,
+          borderRadius: 45,
+          backgroundColor: colors.primary + '20',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        avatarInitials: {
+          fontSize: 32,
+          fontWeight: '700',
+          color: colors.primary,
         },
         userInfo: {
           flex: 1,
-          justifyContent: 'center',
-          backgroundColor: 'transparent',
-          paddingVertical: 0,
-          paddingHorizontal: 0,
+          marginLeft: 18,
         },
         userName: {
-          fontSize: 22,
-          fontWeight: '600',
+          fontSize: 24,
+          fontWeight: '700',
           color: colors.text,
-          marginBottom: 2,
-          textAlign: 'left',
-          letterSpacing: 0.2,
-          backgroundColor: 'transparent',
+          marginBottom: 4,
         },
         emailText: {
-          fontSize: 16,
-          color: colors.text,
-          opacity: 0.7,
-          textAlign: 'left',
-          letterSpacing: 0.1,
-          backgroundColor: 'transparent',
+          fontSize: 15,
+          color: colors.placeholder,
         },
-        modernButton: {
-          backgroundColor: colors.card,
-          paddingVertical: 10,
-          paddingHorizontal: 24,
-          borderRadius: 8,
-          marginTop: 0,
-          marginHorizontal: 6,
-          borderWidth: 1,
-          borderColor: colors.border,
-          elevation: 0,
-        },
-        buttonText: {
-          color: colors.primary,
-          textAlign: 'center',
-          fontSize: 16,
-          fontWeight: '500',
-          letterSpacing: 0.2,
-        },
-        buttonRow: {
+        photoButtonsRow: {
           flexDirection: 'row',
           justifyContent: 'center',
+          gap: 12,
+        },
+        photoButton: {
+          flexDirection: 'row',
           alignItems: 'center',
+          backgroundColor: colors.background,
+          paddingVertical: 10,
+          paddingHorizontal: 16,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        photoButtonText: {
+          color: colors.primary,
+          fontSize: 14,
+          fontWeight: '600',
+          marginLeft: 8,
+        },
+        // Stats Section
+        statsCard: {
+          backgroundColor: colors.card,
+          borderRadius: 20,
+          padding: 20,
+          marginBottom: 16,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 3,
+        },
+        sectionTitle: {
+          fontSize: 18,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 16,
+        },
+        statsRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+        },
+        statItem: {
+          alignItems: 'center',
+          flex: 1,
+        },
+        statIconContainer: {
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 10,
+        },
+        statValue: {
+          fontSize: 28,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        statLabel: {
+          fontSize: 13,
+          color: colors.placeholder,
+          marginTop: 4,
+        },
+        // Quick Settings
+        settingsCard: {
+          backgroundColor: colors.card,
+          borderRadius: 20,
+          padding: 20,
+          marginBottom: 16,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 3,
+        },
+        settingRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
+        settingRowLast: {
+          borderBottomWidth: 0,
+        },
+        settingLeft: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        settingIconContainer: {
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 14,
+        },
+        settingText: {
+          fontSize: 16,
+          fontWeight: '500',
+          color: colors.text,
+        },
+        settingSubtext: {
+          fontSize: 13,
+          color: colors.placeholder,
+          marginTop: 2,
+        },
+        // Achievements Preview
+        achievementsCard: {
+          backgroundColor: colors.card,
+          borderRadius: 20,
+          padding: 20,
+          marginBottom: 16,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 3,
+        },
+        achievementsRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          marginTop: 8,
+        },
+        achievementBadge: {
+          alignItems: 'center',
+          opacity: 0.4,
+        },
+        achievementBadgeEarned: {
+          opacity: 1,
+        },
+        achievementEmoji: {
+          fontSize: 24,
+        },
+        achievementIcon: {
+          width: 50,
+          height: 50,
+          borderRadius: 25,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 8,
+        },
+        achievementName: {
+          fontSize: 12,
+          color: colors.text,
+          fontWeight: '500',
+        },
+        // Member Since
+        memberSince: {
+          textAlign: 'center',
+          fontSize: 13,
+          color: colors.placeholder,
           marginTop: 8,
         },
       }),
@@ -170,7 +356,10 @@ const Profile: React.FC = () => {
       if (response.assets) {
         const firstAsset = response.assets[0];
         if (firstAsset && firstAsset.base64) {
-          uploadImageToLambda(firstAsset.base64, firstAsset.fileName);
+          uploadImageToLambda(
+            firstAsset.base64,
+            firstAsset.fileName || 'photo.jpg',
+          );
         }
       }
     });
@@ -186,13 +375,19 @@ const Profile: React.FC = () => {
       if (response.assets) {
         const firstAsset = response.assets[0];
         if (firstAsset && firstAsset.base64) {
-          uploadImageToLambda(firstAsset.base64, firstAsset.fileName);
+          uploadImageToLambda(
+            firstAsset.base64,
+            firstAsset.fileName || 'photo.jpg',
+          );
         }
       }
     });
   };
 
-  const uploadImageToLambda = async (base64Image: string, fileName: string) => {
+  const uploadImageToLambda = async (
+    base64Image: string,
+    fileName: string | undefined,
+  ) => {
     try {
       const lambdaResponse = await axios.post(
         'https://8nxzl6o6fd.execute-api.us-east-2.amazonaws.com/default/uploadImageFunction',
@@ -242,40 +437,237 @@ const Profile: React.FC = () => {
     }
   };
 
+  const getInitials = (name: string | undefined) => {
+    if (!name) {
+      return '?';
+    }
+    return name
+      .split(' ')
+      .map(part => part[0]?.toUpperCase())
+      .join('')
+      .slice(0, 2);
+  };
+
   return (
-    <SafeAreaView style={themedStyles.container} edges={['top']}>
-      {/* Header container for hamburger and centered title */}
+    <SafeAreaView style={themedStyles.safeArea} edges={['top']}>
+      {/* Header */}
       <View style={themedStyles.header}>
         <HamburgerMenu />
         <Text style={themedStyles.title}>Profile</Text>
       </View>
 
-      {/* Profile info row */}
-      <View style={themedStyles.profileRow}>
-        {selectedImage ? (
-          <Image source={{uri: selectedImage}} style={themedStyles.avatar} />
-        ) : (
-          <View style={themedStyles.avatar} />
-        )}
-        <View style={themedStyles.userInfo}>
-          <Text style={themedStyles.userName}>{userData?.username}</Text>
-          <Text style={themedStyles.emailText}>{userData?.email}</Text>
-        </View>
-      </View>
+      <ScrollView
+        style={themedStyles.container}
+        contentContainerStyle={themedStyles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        {/* Profile Card */}
+        <View style={themedStyles.profileCard}>
+          <View style={themedStyles.profileRow}>
+            <View style={themedStyles.avatarContainer}>
+              {selectedImage ? (
+                <Image
+                  source={{uri: selectedImage}}
+                  style={themedStyles.avatar}
+                />
+              ) : (
+                <View style={themedStyles.avatarPlaceholder}>
+                  <Text style={themedStyles.avatarInitials}>
+                    {getInitials(userData?.username)}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={themedStyles.userInfo}>
+              <Text style={themedStyles.userName}>{userData?.username}</Text>
+              <Text style={themedStyles.emailText}>{userData?.email}</Text>
+            </View>
+          </View>
 
-      {/* Modern button row, now centered */}
-      <View style={themedStyles.buttonRow}>
-        <TouchableOpacity
-          style={themedStyles.modernButton}
-          onPress={handleChoosePhoto}>
-          <Text style={themedStyles.buttonText}>Select Photo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={themedStyles.modernButton}
-          onPress={handleTakePhoto}>
-          <Text style={themedStyles.buttonText}>Take Photo</Text>
-        </TouchableOpacity>
-      </View>
+          {/* Photo Buttons */}
+          <View style={themedStyles.photoButtonsRow}>
+            <TouchableOpacity
+              style={themedStyles.photoButton}
+              onPress={handleChoosePhoto}>
+              <FontAwesomeIcon
+                icon={faImage}
+                size={16}
+                color={colors.primary}
+              />
+              <Text style={themedStyles.photoButtonText}>Gallery</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={themedStyles.photoButton}
+              onPress={handleTakePhoto}>
+              <FontAwesomeIcon
+                icon={faCamera}
+                size={16}
+                color={colors.primary}
+              />
+              <Text style={themedStyles.photoButtonText}>Camera</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Stats Card */}
+        <View style={themedStyles.statsCard}>
+          <Text style={themedStyles.sectionTitle}>📊 Your Activity</Text>
+          <View style={themedStyles.statsRow}>
+            <View style={themedStyles.statItem}>
+              <View
+                style={[
+                  themedStyles.statIconContainer,
+                  {backgroundColor: colors.primary + '20'},
+                ]}>
+                <FontAwesomeIcon
+                  icon={faCalendarPlus}
+                  size={24}
+                  color={colors.primary}
+                />
+              </View>
+              <Text style={themedStyles.statValue}>
+                {userStats.eventsCreated}
+              </Text>
+              <Text style={themedStyles.statLabel}>Events Created</Text>
+            </View>
+            <View style={themedStyles.statItem}>
+              <View
+                style={[
+                  themedStyles.statIconContainer,
+                  {backgroundColor: '#4CAF50' + '20'},
+                ]}>
+                <FontAwesomeIcon
+                  icon={faCalendarCheck}
+                  size={24}
+                  color="#4CAF50"
+                />
+              </View>
+              <Text style={themedStyles.statValue}>
+                {userStats.eventsJoined}
+              </Text>
+              <Text style={themedStyles.statLabel}>Events Joined</Text>
+            </View>
+            <View style={themedStyles.statItem}>
+              <View
+                style={[
+                  themedStyles.statIconContainer,
+                  {backgroundColor: '#FF9800' + '20'},
+                ]}>
+                <FontAwesomeIcon icon={faUsers} size={24} color="#FF9800" />
+              </View>
+              <Text style={themedStyles.statValue}>{events.length}</Text>
+              <Text style={themedStyles.statLabel}>Total Events</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Quick Settings Card */}
+        <View style={themedStyles.settingsCard}>
+          <Text style={themedStyles.sectionTitle}>⚙️ Quick Settings</Text>
+          <View style={[themedStyles.settingRow, themedStyles.settingRowLast]}>
+            <View style={themedStyles.settingLeft}>
+              <View
+                style={[
+                  themedStyles.settingIconContainer,
+                  {
+                    backgroundColor: darkMode
+                      ? '#5C6BC0' + '20'
+                      : '#FFC107' + '20',
+                  },
+                ]}>
+                <FontAwesomeIcon
+                  icon={darkMode ? faMoon : faSun}
+                  size={18}
+                  color={darkMode ? '#5C6BC0' : '#FFC107'}
+                />
+              </View>
+              <View>
+                <Text style={themedStyles.settingText}>Dark Mode</Text>
+                <Text style={themedStyles.settingSubtext}>
+                  {darkMode ? 'Currently on' : 'Currently off'}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={darkMode}
+              onValueChange={toggleDarkMode}
+              trackColor={{false: colors.border, true: colors.primary + '50'}}
+              thumbColor={darkMode ? colors.primary : '#f4f3f4'}
+            />
+          </View>
+        </View>
+
+        {/* Achievements Preview Card */}
+        <View style={themedStyles.achievementsCard}>
+          <Text style={themedStyles.sectionTitle}>🏆 Achievements</Text>
+          <View style={themedStyles.achievementsRow}>
+            <View
+              style={[
+                themedStyles.achievementBadge,
+                userStats.eventsCreated >= 1 &&
+                  themedStyles.achievementBadgeEarned,
+              ]}>
+              <View
+                style={[
+                  themedStyles.achievementIcon,
+                  {backgroundColor: '#FFD700' + '30'},
+                ]}>
+                <Text style={themedStyles.achievementEmoji}>🎯</Text>
+              </View>
+              <Text style={themedStyles.achievementName}>First Event</Text>
+            </View>
+            <View
+              style={[
+                themedStyles.achievementBadge,
+                userStats.eventsCreated >= 5 &&
+                  themedStyles.achievementBadgeEarned,
+              ]}>
+              <View
+                style={[
+                  themedStyles.achievementIcon,
+                  {backgroundColor: '#C0C0C0' + '30'},
+                ]}>
+                <Text style={themedStyles.achievementEmoji}>⭐</Text>
+              </View>
+              <Text style={themedStyles.achievementName}>5 Events</Text>
+            </View>
+            <View
+              style={[
+                themedStyles.achievementBadge,
+                userStats.eventsCreated >= 10 &&
+                  themedStyles.achievementBadgeEarned,
+              ]}>
+              <View
+                style={[
+                  themedStyles.achievementIcon,
+                  {backgroundColor: '#CD7F32' + '30'},
+                ]}>
+                <Text style={themedStyles.achievementEmoji}>🏅</Text>
+              </View>
+              <Text style={themedStyles.achievementName}>10 Events</Text>
+            </View>
+            <View
+              style={[
+                themedStyles.achievementBadge,
+                userStats.eventsJoined >= 10 &&
+                  themedStyles.achievementBadgeEarned,
+              ]}>
+              <View
+                style={[
+                  themedStyles.achievementIcon,
+                  {backgroundColor: colors.primary + '30'},
+                ]}>
+                <Text style={themedStyles.achievementEmoji}>🤝</Text>
+              </View>
+              <Text style={themedStyles.achievementName}>Team Player</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Member Since */}
+        <Text style={themedStyles.memberSince}>
+          Member since {new Date().getFullYear()}
+        </Text>
+      </ScrollView>
     </SafeAreaView>
   );
 };
