@@ -7,13 +7,25 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
+  ScrollView,
+  Keyboard,
 } from 'react-native';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 import UserContext from '../UserContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from '../../config/api';
 import {useTheme} from '../ThemeContext/ThemeContext';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {
+  faUser,
+  faLock,
+  faEnvelope,
+  faIdCard,
+  faArrowRight,
+  faUserPlus,
+  faSignInAlt,
+} from '@fortawesome/free-solid-svg-icons';
 
 // Interfaces
 type RootStackParamList = {
@@ -36,85 +48,206 @@ function LandingPage() {
 
   // Theme
   const {colors} = useTheme();
+
+  // Tab state: 'login' or 'register'
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+
   const themedStyles = useMemo(
     () =>
       StyleSheet.create({
-        container: {
+        safeArea: {
           flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
           backgroundColor: colors.background,
         },
-        title: {
-          textAlign: 'center',
-          fontSize: 20,
-          fontWeight: 'bold',
-          marginBottom: 20,
-          marginTop: 100,
-          color: colors.primary,
+        container: {
+          flex: 1,
+          backgroundColor: colors.background,
         },
-        buttonContainer: {
+        scrollContent: {
+          flexGrow: 1,
+          justifyContent: 'center',
+          padding: 24,
+        },
+        // Hero Section
+        heroSection: {
+          alignItems: 'center',
+          marginBottom: 40,
+        },
+        logoContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 16,
+        },
+        logoEmoji: {
+          fontSize: 48,
+          marginHorizontal: 6,
+        },
+        appName: {
+          fontSize: 36,
+          fontWeight: '800',
+          color: colors.primary,
+          letterSpacing: 1,
+          marginBottom: 8,
+        },
+        tagline: {
+          fontSize: 16,
+          color: colors.placeholder,
+          textAlign: 'center',
+          lineHeight: 22,
+        },
+        // Form Card
+        formCard: {
+          backgroundColor: colors.card,
+          borderRadius: 24,
+          padding: 24,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 4},
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
+          elevation: 5,
+        },
+        // Tabs
+        tabContainer: {
+          flexDirection: 'row',
+          backgroundColor: colors.background,
+          borderRadius: 16,
+          padding: 4,
+          marginBottom: 24,
+        },
+        tab: {
+          flex: 1,
+          paddingVertical: 12,
+          borderRadius: 12,
+          alignItems: 'center',
           flexDirection: 'row',
           justifyContent: 'center',
-          marginBottom: 20,
         },
-        loginButton: {
-          marginRight: 10,
-          height: 35,
-          width: 100,
-          borderRadius: 10,
+        tabActive: {
           backgroundColor: colors.primary,
-          justifyContent: 'center',
-          alignItems: 'center',
         },
-        registerButton: {
-          height: 35,
-          width: 100,
-          borderRadius: 10,
-          backgroundColor: colors.border,
-          justifyContent: 'center',
-          alignItems: 'center',
+        tabText: {
+          fontSize: 15,
+          fontWeight: '600',
+          color: colors.placeholder,
+          marginLeft: 8,
         },
-        loginCancelButton: {
-          height: 35,
-          width: 100,
-          justifyContent: 'center',
-          alignItems: 'center',
+        tabTextActive: {
+          color: colors.buttonText,
         },
-        registerCancelButton: {
-          height: 35,
-          width: 100,
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
-        buttonText: {
+        // Form Title
+        formTitle: {
+          fontSize: 24,
+          fontWeight: '700',
           color: colors.text,
-          fontSize: 16,
-          fontWeight: 'bold',
+          marginBottom: 8,
+          textAlign: 'center',
+        },
+        formSubtitle: {
+          fontSize: 14,
+          color: colors.placeholder,
+          marginBottom: 24,
+          textAlign: 'center',
+        },
+        // Input Group
+        inputGroup: {
+          marginBottom: 16,
+        },
+        inputLabel: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 8,
+        },
+        inputContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.inputBackground,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: colors.border,
+          paddingHorizontal: 16,
+        },
+        inputContainerFocused: {
+          borderColor: colors.primary,
+          borderWidth: 2,
+        },
+        inputIcon: {
+          marginRight: 12,
         },
         input: {
-          height: 40,
-          borderColor: colors.border,
-          borderWidth: 1,
-          marginBottom: 10,
-          padding: 10,
-          backgroundColor: colors.card,
+          flex: 1,
+          height: 52,
+          fontSize: 16,
           color: colors.text,
         },
-        errorMessage: {
-          color: colors.text,
-          marginTop: 10,
+        // Primary Button
+        primaryButton: {
+          backgroundColor: colors.primary,
+          borderRadius: 14,
+          paddingVertical: 16,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          marginTop: 8,
+          shadowColor: colors.primary,
+          shadowOffset: {width: 0, height: 4},
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+          elevation: 4,
         },
-        successMessage: {
-          color: colors.primary,
-          marginTop: 10,
+        primaryButtonText: {
+          color: colors.buttonText,
+          fontSize: 17,
+          fontWeight: '700',
+          marginRight: 8,
+        },
+        // Messages
+        errorContainer: {
+          backgroundColor: colors.error + '15',
+          borderRadius: 12,
+          padding: 14,
+          marginTop: 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        errorText: {
+          color: colors.error,
+          fontSize: 14,
+          flex: 1,
+          marginLeft: 10,
+        },
+        successContainer: {
+          backgroundColor: '#4CAF50' + '15',
+          borderRadius: 12,
+          padding: 14,
+          marginTop: 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        successText: {
+          color: '#4CAF50',
+          fontSize: 14,
+          flex: 1,
+          marginLeft: 10,
+        },
+        // Footer
+        footer: {
+          marginTop: 32,
+          alignItems: 'center',
+        },
+        footerText: {
+          fontSize: 13,
+          color: colors.placeholder,
+        },
+        footerEmojis: {
+          fontSize: 20,
+          marginTop: 8,
         },
       }),
     [colors],
   );
 
-  const [showLoginForm, setShowLoginForm] = useState(false);
-  const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [registrationData, setRegistrationData] = useState({
     name: '',
     email: '',
@@ -125,6 +258,9 @@ function LandingPage() {
     username: '',
     password: '',
   });
+
+  // Focus states
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Error messages
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -143,22 +279,18 @@ function LandingPage() {
 
   // Reset form states when navigating away from this screen
   useEffect(() => {
-    setShowLoginForm(false);
-    setShowRegisterForm(false);
     setErrorMessage(null);
     setSuccessMessage(null);
   }, [navigation]);
 
+  // Clear messages when switching tabs
   useEffect(() => {
-    if (showLoginForm) {
-      loginUsernameInputRef.current?.focus();
-    }
-    if (showRegisterForm) {
-      registerNameInputRef.current?.focus();
-    }
-  }, [showLoginForm, showRegisterForm]);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }, [activeTab]);
 
   const handleRegistration = async () => {
+    Keyboard.dismiss();
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
@@ -168,7 +300,7 @@ function LandingPage() {
       const responseData = await response.json();
       if (responseData.success) {
         await AsyncStorage.setItem('userToken', responseData.token);
-        setSuccessMessage('User created successfully!');
+        setSuccessMessage('Account created successfully!');
         setErrorMessage(null);
         setUserData(responseData.user);
         navigation.navigate('BottomNavigator', {
@@ -185,13 +317,13 @@ function LandingPage() {
         if (responseData.message?.includes('Email already in use')) {
           setErrorMessage('Email already in use. Please use another email.');
         } else {
-          setErrorMessage(responseData.message);
+          setErrorMessage(responseData.message || 'Registration failed.');
         }
         setSuccessMessage(null);
       }
     } catch (error) {
       console.error('Error during registration:', error as Error);
-      setErrorMessage('Failed to create new user. Please try again.');
+      setErrorMessage('Failed to create account. Please try again.');
       setSuccessMessage(null);
     }
     setUserData({
@@ -203,6 +335,7 @@ function LandingPage() {
   };
 
   const handleLogin = async () => {
+    Keyboard.dismiss();
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
@@ -218,7 +351,7 @@ function LandingPage() {
           return;
         }
         await AsyncStorage.setItem('userToken', responseData.token);
-        setSuccessMessage('User logged in successfully!');
+        setSuccessMessage('Welcome back!');
         setErrorMessage(null);
 
         navigation.navigate('BottomNavigator', {
@@ -233,7 +366,7 @@ function LandingPage() {
         });
       } else {
         setErrorMessage(
-          responseData.message || 'Failed to log in. Please try again.',
+          responseData.message || 'Invalid username or password.',
         );
         setSuccessMessage(null);
       }
@@ -244,155 +377,371 @@ function LandingPage() {
     }
   };
 
-  const dismissForms = () => {
-    setShowLoginForm(false);
-    setShowRegisterForm(false);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-  };
+  const renderLoginForm = () => (
+    <>
+      <Text style={themedStyles.formTitle}>Welcome Back!</Text>
+      <Text style={themedStyles.formSubtitle}>
+        Sign in to continue to your events
+      </Text>
 
-  const cancelForm = () => {
-    setShowLoginForm(false);
-    setShowRegisterForm(false);
-    setLoginData({username: '', password: ''});
-    setRegistrationData({name: '', email: '', username: '', password: ''});
-    setErrorMessage(null);
-    setSuccessMessage(null);
-  };
+      {/* Username */}
+      <View style={themedStyles.inputGroup}>
+        <Text style={themedStyles.inputLabel}>Username</Text>
+        <View
+          style={[
+            themedStyles.inputContainer,
+            focusedField === 'loginUsername' &&
+              themedStyles.inputContainerFocused,
+          ]}>
+          <FontAwesomeIcon
+            icon={faUser}
+            size={18}
+            color={
+              focusedField === 'loginUsername'
+                ? colors.primary
+                : colors.placeholder
+            }
+            style={themedStyles.inputIcon}
+          />
+          <TextInput
+            style={themedStyles.input}
+            placeholder="Enter your username"
+            placeholderTextColor={colors.placeholder}
+            value={loginData.username}
+            onChangeText={text => setLoginData({...loginData, username: text})}
+            ref={loginUsernameInputRef}
+            autoCapitalize="none"
+            onFocus={() => setFocusedField('loginUsername')}
+            onBlur={() => setFocusedField(null)}
+            returnKeyType="next"
+            onSubmitEditing={() => loginPasswordInputRef.current?.focus()}
+          />
+        </View>
+      </View>
+
+      {/* Password */}
+      <View style={themedStyles.inputGroup}>
+        <Text style={themedStyles.inputLabel}>Password</Text>
+        <View
+          style={[
+            themedStyles.inputContainer,
+            focusedField === 'loginPassword' &&
+              themedStyles.inputContainerFocused,
+          ]}>
+          <FontAwesomeIcon
+            icon={faLock}
+            size={18}
+            color={
+              focusedField === 'loginPassword'
+                ? colors.primary
+                : colors.placeholder
+            }
+            style={themedStyles.inputIcon}
+          />
+          <TextInput
+            style={themedStyles.input}
+            placeholder="Enter your password"
+            placeholderTextColor={colors.placeholder}
+            secureTextEntry
+            value={loginData.password}
+            onChangeText={text => setLoginData({...loginData, password: text})}
+            ref={loginPasswordInputRef}
+            autoCapitalize="none"
+            onFocus={() => setFocusedField('loginPassword')}
+            onBlur={() => setFocusedField(null)}
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
+          />
+        </View>
+      </View>
+
+      {/* Login Button */}
+      <TouchableOpacity
+        style={themedStyles.primaryButton}
+        onPress={handleLogin}>
+        <Text style={themedStyles.primaryButtonText}>Sign In</Text>
+        <FontAwesomeIcon
+          icon={faArrowRight}
+          size={18}
+          color={colors.buttonText}
+        />
+      </TouchableOpacity>
+    </>
+  );
+
+  const renderRegisterForm = () => (
+    <>
+      <Text style={themedStyles.formTitle}>Create Account</Text>
+      <Text style={themedStyles.formSubtitle}>
+        Join BetterPlay and start organizing events
+      </Text>
+
+      {/* Name */}
+      <View style={themedStyles.inputGroup}>
+        <Text style={themedStyles.inputLabel}>Full Name</Text>
+        <View
+          style={[
+            themedStyles.inputContainer,
+            focusedField === 'registerName' &&
+              themedStyles.inputContainerFocused,
+          ]}>
+          <FontAwesomeIcon
+            icon={faIdCard}
+            size={18}
+            color={
+              focusedField === 'registerName'
+                ? colors.primary
+                : colors.placeholder
+            }
+            style={themedStyles.inputIcon}
+          />
+          <TextInput
+            style={themedStyles.input}
+            placeholder="Enter your full name"
+            placeholderTextColor={colors.placeholder}
+            value={registrationData.name}
+            onChangeText={text =>
+              setRegistrationData({...registrationData, name: text})
+            }
+            ref={registerNameInputRef}
+            autoCapitalize="words"
+            onFocus={() => setFocusedField('registerName')}
+            onBlur={() => setFocusedField(null)}
+            returnKeyType="next"
+            onSubmitEditing={() => registerEmailInputRef.current?.focus()}
+          />
+        </View>
+      </View>
+
+      {/* Email */}
+      <View style={themedStyles.inputGroup}>
+        <Text style={themedStyles.inputLabel}>Email</Text>
+        <View
+          style={[
+            themedStyles.inputContainer,
+            focusedField === 'registerEmail' &&
+              themedStyles.inputContainerFocused,
+          ]}>
+          <FontAwesomeIcon
+            icon={faEnvelope}
+            size={18}
+            color={
+              focusedField === 'registerEmail'
+                ? colors.primary
+                : colors.placeholder
+            }
+            style={themedStyles.inputIcon}
+          />
+          <TextInput
+            style={themedStyles.input}
+            placeholder="Enter your email"
+            placeholderTextColor={colors.placeholder}
+            value={registrationData.email}
+            onChangeText={text =>
+              setRegistrationData({...registrationData, email: text})
+            }
+            ref={registerEmailInputRef}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            onFocus={() => setFocusedField('registerEmail')}
+            onBlur={() => setFocusedField(null)}
+            returnKeyType="next"
+            onSubmitEditing={() => registerUsernameInputRef.current?.focus()}
+          />
+        </View>
+      </View>
+
+      {/* Username */}
+      <View style={themedStyles.inputGroup}>
+        <Text style={themedStyles.inputLabel}>Username</Text>
+        <View
+          style={[
+            themedStyles.inputContainer,
+            focusedField === 'registerUsername' &&
+              themedStyles.inputContainerFocused,
+          ]}>
+          <FontAwesomeIcon
+            icon={faUser}
+            size={18}
+            color={
+              focusedField === 'registerUsername'
+                ? colors.primary
+                : colors.placeholder
+            }
+            style={themedStyles.inputIcon}
+          />
+          <TextInput
+            style={themedStyles.input}
+            placeholder="Choose a username"
+            placeholderTextColor={colors.placeholder}
+            value={registrationData.username}
+            onChangeText={text =>
+              setRegistrationData({...registrationData, username: text})
+            }
+            ref={registerUsernameInputRef}
+            autoCapitalize="none"
+            onFocus={() => setFocusedField('registerUsername')}
+            onBlur={() => setFocusedField(null)}
+            returnKeyType="next"
+            onSubmitEditing={() => registerPasswordInputRef.current?.focus()}
+          />
+        </View>
+      </View>
+
+      {/* Password */}
+      <View style={themedStyles.inputGroup}>
+        <Text style={themedStyles.inputLabel}>Password</Text>
+        <View
+          style={[
+            themedStyles.inputContainer,
+            focusedField === 'registerPassword' &&
+              themedStyles.inputContainerFocused,
+          ]}>
+          <FontAwesomeIcon
+            icon={faLock}
+            size={18}
+            color={
+              focusedField === 'registerPassword'
+                ? colors.primary
+                : colors.placeholder
+            }
+            style={themedStyles.inputIcon}
+          />
+          <TextInput
+            style={themedStyles.input}
+            placeholder="Create a password"
+            placeholderTextColor={colors.placeholder}
+            secureTextEntry
+            value={registrationData.password}
+            onChangeText={text =>
+              setRegistrationData({...registrationData, password: text})
+            }
+            ref={registerPasswordInputRef}
+            autoCapitalize="none"
+            onFocus={() => setFocusedField('registerPassword')}
+            onBlur={() => setFocusedField(null)}
+            returnKeyType="go"
+            onSubmitEditing={handleRegistration}
+          />
+        </View>
+      </View>
+
+      {/* Register Button */}
+      <TouchableOpacity
+        style={themedStyles.primaryButton}
+        onPress={handleRegistration}>
+        <Text style={themedStyles.primaryButtonText}>Create Account</Text>
+        <FontAwesomeIcon
+          icon={faArrowRight}
+          size={18}
+          color={colors.buttonText}
+        />
+      </TouchableOpacity>
+    </>
+  );
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 130 : 0}
-      style={themedStyles.container}>
-      <TouchableWithoutFeedback onPress={dismissForms}>
-        <View style={themedStyles.container}>
-          <Text style={themedStyles.title}>Welcome!</Text>
-          <View style={themedStyles.buttonContainer}>
-            <TouchableOpacity
-              style={themedStyles.loginButton}
-              onPress={() => {
-                setShowLoginForm(true);
-                setShowRegisterForm(false);
-              }}>
-              <Text style={themedStyles.buttonText}>Login</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={themedStyles.registerButton}
-              onPress={() => {
-                setShowLoginForm(false);
-                setShowRegisterForm(true);
-              }}>
-              <Text style={themedStyles.buttonText}>Register</Text>
-            </TouchableOpacity>
+    <SafeAreaView style={themedStyles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={themedStyles.container}>
+        <ScrollView
+          contentContainerStyle={themedStyles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          {/* Hero Section */}
+          <View style={themedStyles.heroSection}>
+            <View style={themedStyles.logoContainer}>
+              <Text style={themedStyles.logoEmoji}>🏀</Text>
+              <Text style={themedStyles.logoEmoji}>⚽</Text>
+              <Text style={themedStyles.logoEmoji}>🏒</Text>
+            </View>
+            <Text style={themedStyles.appName}>BetterPlay</Text>
+            <Text style={themedStyles.tagline}>
+              Organize games. Build teams.{'\n'}Play together.
+            </Text>
           </View>
 
-          {showLoginForm && (
-            <View>
-              <TextInput
-                style={themedStyles.input}
-                placeholder="Username"
-                placeholderTextColor={colors.text}
-                value={loginData.username}
-                onChangeText={text =>
-                  setLoginData({...loginData, username: text})
-                }
-                ref={loginUsernameInputRef}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={themedStyles.input}
-                placeholder="Password"
-                placeholderTextColor={colors.text}
-                secureTextEntry
-                value={loginData.password}
-                onChangeText={text =>
-                  setLoginData({...loginData, password: text})
-                }
-                ref={loginPasswordInputRef}
-                autoCapitalize="none"
-              />
+          {/* Form Card */}
+          <View style={themedStyles.formCard}>
+            {/* Tab Switcher */}
+            <View style={themedStyles.tabContainer}>
               <TouchableOpacity
-                style={themedStyles.loginButton}
-                onPress={handleLogin}>
-                <Text style={themedStyles.buttonText}>Login</Text>
+                style={[
+                  themedStyles.tab,
+                  activeTab === 'login' && themedStyles.tabActive,
+                ]}
+                onPress={() => setActiveTab('login')}>
+                <FontAwesomeIcon
+                  icon={faSignInAlt}
+                  size={16}
+                  color={
+                    activeTab === 'login'
+                      ? colors.buttonText
+                      : colors.placeholder
+                  }
+                />
+                <Text
+                  style={[
+                    themedStyles.tabText,
+                    activeTab === 'login' && themedStyles.tabTextActive,
+                  ]}>
+                  Sign In
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={themedStyles.loginCancelButton}
-                onPress={cancelForm}>
-                <Text style={themedStyles.buttonText}>Cancel</Text>
+                style={[
+                  themedStyles.tab,
+                  activeTab === 'register' && themedStyles.tabActive,
+                ]}
+                onPress={() => setActiveTab('register')}>
+                <FontAwesomeIcon
+                  icon={faUserPlus}
+                  size={16}
+                  color={
+                    activeTab === 'register'
+                      ? colors.buttonText
+                      : colors.placeholder
+                  }
+                />
+                <Text
+                  style={[
+                    themedStyles.tabText,
+                    activeTab === 'register' && themedStyles.tabTextActive,
+                  ]}>
+                  Register
+                </Text>
               </TouchableOpacity>
             </View>
-          )}
 
-          {showRegisterForm && (
-            <View>
-              <TextInput
-                style={themedStyles.input}
-                placeholder="Name"
-                placeholderTextColor={colors.text}
-                value={registrationData.name}
-                onChangeText={text =>
-                  setRegistrationData({...registrationData, name: text})
-                }
-                ref={registerNameInputRef}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={themedStyles.input}
-                placeholder="Email"
-                placeholderTextColor={colors.text}
-                value={registrationData.email}
-                onChangeText={text =>
-                  setRegistrationData({...registrationData, email: text})
-                }
-                ref={registerEmailInputRef}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={themedStyles.input}
-                placeholder="Username"
-                placeholderTextColor={colors.text}
-                value={registrationData.username}
-                onChangeText={text =>
-                  setRegistrationData({...registrationData, username: text})
-                }
-                ref={registerUsernameInputRef}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={themedStyles.input}
-                placeholder="Password"
-                placeholderTextColor={colors.text}
-                secureTextEntry
-                value={registrationData.password}
-                onChangeText={text =>
-                  setRegistrationData({...registrationData, password: text})
-                }
-                ref={registerPasswordInputRef}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                style={themedStyles.registerButton}
-                onPress={handleRegistration}>
-                <Text style={themedStyles.buttonText}>Register</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={themedStyles.registerCancelButton}
-                onPress={cancelForm}>
-                <Text style={themedStyles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {errorMessage && (
-            <Text style={themedStyles.errorMessage}>{errorMessage}</Text>
-          )}
-          {successMessage && (
-            <Text style={themedStyles.successMessage}>{successMessage}</Text>
-          )}
-        </View>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+            {/* Form Content */}
+            {activeTab === 'login' ? renderLoginForm() : renderRegisterForm()}
+
+            {/* Error Message */}
+            {errorMessage && (
+              <View style={themedStyles.errorContainer}>
+                <Text style={themedStyles.errorText}>⚠️ {errorMessage}</Text>
+              </View>
+            )}
+
+            {/* Success Message */}
+            {successMessage && (
+              <View style={themedStyles.successContainer}>
+                <Text style={themedStyles.successText}>✓ {successMessage}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Footer */}
+          <View style={themedStyles.footer}>
+            <Text style={themedStyles.footerText}>
+              Your next game is just a tap away
+            </Text>
+            <Text style={themedStyles.footerEmojis}>🎯 🏆 🤝</Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
