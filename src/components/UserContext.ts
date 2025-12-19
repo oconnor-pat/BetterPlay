@@ -4,6 +4,7 @@ type UserData = {
   _id: string;
   username: string;
   email: string;
+  profilePicUrl?: string;
 };
 
 export interface UserContextType {

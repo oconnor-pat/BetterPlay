@@ -1,4 +1,11 @@
-import React, {useState, useContext, useEffect, useMemo, useRef} from 'react';
+import React, {
+  useState,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from 'react';
 import {
   View,
   Text,
@@ -8,6 +15,8 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  RefreshControl,
+  Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
@@ -18,6 +27,9 @@ import {
   faEdit,
   faCheck,
   faTimes,
+  faHeart,
+  faComment,
+  faPaperPlane,
 } from '@fortawesome/free-solid-svg-icons';
 import UserContext, {UserContextType} from '../UserContext';
 import axios from 'axios';
@@ -29,6 +41,7 @@ interface Reply {
   text: string;
   username: string;
   userId: string;
+  profilePicUrl?: string;
 }
 
 interface Comment {
@@ -36,6 +49,7 @@ interface Comment {
   text: string;
   username: string;
   userId: string;
+  profilePicUrl?: string;
   replies?: Reply[];
 }
 
@@ -44,8 +58,50 @@ interface Post {
   text: string;
   userId: string;
   username: string;
+  profilePicUrl?: string;
   comments: Comment[];
+  likes?: string[]; // Array of user IDs who liked
+  createdAt?: string;
 }
+
+// Helper to get user initials for avatar
+const getInitials = (name: string): string => {
+  if (!name) {
+    return '?';
+  }
+  const parts = name.trim().split(' ');
+  if (parts.length === 1) {
+    return parts[0].charAt(0).toUpperCase();
+  }
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+};
+
+// Helper to format timestamp
+const formatTimeAgo = (dateString?: string): string => {
+  if (!dateString) {
+    return '';
+  }
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) {
+    return 'Just now';
+  }
+  if (diffMins < 60) {
+    return `${diffMins}m ago`;
+  }
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+  if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  }
+  return date.toLocaleDateString();
+};
 
 const CommunityNotes: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -54,6 +110,8 @@ const CommunityNotes: React.FC = () => {
   const [replyText, setReplyText] = useState<{[key: string]: string}>({});
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
 
   // Edit state
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -87,7 +145,7 @@ const CommunityNotes: React.FC = () => {
         container: {
           flex: 1,
           backgroundColor: colors.background,
-          paddingHorizontal: 16,
+          paddingHorizontal: 0,
           paddingTop: 0,
         },
         header: {
@@ -97,6 +155,7 @@ const CommunityNotes: React.FC = () => {
           marginTop: 8,
           marginBottom: 16,
           paddingTop: 8,
+          paddingHorizontal: 16,
           backgroundColor: colors.background,
           zIndex: 1,
         },
@@ -115,68 +174,163 @@ const CommunityNotes: React.FC = () => {
           top: 8,
           zIndex: -1,
         },
-        addPostInputRow: {
+        // Composer Card
+        composerCard: {
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          padding: 16,
+          marginHorizontal: 16,
+          marginBottom: 16,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 3,
+        },
+        composerRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 16,
+        },
+        composerAvatar: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: colors.primary + '20',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 12,
+        },
+        composerAvatarImage: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          marginRight: 12,
+        },
+        composerAvatarText: {
+          fontSize: 16,
+          fontWeight: '700',
+          color: colors.primary,
+        },
+        addPostInputRow: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
         },
         addPostInput: {
           flex: 1,
           height: 44,
           borderColor: colors.border,
           borderWidth: 1,
-          borderRadius: 10,
-          paddingHorizontal: 14,
+          borderRadius: 22,
+          paddingHorizontal: 16,
           color: colors.text,
-          backgroundColor: colors.card,
+          backgroundColor: colors.background,
           fontSize: 16,
           marginRight: 10,
         },
         modernButton: {
           backgroundColor: colors.primary,
           paddingVertical: 10,
-          paddingHorizontal: 18,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: colors.primary,
+          paddingHorizontal: 16,
+          borderRadius: 20,
           alignItems: 'center',
           justifyContent: 'center',
+          flexDirection: 'row',
         },
         modernButtonText: {
-          color: colors.background,
-          fontWeight: 'bold',
-          fontSize: 16,
+          color: '#fff',
+          fontWeight: '600',
+          fontSize: 15,
         },
+        // Post Card
         postContainer: {
-          marginBottom: 16,
+          marginBottom: 12,
+          marginHorizontal: 16,
           backgroundColor: colors.card,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: colors.border,
-          padding: 14,
-          shadowColor: colors.text,
+          borderRadius: 16,
+          padding: 16,
+          shadowColor: '#000',
           shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.07,
-          shadowRadius: 4,
-          elevation: 2,
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 3,
         },
         postHeaderRow: {
           flexDirection: 'row',
-          justifyContent: 'space-between',
           alignItems: 'flex-start',
-          marginBottom: 8,
+          marginBottom: 12,
+        },
+        postAvatar: {
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: colors.primary + '20',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 12,
+        },
+        postAvatarImage: {
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          marginRight: 12,
+        },
+        postAvatarText: {
+          fontSize: 18,
+          fontWeight: '700',
+          color: colors.primary,
+        },
+        postHeaderContent: {
+          flex: 1,
+        },
+        postUsernameRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         },
         postUsername: {
-          color: colors.primary,
-          fontSize: 15,
-          fontWeight: 'bold',
-          marginBottom: 2,
+          color: colors.text,
+          fontSize: 16,
+          fontWeight: '700',
+        },
+        postTimestamp: {
+          color: colors.placeholder || '#888',
+          fontSize: 13,
+          marginTop: 2,
         },
         postText: {
-          fontSize: 17,
+          fontSize: 16,
           color: colors.text,
-          flex: 1,
-          marginRight: 8,
+          lineHeight: 22,
+          marginBottom: 12,
+        },
+        // Social Actions Row
+        socialActionsRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingTop: 12,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          marginTop: 4,
+        },
+        socialAction: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginRight: 24,
+          paddingVertical: 4,
+        },
+        socialActionText: {
+          marginLeft: 6,
+          fontSize: 14,
+          color: colors.text,
+          fontWeight: '500',
+        },
+        likedText: {
+          color: '#e74c3c',
+        },
+        postActionsRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
         },
         postTrashIcon: {
           marginLeft: 8,
@@ -186,57 +340,110 @@ const CommunityNotes: React.FC = () => {
           marginLeft: 8,
           padding: 4,
         },
+        // Comments Section
+        commentsSection: {
+          marginTop: 8,
+          paddingTop: 8,
+        },
         commentInputRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginTop: 8,
-          marginBottom: 4,
+          marginTop: 12,
+          paddingTop: 12,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        },
+        commentInputAvatar: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: colors.primary + '20',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 10,
+        },
+        commentInputAvatarImage: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          marginRight: 10,
+        },
+        commentInputAvatarText: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.primary,
         },
         commentInput: {
           flex: 1,
-          height: 38,
+          height: 36,
           borderColor: colors.border,
           borderWidth: 1,
-          borderRadius: 8,
-          paddingHorizontal: 10,
+          borderRadius: 18,
+          paddingHorizontal: 14,
           color: colors.text,
           backgroundColor: colors.background,
           marginRight: 8,
-          fontSize: 15,
+          fontSize: 14,
+        },
+        commentSendButton: {
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         commentContainer: {
-          marginLeft: 0,
-          marginTop: 10,
-          marginBottom: 10,
-          padding: 10,
+          marginTop: 12,
+          padding: 12,
           backgroundColor: colors.background,
-          borderRadius: 8,
+          borderRadius: 12,
           borderWidth: 1,
           borderColor: colors.border,
-          shadowColor: colors.text,
-          shadowOffset: {width: 0, height: 1},
-          shadowOpacity: 0.04,
-          shadowRadius: 2,
-          elevation: 1,
-          minHeight: 44,
         },
         commentHeaderRow: {
           flexDirection: 'row',
-          justifyContent: 'space-between',
           alignItems: 'flex-start',
-          marginBottom: 2,
+          marginBottom: 4,
+        },
+        commentAvatar: {
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          backgroundColor: colors.primary + '15',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 10,
+        },
+        commentAvatarImage: {
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          marginRight: 10,
+        },
+        commentAvatarText: {
+          fontSize: 11,
+          fontWeight: '700',
+          color: colors.primary,
+        },
+        commentContent: {
+          flex: 1,
         },
         commentUsername: {
-          color: colors.primary,
+          color: colors.text,
           fontSize: 14,
-          fontWeight: 'bold',
-          textAlign: 'left',
-          flex: 1,
-          paddingRight: 8,
+          fontWeight: '600',
         },
         commentText: {
           color: colors.text,
-          marginTop: 2,
+          fontSize: 14,
+          marginTop: 4,
+          lineHeight: 20,
+        },
+        commentActionsRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
         },
         commentTrashIcon: {
           padding: 2,
@@ -249,55 +456,96 @@ const CommunityNotes: React.FC = () => {
         replyButton: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginTop: 4,
+          marginTop: 8,
+          paddingVertical: 4,
         },
         replyButtonText: {
           color: colors.primary,
-          marginLeft: 4,
+          marginLeft: 6,
           fontSize: 13,
+          fontWeight: '500',
         },
         replyInputRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginTop: 6,
-          marginLeft: 16,
+          marginTop: 10,
+          marginLeft: 38,
+          paddingTop: 8,
         },
         replyInput: {
           flex: 1,
-          height: 36,
+          height: 34,
           borderColor: colors.border,
           borderWidth: 1,
-          borderRadius: 8,
-          paddingHorizontal: 10,
+          borderRadius: 17,
+          paddingHorizontal: 14,
           color: colors.text,
           backgroundColor: colors.background,
           marginRight: 8,
-          fontSize: 14,
+          fontSize: 13,
+        },
+        replySendButton: {
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        repliesContainer: {
+          marginLeft: 38,
+          marginTop: 8,
+          borderLeftWidth: 2,
+          borderLeftColor: colors.border,
+          paddingLeft: 12,
         },
         replyContainer: {
-          marginLeft: 16,
-          marginTop: 6,
-          marginBottom: 6,
-          padding: 8,
+          marginTop: 8,
+          padding: 10,
           backgroundColor: colors.card,
-          borderRadius: 8,
-          borderWidth: 1,
-          borderColor: colors.border,
+          borderRadius: 10,
         },
         replyHeaderRow: {
           flexDirection: 'row',
+          alignItems: 'flex-start',
+        },
+        replyAvatar: {
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          backgroundColor: colors.primary + '15',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'center',
+          marginRight: 8,
+        },
+        replyAvatarImage: {
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          marginRight: 8,
+        },
+        replyAvatarText: {
+          fontSize: 10,
+          fontWeight: '700',
+          color: colors.primary,
+        },
+        replyContent: {
+          flex: 1,
         },
         replyUsername: {
-          color: colors.primary,
+          color: colors.text,
           fontSize: 13,
-          fontWeight: 'bold',
+          fontWeight: '600',
         },
         replyText: {
           color: colors.text,
           fontSize: 13,
-          marginTop: 2,
+          marginTop: 3,
+          lineHeight: 18,
+        },
+        replyActionsRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
         },
         replyTrashIcon: {
           padding: 2,
@@ -330,24 +578,149 @@ const CommunityNotes: React.FC = () => {
         flex1: {
           flex: 1,
         },
+        // Empty State
+        emptyState: {
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 60,
+          paddingHorizontal: 32,
+        },
+        emptyStateText: {
+          fontSize: 18,
+          fontWeight: '600',
+          color: colors.text,
+          marginTop: 16,
+          textAlign: 'center',
+        },
+        emptyStateSubtext: {
+          fontSize: 14,
+          color: colors.placeholder || '#888',
+          marginTop: 8,
+          textAlign: 'center',
+        },
+        listContent: {
+          paddingTop: 8,
+          paddingBottom: 24,
+        },
+        disabledButton: {
+          opacity: 0.5,
+        },
+        loadingContainer: {
+          marginTop: 40,
+        },
+        editInputFlex: {
+          flex: 1,
+        },
       }),
     [colors],
   );
 
-  // Fetch posts from backend on mount
-  useEffect(() => {
-    fetchPosts();
-  }, []);
-
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/community-notes`);
       setPosts(response.data);
+      // Initialize liked posts from response if available
+      if (userData) {
+        const liked = new Set<string>();
+        response.data.forEach((post: Post) => {
+          if (post.likes?.includes(userData._id)) {
+            liked.add(post._id);
+          }
+        });
+        setLikedPosts(liked);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to fetch posts.');
     } finally {
       setLoading(false);
+    }
+  }, [userData]);
+
+  // Fetch posts from backend on mount
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchPosts();
+    setRefreshing(false);
+  };
+
+  // Toggle like on a post (optimistic UI update with revert on error)
+  const toggleLike = async (postId: string) => {
+    if (!userData) {
+      return;
+    }
+
+    const isLiked = likedPosts.has(postId);
+
+    // Optimistic update
+    setLikedPosts(prev => {
+      const newSet = new Set(prev);
+      if (isLiked) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+
+    setPosts(prevPosts =>
+      prevPosts.map(post =>
+        post._id === postId
+          ? {
+              ...post,
+              likes: isLiked
+                ? (post.likes || []).filter(id => id !== userData._id)
+                : [...(post.likes || []), userData._id],
+            }
+          : post,
+      ),
+    );
+
+    // Send to backend
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/community-notes/${postId}/like`,
+        {
+          userId: userData._id,
+        },
+      );
+      // Update with actual server response to ensure consistency
+      setPosts(prevPosts =>
+        prevPosts.map(post =>
+          post._id === postId ? {...post, likes: response.data.likes} : post,
+        ),
+      );
+    } catch (error) {
+      // Revert optimistic update on error
+      setLikedPosts(prev => {
+        const newSet = new Set(prev);
+        if (isLiked) {
+          newSet.add(postId); // Re-add if was liked before
+        } else {
+          newSet.delete(postId); // Remove if wasn't liked before
+        }
+        return newSet;
+      });
+
+      setPosts(prevPosts =>
+        prevPosts.map(post =>
+          post._id === postId
+            ? {
+                ...post,
+                likes: isLiked
+                  ? [...(post.likes || []), userData._id] // Re-add user
+                  : (post.likes || []).filter(id => id !== userData._id), // Remove user
+              }
+            : post,
+        ),
+      );
+
+      Alert.alert('Error', 'Failed to update like. Please try again.');
     }
   };
 
@@ -359,6 +732,7 @@ const CommunityNotes: React.FC = () => {
           text: newPostText,
           userId: userData._id,
           username: userData.username,
+          profilePicUrl: userData.profilePicUrl || '',
         });
         setPosts(prev => [...prev, response.data]);
         setNewPostText('');
@@ -413,6 +787,7 @@ const CommunityNotes: React.FC = () => {
             text,
             username: userData.username,
             userId: userData._id,
+            profilePicUrl: userData.profilePicUrl || '',
           },
         );
         setPosts(prevPosts =>
@@ -483,6 +858,7 @@ const CommunityNotes: React.FC = () => {
             text,
             username: userData.username,
             userId: userData._id,
+            profilePicUrl: userData.profilePicUrl || '',
           },
         );
         setPosts(prevPosts =>
@@ -587,8 +963,17 @@ const CommunityNotes: React.FC = () => {
             : post,
         ),
       );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to delete comment.');
+    } catch (error: any) {
+      console.error(
+        'Delete comment error:',
+        error.response?.data || error.message,
+      );
+      Alert.alert(
+        'Error',
+        `Failed to delete comment: ${
+          error.response?.data?.error || error.message
+        }`,
+      );
     }
   };
 
@@ -621,6 +1006,17 @@ const CommunityNotes: React.FC = () => {
     }
   };
 
+  // Empty state component
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <FontAwesomeIcon icon={faComment} size={48} color={colors.border} />
+      <Text style={styles.emptyStateText}>No posts yet</Text>
+      <Text style={styles.emptyStateSubtext}>
+        Be the first to share something with the community!
+      </Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -630,95 +1026,193 @@ const CommunityNotes: React.FC = () => {
         <Text style={styles.title}>Community Notes</Text>
       </View>
 
-      {/* Add Post Input Row */}
-      <View style={styles.addPostInputRow}>
-        <TextInput
-          style={styles.addPostInput}
-          placeholder="Enter your post"
-          placeholderTextColor={colors.border}
-          value={newPostText}
-          onChangeText={text => setNewPostText(text)}
-        />
-        <TouchableOpacity style={styles.modernButton} onPress={addPost}>
-          <Text style={styles.modernButtonText}>Add Post</Text>
-        </TouchableOpacity>
+      {/* Composer Card */}
+      <View style={styles.composerCard}>
+        <View style={styles.composerRow}>
+          {userData?.profilePicUrl ? (
+            <Image
+              source={{uri: userData.profilePicUrl}}
+              style={styles.composerAvatarImage}
+            />
+          ) : (
+            <View style={styles.composerAvatar}>
+              <Text style={styles.composerAvatarText}>
+                {userData ? getInitials(userData.username) : '?'}
+              </Text>
+            </View>
+          )}
+          <View style={styles.addPostInputRow}>
+            <TextInput
+              style={styles.addPostInput}
+              placeholder="What's on your mind?"
+              placeholderTextColor={colors.border}
+              value={newPostText}
+              onChangeText={text => setNewPostText(text)}
+              multiline
+            />
+            <TouchableOpacity
+              style={[
+                styles.modernButton,
+                !newPostText.trim() && styles.disabledButton,
+              ]}
+              onPress={addPost}
+              disabled={!newPostText.trim()}>
+              <FontAwesomeIcon icon={faPaperPlane} size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} />
+      {loading && posts.length === 0 ? (
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          style={styles.loadingContainer}
+        />
       ) : (
         <FlatList
           data={posts}
           keyExtractor={item => item._id}
-          refreshing={loading}
-          onRefresh={fetchPosts}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
+          ListEmptyComponent={renderEmptyState}
           renderItem={({item}) => (
             <View style={styles.postContainer}>
-              {/* Post header row with username, text and trash/edit icons */}
+              {/* Post Header with Avatar */}
               <View style={styles.postHeaderRow}>
-                <View style={styles.flex1}>
-                  <Text style={styles.postUsername}>{item.username}</Text>
-                  {editingPostId === item._id ? (
-                    <TextInput
-                      style={styles.editInput}
-                      value={editingPostText}
-                      onChangeText={setEditingPostText}
-                      autoFocus
-                    />
-                  ) : (
-                    <Text style={styles.postText}>{item.text}</Text>
-                  )}
-                </View>
-                {editingPostId === item._id ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.editActionIcon}
-                      onPress={() => saveEditPost(item._id)}>
-                      <FontAwesomeIcon
-                        icon={faCheck}
-                        size={18}
-                        color={colors.primary}
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.editActionIcon}
-                      onPress={cancelEditPost}>
-                      <FontAwesomeIcon
-                        icon={faTimes}
-                        size={18}
-                        color={colors.text}
-                      />
-                    </TouchableOpacity>
-                  </>
-                ) : userData && item.userId === userData._id ? (
-                  <View style={styles.rowCenter}>
-                    <TouchableOpacity
-                      style={styles.postEditIcon}
-                      onPress={() => startEditPost(item)}>
-                      <FontAwesomeIcon
-                        icon={faEdit}
-                        size={20}
-                        color={colors.primary}
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.postTrashIcon}
-                      onPress={() => deletePost(item._id)}>
-                      <FontAwesomeIcon
-                        icon={faTrash}
-                        size={22}
-                        color={colors.text}
-                      />
-                    </TouchableOpacity>
+                {item.profilePicUrl ? (
+                  <Image
+                    source={{uri: item.profilePicUrl}}
+                    style={styles.postAvatarImage}
+                  />
+                ) : (
+                  <View style={styles.postAvatar}>
+                    <Text style={styles.postAvatarText}>
+                      {getInitials(item.username)}
+                    </Text>
                   </View>
-                ) : null}
+                )}
+                <View style={styles.postHeaderContent}>
+                  <View style={styles.postUsernameRow}>
+                    <Text style={styles.postUsername}>{item.username}</Text>
+                    {userData &&
+                      item.userId === userData._id &&
+                      editingPostId !== item._id && (
+                        <View style={styles.postActionsRow}>
+                          <TouchableOpacity
+                            style={styles.postEditIcon}
+                            onPress={() => startEditPost(item)}>
+                            <FontAwesomeIcon
+                              icon={faEdit}
+                              size={16}
+                              color={colors.primary}
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.postTrashIcon}
+                            onPress={() => deletePost(item._id)}>
+                            <FontAwesomeIcon
+                              icon={faTrash}
+                              size={16}
+                              color={colors.text}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                  </View>
+                  <Text style={styles.postTimestamp}>
+                    {formatTimeAgo(item.createdAt)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Post Content */}
+              {editingPostId === item._id ? (
+                <View style={styles.rowCenter}>
+                  <TextInput
+                    style={styles.editInput}
+                    value={editingPostText}
+                    onChangeText={setEditingPostText}
+                    autoFocus
+                    multiline
+                  />
+                  <TouchableOpacity
+                    style={styles.editActionIcon}
+                    onPress={() => saveEditPost(item._id)}>
+                    <FontAwesomeIcon
+                      icon={faCheck}
+                      size={18}
+                      color={colors.primary}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.editActionIcon}
+                    onPress={cancelEditPost}>
+                    <FontAwesomeIcon
+                      icon={faTimes}
+                      size={18}
+                      color={colors.text}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <Text style={styles.postText}>{item.text}</Text>
+              )}
+
+              {/* Social Actions Row */}
+              <View style={styles.socialActionsRow}>
+                <TouchableOpacity
+                  style={styles.socialAction}
+                  onPress={() => toggleLike(item._id)}>
+                  <FontAwesomeIcon
+                    icon={faHeart}
+                    size={18}
+                    color={likedPosts.has(item._id) ? '#e74c3c' : colors.border}
+                  />
+                  <Text
+                    style={[
+                      styles.socialActionText,
+                      likedPosts.has(item._id) && styles.likedText,
+                    ]}>
+                    {item.likes?.length || 0}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.socialAction}>
+                  <FontAwesomeIcon
+                    icon={faComment}
+                    size={18}
+                    color={colors.text}
+                  />
+                  <Text style={styles.socialActionText}>
+                    {item.comments?.length || 0}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Add Comment Input Row */}
               <View style={styles.commentInputRow}>
+                {userData?.profilePicUrl ? (
+                  <Image
+                    source={{uri: userData.profilePicUrl}}
+                    style={styles.commentInputAvatarImage}
+                  />
+                ) : (
+                  <View style={styles.commentInputAvatar}>
+                    <Text style={styles.commentInputAvatarText}>
+                      {userData ? getInitials(userData.username) : '?'}
+                    </Text>
+                  </View>
+                )}
                 <TextInput
                   style={styles.commentInput}
-                  placeholder="Add a comment"
+                  placeholder="Write a comment..."
                   placeholderTextColor={colors.border}
                   value={commentText[item._id] || ''}
                   onChangeText={text =>
@@ -726,148 +1220,57 @@ const CommunityNotes: React.FC = () => {
                   }
                 />
                 <TouchableOpacity
-                  style={styles.modernButton}
+                  style={styles.commentSendButton}
                   onPress={() => addComment(item._id)}>
-                  <Text style={styles.modernButtonText}>Add Comment</Text>
+                  <FontAwesomeIcon icon={faPaperPlane} size={14} color="#fff" />
                 </TouchableOpacity>
               </View>
 
-              <FlatList
-                data={item.comments}
-                keyExtractor={comment => comment._id || comment.text}
-                renderItem={({item: comment}) => (
-                  <View style={styles.commentContainer}>
-                    <View style={styles.commentHeaderRow}>
-                      <Text style={styles.commentUsername}>
-                        {comment.username}
-                      </Text>
-                      <View style={styles.rowCenter}>
-                        <TouchableOpacity
-                          style={styles.replyButton}
-                          onPress={() => setReplyingTo(comment._id!)}>
-                          <FontAwesomeIcon
-                            icon={faReply}
-                            size={14}
-                            color={colors.primary}
+              {/* Comments Section */}
+              {item.comments && item.comments.length > 0 && (
+                <View style={styles.commentsSection}>
+                  {item.comments.map(comment => (
+                    <View
+                      key={comment._id || comment.text}
+                      style={styles.commentContainer}>
+                      <View style={styles.commentHeaderRow}>
+                        {comment.profilePicUrl ? (
+                          <Image
+                            source={{uri: comment.profilePicUrl}}
+                            style={styles.commentAvatarImage}
                           />
-                          <Text style={styles.replyButtonText}>Reply</Text>
-                        </TouchableOpacity>
-                        {userData &&
-                        comment.userId === userData._id &&
-                        comment._id ? (
-                          <>
-                            <TouchableOpacity
-                              style={styles.commentEditIcon}
-                              onPress={() => startEditComment(comment)}>
-                              <FontAwesomeIcon
-                                icon={faEdit}
-                                size={16}
-                                color={colors.primary}
-                              />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.commentTrashIcon}
-                              onPress={() =>
-                                deleteComment(item._id, comment._id!)
-                              }>
-                              <FontAwesomeIcon
-                                icon={faTrash}
-                                size={16}
-                                color={colors.text}
-                              />
-                            </TouchableOpacity>
-                          </>
-                        ) : null}
-                      </View>
-                    </View>
-                    {editingCommentId === comment._id ? (
-                      <View style={styles.rowCenter}>
-                        <TextInput
-                          style={styles.editInput}
-                          value={editingCommentText}
-                          onChangeText={setEditingCommentText}
-                          autoFocus
-                        />
-                        <TouchableOpacity
-                          style={styles.editActionIcon}
-                          onPress={() =>
-                            saveEditComment(item._id, comment._id!)
-                          }>
-                          <FontAwesomeIcon
-                            icon={faCheck}
-                            size={16}
-                            color={colors.primary}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.editActionIcon}
-                          onPress={cancelEditComment}>
-                          <FontAwesomeIcon
-                            icon={faTimes}
-                            size={16}
-                            color={colors.text}
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <Text style={styles.commentText}>{comment.text}</Text>
-                    )}
-
-                    {/* Reply input */}
-                    {replyingTo === comment._id ? (
-                      <View style={styles.replyInputRow}>
-                        <TextInput
-                          ref={ref => {
-                            if (ref) {
-                              replyInputRefs.current[comment._id!] = ref;
-                            }
-                          }}
-                          style={styles.replyInput}
-                          placeholder="Write a reply..."
-                          placeholderTextColor={colors.border}
-                          value={replyText[comment._id!] || ''}
-                          onChangeText={text =>
-                            setReplyText(prev => ({
-                              ...prev,
-                              [comment._id!]: text,
-                            }))
-                          }
-                        />
-                        <TouchableOpacity
-                          style={styles.modernButton}
-                          onPress={() => {
-                            addReply(item._id, comment._id!);
-                            setReplyingTo(null);
-                          }}>
-                          <Text style={styles.modernButtonText}>Reply</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
-
-                    {/* Replies */}
-                    {comment.replies && comment.replies.length > 0 ? (
-                      <FlatList
-                        data={comment.replies}
-                        keyExtractor={reply => reply._id || reply.text}
-                        renderItem={({item: reply}) => (
-                          <View style={styles.replyContainer}>
-                            <View style={styles.replyHeaderRow}>
-                              <Text style={styles.replyUsername}>
-                                {reply.username}
-                              </Text>
+                        ) : (
+                          <View style={styles.commentAvatar}>
+                            <Text style={styles.commentAvatarText}>
+                              {getInitials(comment.username)}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.commentContent}>
+                          <View style={styles.postUsernameRow}>
+                            <Text style={styles.commentUsername}>
+                              {comment.username}
+                            </Text>
+                            <View style={styles.commentActionsRow}>
+                              <TouchableOpacity
+                                style={styles.replyButton}
+                                onPress={() => setReplyingTo(comment._id!)}>
+                                <FontAwesomeIcon
+                                  icon={faReply}
+                                  size={12}
+                                  color={colors.primary}
+                                />
+                                <Text style={styles.replyButtonText}>
+                                  Reply
+                                </Text>
+                              </TouchableOpacity>
                               {userData &&
-                              reply.userId === userData._id &&
-                              reply._id ? (
-                                <View style={styles.rowCenter}>
+                              comment.userId === userData._id &&
+                              comment._id ? (
+                                <>
                                   <TouchableOpacity
-                                    style={styles.replyEditIcon}
-                                    onPress={() =>
-                                      startEditReply(
-                                        item._id,
-                                        comment._id!,
-                                        reply,
-                                      )
-                                    }>
+                                    style={styles.editActionIcon}
+                                    onPress={() => startEditComment(comment)}>
                                     <FontAwesomeIcon
                                       icon={faEdit}
                                       size={14}
@@ -875,13 +1278,9 @@ const CommunityNotes: React.FC = () => {
                                     />
                                   </TouchableOpacity>
                                   <TouchableOpacity
-                                    style={styles.replyTrashIcon}
+                                    style={styles.editActionIcon}
                                     onPress={() =>
-                                      deleteReply(
-                                        item._id,
-                                        comment._id!,
-                                        reply._id!,
-                                      )
+                                      deleteComment(item._id, comment._id!)
                                     }>
                                     <FontAwesomeIcon
                                       icon={faTrash}
@@ -889,46 +1288,186 @@ const CommunityNotes: React.FC = () => {
                                       color={colors.text}
                                     />
                                   </TouchableOpacity>
-                                </View>
+                                </>
                               ) : null}
                             </View>
-                            {editingReplyId === reply._id ? (
-                              <View style={styles.rowCenter}>
-                                <TextInput
-                                  style={styles.editInput}
-                                  value={editingReplyText}
-                                  onChangeText={setEditingReplyText}
-                                  autoFocus
-                                />
-                                <TouchableOpacity
-                                  style={styles.editActionIcon}
-                                  onPress={saveEditReply}>
-                                  <FontAwesomeIcon
-                                    icon={faCheck}
-                                    size={14}
-                                    color={colors.primary}
-                                  />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={styles.editActionIcon}
-                                  onPress={cancelEditReply}>
-                                  <FontAwesomeIcon
-                                    icon={faTimes}
-                                    size={14}
-                                    color={colors.text}
-                                  />
-                                </TouchableOpacity>
-                              </View>
-                            ) : (
-                              <Text style={styles.replyText}>{reply.text}</Text>
-                            )}
                           </View>
-                        )}
-                      />
-                    ) : null}
-                  </View>
-                )}
-              />
+                          {editingCommentId === comment._id ? (
+                            <View style={styles.rowCenter}>
+                              <TextInput
+                                style={styles.editInput}
+                                value={editingCommentText}
+                                onChangeText={setEditingCommentText}
+                                autoFocus
+                              />
+                              <TouchableOpacity
+                                style={styles.editActionIcon}
+                                onPress={() =>
+                                  saveEditComment(item._id, comment._id!)
+                                }>
+                                <FontAwesomeIcon
+                                  icon={faCheck}
+                                  size={14}
+                                  color={colors.primary}
+                                />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.editActionIcon}
+                                onPress={cancelEditComment}>
+                                <FontAwesomeIcon
+                                  icon={faTimes}
+                                  size={14}
+                                  color={colors.text}
+                                />
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <Text style={styles.commentText}>
+                              {comment.text}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Reply input */}
+                      {replyingTo === comment._id && (
+                        <View style={styles.replyInputRow}>
+                          <TextInput
+                            ref={ref => {
+                              if (ref) {
+                                replyInputRefs.current[comment._id!] = ref;
+                              }
+                            }}
+                            style={styles.replyInput}
+                            placeholder="Write a reply..."
+                            placeholderTextColor={colors.border}
+                            value={replyText[comment._id!] || ''}
+                            onChangeText={text =>
+                              setReplyText(prev => ({
+                                ...prev,
+                                [comment._id!]: text,
+                              }))
+                            }
+                          />
+                          <TouchableOpacity
+                            style={styles.replySendButton}
+                            onPress={() => {
+                              addReply(item._id, comment._id!);
+                              setReplyingTo(null);
+                            }}>
+                            <FontAwesomeIcon
+                              icon={faPaperPlane}
+                              size={12}
+                              color="#fff"
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      {/* Replies */}
+                      {comment.replies && comment.replies.length > 0 && (
+                        <View style={styles.repliesContainer}>
+                          {comment.replies.map(reply => (
+                            <View
+                              key={reply._id || reply.text}
+                              style={styles.replyContainer}>
+                              <View style={styles.replyHeaderRow}>
+                                {reply.profilePicUrl ? (
+                                  <Image
+                                    source={{uri: reply.profilePicUrl}}
+                                    style={styles.replyAvatarImage}
+                                  />
+                                ) : (
+                                  <View style={styles.replyAvatar}>
+                                    <Text style={styles.replyAvatarText}>
+                                      {getInitials(reply.username)}
+                                    </Text>
+                                  </View>
+                                )}
+                                <View style={styles.replyContent}>
+                                  <View style={styles.postUsernameRow}>
+                                    <Text style={styles.replyUsername}>
+                                      {reply.username}
+                                    </Text>
+                                    {userData &&
+                                    reply.userId === userData._id &&
+                                    reply._id ? (
+                                      <View style={styles.replyActionsRow}>
+                                        <TouchableOpacity
+                                          style={styles.editActionIcon}
+                                          onPress={() =>
+                                            startEditReply(
+                                              item._id,
+                                              comment._id!,
+                                              reply,
+                                            )
+                                          }>
+                                          <FontAwesomeIcon
+                                            icon={faEdit}
+                                            size={12}
+                                            color={colors.primary}
+                                          />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                          style={styles.editActionIcon}
+                                          onPress={() =>
+                                            deleteReply(
+                                              item._id,
+                                              comment._id!,
+                                              reply._id!,
+                                            )
+                                          }>
+                                          <FontAwesomeIcon
+                                            icon={faTrash}
+                                            size={12}
+                                            color={colors.text}
+                                          />
+                                        </TouchableOpacity>
+                                      </View>
+                                    ) : null}
+                                  </View>
+                                  {editingReplyId === reply._id ? (
+                                    <View style={styles.rowCenter}>
+                                      <TextInput
+                                        style={styles.editInput}
+                                        value={editingReplyText}
+                                        onChangeText={setEditingReplyText}
+                                        autoFocus
+                                      />
+                                      <TouchableOpacity
+                                        style={styles.editActionIcon}
+                                        onPress={saveEditReply}>
+                                        <FontAwesomeIcon
+                                          icon={faCheck}
+                                          size={12}
+                                          color={colors.primary}
+                                        />
+                                      </TouchableOpacity>
+                                      <TouchableOpacity
+                                        style={styles.editActionIcon}
+                                        onPress={cancelEditReply}>
+                                        <FontAwesomeIcon
+                                          icon={faTimes}
+                                          size={12}
+                                          color={colors.text}
+                                        />
+                                      </TouchableOpacity>
+                                    </View>
+                                  ) : (
+                                    <Text style={styles.replyText}>
+                                      {reply.text}
+                                    </Text>
+                                  )}
+                                </View>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           )}
         />
