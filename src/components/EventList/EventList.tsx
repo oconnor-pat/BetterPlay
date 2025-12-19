@@ -363,18 +363,43 @@ const EventList: React.FC = () => {
           alignItems: 'center',
           justifyContent: 'center',
         },
-        modalView: {
+        modalOverlay: {
           flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
           justifyContent: 'center',
-          padding: 20,
-          backgroundColor: colors.background,
+          padding: 16,
+        },
+        modalView: {
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          padding: 24,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 4},
+          shadowOpacity: 0.25,
+          shadowRadius: 12,
+          elevation: 8,
+          maxHeight: '90%',
+        },
+        modalHeader: {
+          color: colors.text,
+          fontSize: 24,
+          marginBottom: 24,
+          textAlign: 'center',
+          fontWeight: '700',
+        },
+        modalLabel: {
+          color: colors.text,
+          fontSize: 14,
+          fontWeight: '600',
+          marginBottom: 8,
+          marginLeft: 4,
         },
         modalInput: {
-          backgroundColor: colors.inputBackground || '#fff',
+          backgroundColor: colors.inputBackground || colors.background,
           color: colors.text,
-          padding: 12,
+          padding: 14,
           marginBottom: 16,
-          borderRadius: 8,
+          borderRadius: 12,
           borderWidth: 1,
           borderColor: colors.border,
           fontSize: 16,
@@ -385,49 +410,65 @@ const EventList: React.FC = () => {
         },
         saveButton: {
           backgroundColor: colors.primary,
-          padding: 12,
-          borderRadius: 8,
+          padding: 16,
+          borderRadius: 12,
           marginVertical: 5,
           flex: 1,
           alignItems: 'center',
-          marginHorizontal: 8,
+          marginHorizontal: 6,
           minWidth: 100,
+          shadowColor: colors.primary,
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.3,
+          shadowRadius: 4,
+          elevation: 3,
         },
         cancelButton: {
-          backgroundColor: colors.error || '#b11313',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderColor: colors.error || '#b11313',
+          shadowOpacity: 0,
+          elevation: 0,
         },
         buttonText: {
           color: colors.buttonText || '#fff',
           textAlign: 'center',
-          fontWeight: 'bold',
+          fontWeight: '700',
           fontSize: 16,
         },
-        modalHeader: {
-          color: colors.primary,
-          fontSize: 20,
-          marginBottom: 16,
-          textAlign: 'center',
-          fontWeight: 'bold',
+        cancelButtonText: {
+          color: colors.error || '#b11313',
         },
         buttonContainer: {
           flexDirection: 'row',
           justifyContent: 'center',
-          marginTop: 20,
+          marginTop: 24,
           alignItems: 'center',
         },
         confirmButton: {
-          color: colors.primary,
+          color: colors.buttonText || '#fff',
           textAlign: 'center',
-          marginTop: 10,
+          marginTop: 12,
           marginBottom: 16,
           fontSize: 16,
-          fontWeight: 'bold',
+          fontWeight: '600',
+          backgroundColor: colors.primary,
+          paddingVertical: 10,
+          paddingHorizontal: 20,
+          borderRadius: 8,
+          overflow: 'hidden',
+        },
+        pickerContainer: {
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginBottom: 8,
+          overflow: 'hidden',
         },
         picker: {
-          backgroundColor: colors.inputBackground || '#fff',
+          backgroundColor: 'transparent',
           color: colors.text,
-          borderRadius: 8,
-          marginBottom: 16,
         },
         eventUsername: {
           color: colors.primary,
@@ -833,228 +874,246 @@ const EventList: React.FC = () => {
         />
       )}
 
-      <Modal animationType="slide" transparent={true} visible={modalVisible}>
-        <View style={themedStyles.modalView}>
-          <Text style={themedStyles.modalHeader}>
-            {isEditing ? 'Edit Event' : 'Create New Event'}
-          </Text>
-
-          <TextInput
-            style={themedStyles.modalInput}
-            placeholder="Event Name"
-            placeholderTextColor={colors.placeholder || '#888'}
-            value={newEvent.name}
-            onChangeText={text => setNewEvent({...newEvent, name: text})}
-          />
-          {/* Location Input with Autocomplete */}
-          <View style={themedStyles.autocompleteContainer}>
-            {isApiKeyConfigured ? (
-              <GooglePlacesAutocomplete
-                placeholder="Location/Facility"
-                onPress={(data, details = null) => {
-                  console.log('Selected place:', data, details);
-                  const location =
-                    data.description ||
-                    data.structured_formatting?.main_text ||
-                    '';
-                  const coords = details?.geometry?.location;
-
-                  setNewEvent({
-                    ...newEvent,
-                    location: location,
-                    latitude: coords?.lat,
-                    longitude: coords?.lng,
-                  });
-                }}
-                query={{
-                  key: GOOGLE_PLACES_API_KEY,
-                  language: 'en',
-                  types: 'establishment|geocode',
-                }}
-                fetchDetails={true}
-                styles={autocompleteStyles}
-                onFail={error => {
-                  console.warn('GooglePlacesAutocomplete error:', error);
-                }}
-                textInputProps={{
-                  placeholderTextColor: colors.placeholder || '#888',
-                }}
-                enablePoweredByContainer={false}
-                debounce={200}
-              />
-            ) : (
-              <TextInput
-                style={themedStyles.modalInput}
-                placeholder="Location/Facility"
-                placeholderTextColor={colors.placeholder || '#888'}
-                value={newEvent.location}
-                onChangeText={text =>
-                  setNewEvent({...newEvent, location: text})
-                }
-              />
-            )}
-          </View>
-
-          {/* Event Date selector */}
-          <TouchableOpacity
-            style={themedStyles.modalInput}
-            onPress={() => setShowDatePicker(true)}>
-            <Text
-              style={{color: newEvent.date ? colors.text : colors.placeholder}}>
-              {newEvent.date ? newEvent.date : 'Select Event Date'}
+      <Modal animationType="fade" transparent={true} visible={modalVisible}>
+        <View style={themedStyles.modalOverlay}>
+          <View style={themedStyles.modalView}>
+            <Text style={themedStyles.modalHeader}>
+              {isEditing ? '✏️ Edit Event' : '🎉 Create New Event'}
             </Text>
-          </TouchableOpacity>
-          {showDatePicker && (
-            <View>
-              <DateTimePicker
-                value={date || new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={onDateChange}
-                textColor={colors.text}
-              />
-              <TouchableOpacity
-                onPress={() => {
-                  setNewEvent({...newEvent, date: date?.toDateString()});
-                  setShowDatePicker(false);
-                }}>
-                <Text style={themedStyles.confirmButton}>Confirm Date</Text>
-              </TouchableOpacity>
-            </View>
-          )}
 
-          {/* Event Time selector */}
-          <TouchableOpacity
-            style={themedStyles.modalInput}
-            onPress={() => setShowTimePicker(true)}>
-            <Text
-              style={{color: newEvent.time ? colors.text : colors.placeholder}}>
-              {newEvent.time ? newEvent.time : 'Select Event Time'}
-            </Text>
-          </TouchableOpacity>
-          {showTimePicker && (
-            <View>
-              <DateTimePicker
-                value={time || new Date()}
-                mode="time"
-                minuteInterval={15}
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={onTimeChange}
-                textColor={colors.text}
-              />
-              <TouchableOpacity
-                onPress={() => {
-                  setNewEvent({
-                    ...newEvent,
-                    time: time?.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }),
-                  });
-                  setShowTimePicker(false);
-                }}>
-                <Text style={themedStyles.confirmButton}>Confirm Time</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            <TextInput
+              style={themedStyles.modalInput}
+              placeholder="Event Name"
+              placeholderTextColor={colors.placeholder || '#888'}
+              value={newEvent.name}
+              onChangeText={text => setNewEvent({...newEvent, name: text})}
+            />
+            {/* Location Input with Autocomplete */}
+            <View style={themedStyles.autocompleteContainer}>
+              {isApiKeyConfigured ? (
+                <GooglePlacesAutocomplete
+                  placeholder="Location/Facility"
+                  onPress={(data, details = null) => {
+                    console.log('Selected place:', data, details);
+                    const location =
+                      data.description ||
+                      data.structured_formatting?.main_text ||
+                      '';
+                    const coords = details?.geometry?.location;
 
-          {/* Roster Size selector */}
-          <TouchableOpacity
-            style={themedStyles.modalInput}
-            onPress={() => {
-              setShowRosterSizePicker(true);
-              setTempRosterSize(newEvent.totalSpots || '');
-            }}>
-            <Text
-              style={{
-                color: newEvent.totalSpots ? colors.text : colors.placeholder,
-              }}>
-              {newEvent.totalSpots ? newEvent.totalSpots : 'Select Roster Size'}
-            </Text>
-          </TouchableOpacity>
-          {showRosterSizePicker && (
-            <View>
-              <Picker
-                selectedValue={tempRosterSize}
-                onValueChange={itemValue => setTempRosterSize(itemValue)}
-                style={themedStyles.picker}
-                dropdownIconColor={colors.text}>
-                {rosterSizeOptions.map(value => (
-                  <Picker.Item
-                    key={value}
-                    label={value}
-                    value={value}
-                    color={colors.text}
-                  />
-                ))}
-              </Picker>
-              <TouchableOpacity
-                onPress={() => {
-                  setNewEvent({...newEvent, totalSpots: tempRosterSize});
-                  setShowRosterSizePicker(false);
-                }}>
-                <Text style={themedStyles.confirmButton}>
-                  Confirm Roster Size
-                </Text>
-              </TouchableOpacity>
+                    setNewEvent({
+                      ...newEvent,
+                      location: location,
+                      latitude: coords?.lat,
+                      longitude: coords?.lng,
+                    });
+                  }}
+                  query={{
+                    key: GOOGLE_PLACES_API_KEY,
+                    language: 'en',
+                    types: 'establishment|geocode',
+                  }}
+                  fetchDetails={true}
+                  styles={autocompleteStyles}
+                  onFail={error => {
+                    console.warn('GooglePlacesAutocomplete error:', error);
+                  }}
+                  textInputProps={{
+                    placeholderTextColor: colors.placeholder || '#888',
+                  }}
+                  enablePoweredByContainer={false}
+                  debounce={200}
+                />
+              ) : (
+                <TextInput
+                  style={themedStyles.modalInput}
+                  placeholder="Location/Facility"
+                  placeholderTextColor={colors.placeholder || '#888'}
+                  value={newEvent.location}
+                  onChangeText={text =>
+                    setNewEvent({...newEvent, location: text})
+                  }
+                />
+              )}
             </View>
-          )}
 
-          {/* Event Type selector */}
-          <TouchableOpacity
-            style={themedStyles.modalInput}
-            onPress={() => {
-              setShowEventTypePicker(true);
-              setTempEventType(newEvent.eventType || '');
-            }}>
-            <Text
-              style={{
-                color: newEvent.eventType ? colors.text : colors.placeholder,
-              }}>
-              {newEvent.eventType ? newEvent.eventType : 'Select Event Type'}
-            </Text>
-          </TouchableOpacity>
-          {showEventTypePicker && (
-            <View>
-              <Picker
-                selectedValue={tempEventType}
-                onValueChange={itemValue => setTempEventType(itemValue)}
-                style={themedStyles.picker}
-                dropdownIconColor={colors.text}>
-                {activityOptions.map(opt => (
-                  <Picker.Item
-                    key={opt.label}
-                    label={`${opt.emoji} ${opt.label}`}
-                    value={opt.label}
-                    color={colors.text}
-                  />
-                ))}
-              </Picker>
-              <TouchableOpacity
-                onPress={() => {
-                  setNewEvent({...newEvent, eventType: tempEventType});
-                  setShowEventTypePicker(false);
-                }}>
-                <Text style={themedStyles.confirmButton}>
-                  Confirm Event Type
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={themedStyles.buttonContainer}>
+            {/* Event Date selector */}
             <TouchableOpacity
-              style={themedStyles.saveButton}
-              onPress={handleSaveNewEvent}>
-              <Text style={themedStyles.buttonText}>
-                {isEditing ? 'Save Changes' : 'Save'}
+              style={themedStyles.modalInput}
+              onPress={() => setShowDatePicker(true)}>
+              <Text
+                style={{
+                  color: newEvent.date ? colors.text : colors.placeholder,
+                }}>
+                {newEvent.date ? newEvent.date : 'Select Event Date'}
               </Text>
             </TouchableOpacity>
+            {showDatePicker && (
+              <View>
+                <DateTimePicker
+                  value={date || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={onDateChange}
+                  textColor={colors.text}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    setNewEvent({...newEvent, date: date?.toDateString()});
+                    setShowDatePicker(false);
+                  }}>
+                  <Text style={themedStyles.confirmButton}>Confirm Date</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Event Time selector */}
             <TouchableOpacity
-              style={[themedStyles.saveButton, themedStyles.cancelButton]}
-              onPress={handleCancelModal}>
-              <Text style={themedStyles.buttonText}>Cancel</Text>
+              style={themedStyles.modalInput}
+              onPress={() => setShowTimePicker(true)}>
+              <Text
+                style={{
+                  color: newEvent.time ? colors.text : colors.placeholder,
+                }}>
+                {newEvent.time ? newEvent.time : 'Select Event Time'}
+              </Text>
             </TouchableOpacity>
+            {showTimePicker && (
+              <View>
+                <DateTimePicker
+                  value={time || new Date()}
+                  mode="time"
+                  minuteInterval={15}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={onTimeChange}
+                  textColor={colors.text}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    setNewEvent({
+                      ...newEvent,
+                      time: time?.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                    });
+                    setShowTimePicker(false);
+                  }}>
+                  <Text style={themedStyles.confirmButton}>Confirm Time</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Roster Size selector */}
+            <TouchableOpacity
+              style={themedStyles.modalInput}
+              onPress={() => {
+                setShowRosterSizePicker(true);
+                setTempRosterSize(newEvent.totalSpots || '');
+              }}>
+              <Text
+                style={{
+                  color: newEvent.totalSpots ? colors.text : colors.placeholder,
+                }}>
+                {newEvent.totalSpots
+                  ? newEvent.totalSpots
+                  : 'Select Roster Size'}
+              </Text>
+            </TouchableOpacity>
+            {showRosterSizePicker && (
+              <View>
+                <View style={themedStyles.pickerContainer}>
+                  <Picker
+                    selectedValue={tempRosterSize}
+                    onValueChange={itemValue => setTempRosterSize(itemValue)}
+                    style={themedStyles.picker}
+                    dropdownIconColor={colors.text}>
+                    {rosterSizeOptions.map(value => (
+                      <Picker.Item
+                        key={value}
+                        label={value}
+                        value={value}
+                        color={colors.text}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setNewEvent({...newEvent, totalSpots: tempRosterSize});
+                    setShowRosterSizePicker(false);
+                  }}>
+                  <Text style={themedStyles.confirmButton}>
+                    Confirm Roster Size
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Event Type selector */}
+            <TouchableOpacity
+              style={themedStyles.modalInput}
+              onPress={() => {
+                setShowEventTypePicker(true);
+                setTempEventType(newEvent.eventType || '');
+              }}>
+              <Text
+                style={{
+                  color: newEvent.eventType ? colors.text : colors.placeholder,
+                }}>
+                {newEvent.eventType ? newEvent.eventType : 'Select Event Type'}
+              </Text>
+            </TouchableOpacity>
+            {showEventTypePicker && (
+              <View>
+                <View style={themedStyles.pickerContainer}>
+                  <Picker
+                    selectedValue={tempEventType}
+                    onValueChange={itemValue => setTempEventType(itemValue)}
+                    style={themedStyles.picker}
+                    dropdownIconColor={colors.text}>
+                    {activityOptions.map(opt => (
+                      <Picker.Item
+                        key={opt.label}
+                        label={`${opt.emoji} ${opt.label}`}
+                        value={opt.label}
+                        color={colors.text}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setNewEvent({...newEvent, eventType: tempEventType});
+                    setShowEventTypePicker(false);
+                  }}>
+                  <Text style={themedStyles.confirmButton}>
+                    Confirm Event Type
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={themedStyles.buttonContainer}>
+              <TouchableOpacity
+                style={themedStyles.saveButton}
+                onPress={handleSaveNewEvent}>
+                <Text style={themedStyles.buttonText}>
+                  {isEditing ? 'Save Changes' : 'Create Event'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[themedStyles.saveButton, themedStyles.cancelButton]}
+                onPress={handleCancelModal}>
+                <Text
+                  style={[
+                    themedStyles.buttonText,
+                    themedStyles.cancelButtonText,
+                  ]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
