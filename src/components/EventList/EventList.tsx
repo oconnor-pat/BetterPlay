@@ -429,9 +429,19 @@ const EventList: React.FC = () => {
         },
         eventUsername: {
           color: colors.primary,
-          fontSize: 14,
-          fontWeight: 'bold',
-          marginBottom: 2,
+          fontSize: 13,
+          fontWeight: '600',
+          marginLeft: 4,
+        },
+        creatorRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 8,
+          paddingVertical: 4,
+          paddingHorizontal: 8,
+          backgroundColor: colors.inputBackground || 'rgba(0,0,0,0.05)',
+          borderRadius: 12,
+          alignSelf: 'flex-start',
         },
       }),
     [colors],
@@ -673,9 +683,12 @@ const EventList: React.FC = () => {
       </View>
       {/* Username of event creator */}
       {item.createdByUsername && (
-        <Text style={themedStyles.eventUsername}>
-          By {item.createdByUsername}
-        </Text>
+        <View style={themedStyles.creatorRow}>
+          <Text style={themedStyles.cardEmoji}>👤</Text>
+          <Text style={themedStyles.eventUsername}>
+            Created by {item.createdByUsername}
+          </Text>
+        </View>
       )}
       {/* Location */}
       <View style={themedStyles.cardRow}>
@@ -764,18 +777,20 @@ const EventList: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Edit/Delete Icons */}
+      {/* Edit/Delete Icons - only show delete for events created by current user */}
       <View style={themedStyles.iconContainer}>
         <TouchableOpacity
           style={themedStyles.iconButton}
           onPress={() => handleEditEvent(item)}>
           <FontAwesomeIcon icon={faCog} size={20} color={colors.text} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={themedStyles.iconButton}
-          onPress={() => handleDeleteEvent(item)}>
-          <FontAwesomeIcon icon={faTrash} size={20} color={colors.text} />
-        </TouchableOpacity>
+        {userData?._id === item.createdBy && (
+          <TouchableOpacity
+            style={themedStyles.iconButton}
+            onPress={() => handleDeleteEvent(item)}>
+            <FontAwesomeIcon icon={faTrash} size={20} color={colors.text} />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
