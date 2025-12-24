@@ -61,7 +61,7 @@ const AppContent = () => {
                   <Stack.Screen
                     name="BottomNavigator"
                     component={BottomNavigator}
-                    options={{headerShown: false}}
+                    options={{headerShown: false, gestureEnabled: false}}
                   />
                   <Stack.Screen
                     name="Settings"
