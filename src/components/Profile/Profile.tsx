@@ -6,7 +6,6 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
-  Switch,
 } from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
@@ -42,7 +41,7 @@ const Profile: React.FC = () => {
   const {_id} = route.params;
 
   const {userData, setUserData} = useContext(UserContext) as UserContextType;
-  const {colors, darkMode, toggleDarkMode} = useTheme();
+  const {colors, darkMode, themeMode} = useTheme();
   const {events} = useEventContext();
 
   // Calculate user stats
@@ -587,12 +586,13 @@ const Profile: React.FC = () => {
                 </Text>
               </View>
             </View>
-            <Switch
-              value={darkMode}
-              onValueChange={toggleDarkMode}
-              trackColor={{false: colors.border, true: colors.primary + '50'}}
-              thumbColor={darkMode ? colors.primary : '#f4f3f4'}
-            />
+            <Text style={[themedStyles.settingSubtext, {marginLeft: 'auto'}]}>
+              {themeMode === 'system'
+                ? 'System'
+                : themeMode === 'dark'
+                ? 'Dark'
+                : 'Light'}
+            </Text>
           </View>
         </View>
 

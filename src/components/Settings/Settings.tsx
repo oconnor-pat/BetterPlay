@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useTheme} from '../ThemeContext/ThemeContext';
+import {useTheme, ThemeMode} from '../ThemeContext/ThemeContext';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faMoon,
@@ -20,12 +20,13 @@ import {
   faShield,
   faCircleInfo,
   faChevronRight,
+  faCircleHalfStroke,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 
 const Settings: React.FC = () => {
-  const {darkMode, toggleDarkMode, colors} = useTheme();
+  const {darkMode, themeMode, setThemeMode, colors} = useTheme();
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -98,10 +99,6 @@ const Settings: React.FC = () => {
     } catch (error) {
       console.error('Error saving notification preference:', error);
     }
-  };
-
-  const handleThemeToggle = () => {
-    toggleDarkMode();
   };
 
   // Themed styles
@@ -208,6 +205,34 @@ const Settings: React.FC = () => {
           marginTop: 24,
           marginBottom: 8,
         },
+        themePicker: {
+          flexDirection: 'row',
+          padding: 12,
+          paddingTop: 0,
+          gap: 8,
+        },
+        themeOption: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          borderRadius: 10,
+          backgroundColor: colors.background,
+          gap: 6,
+        },
+        themeOptionActive: {
+          backgroundColor: colors.primary,
+        },
+        themeOptionText: {
+          fontSize: 13,
+          fontWeight: '500',
+          color: colors.text,
+        },
+        themeOptionTextActive: {
+          color: colors.buttonText,
+        },
       }),
     [colors],
   );
@@ -240,32 +265,104 @@ const Settings: React.FC = () => {
           <View style={themedStyles.section}>
             <Text style={themedStyles.sectionTitle}>Appearance</Text>
             <View style={themedStyles.settingCard}>
-              <TouchableOpacity
-                style={[themedStyles.settingRow, themedStyles.settingRowLast]}
-                onPress={handleThemeToggle}
-                activeOpacity={0.7}>
+              <View
+                style={[themedStyles.settingRow, themedStyles.settingRowLast]}>
                 <View style={themedStyles.iconContainer}>
                   <FontAwesomeIcon
-                    icon={darkMode ? faMoon : faSun}
+                    icon={
+                      themeMode === 'system'
+                        ? faCircleHalfStroke
+                        : darkMode
+                        ? faMoon
+                        : faSun
+                    }
                     size={18}
                     color={colors.primary}
                   />
                 </View>
                 <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>Dark Mode</Text>
+                  <Text style={themedStyles.settingTitle}>Theme</Text>
                   <Text style={themedStyles.settingDescription}>
-                    {darkMode ? 'Dark theme enabled' : 'Light theme enabled'}
+                    {themeMode === 'system'
+                      ? `System (${darkMode ? 'Dark' : 'Light'})`
+                      : themeMode === 'dark'
+                      ? 'Dark'
+                      : 'Light'}
                   </Text>
                 </View>
-                <View style={themedStyles.settingAction}>
-                  <Switch
-                    value={darkMode}
-                    onValueChange={handleThemeToggle}
-                    trackColor={{false: colors.border, true: colors.primary}}
-                    thumbColor={colors.buttonText}
+              </View>
+              {/* Theme Picker */}
+              <View style={themedStyles.themePicker}>
+                <TouchableOpacity
+                  style={[
+                    themedStyles.themeOption,
+                    themeMode === 'system' && themedStyles.themeOptionActive,
+                  ]}
+                  onPress={() => setThemeMode('system')}
+                  activeOpacity={0.7}>
+                  <FontAwesomeIcon
+                    icon={faCircleHalfStroke}
+                    size={16}
+                    color={
+                      themeMode === 'system' ? colors.buttonText : colors.text
+                    }
                   />
-                </View>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      themedStyles.themeOptionText,
+                      themeMode === 'system' &&
+                        themedStyles.themeOptionTextActive,
+                    ]}>
+                    System
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    themedStyles.themeOption,
+                    themeMode === 'light' && themedStyles.themeOptionActive,
+                  ]}
+                  onPress={() => setThemeMode('light')}
+                  activeOpacity={0.7}>
+                  <FontAwesomeIcon
+                    icon={faSun}
+                    size={16}
+                    color={
+                      themeMode === 'light' ? colors.buttonText : colors.text
+                    }
+                  />
+                  <Text
+                    style={[
+                      themedStyles.themeOptionText,
+                      themeMode === 'light' &&
+                        themedStyles.themeOptionTextActive,
+                    ]}>
+                    Light
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    themedStyles.themeOption,
+                    themeMode === 'dark' && themedStyles.themeOptionActive,
+                  ]}
+                  onPress={() => setThemeMode('dark')}
+                  activeOpacity={0.7}>
+                  <FontAwesomeIcon
+                    icon={faMoon}
+                    size={16}
+                    color={
+                      themeMode === 'dark' ? colors.buttonText : colors.text
+                    }
+                  />
+                  <Text
+                    style={[
+                      themedStyles.themeOptionText,
+                      themeMode === 'dark' &&
+                        themedStyles.themeOptionTextActive,
+                    ]}>
+                    Dark
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 

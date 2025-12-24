@@ -223,6 +223,8 @@ const CommunityNotes: React.FC = () => {
           borderWidth: 1,
           borderRadius: 22,
           paddingHorizontal: 16,
+          paddingVertical: 0,
+          textAlignVertical: 'center',
           color: colors.text,
           backgroundColor: colors.background,
           fontSize: 16,
