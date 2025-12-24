@@ -1,4 +1,8 @@
 {
   "name": "BetterPlay",
-  "displayName": "BetterPlay"
+  "displayName": "BetterPlay",
+  "version": "0.0.1",
+  "ios": {
+    "bundleIdentifier": "com.oconnorpat.betterplay"
+  }
 }
