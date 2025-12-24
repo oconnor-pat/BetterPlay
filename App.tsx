@@ -16,6 +16,9 @@ import {
 } from './src/components/ThemeContext/ThemeContext';
 import {EventProvider} from './src/Context/EventContext';
 
+// Import i18n configuration
+import './src/i18n';
+
 // Types
 type UserData = {
   _id: string;

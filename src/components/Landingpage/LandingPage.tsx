@@ -26,6 +26,7 @@ import {
   faUserPlus,
   faSignInAlt,
 } from '@fortawesome/free-solid-svg-icons';
+import {useTranslation} from 'react-i18next';
 
 // Interfaces
 type RootStackParamList = {
@@ -48,6 +49,9 @@ function LandingPage() {
 
   // Theme
   const {colors} = useTheme();
+
+  // Translation
+  const {t} = useTranslation();
 
   // Tab state: 'login' or 'register'
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
@@ -379,14 +383,14 @@ function LandingPage() {
 
   const renderLoginForm = () => (
     <>
-      <Text style={themedStyles.formTitle}>Welcome Back!</Text>
+      <Text style={themedStyles.formTitle}>{t('auth.welcomeBack')}</Text>
       <Text style={themedStyles.formSubtitle}>
-        Sign in to continue to your events
+        {t('landing.signInToContinue')}
       </Text>
 
       {/* Username */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>Username</Text>
+        <Text style={themedStyles.inputLabel}>{t('auth.username')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -405,7 +409,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder="Enter your username"
+            placeholder={t('landing.enterUsername')}
             placeholderTextColor={colors.placeholder}
             value={loginData.username}
             onChangeText={text => setLoginData({...loginData, username: text})}
@@ -421,7 +425,7 @@ function LandingPage() {
 
       {/* Password */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>Password</Text>
+        <Text style={themedStyles.inputLabel}>{t('auth.password')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -440,7 +444,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder="Enter your password"
+            placeholder={t('landing.enterPassword')}
             placeholderTextColor={colors.placeholder}
             secureTextEntry
             value={loginData.password}
@@ -459,7 +463,9 @@ function LandingPage() {
       <TouchableOpacity
         style={themedStyles.primaryButton}
         onPress={handleLogin}>
-        <Text style={themedStyles.primaryButtonText}>Sign In</Text>
+        <Text style={themedStyles.primaryButtonText}>
+          {t('landing.signIn')}
+        </Text>
         <FontAwesomeIcon
           icon={faArrowRight}
           size={18}
@@ -471,14 +477,14 @@ function LandingPage() {
 
   const renderRegisterForm = () => (
     <>
-      <Text style={themedStyles.formTitle}>Create Account</Text>
+      <Text style={themedStyles.formTitle}>{t('auth.createAccount')}</Text>
       <Text style={themedStyles.formSubtitle}>
-        Join BetterPlay and start organizing events
+        {t('landing.joinBetterPlay')}
       </Text>
 
       {/* Name */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>Full Name</Text>
+        <Text style={themedStyles.inputLabel}>{t('landing.fullName')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -497,7 +503,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder="Enter your full name"
+            placeholder={t('landing.enterFullName')}
             placeholderTextColor={colors.placeholder}
             value={registrationData.name}
             onChangeText={text =>
@@ -515,7 +521,7 @@ function LandingPage() {
 
       {/* Email */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>Email</Text>
+        <Text style={themedStyles.inputLabel}>{t('auth.email')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -534,7 +540,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder="Enter your email"
+            placeholder={t('landing.enterEmail')}
             placeholderTextColor={colors.placeholder}
             value={registrationData.email}
             onChangeText={text =>
@@ -553,7 +559,7 @@ function LandingPage() {
 
       {/* Username */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>Username</Text>
+        <Text style={themedStyles.inputLabel}>{t('auth.username')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -572,7 +578,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder="Choose a username"
+            placeholder={t('landing.chooseUsername')}
             placeholderTextColor={colors.placeholder}
             value={registrationData.username}
             onChangeText={text =>
@@ -590,7 +596,7 @@ function LandingPage() {
 
       {/* Password */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>Password</Text>
+        <Text style={themedStyles.inputLabel}>{t('auth.password')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -609,7 +615,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder="Create a password"
+            placeholder={t('landing.createPassword')}
             placeholderTextColor={colors.placeholder}
             secureTextEntry
             value={registrationData.password}
@@ -630,7 +636,9 @@ function LandingPage() {
       <TouchableOpacity
         style={themedStyles.primaryButton}
         onPress={handleRegistration}>
-        <Text style={themedStyles.primaryButtonText}>Create Account</Text>
+        <Text style={themedStyles.primaryButtonText}>
+          {t('auth.createAccount')}
+        </Text>
         <FontAwesomeIcon
           icon={faArrowRight}
           size={18}
@@ -658,7 +666,7 @@ function LandingPage() {
             </View>
             <Text style={themedStyles.appName}>BetterPlay</Text>
             <Text style={themedStyles.tagline}>
-              Organize games. Build teams.{'\n'}Play together.
+              {t('landing.taglineMultiline')}
             </Text>
           </View>
 
@@ -686,7 +694,7 @@ function LandingPage() {
                     themedStyles.tabText,
                     activeTab === 'login' && themedStyles.tabTextActive,
                   ]}>
-                  Sign In
+                  {t('landing.signIn')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -709,7 +717,7 @@ function LandingPage() {
                     themedStyles.tabText,
                     activeTab === 'register' && themedStyles.tabTextActive,
                   ]}>
-                  Register
+                  {t('auth.register')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -735,7 +743,7 @@ function LandingPage() {
           {/* Footer */}
           <View style={themedStyles.footer}>
             <Text style={themedStyles.footerText}>
-              Your next game is just a tap away
+              {t('landing.footerText')}
             </Text>
             <Text style={themedStyles.footerEmojis}>🎯 🏆 🤝</Text>
           </View>

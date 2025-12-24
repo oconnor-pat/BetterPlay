@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Modal,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useTheme, ThemeMode} from '../ThemeContext/ThemeContext';
@@ -21,15 +22,46 @@ import {
   faCircleInfo,
   faChevronRight,
   faCircleHalfStroke,
+  faCheck,
+  faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
+import {useTranslation} from 'react-i18next';
+
+interface Language {
+  code: string;
+  name: string;
+  nativeName: string;
+}
+
+const LANGUAGES: Language[] = [
+  {code: 'en', name: 'English', nativeName: 'English'},
+  {code: 'es', name: 'Spanish', nativeName: 'Español'},
+  {code: 'fr', name: 'French', nativeName: 'Français'},
+  {code: 'de', name: 'German', nativeName: 'Deutsch'},
+  {code: 'it', name: 'Italian', nativeName: 'Italiano'},
+  {code: 'pt', name: 'Portuguese', nativeName: 'Português'},
+  {code: 'zh', name: 'Chinese', nativeName: '中文'},
+  {code: 'ja', name: 'Japanese', nativeName: '日本語'},
+  {code: 'ko', name: 'Korean', nativeName: '한국어'},
+  {code: 'ar', name: 'Arabic', nativeName: 'العربية'},
+  {code: 'hi', name: 'Hindi', nativeName: 'हिन्दी'},
+  {code: 'ru', name: 'Russian', nativeName: 'Русский'},
+];
+
+const LANGUAGE_STORAGE_KEY = '@app_language';
 
 const Settings: React.FC = () => {
+  const {t, i18n} = useTranslation();
   const {darkMode, themeMode, setThemeMode, colors} = useTheme();
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>(
+    LANGUAGES.find(l => l.code === i18n.language) || LANGUAGES[0],
+  );
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   // Load saved preferences on mount
   useEffect(() => {
@@ -42,12 +74,19 @@ const Settings: React.FC = () => {
       const savedNotificationsPref = await AsyncStorage.getItem(
         'notificationsEnabled',
       );
+      const savedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
 
       if (savedLocationPref !== null) {
         setLocationEnabled(JSON.parse(savedLocationPref));
       }
       if (savedNotificationsPref !== null) {
         setNotificationsEnabled(JSON.parse(savedNotificationsPref));
+      }
+      if (savedLanguage !== null) {
+        const language = LANGUAGES.find(l => l.code === savedLanguage);
+        if (language) {
+          setSelectedLanguage(language);
+        }
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -98,6 +137,17 @@ const Settings: React.FC = () => {
       );
     } catch (error) {
       console.error('Error saving notification preference:', error);
+    }
+  };
+
+  const handleLanguageSelect = async (language: Language) => {
+    setSelectedLanguage(language);
+    setLanguageModalVisible(false);
+    try {
+      await i18n.changeLanguage(language.code);
+      await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, language.code);
+    } catch (error) {
+      console.error('Error saving language preference:', error);
     }
   };
 
@@ -233,6 +283,68 @@ const Settings: React.FC = () => {
         themeOptionTextActive: {
           color: colors.buttonText,
         },
+        // Language Modal Styles
+        modalOverlay: {
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          justifyContent: 'flex-end',
+        },
+        modalContent: {
+          backgroundColor: colors.card,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          paddingBottom: 34,
+          maxHeight: '70%',
+        },
+        modalHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: 16,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
+        modalTitle: {
+          fontSize: 18,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        modalCloseButton: {
+          padding: 4,
+        },
+        languageList: {
+          paddingHorizontal: 8,
+        },
+        languageOption: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: 16,
+          marginHorizontal: 8,
+          marginVertical: 4,
+          borderRadius: 12,
+          backgroundColor: colors.background,
+        },
+        languageOptionSelected: {
+          backgroundColor: colors.primary + '20',
+          borderWidth: 1,
+          borderColor: colors.primary,
+        },
+        languageInfo: {
+          flex: 1,
+        },
+        languageName: {
+          fontSize: 16,
+          fontWeight: '500',
+          color: colors.text,
+        },
+        languageNativeName: {
+          fontSize: 14,
+          color: colors.placeholder,
+          marginTop: 2,
+        },
+        languageCheck: {
+          marginLeft: 12,
+        },
       }),
     [colors],
   );
@@ -255,15 +367,15 @@ const Settings: React.FC = () => {
         <View style={themedStyles.scrollContent}>
           {/* Header */}
           <View style={themedStyles.header}>
-            <Text style={themedStyles.title}>Settings</Text>
-            <Text style={themedStyles.subtitle}>
-              Manage your app preferences
-            </Text>
+            <Text style={themedStyles.title}>{t('settings.title')}</Text>
+            <Text style={themedStyles.subtitle}>{t('settings.subtitle')}</Text>
           </View>
 
           {/* Appearance Section */}
           <View style={themedStyles.section}>
-            <Text style={themedStyles.sectionTitle}>Appearance</Text>
+            <Text style={themedStyles.sectionTitle}>
+              {t('settings.appearance')}
+            </Text>
             <View style={themedStyles.settingCard}>
               <View
                 style={[themedStyles.settingRow, themedStyles.settingRowLast]}>
@@ -281,13 +393,17 @@ const Settings: React.FC = () => {
                   />
                 </View>
                 <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>Theme</Text>
+                  <Text style={themedStyles.settingTitle}>
+                    {t('settings.theme')}
+                  </Text>
                   <Text style={themedStyles.settingDescription}>
                     {themeMode === 'system'
-                      ? `System (${darkMode ? 'Dark' : 'Light'})`
+                      ? `${t('settings.system')} (${
+                          darkMode ? t('settings.dark') : t('settings.light')
+                        })`
                       : themeMode === 'dark'
-                      ? 'Dark'
-                      : 'Light'}
+                      ? t('settings.dark')
+                      : t('settings.light')}
                   </Text>
                 </View>
               </View>
@@ -313,7 +429,7 @@ const Settings: React.FC = () => {
                       themeMode === 'system' &&
                         themedStyles.themeOptionTextActive,
                     ]}>
-                    System
+                    {t('settings.system')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -336,7 +452,7 @@ const Settings: React.FC = () => {
                       themeMode === 'light' &&
                         themedStyles.themeOptionTextActive,
                     ]}>
-                    Light
+                    {t('settings.light')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -359,7 +475,7 @@ const Settings: React.FC = () => {
                       themeMode === 'dark' &&
                         themedStyles.themeOptionTextActive,
                     ]}>
-                    Dark
+                    {t('settings.dark')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -368,7 +484,9 @@ const Settings: React.FC = () => {
 
           {/* Privacy & Permissions Section */}
           <View style={themedStyles.section}>
-            <Text style={themedStyles.sectionTitle}>Privacy & Permissions</Text>
+            <Text style={themedStyles.sectionTitle}>
+              {t('settings.privacyPermissions')}
+            </Text>
             <View style={themedStyles.settingCard}>
               <TouchableOpacity
                 style={themedStyles.settingRow}
@@ -383,10 +501,10 @@ const Settings: React.FC = () => {
                 </View>
                 <View style={themedStyles.settingContent}>
                   <Text style={themedStyles.settingTitle}>
-                    Location Services
+                    {t('settings.locationServices')}
                   </Text>
                   <Text style={themedStyles.settingDescription}>
-                    Allow app to access your location
+                    {t('settings.locationDescription')}
                   </Text>
                 </View>
                 <View style={themedStyles.settingAction}>
@@ -411,9 +529,11 @@ const Settings: React.FC = () => {
                   />
                 </View>
                 <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>Notifications</Text>
+                  <Text style={themedStyles.settingTitle}>
+                    {t('settings.notifications')}
+                  </Text>
                   <Text style={themedStyles.settingDescription}>
-                    Receive push notifications
+                    {t('settings.notificationsDescription')}
                   </Text>
                 </View>
                 <View style={themedStyles.settingAction}>
@@ -430,14 +550,12 @@ const Settings: React.FC = () => {
 
           {/* More Options Section */}
           <View style={themedStyles.section}>
-            <Text style={themedStyles.sectionTitle}>More</Text>
+            <Text style={themedStyles.sectionTitle}>{t('settings.more')}</Text>
             <View style={themedStyles.settingCard}>
               <TouchableOpacity
                 style={themedStyles.settingRow}
                 activeOpacity={0.7}
-                onPress={() =>
-                  Alert.alert('Language', 'Coming soon: Language selection')
-                }>
+                onPress={() => setLanguageModalVisible(true)}>
                 <View style={themedStyles.iconContainer}>
                   <FontAwesomeIcon
                     icon={faGlobe}
@@ -446,8 +564,12 @@ const Settings: React.FC = () => {
                   />
                 </View>
                 <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>Language</Text>
-                  <Text style={themedStyles.settingDescription}>English</Text>
+                  <Text style={themedStyles.settingTitle}>
+                    {t('settings.language')}
+                  </Text>
+                  <Text style={themedStyles.settingDescription}>
+                    {selectedLanguage.name} ({selectedLanguage.nativeName})
+                  </Text>
                 </View>
                 <View style={themedStyles.chevronContainer}>
                   <FontAwesomeIcon
@@ -472,9 +594,11 @@ const Settings: React.FC = () => {
                   />
                 </View>
                 <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>Privacy Policy</Text>
+                  <Text style={themedStyles.settingTitle}>
+                    {t('settings.privacyPolicy')}
+                  </Text>
                   <Text style={themedStyles.settingDescription}>
-                    View our privacy policy
+                    {t('settings.privacyPolicyDescription')}
                   </Text>
                 </View>
                 <View style={themedStyles.chevronContainer}>
@@ -503,9 +627,11 @@ const Settings: React.FC = () => {
                   />
                 </View>
                 <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>About</Text>
+                  <Text style={themedStyles.settingTitle}>
+                    {t('settings.about')}
+                  </Text>
                   <Text style={themedStyles.settingDescription}>
-                    App information
+                    {t('settings.aboutDescription')}
                   </Text>
                 </View>
                 <View style={themedStyles.chevronContainer}>
@@ -523,6 +649,64 @@ const Settings: React.FC = () => {
           <Text style={themedStyles.version}>BetterPlay v0.0.1</Text>
         </View>
       </ScrollView>
+
+      {/* Language Selection Modal */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setLanguageModalVisible(false)}>
+        <TouchableOpacity
+          style={themedStyles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setLanguageModalVisible(false)}>
+          <View
+            style={themedStyles.modalContent}
+            onStartShouldSetResponder={() => true}>
+            <View style={themedStyles.modalHeader}>
+              <Text style={themedStyles.modalTitle}>
+                {t('settings.selectLanguage')}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.modalCloseButton}
+                onPress={() => setLanguageModalVisible(false)}>
+                <FontAwesomeIcon icon={faXmark} size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={themedStyles.languageList}>
+              {LANGUAGES.map(language => (
+                <TouchableOpacity
+                  key={language.code}
+                  style={[
+                    themedStyles.languageOption,
+                    selectedLanguage.code === language.code &&
+                      themedStyles.languageOptionSelected,
+                  ]}
+                  onPress={() => handleLanguageSelect(language)}
+                  activeOpacity={0.7}>
+                  <View style={themedStyles.languageInfo}>
+                    <Text style={themedStyles.languageName}>
+                      {language.name}
+                    </Text>
+                    <Text style={themedStyles.languageNativeName}>
+                      {language.nativeName}
+                    </Text>
+                  </View>
+                  {selectedLanguage.code === language.code && (
+                    <View style={themedStyles.languageCheck}>
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={18}
+                        color={colors.primary}
+                      />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };

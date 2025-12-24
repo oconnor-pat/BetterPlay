@@ -35,6 +35,7 @@ import UserContext, {UserContextType} from '../UserContext';
 import axios from 'axios';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
+import {useTranslation} from 'react-i18next';
 
 interface Reply {
   _id?: string;
@@ -127,6 +128,7 @@ const CommunityNotes: React.FC = () => {
 
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
+  const {t} = useTranslation();
 
   // --- Autofocus logic for reply input ---
   const replyInputRefs = useRef<{[key: string]: TextInput | null}>({});
@@ -1012,9 +1014,9 @@ const CommunityNotes: React.FC = () => {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <FontAwesomeIcon icon={faComment} size={48} color={colors.border} />
-      <Text style={styles.emptyStateText}>No posts yet</Text>
+      <Text style={styles.emptyStateText}>{t('communityNotes.noPosts')}</Text>
       <Text style={styles.emptyStateSubtext}>
-        Be the first to share something with the community!
+        {t('communityNotes.beFirstToShare')}
       </Text>
     </View>
   );
@@ -1025,7 +1027,7 @@ const CommunityNotes: React.FC = () => {
         <View style={styles.hamburger}>
           <HamburgerMenu />
         </View>
-        <Text style={styles.title}>Community Notes</Text>
+        <Text style={styles.title}>{t('communityNotes.title')}</Text>
       </View>
 
       {/* Composer Card */}
@@ -1046,7 +1048,7 @@ const CommunityNotes: React.FC = () => {
           <View style={styles.addPostInputRow}>
             <TextInput
               style={styles.addPostInput}
-              placeholder="What's on your mind?"
+              placeholder={t('communityNotes.whatsOnYourMind')}
               placeholderTextColor={colors.border}
               value={newPostText}
               onChangeText={text => setNewPostText(text)}
@@ -1214,7 +1216,7 @@ const CommunityNotes: React.FC = () => {
                 )}
                 <TextInput
                   style={styles.commentInput}
-                  placeholder="Write a comment..."
+                  placeholder={t('communityNotes.writeComment')}
                   placeholderTextColor={colors.border}
                   value={commentText[item._id] || ''}
                   onChangeText={text =>
@@ -1263,7 +1265,7 @@ const CommunityNotes: React.FC = () => {
                                   color={colors.primary}
                                 />
                                 <Text style={styles.replyButtonText}>
-                                  Reply
+                                  {t('communityNotes.reply')}
                                 </Text>
                               </TouchableOpacity>
                               {userData &&
@@ -1341,7 +1343,7 @@ const CommunityNotes: React.FC = () => {
                               }
                             }}
                             style={styles.replyInput}
-                            placeholder="Write a reply..."
+                            placeholder={t('communityNotes.writeReply')}
                             placeholderTextColor={colors.border}
                             value={replyText[comment._id!] || ''}
                             onChangeText={text =>

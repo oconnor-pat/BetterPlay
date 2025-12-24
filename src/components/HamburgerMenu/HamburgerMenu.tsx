@@ -5,12 +5,14 @@ import {faBars, faGear, faSignOut} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import UserContext from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
+import {useTranslation} from 'react-i18next';
 
 const HamburgerMenu: React.FC = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const {setUserData} = useContext(UserContext);
   const navigation = useNavigation<NavigationProp<any>>();
   const {colors} = useTheme();
+  const {t} = useTranslation();
 
   const handleMenuToggle = () => {
     setMenuVisible(!menuVisible);
@@ -48,7 +50,7 @@ const HamburgerMenu: React.FC = () => {
               onPress={() => handleOptionPress('Settings')}>
               <FontAwesomeIcon icon={faGear} size={20} color={colors.text} />
               <Text style={[styles.menuText, {color: colors.text}]}>
-                Settings
+                {t('menu.settings')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -60,7 +62,7 @@ const HamburgerMenu: React.FC = () => {
                 color={colors.error}
               />
               <Text style={[styles.menuText, {color: colors.error}]}>
-                Sign Out
+                {t('menu.signOut')}
               </Text>
             </TouchableOpacity>
           </View>

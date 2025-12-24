@@ -28,6 +28,7 @@ import {
   faImage,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
+import {useTranslation} from 'react-i18next';
 
 // Types
 type ProfileScreenRouteProp = RouteProp<
@@ -43,6 +44,7 @@ const Profile: React.FC = () => {
   const {userData, setUserData} = useContext(UserContext) as UserContextType;
   const {colors, darkMode, themeMode} = useTheme();
   const {events} = useEventContext();
+  const {t} = useTranslation();
 
   // Calculate user stats
   const userStats = useMemo(() => {
@@ -252,6 +254,12 @@ const Profile: React.FC = () => {
           color: colors.placeholder,
           marginTop: 2,
         },
+        settingSubtextRight: {
+          fontSize: 13,
+          color: colors.placeholder,
+          marginTop: 2,
+          marginLeft: 'auto',
+        },
         // Achievements Preview
         achievementsCard: {
           backgroundColor: colors.card,
@@ -452,7 +460,7 @@ const Profile: React.FC = () => {
       {/* Header */}
       <View style={themedStyles.header}>
         <HamburgerMenu />
-        <Text style={themedStyles.title}>Profile</Text>
+        <Text style={themedStyles.title}>{t('profile.title')}</Text>
       </View>
 
       <ScrollView
@@ -492,7 +500,9 @@ const Profile: React.FC = () => {
                 size={16}
                 color={colors.primary}
               />
-              <Text style={themedStyles.photoButtonText}>Gallery</Text>
+              <Text style={themedStyles.photoButtonText}>
+                {t('profile.gallery')}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={themedStyles.photoButton}
@@ -502,14 +512,18 @@ const Profile: React.FC = () => {
                 size={16}
                 color={colors.primary}
               />
-              <Text style={themedStyles.photoButtonText}>Camera</Text>
+              <Text style={themedStyles.photoButtonText}>
+                {t('profile.camera')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Stats Card */}
         <View style={themedStyles.statsCard}>
-          <Text style={themedStyles.sectionTitle}>📊 Your Activity</Text>
+          <Text style={themedStyles.sectionTitle}>
+            📊 {t('profile.yourActivity')}
+          </Text>
           <View style={themedStyles.statsRow}>
             <View style={themedStyles.statItem}>
               <View
@@ -526,7 +540,9 @@ const Profile: React.FC = () => {
               <Text style={themedStyles.statValue}>
                 {userStats.eventsCreated}
               </Text>
-              <Text style={themedStyles.statLabel}>Events Created</Text>
+              <Text style={themedStyles.statLabel}>
+                {t('profile.eventsCreated')}
+              </Text>
             </View>
             <View style={themedStyles.statItem}>
               <View
@@ -543,7 +559,9 @@ const Profile: React.FC = () => {
               <Text style={themedStyles.statValue}>
                 {userStats.eventsJoined}
               </Text>
-              <Text style={themedStyles.statLabel}>Events Joined</Text>
+              <Text style={themedStyles.statLabel}>
+                {t('profile.eventsJoined')}
+              </Text>
             </View>
             <View style={themedStyles.statItem}>
               <View
@@ -554,14 +572,18 @@ const Profile: React.FC = () => {
                 <FontAwesomeIcon icon={faUsers} size={24} color="#FF9800" />
               </View>
               <Text style={themedStyles.statValue}>{events.length}</Text>
-              <Text style={themedStyles.statLabel}>Total Events</Text>
+              <Text style={themedStyles.statLabel}>
+                {t('profile.totalEvents')}
+              </Text>
             </View>
           </View>
         </View>
 
         {/* Quick Settings Card */}
         <View style={themedStyles.settingsCard}>
-          <Text style={themedStyles.sectionTitle}>⚙️ Quick Settings</Text>
+          <Text style={themedStyles.sectionTitle}>
+            ⚙️ {t('profile.quickSettings')}
+          </Text>
           <View style={[themedStyles.settingRow, themedStyles.settingRowLast]}>
             <View style={themedStyles.settingLeft}>
               <View
@@ -580,25 +602,31 @@ const Profile: React.FC = () => {
                 />
               </View>
               <View>
-                <Text style={themedStyles.settingText}>Dark Mode</Text>
+                <Text style={themedStyles.settingText}>
+                  {t('profile.darkMode')}
+                </Text>
                 <Text style={themedStyles.settingSubtext}>
-                  {darkMode ? 'Currently on' : 'Currently off'}
+                  {darkMode
+                    ? t('profile.currentlyOn')
+                    : t('profile.currentlyOff')}
                 </Text>
               </View>
             </View>
-            <Text style={[themedStyles.settingSubtext, {marginLeft: 'auto'}]}>
+            <Text style={themedStyles.settingSubtextRight}>
               {themeMode === 'system'
-                ? 'System'
+                ? t('settings.system')
                 : themeMode === 'dark'
-                ? 'Dark'
-                : 'Light'}
+                ? t('settings.dark')
+                : t('settings.light')}
             </Text>
           </View>
         </View>
 
         {/* Achievements Preview Card */}
         <View style={themedStyles.achievementsCard}>
-          <Text style={themedStyles.sectionTitle}>🏆 Achievements</Text>
+          <Text style={themedStyles.sectionTitle}>
+            🏆 {t('profile.achievements')}
+          </Text>
           <View style={themedStyles.achievementsRow}>
             <View
               style={[
@@ -613,7 +641,9 @@ const Profile: React.FC = () => {
                 ]}>
                 <Text style={themedStyles.achievementEmoji}>🎯</Text>
               </View>
-              <Text style={themedStyles.achievementName}>First Event</Text>
+              <Text style={themedStyles.achievementName}>
+                {t('profile.firstEvent')}
+              </Text>
             </View>
             <View
               style={[
@@ -628,7 +658,9 @@ const Profile: React.FC = () => {
                 ]}>
                 <Text style={themedStyles.achievementEmoji}>⭐</Text>
               </View>
-              <Text style={themedStyles.achievementName}>5 Events</Text>
+              <Text style={themedStyles.achievementName}>
+                {t('profile.fiveEvents')}
+              </Text>
             </View>
             <View
               style={[
@@ -643,7 +675,9 @@ const Profile: React.FC = () => {
                 ]}>
                 <Text style={themedStyles.achievementEmoji}>🏅</Text>
               </View>
-              <Text style={themedStyles.achievementName}>10 Events</Text>
+              <Text style={themedStyles.achievementName}>
+                {t('profile.tenEvents')}
+              </Text>
             </View>
             <View
               style={[
@@ -658,14 +692,16 @@ const Profile: React.FC = () => {
                 ]}>
                 <Text style={themedStyles.achievementEmoji}>🤝</Text>
               </View>
-              <Text style={themedStyles.achievementName}>Team Player</Text>
+              <Text style={themedStyles.achievementName}>
+                {t('profile.teamPlayer')}
+              </Text>
             </View>
           </View>
         </View>
 
         {/* Member Since */}
         <Text style={themedStyles.memberSince}>
-          Member since {new Date().getFullYear()}
+          {t('profile.memberSince')} {new Date().getFullYear()}
         </Text>
       </ScrollView>
     </SafeAreaView>

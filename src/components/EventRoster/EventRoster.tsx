@@ -19,6 +19,7 @@ import {useEventContext} from '../../Context/EventContext';
 import UserContext, {UserContextType} from '../UserContext';
 import {API_BASE_URL} from '../../config/api';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {useTranslation} from 'react-i18next';
 import {
   faChevronDown,
   faChevronUp,
@@ -134,6 +135,7 @@ const EventRoster: React.FC = () => {
   const {colors} = useTheme();
   const {updateRosterSpots} = useEventContext();
   const {userData} = useContext(UserContext) as UserContextType;
+  const {t} = useTranslation();
 
   const [roster, setRoster] = useState<Player[]>(initialRoster || []);
   const [username, setUsername] = useState(userData?.username || '');
@@ -943,7 +945,9 @@ const EventRoster: React.FC = () => {
           {/* Progress Bar */}
           <View style={themedStyles.progressSection}>
             <View style={themedStyles.progressHeader}>
-              <Text style={themedStyles.progressLabel}>Roster Spots</Text>
+              <Text style={themedStyles.progressLabel}>
+                {t('roster.rosterSpots')}
+              </Text>
               <Text style={themedStyles.progressCount}>
                 {roster.length} / {totalSpots}
               </Text>
@@ -958,10 +962,8 @@ const EventRoster: React.FC = () => {
             </View>
             <Text style={themedStyles.progressRemaining}>
               {spotsRemaining > 0
-                ? `${spotsRemaining} spot${
-                    spotsRemaining !== 1 ? 's' : ''
-                  } remaining`
-                : 'Roster is full!'}
+                ? t('roster.spotsRemaining', {count: spotsRemaining})
+                : t('roster.rosterFull')}
             </Text>
           </View>
         </View>
@@ -969,23 +971,27 @@ const EventRoster: React.FC = () => {
         {/* Stats Section */}
         {roster.length > 0 && (
           <View style={themedStyles.statsSection}>
-            <Text style={themedStyles.statsSectionTitle}>📊 Roster Stats</Text>
+            <Text style={themedStyles.statsSectionTitle}>
+              📊 {t('roster.rosterStats')}
+            </Text>
             <View style={themedStyles.statsRow}>
               <View style={themedStyles.statItem}>
                 <Text style={themedStyles.statValue}>{roster.length}</Text>
-                <Text style={themedStyles.statLabel}>Players</Text>
+                <Text style={themedStyles.statLabel}>
+                  {t('roster.players')}
+                </Text>
               </View>
               <View style={themedStyles.statItem}>
                 <Text style={themedStyles.statValueGreen}>
                   {rosterStats.paidCount}
                 </Text>
-                <Text style={themedStyles.statLabel}>Paid</Text>
+                <Text style={themedStyles.statLabel}>{t('roster.paid')}</Text>
               </View>
               <View style={themedStyles.statItem}>
                 <Text style={themedStyles.statValueError}>
                   {rosterStats.unpaidCount}
                 </Text>
-                <Text style={themedStyles.statLabel}>Unpaid</Text>
+                <Text style={themedStyles.statLabel}>{t('roster.unpaid')}</Text>
               </View>
             </View>
 
@@ -993,7 +999,7 @@ const EventRoster: React.FC = () => {
             {Object.keys(rosterStats.teamCounts).length > 1 && (
               <View style={themedStyles.teamBreakdown}>
                 <Text style={themedStyles.statsSectionTitleSmall}>
-                  Teams by Jersey
+                  {t('roster.teamsByJersey')}
                 </Text>
                 <View style={themedStyles.teamRow}>
                   {Object.entries(rosterStats.teamCounts).map(
@@ -1041,7 +1047,9 @@ const EventRoster: React.FC = () => {
                 color={colors.primary}
               />
               <Text style={themedStyles.addPlayerTitle}>
-                {isUserOnRoster ? 'Already Joined' : 'Join This Event'}
+                {isUserOnRoster
+                  ? t('roster.alreadyJoined')
+                  : t('roster.joinThisEvent')}
               </Text>
             </View>
             <FontAwesomeIcon
@@ -1061,7 +1069,7 @@ const EventRoster: React.FC = () => {
                     color={colors.primary}
                   />
                   <Text style={themedStyles.alreadyJoinedText}>
-                    You're on the roster!
+                    {t('roster.youreOnTheRoster')}
                   </Text>
                 </View>
               ) : (
@@ -1074,7 +1082,7 @@ const EventRoster: React.FC = () => {
 
                   <TextInput
                     style={themedStyles.input}
-                    placeholder="Your name"
+                    placeholder={t('roster.yourName')}
                     placeholderTextColor={colors.placeholder}
                     value={username}
                     onChangeText={setUsername}
@@ -1090,7 +1098,7 @@ const EventRoster: React.FC = () => {
                           ? themedStyles.dropdownText
                           : themedStyles.placeholderText
                       }>
-                      {paidStatus || 'Select Paid Status'}
+                      {paidStatus || t('roster.selectPaidStatus')}
                     </Text>
                     <FontAwesomeIcon
                       icon={faChevronDown}
@@ -1121,7 +1129,7 @@ const EventRoster: React.FC = () => {
                             ? themedStyles.dropdownText
                             : themedStyles.placeholderText
                         }>
-                        {jerseyColor || 'Select Jersey Color'}
+                        {jerseyColor || t('roster.selectJerseyColor')}
                       </Text>
                     </View>
                     <FontAwesomeIcon
@@ -1141,7 +1149,7 @@ const EventRoster: React.FC = () => {
                           ? themedStyles.dropdownText
                           : themedStyles.placeholderText
                       }>
-                      {position || 'Select Position'}
+                      {position || t('roster.selectPosition')}
                     </Text>
                     <FontAwesomeIcon
                       icon={faChevronDown}
@@ -1163,7 +1171,9 @@ const EventRoster: React.FC = () => {
                       color={colors.buttonText}
                     />
                     <Text style={themedStyles.buttonText}>
-                      {spotsRemaining === 0 ? 'Roster Full' : 'Join Event'}
+                      {spotsRemaining === 0
+                        ? t('roster.rosterFull')
+                        : t('roster.joinEvent')}
                     </Text>
                   </TouchableOpacity>
                 </>
@@ -1177,7 +1187,7 @@ const EventRoster: React.FC = () => {
           <View style={themedStyles.sectionHeader}>
             <FontAwesomeIcon icon={faUsers} size={18} color={colors.primary} />
             <Text style={themedStyles.sectionTitle}>
-              Rostered Players ({roster.length})
+              {t('roster.rosteredPlayers')} ({roster.length})
             </Text>
           </View>
 
@@ -1185,7 +1195,7 @@ const EventRoster: React.FC = () => {
             <ActivityIndicator size="large" color={colors.primary} />
           ) : roster.length === 0 ? (
             <Text style={themedStyles.emptyState}>
-              No players have joined yet. Be the first!
+              {t('roster.noPlayersYet')}
             </Text>
           ) : (
             <FlatList
@@ -1205,7 +1215,9 @@ const EventRoster: React.FC = () => {
           onRequestClose={() => setPaidStatusModalVisible(false)}>
           <View style={themedStyles.modalOverlay}>
             <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>Payment Status</Text>
+              <Text style={themedStyles.modalTitle}>
+                {t('roster.paymentStatus')}
+              </Text>
               {['Paid', 'Unpaid'].map(status => (
                 <TouchableOpacity
                   key={status}
@@ -1241,7 +1253,9 @@ const EventRoster: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.modalClose}
                 onPress={() => setPaidStatusModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>Close</Text>
+                <Text style={themedStyles.modalCloseText}>
+                  {t('common.close')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1255,7 +1269,9 @@ const EventRoster: React.FC = () => {
           onRequestClose={() => setJerseyColorModalVisible(false)}>
           <View style={themedStyles.modalOverlay}>
             <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>Jersey Color</Text>
+              <Text style={themedStyles.modalTitle}>
+                {t('roster.jerseyColor')}
+              </Text>
               <ScrollView style={themedStyles.modalScrollView}>
                 {Object.keys(jerseyColors).map(color => (
                   <TouchableOpacity
@@ -1288,7 +1304,9 @@ const EventRoster: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.modalClose}
                 onPress={() => setJerseyColorModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>Close</Text>
+                <Text style={themedStyles.modalCloseText}>
+                  {t('common.close')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1338,7 +1356,9 @@ const EventRoster: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.modalClose}
                 onPress={() => setPositionModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>Close</Text>
+                <Text style={themedStyles.modalCloseText}>
+                  {t('common.close')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1352,7 +1372,9 @@ const EventRoster: React.FC = () => {
           onRequestClose={() => setEditModalVisible(false)}>
           <View style={themedStyles.modalOverlay}>
             <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>✏️ Edit Your Info</Text>
+              <Text style={themedStyles.modalTitle}>
+                ✏️ {t('roster.editYourInfo')}
+              </Text>
 
               {/* Edit Paid Status */}
               <TouchableOpacity
@@ -1364,7 +1386,7 @@ const EventRoster: React.FC = () => {
                       ? themedStyles.dropdownText
                       : themedStyles.placeholderText
                   }>
-                  {editPaidStatus || 'Select Paid Status'}
+                  {editPaidStatus || t('roster.selectPaidStatus')}
                 </Text>
                 <FontAwesomeIcon
                   icon={faChevronDown}
@@ -1395,7 +1417,7 @@ const EventRoster: React.FC = () => {
                         ? themedStyles.dropdownText
                         : themedStyles.placeholderText
                     }>
-                    {editJerseyColor || 'Select Jersey Color'}
+                    {editJerseyColor || t('roster.selectJerseyColor')}
                   </Text>
                 </View>
                 <FontAwesomeIcon
@@ -1415,7 +1437,7 @@ const EventRoster: React.FC = () => {
                       ? themedStyles.dropdownText
                       : themedStyles.placeholderText
                   }>
-                  {editPosition || 'Select Position'}
+                  {editPosition || t('roster.selectPosition')}
                 </Text>
                 <FontAwesomeIcon
                   icon={faChevronDown}
@@ -1433,7 +1455,9 @@ const EventRoster: React.FC = () => {
                   size={18}
                   color={colors.buttonText}
                 />
-                <Text style={themedStyles.buttonText}>Save Changes</Text>
+                <Text style={themedStyles.buttonText}>
+                  {t('roster.saveChanges')}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -1443,7 +1467,7 @@ const EventRoster: React.FC = () => {
                 onPress={() => setEditModalVisible(false)}>
                 <Text
                   style={[themedStyles.modalCloseText, {color: colors.text}]}>
-                  Cancel
+                  {t('common.cancel')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1458,7 +1482,9 @@ const EventRoster: React.FC = () => {
           onRequestClose={() => setEditPaidStatusModalVisible(false)}>
           <View style={themedStyles.modalOverlay}>
             <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>Payment Status</Text>
+              <Text style={themedStyles.modalTitle}>
+                {t('roster.paymentStatus')}
+              </Text>
               {['Paid', 'Unpaid'].map(status => (
                 <TouchableOpacity
                   key={status}
@@ -1495,7 +1521,9 @@ const EventRoster: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.modalClose}
                 onPress={() => setEditPaidStatusModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>Close</Text>
+                <Text style={themedStyles.modalCloseText}>
+                  {t('common.close')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1509,7 +1537,9 @@ const EventRoster: React.FC = () => {
           onRequestClose={() => setEditJerseyColorModalVisible(false)}>
           <View style={themedStyles.modalOverlay}>
             <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>Jersey Color</Text>
+              <Text style={themedStyles.modalTitle}>
+                {t('roster.jerseyColor')}
+              </Text>
               <ScrollView style={themedStyles.modalScrollView}>
                 {Object.keys(jerseyColors).map(color => (
                   <TouchableOpacity
@@ -1543,7 +1573,9 @@ const EventRoster: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.modalClose}
                 onPress={() => setEditJerseyColorModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>Close</Text>
+                <Text style={themedStyles.modalCloseText}>
+                  {t('common.close')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1557,7 +1589,9 @@ const EventRoster: React.FC = () => {
           onRequestClose={() => setEditPositionModalVisible(false)}>
           <View style={themedStyles.modalOverlay}>
             <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>Select Position</Text>
+              <Text style={themedStyles.modalTitle}>
+                {t('roster.selectPosition')}
+              </Text>
               <ScrollView style={themedStyles.modalScrollView}>
                 {(positionOptions[eventType] || positionOptions.Default).map(
                   pos => (
@@ -1596,7 +1630,9 @@ const EventRoster: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.modalClose}
                 onPress={() => setEditPositionModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>Close</Text>
+                <Text style={themedStyles.modalCloseText}>
+                  {t('common.close')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

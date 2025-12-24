@@ -25,6 +25,7 @@ import UserContext, {UserContextType} from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
+import {useTranslation} from 'react-i18next';
 
 export type RootStackParamList = {
   EventList: undefined;
@@ -222,6 +223,7 @@ const getCoordinatesFromLocation = (
 const EventList: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
+  const {t} = useTranslation();
 
   const themedStyles = useMemo(
     () =>
@@ -750,7 +752,7 @@ const EventList: React.FC = () => {
         <View style={themedStyles.creatorRow}>
           <Text style={themedStyles.cardEmoji}>👤</Text>
           <Text style={themedStyles.eventUsername}>
-            Created by {item.createdByUsername}
+            {t('events.createdBy')} {item.createdByUsername}
           </Text>
         </View>
       )}
@@ -770,7 +772,8 @@ const EventList: React.FC = () => {
       <View style={themedStyles.cardRow}>
         <Text style={themedStyles.cardEmoji}>👥</Text>
         <Text style={themedStyles.cardText}>
-          {item.rosterSpotsFilled} / {item.totalSpots} players joined
+          {item.rosterSpotsFilled} / {item.totalSpots}{' '}
+          {t('events.playersJoined')}
         </Text>
       </View>
 
@@ -812,7 +815,9 @@ const EventList: React.FC = () => {
         })()}
         <View style={themedStyles.mapOverlay}>
           <Text style={themedStyles.mapText}>📍 {item.location}</Text>
-          <Text style={themedStyles.mapSubtext}>Tap to open in Maps</Text>
+          <Text style={themedStyles.mapSubtext}>
+            {t('events.tapToOpenMaps')}
+          </Text>
         </View>
       </TouchableOpacity>
 
@@ -825,7 +830,9 @@ const EventList: React.FC = () => {
           style={themedStyles.actionButton}
           onPress={() => openMapsForEvent(item)}>
           <Text style={themedStyles.cardEmoji}>🧭</Text>
-          <Text style={themedStyles.actionButtonText}>Get Directions</Text>
+          <Text style={themedStyles.actionButtonText}>
+            {t('events.getDirections')}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[themedStyles.actionButton, themedStyles.joinButton]}
@@ -836,7 +843,7 @@ const EventList: React.FC = () => {
               themedStyles.actionButtonText,
               themedStyles.joinButtonText,
             ]}>
-            Join Event
+            {t('events.joinEvent')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -864,7 +871,7 @@ const EventList: React.FC = () => {
       {/* Header */}
       <View style={themedStyles.header}>
         <HamburgerMenu />
-        <Text style={themedStyles.title}>Event List</Text>
+        <Text style={themedStyles.title}>{t('events.title')}</Text>
         <TouchableOpacity
           style={themedStyles.addButton}
           onPress={() => {
@@ -899,12 +906,14 @@ const EventList: React.FC = () => {
         <View style={themedStyles.modalOverlay}>
           <View style={themedStyles.modalView}>
             <Text style={themedStyles.modalHeader}>
-              {isEditing ? '✏️ Edit Event' : '🎉 Create New Event'}
+              {isEditing
+                ? `✏️ ${t('events.editEvent')}`
+                : `🎉 ${t('events.createEvent')}`}
             </Text>
 
             <TextInput
               style={themedStyles.modalInput}
-              placeholder="Event Name"
+              placeholder={t('events.eventName')}
               placeholderTextColor={colors.placeholder || '#888'}
               value={newEvent.name}
               onChangeText={text => setNewEvent({...newEvent, name: text})}
@@ -948,7 +957,7 @@ const EventList: React.FC = () => {
               ) : (
                 <TextInput
                   style={themedStyles.modalInput}
-                  placeholder="Location/Facility"
+                  placeholder={t('events.eventLocation')}
                   placeholderTextColor={colors.placeholder || '#888'}
                   value={newEvent.location}
                   onChangeText={text =>
@@ -966,7 +975,7 @@ const EventList: React.FC = () => {
                 style={{
                   color: newEvent.date ? colors.text : colors.placeholder,
                 }}>
-                {newEvent.date ? newEvent.date : 'Select Event Date'}
+                {newEvent.date ? newEvent.date : t('events.selectEventDate')}
               </Text>
             </TouchableOpacity>
             {showDatePicker && (
@@ -983,7 +992,9 @@ const EventList: React.FC = () => {
                     setNewEvent({...newEvent, date: date?.toDateString()});
                     setShowDatePicker(false);
                   }}>
-                  <Text style={themedStyles.confirmButton}>Confirm Date</Text>
+                  <Text style={themedStyles.confirmButton}>
+                    {t('events.confirmDate')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -996,7 +1007,7 @@ const EventList: React.FC = () => {
                 style={{
                   color: newEvent.time ? colors.text : colors.placeholder,
                 }}>
-                {newEvent.time ? newEvent.time : 'Select Event Time'}
+                {newEvent.time ? newEvent.time : t('events.selectEventTime')}
               </Text>
             </TouchableOpacity>
             {showTimePicker && (
@@ -1020,7 +1031,9 @@ const EventList: React.FC = () => {
                     });
                     setShowTimePicker(false);
                   }}>
-                  <Text style={themedStyles.confirmButton}>Confirm Time</Text>
+                  <Text style={themedStyles.confirmButton}>
+                    {t('events.confirmTime')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1038,7 +1051,7 @@ const EventList: React.FC = () => {
                 }}>
                 {newEvent.totalSpots
                   ? newEvent.totalSpots
-                  : 'Select Roster Size'}
+                  : t('events.selectRosterSize')}
               </Text>
             </TouchableOpacity>
             {showRosterSizePicker && (
@@ -1065,7 +1078,7 @@ const EventList: React.FC = () => {
                     setShowRosterSizePicker(false);
                   }}>
                   <Text style={themedStyles.confirmButton}>
-                    Confirm Roster Size
+                    {t('events.confirmRosterSize')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1082,7 +1095,9 @@ const EventList: React.FC = () => {
                 style={{
                   color: newEvent.eventType ? colors.text : colors.placeholder,
                 }}>
-                {newEvent.eventType ? newEvent.eventType : 'Select Event Type'}
+                {newEvent.eventType
+                  ? newEvent.eventType
+                  : t('events.selectEventType')}
               </Text>
             </TouchableOpacity>
             {showEventTypePicker && (
@@ -1109,7 +1124,7 @@ const EventList: React.FC = () => {
                     setShowEventTypePicker(false);
                   }}>
                   <Text style={themedStyles.confirmButton}>
-                    Confirm Event Type
+                    {t('events.confirmEventType')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1120,7 +1135,9 @@ const EventList: React.FC = () => {
                 style={themedStyles.saveButton}
                 onPress={handleSaveNewEvent}>
                 <Text style={themedStyles.buttonText}>
-                  {isEditing ? 'Save Changes' : 'Create Event'}
+                  {isEditing
+                    ? t('events.saveChanges')
+                    : t('events.createEvent')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1131,7 +1148,7 @@ const EventList: React.FC = () => {
                     themedStyles.buttonText,
                     themedStyles.cancelButtonText,
                   ]}>
-                  Cancel
+                  {t('common.cancel')}
                 </Text>
               </TouchableOpacity>
             </View>
