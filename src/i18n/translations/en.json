@@ -154,7 +154,9 @@
     "editPost": "Edit Post",
     "editComment": "Edit Comment",
     "noPosts": "No posts yet. Be the first to share!",
-    "justNow": "Just now"
+    "justNow": "Just now",
+    "likedBy": "Liked by",
+    "noLikesYet": "No likes yet"
   },
   "settings": {
     "title": "Settings",
