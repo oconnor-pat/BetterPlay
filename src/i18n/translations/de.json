@@ -98,7 +98,15 @@
     "confirmTime": "Zeit bestätigen",
     "confirmRosterSize": "Bestätigen",
     "confirmEventType": "Bestätigen",
-    "saveChanges": "Änderungen speichern"
+    "saveChanges": "Änderungen speichern",
+    "searchPlaceholder": "Nach Name, Ort, Datum, Typ suchen...",
+    "tryDifferentSearch": "Versuche einen anderen Suchbegriff",
+    "filterEvents": "Events filtern",
+    "dateRange": "Datum",
+    "availability": "Verfügbarkeit",
+    "availableOnly": "Nur Events mit freien Plätzen anzeigen",
+    "clearFilters": "Alles löschen",
+    "applyFilters": "Filter anwenden"
   },
   "profile": {
     "title": "Profil",

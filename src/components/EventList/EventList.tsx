@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  ScrollView,
 } from 'react-native';
 import MapView, {Marker} from 'react-native-maps';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -18,7 +19,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import {faPlus, faTrash, faCog} from '@fortawesome/free-solid-svg-icons';
+import {faPlus, faTrash, faCog, faSearch, faTimes, faFilter, faChevronDown} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
@@ -93,6 +94,14 @@ const activityOptions = [
   {label: 'Softball', emoji: '🥎'},
   {label: 'Lacrosse', emoji: '🥍'},
   {label: 'Volleyball', emoji: '🏐'},
+];
+
+const dateFilterOptions = [
+  {label: 'All Dates', value: 'all'},
+  {label: 'Today', value: 'today'},
+  {label: 'Tomorrow', value: 'tomorrow'},
+  {label: 'This Week', value: 'thisWeek'},
+  {label: 'This Month', value: 'thisMonth'},
 ];
 
 const getEventTypeEmoji = (eventType: string) => {
@@ -500,6 +509,237 @@ const EventList: React.FC = () => {
           borderRadius: 12,
           alignSelf: 'flex-start',
         },
+        searchContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.inputBackground || colors.card,
+          borderRadius: 12,
+          paddingHorizontal: 12,
+          marginBottom: 16,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        searchInput: {
+          flex: 1,
+          paddingVertical: 12,
+          paddingHorizontal: 8,
+          fontSize: 16,
+          color: colors.text,
+        },
+        searchIcon: {
+          marginRight: 4,
+        },
+        clearButton: {
+          padding: 4,
+        },
+        searchButton: {
+          padding: 8,
+          marginLeft: 8,
+          zIndex: 1,
+        },
+        noResultsContainer: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingVertical: 40,
+        },
+        noResultsText: {
+          color: colors.text,
+          fontSize: 16,
+          opacity: 0.7,
+          textAlign: 'center',
+        },
+        noResultsSubtext: {
+          color: colors.text,
+          fontSize: 14,
+          opacity: 0.5,
+          textAlign: 'center',
+          marginTop: 8,
+        },
+        filterButton: {
+          padding: 8,
+          marginLeft: 8,
+          position: 'relative',
+        },
+        filterBadge: {
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          backgroundColor: colors.error || '#e74c3c',
+          borderRadius: 10,
+          minWidth: 18,
+          height: 18,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        filterBadgeText: {
+          color: '#fff',
+          fontSize: 11,
+          fontWeight: 'bold',
+        },
+        filterModalOverlay: {
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          justifyContent: 'flex-end',
+        },
+        filterModalContent: {
+          backgroundColor: colors.card,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingTop: 20,
+          paddingHorizontal: 20,
+          paddingBottom: 40,
+          maxHeight: '80%',
+        },
+        filterModalHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 20,
+        },
+        filterModalTitle: {
+          fontSize: 20,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        filterSection: {
+          marginBottom: 20,
+        },
+        filterSectionTitle: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 12,
+        },
+        filterChipsContainer: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+        },
+        filterChip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 8,
+          paddingHorizontal: 14,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+          marginRight: 8,
+          marginBottom: 8,
+        },
+        filterChipSelected: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        filterChipText: {
+          fontSize: 14,
+          color: colors.text,
+          marginLeft: 6,
+        },
+        filterChipTextSelected: {
+          color: colors.buttonText || '#fff',
+        },
+        filterChipEmoji: {
+          fontSize: 16,
+        },
+        dateFilterOption: {
+          paddingVertical: 12,
+          paddingHorizontal: 16,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+          marginBottom: 8,
+        },
+        dateFilterOptionSelected: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        dateFilterOptionText: {
+          fontSize: 15,
+          color: colors.text,
+        },
+        dateFilterOptionTextSelected: {
+          color: colors.buttonText || '#fff',
+          fontWeight: '600',
+        },
+        toggleOption: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingVertical: 12,
+          paddingHorizontal: 16,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+        },
+        toggleOptionSelected: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        toggleOptionText: {
+          fontSize: 15,
+          color: colors.text,
+        },
+        toggleOptionTextSelected: {
+          color: colors.buttonText || '#fff',
+          fontWeight: '600',
+        },
+        filterButtonsRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginTop: 20,
+          gap: 12,
+        },
+        clearFiltersButton: {
+          flex: 1,
+          paddingVertical: 14,
+          borderRadius: 12,
+          borderWidth: 2,
+          borderColor: colors.error || '#e74c3c',
+          alignItems: 'center',
+        },
+        clearFiltersText: {
+          color: colors.error || '#e74c3c',
+          fontWeight: '600',
+          fontSize: 16,
+        },
+        applyFiltersButton: {
+          flex: 1,
+          paddingVertical: 14,
+          borderRadius: 12,
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+        },
+        applyFiltersText: {
+          color: colors.buttonText || '#fff',
+          fontWeight: '600',
+          fontSize: 16,
+        },
+        activeFiltersContainer: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          marginBottom: 12,
+          gap: 8,
+        },
+        activeFilterTag: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary + '20',
+          paddingVertical: 6,
+          paddingHorizontal: 10,
+          borderRadius: 16,
+          marginRight: 8,
+          marginBottom: 4,
+        },
+        activeFilterTagText: {
+          color: colors.primary,
+          fontSize: 13,
+          fontWeight: '500',
+          marginRight: 6,
+        },
       }),
     [colors],
   );
@@ -554,6 +794,15 @@ const EventList: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [newEvent, setNewEvent] = useState(() => createEmptyEvent());
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter state
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
+  const [selectedDateFilter, setSelectedDateFilter] = useState('all');
+  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+
   // Location autocomplete state - removed manual toggle, now seamless
 
   // Edit mode state
@@ -589,6 +838,97 @@ const EventList: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Filter events based on search query and filters
+  const filteredEvents = useMemo(() => {
+    let filtered = eventData;
+
+    // Text search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(event => {
+        const nameMatch = event.name.toLowerCase().includes(query);
+        const locationMatch = event.location.toLowerCase().includes(query);
+        const dateMatch = event.date.toLowerCase().includes(query);
+        const typeMatch = event.eventType.toLowerCase().includes(query);
+        const creatorMatch = event.createdByUsername?.toLowerCase().includes(query);
+        return nameMatch || locationMatch || dateMatch || typeMatch || creatorMatch;
+      });
+    }
+
+    // Event type filter
+    if (selectedEventTypes.length > 0) {
+      filtered = filtered.filter(event =>
+        selectedEventTypes.some(
+          type => type.toLowerCase() === event.eventType.toLowerCase()
+        )
+      );
+    }
+
+    // Date filter
+    if (selectedDateFilter !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      filtered = filtered.filter(event => {
+        const eventDate = new Date(event.date);
+        eventDate.setHours(0, 0, 0, 0);
+        
+        switch (selectedDateFilter) {
+          case 'today':
+            return eventDate.getTime() === today.getTime();
+          case 'tomorrow':
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return eventDate.getTime() === tomorrow.getTime();
+          case 'thisWeek':
+            const weekEnd = new Date(today);
+            weekEnd.setDate(weekEnd.getDate() + 7);
+            return eventDate >= today && eventDate <= weekEnd;
+          case 'thisMonth':
+            const monthEnd = new Date(today);
+            monthEnd.setMonth(monthEnd.getMonth() + 1);
+            return eventDate >= today && eventDate <= monthEnd;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Available spots filter
+    if (showAvailableOnly) {
+      filtered = filtered.filter(
+        event => event.rosterSpotsFilled < event.totalSpots
+      );
+    }
+
+    return filtered;
+  }, [eventData, searchQuery, selectedEventTypes, selectedDateFilter, showAvailableOnly]);
+
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedEventTypes.length > 0) count++;
+    if (selectedDateFilter !== 'all') count++;
+    if (showAvailableOnly) count++;
+    return count;
+  }, [selectedEventTypes, selectedDateFilter, showAvailableOnly]);
+
+  // Toggle event type selection
+  const toggleEventType = (type: string) => {
+    setSelectedEventTypes(prev =>
+      prev.includes(type)
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedEventTypes([]);
+    setSelectedDateFilter('all');
+    setShowAvailableOnly(false);
   };
 
   const handleSaveNewEvent = async () => {
@@ -890,11 +1230,105 @@ const EventList: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar with Filter Button */}
+      <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
+        <View style={[themedStyles.searchContainer, {flex: 1, marginBottom: 0}]}>
+          <FontAwesomeIcon
+            icon={faSearch}
+            size={18}
+            color={colors.placeholder || '#888'}
+            style={themedStyles.searchIcon}
+          />
+          <TextInput
+            style={themedStyles.searchInput}
+            placeholder={t('events.searchPlaceholder') || 'Search events...'}
+            placeholderTextColor={colors.placeholder || '#888'}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              style={themedStyles.clearButton}
+              onPress={() => setSearchQuery('')}>
+              <FontAwesomeIcon
+                icon={faTimes}
+                size={18}
+                color={colors.placeholder || '#888'}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          style={themedStyles.filterButton}
+          onPress={() => setShowFilterModal(true)}>
+          <FontAwesomeIcon
+            icon={faFilter}
+            size={20}
+            color={activeFilterCount > 0 ? colors.primary : colors.text}
+          />
+          {activeFilterCount > 0 && (
+            <View style={themedStyles.filterBadge}>
+              <Text style={themedStyles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Active Filters Display */}
+      {activeFilterCount > 0 && (
+        <View style={themedStyles.activeFiltersContainer}>
+          {selectedEventTypes.map(type => (
+            <TouchableOpacity
+              key={type}
+              style={themedStyles.activeFilterTag}
+              onPress={() => toggleEventType(type)}>
+              <Text style={themedStyles.activeFilterTagText}>
+                {getEventTypeEmoji(type)} {type}
+              </Text>
+              <FontAwesomeIcon icon={faTimes} size={12} color={colors.primary} />
+            </TouchableOpacity>
+          ))}
+          {selectedDateFilter !== 'all' && (
+            <TouchableOpacity
+              style={themedStyles.activeFilterTag}
+              onPress={() => setSelectedDateFilter('all')}>
+              <Text style={themedStyles.activeFilterTagText}>
+                📅 {dateFilterOptions.find(d => d.value === selectedDateFilter)?.label}
+              </Text>
+              <FontAwesomeIcon icon={faTimes} size={12} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+          {showAvailableOnly && (
+            <TouchableOpacity
+              style={themedStyles.activeFilterTag}
+              onPress={() => setShowAvailableOnly(false)}>
+              <Text style={themedStyles.activeFilterTagText}>
+                ✅ {t('events.availableOnly') || 'Available spots'}
+              </Text>
+              <FontAwesomeIcon icon={faTimes} size={12} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} />
+      ) : filteredEvents.length === 0 ? (
+        <View style={themedStyles.noResultsContainer}>
+          <Text style={themedStyles.noResultsText}>
+            {searchQuery ? t('common.noResults') : t('events.noEvents')}
+          </Text>
+          {searchQuery && (
+            <Text style={themedStyles.noResultsSubtext}>
+              {t('events.tryDifferentSearch') || 'Try a different search term'}
+            </Text>
+          )}
+        </View>
       ) : (
         <FlatList
-          data={eventData}
+          data={filteredEvents}
           renderItem={renderEventCard}
           keyExtractor={item => item._id}
           refreshing={loading}
@@ -1154,6 +1588,133 @@ const EventList: React.FC = () => {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showFilterModal}
+        onRequestClose={() => setShowFilterModal(false)}>
+        <TouchableOpacity
+          style={themedStyles.filterModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFilterModal(false)}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={e => e.stopPropagation()}
+            style={themedStyles.filterModalContent}>
+            <View style={themedStyles.filterModalHeader}>
+              <Text style={themedStyles.filterModalTitle}>
+                {t('events.filterEvents') || 'Filter Events'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <FontAwesomeIcon icon={faTimes} size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Event Type Filter */}
+              <View style={themedStyles.filterSection}>
+                <Text style={themedStyles.filterSectionTitle}>
+                  {t('events.eventType') || 'Event Type'}
+                </Text>
+                <View style={themedStyles.filterChipsContainer}>
+                  {activityOptions.map(option => (
+                    <TouchableOpacity
+                      key={option.label}
+                      style={[
+                        themedStyles.filterChip,
+                        selectedEventTypes.includes(option.label) &&
+                          themedStyles.filterChipSelected,
+                      ]}
+                      onPress={() => toggleEventType(option.label)}>
+                      <Text style={themedStyles.filterChipEmoji}>
+                        {option.emoji}
+                      </Text>
+                      <Text
+                        style={[
+                          themedStyles.filterChipText,
+                          selectedEventTypes.includes(option.label) &&
+                            themedStyles.filterChipTextSelected,
+                        ]}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Date Filter */}
+              <View style={themedStyles.filterSection}>
+                <Text style={themedStyles.filterSectionTitle}>
+                  {t('events.dateRange') || 'Date'}
+                </Text>
+                {dateFilterOptions.map(option => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      themedStyles.dateFilterOption,
+                      selectedDateFilter === option.value &&
+                        themedStyles.dateFilterOptionSelected,
+                    ]}
+                    onPress={() => setSelectedDateFilter(option.value)}>
+                    <Text
+                      style={[
+                        themedStyles.dateFilterOptionText,
+                        selectedDateFilter === option.value &&
+                          themedStyles.dateFilterOptionTextSelected,
+                      ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Available Spots Filter */}
+              <View style={themedStyles.filterSection}>
+                <Text style={themedStyles.filterSectionTitle}>
+                  {t('events.availability') || 'Availability'}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    themedStyles.toggleOption,
+                    showAvailableOnly && themedStyles.toggleOptionSelected,
+                  ]}
+                  onPress={() => setShowAvailableOnly(!showAvailableOnly)}>
+                  <Text
+                    style={[
+                      themedStyles.toggleOptionText,
+                      showAvailableOnly && themedStyles.toggleOptionTextSelected,
+                    ]}>
+                    {t('events.availableOnly') || 'Show only events with available spots'}
+                  </Text>
+                  {showAvailableOnly && (
+                    <Text style={{color: colors.buttonText || '#fff'}}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+
+            {/* Action Buttons */}
+            <View style={themedStyles.filterButtonsRow}>
+              <TouchableOpacity
+                style={themedStyles.clearFiltersButton}
+                onPress={clearFilters}>
+                <Text style={themedStyles.clearFiltersText}>
+                  {t('events.clearFilters') || 'Clear All'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={themedStyles.applyFiltersButton}
+                onPress={() => setShowFilterModal(false)}>
+                <Text style={themedStyles.applyFiltersText}>
+                  {t('events.applyFilters') || 'Apply Filters'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );

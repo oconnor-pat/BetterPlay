@@ -98,7 +98,15 @@
     "confirmTime": "Confirm Time",
     "confirmRosterSize": "Confirm",
     "confirmEventType": "Confirm",
-    "saveChanges": "Save Changes"
+    "saveChanges": "Save Changes",
+    "searchPlaceholder": "Search by name, location, date, type...",
+    "tryDifferentSearch": "Try a different search term",
+    "filterEvents": "Filter Events",
+    "dateRange": "Date",
+    "availability": "Availability",
+    "availableOnly": "Show only events with available spots",
+    "clearFilters": "Clear All",
+    "applyFilters": "Apply Filters"
   },
   "profile": {
     "title": "Profile",
