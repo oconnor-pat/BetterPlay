@@ -61,6 +61,7 @@
     "title": "Events",
     "createEvent": "Create Event",
     "joinEvent": "Join Event",
+    "viewEvent": "View Event",
     "leaveEvent": "Leave Event",
     "eventDetails": "Event Details",
     "eventName": "Event Name",

@@ -20,7 +20,18 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import {faPlus, faTrash, faCog, faSearch, faTimes, faFilter, faChevronDown, faShareAlt} from '@fortawesome/free-solid-svg-icons';
+import {
+  faPlus,
+  faTrash,
+  faCog,
+  faSearch,
+  faTimes,
+  faFilter,
+  faChevronDown,
+  faShareAlt,
+  faLocationArrow,
+  faArrowRightToBracket,
+} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
@@ -357,21 +368,27 @@ const EventList: React.FC = () => {
         actionButton: {
           flexDirection: 'row',
           alignItems: 'center',
+          justifyContent: 'center',
           backgroundColor: colors.background,
-          borderRadius: 8,
-          paddingVertical: 8,
-          paddingHorizontal: 14,
-          borderWidth: 1,
+          borderRadius: 10,
+          paddingVertical: 12,
+          paddingHorizontal: 18,
+          borderWidth: 1.5,
           borderColor: colors.primary,
-          marginRight: 8,
+          flex: 1,
+          marginRight: 10,
         },
         joinButton: {
           backgroundColor: colors.primary,
           borderColor: colors.primary,
+          marginRight: 0,
+        },
+        actionButtonIcon: {
+          marginRight: 8,
         },
         actionButtonText: {
-          marginLeft: 6,
-          fontWeight: 'bold',
+          fontWeight: '600',
+          fontSize: 15,
           color: colors.primary,
         },
         joinButtonText: {
@@ -379,11 +396,18 @@ const EventList: React.FC = () => {
         },
         iconContainer: {
           flexDirection: 'row',
-          justifyContent: 'flex-end',
-          marginTop: 10,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginTop: 16,
+          paddingTop: 14,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          gap: 24,
         },
         iconButton: {
-          marginLeft: 10,
+          padding: 10,
+          borderRadius: 20,
+          backgroundColor: colors.inputBackground || colors.background,
         },
         addButton: {
           paddingHorizontal: 20,
@@ -860,8 +884,12 @@ const EventList: React.FC = () => {
         const locationMatch = event.location.toLowerCase().includes(query);
         const dateMatch = event.date.toLowerCase().includes(query);
         const typeMatch = event.eventType.toLowerCase().includes(query);
-        const creatorMatch = event.createdByUsername?.toLowerCase().includes(query);
-        return nameMatch || locationMatch || dateMatch || typeMatch || creatorMatch;
+        const creatorMatch = event.createdByUsername
+          ?.toLowerCase()
+          .includes(query);
+        return (
+          nameMatch || locationMatch || dateMatch || typeMatch || creatorMatch
+        );
       });
     }
 
@@ -869,8 +897,8 @@ const EventList: React.FC = () => {
     if (selectedEventTypes.length > 0) {
       filtered = filtered.filter(event =>
         selectedEventTypes.some(
-          type => type.toLowerCase() === event.eventType.toLowerCase()
-        )
+          type => type.toLowerCase() === event.eventType.toLowerCase(),
+        ),
       );
     }
 
@@ -878,11 +906,11 @@ const EventList: React.FC = () => {
     if (selectedDateFilter !== 'all') {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       filtered = filtered.filter(event => {
         const eventDate = new Date(event.date);
         eventDate.setHours(0, 0, 0, 0);
-        
+
         switch (selectedDateFilter) {
           case 'today':
             return eventDate.getTime() === today.getTime();
@@ -907,12 +935,18 @@ const EventList: React.FC = () => {
     // Available spots filter
     if (showAvailableOnly) {
       filtered = filtered.filter(
-        event => event.rosterSpotsFilled < event.totalSpots
+        event => event.rosterSpotsFilled < event.totalSpots,
       );
     }
 
     return filtered;
-  }, [eventData, searchQuery, selectedEventTypes, selectedDateFilter, showAvailableOnly]);
+  }, [
+    eventData,
+    searchQuery,
+    selectedEventTypes,
+    selectedDateFilter,
+    showAvailableOnly,
+  ]);
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -926,9 +960,7 @@ const EventList: React.FC = () => {
   // Toggle event type selection
   const toggleEventType = (type: string) => {
     setSelectedEventTypes(prev =>
-      prev.includes(type)
-        ? prev.filter(t => t !== type)
-        : [...prev, type]
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type],
     );
   };
 
@@ -1065,13 +1097,17 @@ const EventList: React.FC = () => {
   const handleShareEvent = async (event: Event) => {
     const emoji = getEventTypeEmoji(event.eventType);
     const spotsAvailable = event.totalSpots - event.rosterSpotsFilled;
-    const appLink = Platform.OS === 'ios' ? APP_STORE_LINKS.ios : APP_STORE_LINKS.android;
-    
-    const shareMessage = `${emoji} Join me for ${event.name}!\n\n` +
+    const appLink =
+      Platform.OS === 'ios' ? APP_STORE_LINKS.ios : APP_STORE_LINKS.android;
+
+    const shareMessage =
+      `${emoji} Join me for ${event.name}!\n\n` +
       `🏷️ ${event.eventType}\n` +
       `📅 ${event.date} @ ${event.time}\n` +
       `📍 ${event.location}\n` +
-      `👥 ${spotsAvailable} spot${spotsAvailable !== 1 ? 's' : ''} available\n\n` +
+      `👥 ${spotsAvailable} spot${
+        spotsAvailable !== 1 ? 's' : ''
+      } available\n\n` +
       `Download BetterPlay to join:\n${appLink}`;
 
     try {
@@ -1079,7 +1115,7 @@ const EventList: React.FC = () => {
         message: shareMessage,
         title: `Join ${event.name} on BetterPlay`,
       });
-      
+
       if (result.action === Share.sharedAction) {
         // Shared successfully
         if (result.activityType) {
@@ -1088,7 +1124,10 @@ const EventList: React.FC = () => {
         }
       }
     } catch (error) {
-      Alert.alert(t('common.error'), t('events.shareError') || 'Failed to share event');
+      Alert.alert(
+        t('common.error'),
+        t('events.shareError') || 'Failed to share event',
+      );
     }
   };
 
@@ -1207,7 +1246,12 @@ const EventList: React.FC = () => {
         <TouchableOpacity
           style={themedStyles.actionButton}
           onPress={() => openMapsForEvent(item)}>
-          <Text style={themedStyles.cardEmoji}>🧭</Text>
+          <FontAwesomeIcon
+            icon={faLocationArrow}
+            size={16}
+            color={colors.primary}
+            style={themedStyles.actionButtonIcon}
+          />
           <Text style={themedStyles.actionButtonText}>
             {t('events.getDirections')}
           </Text>
@@ -1215,34 +1259,43 @@ const EventList: React.FC = () => {
         <TouchableOpacity
           style={[themedStyles.actionButton, themedStyles.joinButton]}
           onPress={() => handleEventPress(item)}>
-          <Text style={themedStyles.cardEmoji}>📲</Text>
+          <FontAwesomeIcon
+            icon={faArrowRightToBracket}
+            size={16}
+            color={colors.buttonText || '#fff'}
+            style={themedStyles.actionButtonIcon}
+          />
           <Text
             style={[
               themedStyles.actionButtonText,
               themedStyles.joinButtonText,
             ]}>
-            {t('events.joinEvent')}
+            {t('events.viewEvent')}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Edit/Delete/Share Icons */}
+      {/* Share/Settings/Delete Icons */}
       <View style={themedStyles.iconContainer}>
         <TouchableOpacity
           style={themedStyles.iconButton}
           onPress={() => handleShareEvent(item)}>
-          <FontAwesomeIcon icon={faShareAlt} size={20} color={colors.primary} />
+          <FontAwesomeIcon icon={faShareAlt} size={18} color={colors.primary} />
         </TouchableOpacity>
         <TouchableOpacity
           style={themedStyles.iconButton}
           onPress={() => handleEditEvent(item)}>
-          <FontAwesomeIcon icon={faCog} size={20} color={colors.text} />
+          <FontAwesomeIcon icon={faCog} size={18} color={colors.text} />
         </TouchableOpacity>
         {userData?._id === item.createdBy && (
           <TouchableOpacity
             style={themedStyles.iconButton}
             onPress={() => handleDeleteEvent(item)}>
-            <FontAwesomeIcon icon={faTrash} size={20} color={colors.text} />
+            <FontAwesomeIcon
+              icon={faTrash}
+              size={18}
+              color={colors.error || '#e74c3c'}
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -1274,8 +1327,10 @@ const EventList: React.FC = () => {
       </View>
 
       {/* Search Bar with Filter Button */}
-      <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
-        <View style={[themedStyles.searchContainer, {flex: 1, marginBottom: 0}]}>
+      <View
+        style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
+        <View
+          style={[themedStyles.searchContainer, {flex: 1, marginBottom: 0}]}>
           <FontAwesomeIcon
             icon={faSearch}
             size={18}
@@ -1313,7 +1368,9 @@ const EventList: React.FC = () => {
           />
           {activeFilterCount > 0 && (
             <View style={themedStyles.filterBadge}>
-              <Text style={themedStyles.filterBadgeText}>{activeFilterCount}</Text>
+              <Text style={themedStyles.filterBadgeText}>
+                {activeFilterCount}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
@@ -1330,7 +1387,11 @@ const EventList: React.FC = () => {
               <Text style={themedStyles.activeFilterTagText}>
                 {getEventTypeEmoji(type)} {type}
               </Text>
-              <FontAwesomeIcon icon={faTimes} size={12} color={colors.primary} />
+              <FontAwesomeIcon
+                icon={faTimes}
+                size={12}
+                color={colors.primary}
+              />
             </TouchableOpacity>
           ))}
           {selectedDateFilter !== 'all' && (
@@ -1338,9 +1399,17 @@ const EventList: React.FC = () => {
               style={themedStyles.activeFilterTag}
               onPress={() => setSelectedDateFilter('all')}>
               <Text style={themedStyles.activeFilterTagText}>
-                📅 {dateFilterOptions.find(d => d.value === selectedDateFilter)?.label}
+                📅{' '}
+                {
+                  dateFilterOptions.find(d => d.value === selectedDateFilter)
+                    ?.label
+                }
               </Text>
-              <FontAwesomeIcon icon={faTimes} size={12} color={colors.primary} />
+              <FontAwesomeIcon
+                icon={faTimes}
+                size={12}
+                color={colors.primary}
+              />
             </TouchableOpacity>
           )}
           {showAvailableOnly && (
@@ -1350,7 +1419,11 @@ const EventList: React.FC = () => {
               <Text style={themedStyles.activeFilterTagText}>
                 ✅ {t('events.availableOnly') || 'Available spots'}
               </Text>
-              <FontAwesomeIcon icon={faTimes} size={12} color={colors.primary} />
+              <FontAwesomeIcon
+                icon={faTimes}
+                size={12}
+                color={colors.primary}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -1728,9 +1801,11 @@ const EventList: React.FC = () => {
                   <Text
                     style={[
                       themedStyles.toggleOptionText,
-                      showAvailableOnly && themedStyles.toggleOptionTextSelected,
+                      showAvailableOnly &&
+                        themedStyles.toggleOptionTextSelected,
                     ]}>
-                    {t('events.availableOnly') || 'Show only events with available spots'}
+                    {t('events.availableOnly') ||
+                      'Show only events with available spots'}
                   </Text>
                   {showAvailableOnly && (
                     <Text style={{color: colors.buttonText || '#fff'}}>✓</Text>

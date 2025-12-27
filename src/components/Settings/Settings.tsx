@@ -10,7 +10,7 @@ import {
   Modal,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useTheme, ThemeMode} from '../ThemeContext/ThemeContext';
+import {useTheme} from '../ThemeContext/ThemeContext';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faMoon,
