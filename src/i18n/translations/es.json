@@ -106,7 +106,9 @@
     "availability": "Disponibilidad",
     "availableOnly": "Mostrar solo eventos con cupos disponibles",
     "clearFilters": "Limpiar Todo",
-    "applyFilters": "Aplicar Filtros"
+    "applyFilters": "Aplicar Filtros",
+    "shareEvent": "Compartir Evento",
+    "shareError": "Error al compartir el evento"
   },
   "profile": {
     "title": "Perfil",

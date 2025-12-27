@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Linking,
   ScrollView,
+  Share,
 } from 'react-native';
 import MapView, {Marker} from 'react-native-maps';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -19,7 +20,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import {faPlus, faTrash, faCog, faSearch, faTimes, faFilter, faChevronDown} from '@fortawesome/free-solid-svg-icons';
+import {faPlus, faTrash, faCog, faSearch, faTimes, faFilter, faChevronDown, faShareAlt} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
@@ -103,6 +104,13 @@ const dateFilterOptions = [
   {label: 'This Week', value: 'thisWeek'},
   {label: 'This Month', value: 'thisMonth'},
 ];
+
+// App Store Links - Update these with your actual app store URLs when published
+const APP_STORE_LINKS = {
+  ios: 'https://apps.apple.com/app/betterplay/id000000000', // Replace with your iOS App Store link
+  android: 'https://play.google.com/store/apps/details?id=com.betterplay', // Replace with your Google Play link
+  fallback: 'https://betterplay.app', // Replace with your website/landing page
+};
 
 const getEventTypeEmoji = (eventType: string) => {
   const found = activityOptions.find(
@@ -1054,6 +1062,36 @@ const EventList: React.FC = () => {
     setEditingEventId(event._id);
   };
 
+  const handleShareEvent = async (event: Event) => {
+    const emoji = getEventTypeEmoji(event.eventType);
+    const spotsAvailable = event.totalSpots - event.rosterSpotsFilled;
+    const appLink = Platform.OS === 'ios' ? APP_STORE_LINKS.ios : APP_STORE_LINKS.android;
+    
+    const shareMessage = `${emoji} Join me for ${event.name}!\n\n` +
+      `🏷️ ${event.eventType}\n` +
+      `📅 ${event.date} @ ${event.time}\n` +
+      `📍 ${event.location}\n` +
+      `👥 ${spotsAvailable} spot${spotsAvailable !== 1 ? 's' : ''} available\n\n` +
+      `Download BetterPlay to join:\n${appLink}`;
+
+    try {
+      const result = await Share.share({
+        message: shareMessage,
+        title: `Join ${event.name} on BetterPlay`,
+      });
+      
+      if (result.action === Share.sharedAction) {
+        // Shared successfully
+        if (result.activityType) {
+          // Shared with activity type of result.activityType (iOS only)
+          console.log('Shared via:', result.activityType);
+        }
+      }
+    } catch (error) {
+      Alert.alert(t('common.error'), t('events.shareError') || 'Failed to share event');
+    }
+  };
+
   const handleCancelModal = () => {
     setModalVisible(false);
     setNewEvent(createEmptyEvent());
@@ -1188,8 +1226,13 @@ const EventList: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Edit/Delete Icons - only show delete for events created by current user */}
+      {/* Edit/Delete/Share Icons */}
       <View style={themedStyles.iconContainer}>
+        <TouchableOpacity
+          style={themedStyles.iconButton}
+          onPress={() => handleShareEvent(item)}>
+          <FontAwesomeIcon icon={faShareAlt} size={20} color={colors.primary} />
+        </TouchableOpacity>
         <TouchableOpacity
           style={themedStyles.iconButton}
           onPress={() => handleEditEvent(item)}>

@@ -106,7 +106,9 @@
     "availability": "Availability",
     "availableOnly": "Show only events with available spots",
     "clearFilters": "Clear All",
-    "applyFilters": "Apply Filters"
+    "applyFilters": "Apply Filters",
+    "shareEvent": "Share Event",
+    "shareError": "Failed to share event"
   },
   "profile": {
     "title": "Profile",
