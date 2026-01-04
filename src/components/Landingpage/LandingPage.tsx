@@ -30,6 +30,8 @@ import {
   faKey,
   faTimes,
   faCheckCircle,
+  faEye,
+  faEyeSlash,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 
@@ -314,6 +316,9 @@ function LandingPage() {
           marginTop: 16,
           lineHeight: 22,
         },
+        modalSuccessButton: {
+          marginTop: 24,
+        },
         failedAttemptsWarning: {
           backgroundColor: colors.error + '15',
           borderRadius: 12,
@@ -345,6 +350,10 @@ function LandingPage() {
 
   // Focus states
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  // Password visibility states
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
 
   // Error messages
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -573,7 +582,10 @@ function LandingPage() {
                 {t('forgotPassword.successMessage')}
               </Text>
               <TouchableOpacity
-                style={[themedStyles.primaryButton, {marginTop: 24}]}
+                style={[
+                  themedStyles.primaryButton,
+                  themedStyles.modalSuccessButton,
+                ]}
                 onPress={closeForgotPasswordModal}>
                 <Text style={themedStyles.primaryButtonText}>
                   {t('common.done')}
@@ -736,7 +748,7 @@ function LandingPage() {
             style={themedStyles.input}
             placeholder={t('landing.enterPassword')}
             placeholderTextColor={colors.placeholder}
-            secureTextEntry
+            secureTextEntry={!showLoginPassword}
             value={loginData.password}
             onChangeText={text => setLoginData({...loginData, password: text})}
             ref={loginPasswordInputRef}
@@ -746,6 +758,15 @@ function LandingPage() {
             returnKeyType="go"
             onSubmitEditing={handleLogin}
           />
+          <TouchableOpacity
+            onPress={() => setShowLoginPassword(!showLoginPassword)}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <FontAwesomeIcon
+              icon={showLoginPassword ? faEyeSlash : faEye}
+              size={18}
+              color={colors.placeholder}
+            />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -916,7 +937,7 @@ function LandingPage() {
             style={themedStyles.input}
             placeholder={t('landing.createPassword')}
             placeholderTextColor={colors.placeholder}
-            secureTextEntry
+            secureTextEntry={!showRegisterPassword}
             value={registrationData.password}
             onChangeText={text =>
               setRegistrationData({...registrationData, password: text})
@@ -928,6 +949,15 @@ function LandingPage() {
             returnKeyType="go"
             onSubmitEditing={handleRegistration}
           />
+          <TouchableOpacity
+            onPress={() => setShowRegisterPassword(!showRegisterPassword)}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <FontAwesomeIcon
+              icon={showRegisterPassword ? faEyeSlash : faEye}
+              size={18}
+              color={colors.placeholder}
+            />
+          </TouchableOpacity>
         </View>
       </View>
 

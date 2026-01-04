@@ -13,6 +13,8 @@ import {
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
+import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {faEye, faEyeSlash} from '@fortawesome/free-solid-svg-icons';
 
 interface ResetPasswordProps {
   route: {
@@ -32,6 +34,8 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({route, navigation}) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const validatePassword = (): boolean => {
     if (newPassword.length < 8) {
@@ -109,41 +113,63 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({route, navigation}) => {
           {t('resetPassword.subtitle')}
         </Text>
 
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: colors?.inputBackground,
-              color: colors?.text,
-              borderColor: colors?.border,
-            },
-          ]}
-          placeholder={t('resetPassword.newPassword')}
-          placeholderTextColor={colors?.placeholder}
-          value={newPassword}
-          onChangeText={setNewPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          editable={!isSuccess}
-        />
+        <View style={[styles.inputContainer, {borderColor: colors?.border}]}>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors?.inputBackground,
+                color: colors?.text,
+              },
+            ]}
+            placeholder={t('resetPassword.newPassword')}
+            placeholderTextColor={colors?.placeholder}
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry={!showNewPassword}
+            autoCapitalize="none"
+            editable={!isSuccess}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowNewPassword(!showNewPassword)}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <FontAwesomeIcon
+              icon={showNewPassword ? faEyeSlash : faEye}
+              size={18}
+              color={colors?.placeholder}
+            />
+          </TouchableOpacity>
+        </View>
 
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: colors?.inputBackground,
-              color: colors?.text,
-              borderColor: colors?.border,
-            },
-          ]}
-          placeholder={t('resetPassword.confirmPassword')}
-          placeholderTextColor={colors?.placeholder}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          editable={!isSuccess}
-        />
+        <View style={[styles.inputContainer, {borderColor: colors?.border}]}>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors?.inputBackground,
+                color: colors?.text,
+              },
+            ]}
+            placeholder={t('resetPassword.confirmPassword')}
+            placeholderTextColor={colors?.placeholder}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry={!showConfirmPassword}
+            autoCapitalize="none"
+            editable={!isSuccess}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <FontAwesomeIcon
+              icon={showConfirmPassword ? faEyeSlash : faEye}
+              size={18}
+              color={colors?.placeholder}
+            />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={[
@@ -197,12 +223,23 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   input: {
+    flex: 1,
     height: 50,
+    paddingHorizontal: 15,
+    fontSize: 16,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 15,
     marginBottom: 15,
-    fontSize: 16,
+    backgroundColor: 'transparent',
+  },
+  eyeButton: {
+    paddingHorizontal: 15,
+    height: 50,
+    justifyContent: 'center',
   },
   button: {
     height: 50,
