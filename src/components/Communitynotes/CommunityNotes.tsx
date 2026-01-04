@@ -337,6 +337,13 @@ const CommunityNotes: React.FC = () => {
           marginRight: 24,
           paddingVertical: 4,
         },
+        socialActionFlex: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginRight: 24,
+          paddingVertical: 4,
+          flex: 1,
+        },
         socialActionText: {
           marginLeft: 6,
           fontSize: 14,
@@ -727,6 +734,16 @@ const CommunityNotes: React.FC = () => {
           fontSize: 14,
           paddingVertical: 20,
         },
+        likesModalScroll: {
+          maxHeight: 200,
+        },
+        likesModalUsername: {
+          fontSize: 15,
+          color: colors.text,
+          paddingVertical: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
       }),
     [colors],
   );
@@ -986,7 +1003,8 @@ const CommunityNotes: React.FC = () => {
           <Text style={styles.likedByUsername}>{usernames[0]}</Text>
           {othersCount > 0 ? (
             <Text style={styles.likedByOthers}>
-              {' '}+{othersCount} {othersCount === 1 ? 'other' : 'others'}
+              {' '}
+              +{othersCount} {othersCount === 1 ? 'other' : 'others'}
             </Text>
           ) : (
             <>
@@ -1453,7 +1471,7 @@ const CommunityNotes: React.FC = () => {
               {/* Social Actions Row */}
               <View style={styles.socialActionsRow}>
                 <TouchableOpacity
-                  style={[styles.socialAction, {flex: 1}]}
+                  style={styles.socialActionFlex}
                   onPress={() => toggleLike(item._id)}
                   onLongPress={() =>
                     showLikedBy(
