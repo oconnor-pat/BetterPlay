@@ -11,6 +11,7 @@
     "back": "Back",
     "next": "Next",
     "done": "Done",
+    "ok": "OK",
     "search": "Search",
     "noResults": "No results found",
     "close": "Close",
@@ -188,6 +189,17 @@
     "settings": "Settings",
     "signOut": "Sign Out"
   },
+  "forgotPassword": {
+    "title": "Reset Password",
+    "subtitle": "Enter the email address associated with your account and we'll send you a link to reset your password.",
+    "enterEmail": "Please enter your email address",
+    "invalidEmail": "Please enter a valid email address",
+    "sendReset": "Send Reset Link",
+    "successMessage": "If an account exists with this email, you will receive a password reset link shortly. Please check your inbox and spam folder.",
+    "requestFailed": "Unable to process your request. Please try again later.",
+    "tooManyRequests": "Too many requests. Please wait a few minutes before trying again.",
+    "multipleAttempts": "You've had {{count}} failed login attempts. Need to reset your password?"
+  },
   "roster": {
     "title": "Event Roster",
     "players": "Players",
@@ -222,5 +234,21 @@
     "noPlayersYet": "No players yet. Be the first to join!",
     "editYourInfo": "Edit Your Info",
     "saveChanges": "Save Changes"
+  },
+  "resetPassword": {
+    "title": "Reset Password",
+    "subtitle": "Enter your new password below",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "resetButton": "Reset Password",
+    "passwordReset": "Password Reset!",
+    "backToLogin": "Back to Login",
+    "success": "Success",
+    "successMessage": "Your password has been reset successfully. You can now log in with your new password.",
+    "error": "Error",
+    "passwordTooShort": "Password must be at least 8 characters long",
+    "passwordMismatch": "Passwords do not match",
+    "genericError": "Failed to reset password. The link may have expired.",
+    "networkError": "Network error. Please check your connection and try again."
   }
 }

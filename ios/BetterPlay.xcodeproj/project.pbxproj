@@ -12,8 +12,8 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
-		900CFD456260ABD87506A84B /* libPods-BetterPlay.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9EEA78A7275C2628D99AFD17 /* libPods-BetterPlay.a */; };
-		91214A633411E237CEED8E6F /* libPods-BetterPlay-BetterPlayTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F43A29D54AFB8CBAF83E224F /* libPods-BetterPlay-BetterPlayTests.a */; };
+		91EADD0CCFBF4ECE56618DF0 /* libPods-BetterPlay.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 49890406AC5B8A79B60E936D /* libPods-BetterPlay.a */; };
+		ABFF27038DA33A04533286B4 /* libPods-BetterPlay-BetterPlayTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1CD3377713187E9B768F9E23 /* libPods-BetterPlay-BetterPlayTests.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,14 +36,14 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = BetterPlay/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = BetterPlay/Info.plist; sourceTree = "<group>"; };
 		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = BetterPlay/main.m; sourceTree = "<group>"; };
+		1CD3377713187E9B768F9E23 /* libPods-BetterPlay-BetterPlayTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-BetterPlay-BetterPlayTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		2359340C0D39E7D5875CC834 /* Pods-BetterPlay-BetterPlayTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BetterPlay-BetterPlayTests.release.xcconfig"; path = "Target Support Files/Pods-BetterPlay-BetterPlayTests/Pods-BetterPlay-BetterPlayTests.release.xcconfig"; sourceTree = "<group>"; };
 		372894606FD05C36A58DE894 /* Pods-BetterPlay.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BetterPlay.release.xcconfig"; path = "Target Support Files/Pods-BetterPlay/Pods-BetterPlay.release.xcconfig"; sourceTree = "<group>"; };
+		49890406AC5B8A79B60E936D /* libPods-BetterPlay.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-BetterPlay.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = BetterPlay/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		8887435F78B431FEF4F03C1A /* Pods-BetterPlay.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BetterPlay.debug.xcconfig"; path = "Target Support Files/Pods-BetterPlay/Pods-BetterPlay.debug.xcconfig"; sourceTree = "<group>"; };
-		9EEA78A7275C2628D99AFD17 /* libPods-BetterPlay.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-BetterPlay.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D40500B6C16AAB6227AF8BDB /* Pods-BetterPlay-BetterPlayTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BetterPlay-BetterPlayTests.debug.xcconfig"; path = "Target Support Files/Pods-BetterPlay-BetterPlayTests/Pods-BetterPlay-BetterPlayTests.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		F43A29D54AFB8CBAF83E224F /* libPods-BetterPlay-BetterPlayTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-BetterPlay-BetterPlayTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,7 +51,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				91214A633411E237CEED8E6F /* libPods-BetterPlay-BetterPlayTests.a in Frameworks */,
+				ABFF27038DA33A04533286B4 /* libPods-BetterPlay-BetterPlayTests.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -59,7 +59,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				900CFD456260ABD87506A84B /* libPods-BetterPlay.a in Frameworks */,
+				91EADD0CCFBF4ECE56618DF0 /* libPods-BetterPlay.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -100,8 +100,8 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				9EEA78A7275C2628D99AFD17 /* libPods-BetterPlay.a */,
-				F43A29D54AFB8CBAF83E224F /* libPods-BetterPlay-BetterPlayTests.a */,
+				49890406AC5B8A79B60E936D /* libPods-BetterPlay.a */,
+				1CD3377713187E9B768F9E23 /* libPods-BetterPlay-BetterPlayTests.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -562,6 +562,17 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon/ReactCommon.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon/ReactCommon.framework/Headers/react/nativemodule/core",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon-Samples/ReactCommon_Samples.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon-Samples/ReactCommon_Samples.framework/Headers/platform/ios",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-Fabric/React_Fabric.framework/Headers/react/renderer/components/view/platform/cxx",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-NativeModulesApple/React_NativeModulesApple.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers/react/renderer/graphics/platform/ios",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					/usr/lib/swift,
@@ -635,6 +646,17 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon/ReactCommon.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon/ReactCommon.framework/Headers/react/nativemodule/core",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon-Samples/ReactCommon_Samples.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/ReactCommon-Samples/ReactCommon_Samples.framework/Headers/platform/ios",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-Fabric/React_Fabric.framework/Headers/react/renderer/components/view/platform/cxx",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-NativeModulesApple/React_NativeModulesApple.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers",
+					"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers/react/renderer/graphics/platform/ios",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 13.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					/usr/lib/swift,

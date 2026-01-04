@@ -319,7 +319,7 @@ const Profile: React.FC = () => {
       }
 
       try {
-        const token = await AsyncStorage.getItem('token');
+        const token = await AsyncStorage.getItem('userToken');
         const response = await fetch(`${API_BASE_URL}/user/${_id}`, {
           headers: {
             Authorization: token ? `Bearer ${token}` : '',
@@ -414,7 +414,7 @@ const Profile: React.FC = () => {
 
   const updateUserProfilePic = async (imageUrl: string) => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken');
       await axios.put(
         'https://omhl-be-9801a7de15ab.herokuapp.com/user/profile-pic',
         {

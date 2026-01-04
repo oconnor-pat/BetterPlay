@@ -3,6 +3,7 @@ import {View, Text, TouchableOpacity, StyleSheet, Modal} from 'react-native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {faBars, faGear, faSignOut} from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import UserContext from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {useTranslation} from 'react-i18next';
@@ -18,9 +19,11 @@ const HamburgerMenu: React.FC = () => {
     setMenuVisible(!menuVisible);
   };
 
-  const handleOptionPress = (option: string) => {
+  const handleOptionPress = async (option: string) => {
     setMenuVisible(false);
     if (option === 'Sign Out') {
+      // Clear the stored token to fully log out
+      await AsyncStorage.removeItem('userToken');
       setUserData(null);
       navigation.reset({
         index: 0,

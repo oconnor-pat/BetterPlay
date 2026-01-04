@@ -9,6 +9,8 @@ import {
   Platform,
   ScrollView,
   Keyboard,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 import UserContext from '../UserContext';
@@ -25,6 +27,9 @@ import {
   faArrowRight,
   faUserPlus,
   faSignInAlt,
+  faKey,
+  faTimes,
+  faCheckCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 
@@ -248,6 +253,81 @@ function LandingPage() {
           fontSize: 20,
           marginTop: 8,
         },
+        // Forgot Password
+        forgotPasswordLink: {
+          alignItems: 'center',
+          marginTop: 16,
+        },
+        forgotPasswordText: {
+          color: colors.primary,
+          fontSize: 14,
+          fontWeight: '600',
+        },
+        // Modal styles
+        modalOverlay: {
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 24,
+        },
+        modalContent: {
+          backgroundColor: colors.card,
+          borderRadius: 20,
+          padding: 24,
+          width: '100%',
+          maxWidth: 400,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 4},
+          shadowOpacity: 0.25,
+          shadowRadius: 12,
+          elevation: 8,
+        },
+        modalHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 8,
+        },
+        modalTitle: {
+          fontSize: 22,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        modalCloseButton: {
+          padding: 4,
+        },
+        modalSubtitle: {
+          fontSize: 14,
+          color: colors.placeholder,
+          marginBottom: 24,
+          lineHeight: 20,
+        },
+        modalSuccessContainer: {
+          alignItems: 'center',
+          paddingVertical: 20,
+        },
+        modalSuccessText: {
+          fontSize: 16,
+          color: colors.text,
+          textAlign: 'center',
+          marginTop: 16,
+          lineHeight: 22,
+        },
+        failedAttemptsWarning: {
+          backgroundColor: colors.error + '15',
+          borderRadius: 12,
+          padding: 12,
+          marginBottom: 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        failedAttemptsText: {
+          color: colors.error,
+          fontSize: 13,
+          flex: 1,
+          marginLeft: 8,
+        },
       }),
     [colors],
   );
@@ -270,8 +350,19 @@ function LandingPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Forgot password states
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
+  const [forgotPasswordError, setForgotPasswordError] = useState<string | null>(
+    null,
+  );
+
   const loginUsernameInputRef = useRef<TextInput>(null);
   const loginPasswordInputRef = useRef<TextInput>(null);
+  const forgotPasswordEmailRef = useRef<TextInput>(null);
 
   const registerNameInputRef = useRef<TextInput>(null);
   const registerEmailInputRef = useRef<TextInput>(null);
@@ -349,6 +440,7 @@ function LandingPage() {
       const responseData = await response.json();
 
       if (responseData.success) {
+        setFailedAttempts(0); // Reset on successful login
         setUserData(responseData.user);
         if (!responseData.token) {
           console.error('No token in response', responseData);
@@ -369,10 +461,19 @@ function LandingPage() {
           },
         });
       } else {
+        const newFailedAttempts = failedAttempts + 1;
+        setFailedAttempts(newFailedAttempts);
         setErrorMessage(
           responseData.message || 'Invalid username or password.',
         );
         setSuccessMessage(null);
+
+        // Show forgot password modal after 3 failed attempts
+        if (newFailedAttempts >= 3) {
+          setTimeout(() => {
+            setShowForgotPassword(true);
+          }, 500);
+        }
       }
     } catch (error) {
       console.error('Error during login:', error);
@@ -380,6 +481,195 @@ function LandingPage() {
       setSuccessMessage(null);
     }
   };
+
+  const handleForgotPassword = async () => {
+    if (!forgotPasswordEmail.trim()) {
+      setForgotPasswordError(t('forgotPassword.enterEmail'));
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(forgotPasswordEmail)) {
+      setForgotPasswordError(t('forgotPassword.invalidEmail'));
+      return;
+    }
+
+    setForgotPasswordLoading(true);
+    setForgotPasswordError(null);
+
+    try {
+      // Call backend to send password reset email
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: forgotPasswordEmail}),
+      });
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        throw new Error('Server returned non-JSON response');
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setForgotPasswordSuccess(true);
+      } else {
+        setForgotPasswordError(
+          data.message || t('forgotPassword.requestFailed'),
+        );
+      }
+    } catch (error: any) {
+      console.error('Error requesting password reset:', error);
+      setForgotPasswordError(t('forgotPassword.requestFailed'));
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const closeForgotPasswordModal = () => {
+    setShowForgotPassword(false);
+    setForgotPasswordEmail('');
+    setForgotPasswordError(null);
+    setForgotPasswordSuccess(false);
+    setForgotPasswordLoading(false);
+  };
+
+  const renderForgotPasswordModal = () => (
+    <Modal
+      visible={showForgotPassword}
+      transparent
+      animationType="fade"
+      onRequestClose={closeForgotPasswordModal}>
+      <TouchableOpacity
+        style={themedStyles.modalOverlay}
+        activeOpacity={1}
+        onPress={closeForgotPasswordModal}>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={themedStyles.modalContent}
+          onPress={e => e.stopPropagation()}>
+          <View style={themedStyles.modalHeader}>
+            <Text style={themedStyles.modalTitle}>
+              {t('forgotPassword.title')}
+            </Text>
+            <TouchableOpacity
+              style={themedStyles.modalCloseButton}
+              onPress={closeForgotPasswordModal}>
+              <FontAwesomeIcon
+                icon={faTimes}
+                size={20}
+                color={colors.placeholder}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {forgotPasswordSuccess ? (
+            <View style={themedStyles.modalSuccessContainer}>
+              <FontAwesomeIcon icon={faCheckCircle} size={48} color="#4CAF50" />
+              <Text style={themedStyles.modalSuccessText}>
+                {t('forgotPassword.successMessage')}
+              </Text>
+              <TouchableOpacity
+                style={[themedStyles.primaryButton, {marginTop: 24}]}
+                onPress={closeForgotPasswordModal}>
+                <Text style={themedStyles.primaryButtonText}>
+                  {t('common.done')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <Text style={themedStyles.modalSubtitle}>
+                {t('forgotPassword.subtitle')}
+              </Text>
+
+              {failedAttempts >= 3 && (
+                <View style={themedStyles.failedAttemptsWarning}>
+                  <FontAwesomeIcon
+                    icon={faLock}
+                    size={16}
+                    color={colors.error}
+                  />
+                  <Text style={themedStyles.failedAttemptsText}>
+                    {t('forgotPassword.multipleAttempts', {
+                      count: failedAttempts,
+                    })}
+                  </Text>
+                </View>
+              )}
+
+              <View style={themedStyles.inputGroup}>
+                <Text style={themedStyles.inputLabel}>{t('auth.email')}</Text>
+                <View
+                  style={[
+                    themedStyles.inputContainer,
+                    focusedField === 'forgotEmail' &&
+                      themedStyles.inputContainerFocused,
+                  ]}>
+                  <FontAwesomeIcon
+                    icon={faEnvelope}
+                    size={18}
+                    color={
+                      focusedField === 'forgotEmail'
+                        ? colors.primary
+                        : colors.placeholder
+                    }
+                    style={themedStyles.inputIcon}
+                  />
+                  <TextInput
+                    style={themedStyles.input}
+                    placeholder={t('landing.enterEmail')}
+                    placeholderTextColor={colors.placeholder}
+                    value={forgotPasswordEmail}
+                    onChangeText={setForgotPasswordEmail}
+                    ref={forgotPasswordEmailRef}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoComplete="email"
+                    onFocus={() => setFocusedField('forgotEmail')}
+                    onBlur={() => setFocusedField(null)}
+                    returnKeyType="send"
+                    onSubmitEditing={handleForgotPassword}
+                  />
+                </View>
+              </View>
+
+              {forgotPasswordError && (
+                <View style={themedStyles.errorContainer}>
+                  <Text style={themedStyles.errorText}>
+                    ⚠️ {forgotPasswordError}
+                  </Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={themedStyles.primaryButton}
+                onPress={handleForgotPassword}
+                disabled={forgotPasswordLoading}>
+                {forgotPasswordLoading ? (
+                  <ActivityIndicator color={colors.buttonText} />
+                ) : (
+                  <>
+                    <Text style={themedStyles.primaryButtonText}>
+                      {t('forgotPassword.sendReset')}
+                    </Text>
+                    <FontAwesomeIcon
+                      icon={faKey}
+                      size={18}
+                      color={colors.buttonText}
+                    />
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
 
   const renderLoginForm = () => (
     <>
@@ -471,6 +761,15 @@ function LandingPage() {
           size={18}
           color={colors.buttonText}
         />
+      </TouchableOpacity>
+
+      {/* Forgot Password Link */}
+      <TouchableOpacity
+        style={themedStyles.forgotPasswordLink}
+        onPress={() => setShowForgotPassword(true)}>
+        <Text style={themedStyles.forgotPasswordText}>
+          {t('auth.forgotPassword')}
+        </Text>
       </TouchableOpacity>
     </>
   );
@@ -749,6 +1048,9 @@ function LandingPage() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Forgot Password Modal */}
+      {renderForgotPasswordModal()}
     </SafeAreaView>
   );
 }
