@@ -22,6 +22,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -146,8 +147,31 @@ const CommunityNotes: React.FC = () => {
   const {colors} = useTheme();
   const {t} = useTranslation();
 
+  // First-time user onboarding state
+  const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
+
   // --- Autofocus logic for reply input ---
   const replyInputRefs = useRef<{[key: string]: TextInput | null}>({});
+  const composerInputRef = useRef<TextInput | null>(null);
+
+  // Check if user has seen the community notes onboarding
+  useEffect(() => {
+    const checkFirstTimeUser = async () => {
+      const hasSeenHint = await AsyncStorage.getItem(
+        'hasSeenCommunityNotesHint',
+      );
+      if (!hasSeenHint) {
+        setShowFirstTimeHint(true);
+      }
+    };
+    checkFirstTimeUser();
+  }, []);
+
+  // Dismiss hint and save to storage
+  const dismissFirstTimeHint = async () => {
+    await AsyncStorage.setItem('hasSeenCommunityNotesHint', 'true');
+    setShowFirstTimeHint(false);
+  };
 
   useEffect(() => {
     if (replyingTo && replyInputRefs.current[replyingTo]) {
@@ -637,6 +661,21 @@ const CommunityNotes: React.FC = () => {
           color: colors.placeholder || '#888',
           marginTop: 8,
           textAlign: 'center',
+        },
+        ctaButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary,
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+          borderRadius: 25,
+          marginTop: 20,
+          gap: 8,
+        },
+        ctaButtonText: {
+          color: '#fff',
+          fontSize: 16,
+          fontWeight: '600',
         },
         listContent: {
           paddingTop: 8,
@@ -1321,6 +1360,19 @@ const CommunityNotes: React.FC = () => {
       <Text style={styles.emptyStateSubtext}>
         {t('communityNotes.beFirstToShare')}
       </Text>
+      {showFirstTimeHint && (
+        <TouchableOpacity
+          style={styles.ctaButton}
+          onPress={() => {
+            dismissFirstTimeHint();
+            composerInputRef.current?.focus();
+          }}>
+          <FontAwesomeIcon icon={faPaperPlane} size={16} color="#fff" />
+          <Text style={styles.ctaButtonText}>
+            {t('communityNotes.writeFirstPost') || 'Write Your First Post'}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -1353,6 +1405,7 @@ const CommunityNotes: React.FC = () => {
             )}
             <View style={styles.addPostInputRow}>
               <TextInput
+                ref={composerInputRef}
                 style={styles.addPostInput}
                 placeholder={t('communityNotes.whatsOnYourMind')}
                 placeholderTextColor={colors.border}

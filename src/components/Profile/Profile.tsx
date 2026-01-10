@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
@@ -371,6 +372,9 @@ const Profile: React.FC = () => {
     const options: ImagePicker.ImageLibraryOptions = {
       mediaType: 'photo',
       includeBase64: true,
+      maxWidth: 800,
+      maxHeight: 800,
+      quality: 0.7,
     };
 
     ImagePicker.launchImageLibrary(options, (response: ImagePickerResponse) => {
@@ -390,6 +394,9 @@ const Profile: React.FC = () => {
     const options: ImagePicker.CameraOptions = {
       mediaType: 'photo',
       includeBase64: true,
+      maxWidth: 800,
+      maxHeight: 800,
+      quality: 0.7,
     };
 
     ImagePicker.launchCamera(options, (response: ImagePickerResponse) => {
@@ -421,8 +428,19 @@ const Profile: React.FC = () => {
       const imageUrl = lambdaResponse.data.url;
       setSelectedImage(imageUrl);
       updateUserProfilePic(imageUrl);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading image to Lambda:', error);
+      if (error?.response?.status === 413) {
+        Alert.alert(
+          'Image Too Large',
+          'Please choose a smaller image or try taking a new photo.',
+        );
+      } else {
+        Alert.alert(
+          'Upload Failed',
+          'Unable to upload image. Please try again.',
+        );
+      }
     }
   };
 

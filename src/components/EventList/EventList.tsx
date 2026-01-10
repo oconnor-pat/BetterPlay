@@ -15,6 +15,7 @@ import {
   Share,
   KeyboardAvoidingView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, {Marker} from 'react-native-maps';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -589,6 +590,21 @@ const EventList: React.FC = () => {
           textAlign: 'center',
           marginTop: 8,
         },
+        ctaButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary,
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+          borderRadius: 25,
+          marginTop: 20,
+          gap: 8,
+        },
+        ctaButtonText: {
+          color: '#fff',
+          fontSize: 16,
+          fontWeight: '600',
+        },
         filterButton: {
           padding: 8,
           marginLeft: 8,
@@ -854,7 +870,27 @@ const EventList: React.FC = () => {
   const [showEventTypePicker, setShowEventTypePicker] = useState(false);
   const [tempEventType, setTempEventType] = useState(newEvent.eventType || '');
 
+  // First-time user onboarding state
+  const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
+
   const navigation = useNavigation<NavigationProp<any>>();
+
+  // Check if user has seen the events onboarding
+  useEffect(() => {
+    const checkFirstTimeUser = async () => {
+      const hasSeenHint = await AsyncStorage.getItem('hasSeenEventsHint');
+      if (!hasSeenHint) {
+        setShowFirstTimeHint(true);
+      }
+    };
+    checkFirstTimeUser();
+  }, []);
+
+  // Dismiss hint and save to storage
+  const dismissFirstTimeHint = async () => {
+    await AsyncStorage.setItem('hasSeenEventsHint', 'true');
+    setShowFirstTimeHint(false);
+  };
 
   // Fetch events from backend
   useEffect(() => {
@@ -1436,14 +1472,38 @@ const EventList: React.FC = () => {
         <ActivityIndicator size="large" color={colors.primary} />
       ) : filteredEvents.length === 0 ? (
         <View style={themedStyles.noResultsContainer}>
+          <FontAwesomeIcon
+            icon={faPlus}
+            size={48}
+            color={colors.border}
+            style={{marginBottom: 16}}
+          />
           <Text style={themedStyles.noResultsText}>
             {searchQuery ? t('common.noResults') : t('events.noEvents')}
           </Text>
-          {searchQuery && (
+          {searchQuery ? (
             <Text style={themedStyles.noResultsSubtext}>
               {t('events.tryDifferentSearch') || 'Try a different search term'}
             </Text>
-          )}
+          ) : showFirstTimeHint ? (
+            <>
+              <Text style={themedStyles.noResultsSubtext}>
+                {t('events.noEventsSubtext') ||
+                  'Create your first event and invite others to play!'}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.ctaButton}
+                onPress={() => {
+                  dismissFirstTimeHint();
+                  setModalVisible(true);
+                }}>
+                <FontAwesomeIcon icon={faPlus} size={16} color="#fff" />
+                <Text style={themedStyles.ctaButtonText}>
+                  {t('events.createFirstEvent') || 'Create Your First Event'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
         </View>
       ) : (
         <FlatList
