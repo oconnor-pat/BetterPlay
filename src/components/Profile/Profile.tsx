@@ -435,13 +435,13 @@ const Profile: React.FC = () => {
       console.error('Error uploading image to Lambda:', error);
       if (error?.response?.status === 413) {
         Alert.alert(
-          'Image Too Large',
-          'Please choose a smaller image or try taking a new photo.',
+          t('profile.imageTooLarge'),
+          t('profile.imageTooLargeMessage'),
         );
       } else {
         Alert.alert(
-          'Upload Failed',
-          'Unable to upload image. Please try again.',
+          t('profile.uploadFailed'),
+          t('profile.uploadFailedMessage'),
         );
       }
     } finally {

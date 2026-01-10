@@ -757,26 +757,25 @@ const EventRoster: React.FC = () => {
   const handleDelete = async (index: number) => {
     const playerToDelete = roster[index];
     if (!userData?.username || playerToDelete.username !== userData.username) {
-      Alert.alert('Error', 'You can only remove yourself from the roster.');
+      Alert.alert(
+        t('roster.onlyRemoveSelf'),
+        t('roster.onlyRemoveSelfMessage'),
+      );
       return;
     }
-    Alert.alert(
-      'Leave Event',
-      'Are you sure you want to remove yourself from this event?',
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Leave',
-          style: 'destructive',
-          onPress: async () => {
-            const updatedRoster = roster.filter((_, i) => i !== index);
-            setRoster(updatedRoster);
-            await persistRoster(updatedRoster);
-            updateRosterSpots(eventId, updatedRoster.length);
-          },
+    Alert.alert(t('roster.leaveConfirm'), t('roster.leaveConfirmMessage'), [
+      {text: t('common.cancel'), style: 'cancel'},
+      {
+        text: t('common.leave'),
+        style: 'destructive',
+        onPress: async () => {
+          const updatedRoster = roster.filter((_, i) => i !== index);
+          setRoster(updatedRoster);
+          await persistRoster(updatedRoster);
+          updateRosterSpots(eventId, updatedRoster.length);
         },
-      ],
-    );
+      },
+    ]);
   };
 
   // Open edit modal for current user
@@ -793,7 +792,7 @@ const EventRoster: React.FC = () => {
   // Save edited player info
   const handleSaveEdit = async () => {
     if (!editPaidStatus || !editJerseyColor || !editPosition) {
-      Alert.alert('Error', 'Please fill out all fields.');
+      Alert.alert(t('roster.missingFields'), t('roster.missingFieldsMessage'));
       return;
     }
     const updatedRoster = roster.map(player =>

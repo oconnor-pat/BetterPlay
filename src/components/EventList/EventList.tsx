@@ -133,7 +133,10 @@ const getEventTypeEmoji = (eventType: string) => {
 };
 
 // Prefer Google Maps; fall back to Waze, then Apple (iOS) or geo (Android)
-const openMapsForEvent = async (event: Partial<Event>) => {
+const openMapsForEvent = async (
+  event: Partial<Event>,
+  t: (key: string) => string,
+) => {
   const name = event?.name || 'Destination';
   const address = event?.location || '';
 
@@ -205,7 +208,7 @@ const openMapsForEvent = async (event: Partial<Event>) => {
     }
   } catch (e) {
     console.error('Failed to open maps:', e);
-    Alert.alert('Unable to open maps', 'Please install a maps app.');
+    Alert.alert(t('events.mapsError'), t('events.mapsErrorMessage'));
   }
 };
 
@@ -907,7 +910,7 @@ const EventList: React.FC = () => {
       const response = await axios.get(`${API_BASE_URL}/events`);
       setEventData(response.data);
     } catch (error) {
-      Alert.alert('Error', 'Failed to fetch events.');
+      Alert.alert(t('common.error'), t('events.fetchError'));
     } finally {
       setLoading(false);
     }
@@ -1044,7 +1047,7 @@ const EventList: React.FC = () => {
             ),
           );
         } catch (error) {
-          Alert.alert('Error', 'Failed to update event.');
+          Alert.alert(t('common.error'), t('events.updateError'));
           setSavingEvent(false);
           return;
         }
@@ -1064,7 +1067,7 @@ const EventList: React.FC = () => {
           });
           setEventData(prevData => [...prevData, response.data]);
         } catch (error) {
-          Alert.alert('Error', 'Failed to create event.');
+          Alert.alert(t('common.error'), t('events.createError'));
           setSavingEvent(false);
           return;
         }
@@ -1077,7 +1080,7 @@ const EventList: React.FC = () => {
       setIsEditing(false);
       setEditingEventId(null);
     } else {
-      Alert.alert('Missing Fields', 'Please fill in all fields.');
+      Alert.alert(t('events.missingFields'), t('events.missingFieldsMessage'));
     }
   };
 
@@ -1096,16 +1099,16 @@ const EventList: React.FC = () => {
 
   const handleDeleteEvent = (event: Event) => {
     if (event.createdBy !== (userData?._id || '')) {
-      Alert.alert('Not Authorized', 'You can only delete events you created.');
+      Alert.alert(t('events.notAuthorized'), t('events.notAuthorizedDelete'));
       return;
     }
     Alert.alert(
-      'Delete Event',
-      'Are you sure you want to delete this event?',
+      t('events.deleteConfirm'),
+      t('events.deleteConfirmMessage'),
       [
-        {text: 'Cancel', style: 'cancel'},
+        {text: t('common.cancel'), style: 'cancel'},
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             setDeletingEventId(event._id);
@@ -1115,7 +1118,7 @@ const EventList: React.FC = () => {
                 prevData.filter(e => e._id !== event._id),
               );
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete event.');
+              Alert.alert(t('common.error'), t('events.deleteError'));
             } finally {
               setDeletingEventId(null);
             }
@@ -1250,7 +1253,7 @@ const EventList: React.FC = () => {
       {/* Interactive Map View */}
       <TouchableOpacity
         style={themedStyles.mapBox}
-        onPress={() => openMapsForEvent(item)}
+        onPress={() => openMapsForEvent(item, t)}
         activeOpacity={0.7}>
         {(() => {
           // Use exact coordinates if available, otherwise use location lookup
@@ -1295,7 +1298,7 @@ const EventList: React.FC = () => {
       <View style={themedStyles.actionRow}>
         <TouchableOpacity
           style={themedStyles.actionButton}
-          onPress={() => openMapsForEvent(item)}>
+          onPress={() => openMapsForEvent(item, t)}>
           <FontAwesomeIcon
             icon={faLocationArrow}
             size={16}

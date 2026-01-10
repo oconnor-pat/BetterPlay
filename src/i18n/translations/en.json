@@ -5,7 +5,7 @@
     "delete": "Delete",
     "edit": "Edit",
     "loading": "Loading...",
-    "error": "Error",
+    "error": "Oops!",
     "success": "Success",
     "confirm": "Confirm",
     "back": "Back",
@@ -19,7 +19,10 @@
     "update": "Update",
     "create": "Create",
     "join": "Join",
-    "leave": "Leave"
+    "leave": "Leave",
+    "tryAgain": "Please try again",
+    "connectionError": "Couldn't connect to the server. Check your internet connection and try again.",
+    "somethingWentWrong": "Something went wrong. Please try again later."
   },
   "auth": {
     "login": "Log In",
@@ -112,7 +115,19 @@
     "clearFilters": "Clear All",
     "applyFilters": "Apply Filters",
     "shareEvent": "Share Event",
-    "shareError": "Failed to share event"
+    "shareError": "Failed to share event",
+    "fetchError": "Couldn't load events right now. Pull down to refresh.",
+    "createError": "Couldn't create your event. Please check your connection and try again.",
+    "updateError": "Couldn't save your changes. Please try again.",
+    "deleteError": "Couldn't delete this event. Please try again.",
+    "missingFields": "Almost there!",
+    "missingFieldsMessage": "Please fill in all the required fields to create your event.",
+    "notAuthorized": "Hold on!",
+    "notAuthorizedDelete": "You can only delete events that you created.",
+    "deleteConfirm": "Delete Event?",
+    "deleteConfirmMessage": "Are you sure you want to delete this event? This can't be undone.",
+    "mapsError": "Couldn't open maps",
+    "mapsErrorMessage": "Please make sure you have a maps app installed."
   },
   "profile": {
     "title": "Profile",
@@ -139,7 +154,11 @@
     "yourActivity": "Your Activity",
     "totalEvents": "Total Events",
     "fiveEvents": "5 Events",
-    "tenEvents": "10 Events"
+    "tenEvents": "10 Events",
+    "imageTooLarge": "Image Too Large",
+    "imageTooLargeMessage": "This photo is too big. Please choose a smaller image or try taking a new one.",
+    "uploadFailed": "Upload Failed",
+    "uploadFailedMessage": "Couldn't upload your photo. Please try again."
   },
   "communityNotes": {
     "title": "Community Notes",
@@ -161,7 +180,18 @@
     "writeFirstPost": "Write Your First Post",
     "justNow": "Just now",
     "likedBy": "Liked by",
-    "noLikesYet": "No likes yet"
+    "noLikesYet": "No likes yet",
+    "fetchError": "Couldn't load posts right now. Pull down to refresh.",
+    "postError": "Couldn't share your post. Please try again.",
+    "editPostError": "Couldn't save your changes. Please try again.",
+    "commentError": "Couldn't add your comment. Please try again.",
+    "editCommentError": "Couldn't save your comment. Please try again.",
+    "replyError": "Couldn't add your reply. Please try again.",
+    "editReplyError": "Couldn't save your reply. Please try again.",
+    "deletePostError": "Couldn't delete this post. Please try again.",
+    "deleteCommentError": "Couldn't delete this comment. Please try again.",
+    "deleteReplyError": "Couldn't delete this reply. Please try again.",
+    "likeError": "Couldn't update like. Please try again."
   },
   "settings": {
     "title": "Settings",
@@ -272,7 +302,13 @@
     "rosteredPlayers": "Rostered Players",
     "noPlayersYet": "No players yet. Be the first to join!",
     "editYourInfo": "Edit Your Info",
-    "saveChanges": "Save Changes"
+    "saveChanges": "Save Changes",
+    "missingFields": "Almost there!",
+    "missingFieldsMessage": "Please fill in all fields to join the roster.",
+    "onlyRemoveSelf": "Hold on!",
+    "onlyRemoveSelfMessage": "You can only remove yourself from the roster.",
+    "leaveConfirm": "Leave Event?",
+    "leaveConfirmMessage": "Are you sure you want to remove yourself from this event?"
   },
   "resetPassword": {
     "title": "Reset Password",

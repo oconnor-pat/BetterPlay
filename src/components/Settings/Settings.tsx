@@ -121,20 +121,20 @@ const Settings: React.FC = () => {
         // Request location permission
         Geolocation.requestAuthorization(
           () => {
-            Alert.alert('Success', 'Location services enabled');
+            Alert.alert(t('common.success'), t('settings.locationEnabled'));
           },
           error => {
             console.error('Location permission denied:', error);
             Alert.alert(
-              'Permission Denied',
-              'Please enable location services in your device settings.',
+              t('settings.permissionDenied'),
+              t('settings.enableLocationSettings'),
             );
             setLocationEnabled(false);
             AsyncStorage.setItem('locationEnabled', JSON.stringify(false));
           },
         );
       } else {
-        Alert.alert('Location services disabled');
+        Alert.alert(t('settings.locationDisabled'));
       }
     } catch (error) {
       console.error('Error saving location preference:', error);

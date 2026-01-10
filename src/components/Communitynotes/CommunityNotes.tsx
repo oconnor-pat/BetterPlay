@@ -819,11 +819,11 @@ const CommunityNotes: React.FC = () => {
         setLikedComments(likedCommentsSet);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to fetch posts.');
+      Alert.alert(t('common.error'), t('communityNotes.fetchError'));
     } finally {
       setLoading(false);
     }
-  }, [userData]);
+  }, [userData, t]);
 
   // Fetch posts from backend on mount
   useEffect(() => {
@@ -924,7 +924,7 @@ const CommunityNotes: React.FC = () => {
         ),
       );
 
-      Alert.alert('Error', 'Failed to update like. Please try again.');
+      Alert.alert(t('common.error'), t('communityNotes.likeError'));
     }
   };
 
@@ -1087,7 +1087,7 @@ const CommunityNotes: React.FC = () => {
         setPosts(prev => [...prev, response.data]);
         setNewPostText('');
       } catch (error) {
-        Alert.alert('Error', 'Failed to add post.');
+        Alert.alert(t('common.error'), t('communityNotes.postError'));
       } finally {
         setPostingContent(false);
       }
@@ -1124,7 +1124,7 @@ const CommunityNotes: React.FC = () => {
       setEditingPostId(null);
       setEditingPostText('');
     } catch (error) {
-      Alert.alert('Error', 'Failed to edit post.');
+      Alert.alert(t('common.error'), t('communityNotes.editPostError'));
     }
   };
 
@@ -1151,7 +1151,7 @@ const CommunityNotes: React.FC = () => {
         );
         setCommentText(prev => ({...prev, [postId]: ''}));
       } catch (error) {
-        Alert.alert('Error', 'Failed to add comment.');
+        Alert.alert(t('common.error'), t('communityNotes.commentError'));
       }
     }
   };
@@ -1195,7 +1195,7 @@ const CommunityNotes: React.FC = () => {
       setEditingCommentId(null);
       setEditingCommentText('');
     } catch (error) {
-      Alert.alert('Error', 'Failed to edit comment.');
+      Alert.alert(t('common.error'), t('communityNotes.editCommentError'));
     }
   };
 
@@ -1230,7 +1230,7 @@ const CommunityNotes: React.FC = () => {
         setReplyText(prev => ({...prev, [commentId]: ''}));
         setReplyingTo(null);
       } catch (error) {
-        Alert.alert('Error', 'Failed to add reply.');
+        Alert.alert(t('common.error'), t('communityNotes.replyError'));
       }
     }
   };
@@ -1288,7 +1288,7 @@ const CommunityNotes: React.FC = () => {
       setEditingReplyText('');
       setEditingReplyParent(null);
     } catch (error) {
-      Alert.alert('Error', 'Failed to edit reply.');
+      Alert.alert(t('common.error'), t('communityNotes.editReplyError'));
     }
   };
 
@@ -1298,7 +1298,7 @@ const CommunityNotes: React.FC = () => {
       await axios.delete(`${API_BASE_URL}/community-notes/${postId}`);
       setPosts(prevPosts => prevPosts.filter(post => post._id !== postId));
     } catch (error) {
-      Alert.alert('Error', 'Failed to delete post.');
+      Alert.alert(t('common.error'), t('communityNotes.deletePostError'));
     }
   };
 
@@ -1354,7 +1354,7 @@ const CommunityNotes: React.FC = () => {
         ),
       );
     } catch (error) {
-      Alert.alert('Error', 'Failed to delete reply.');
+      Alert.alert(t('common.error'), t('communityNotes.deleteReplyError'));
     }
   };
 
