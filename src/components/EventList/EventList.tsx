@@ -1283,11 +1283,13 @@ const EventList: React.FC = () => {
           onPress={() => handleShareEvent(item)}>
           <FontAwesomeIcon icon={faShareAlt} size={18} color={colors.primary} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={themedStyles.iconButton}
-          onPress={() => handleEditEvent(item)}>
-          <FontAwesomeIcon icon={faCog} size={18} color={colors.text} />
-        </TouchableOpacity>
+        {userData?._id === item.createdBy && (
+          <TouchableOpacity
+            style={themedStyles.iconButton}
+            onPress={() => handleEditEvent(item)}>
+            <FontAwesomeIcon icon={faCog} size={18} color={colors.text} />
+          </TouchableOpacity>
+        )}
         {userData?._id === item.createdBy && (
           <TouchableOpacity
             style={themedStyles.iconButton}
