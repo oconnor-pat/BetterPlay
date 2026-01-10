@@ -23,7 +23,6 @@ import {
   faLocationDot,
   faBell,
   faGlobe,
-  faShield,
   faCircleInfo,
   faChevronRight,
   faCircleHalfStroke,
@@ -808,42 +807,26 @@ const Settings: React.FC = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={themedStyles.settingRow}
-                activeOpacity={0.7}
-                onPress={() =>
-                  Alert.alert('Privacy Policy', 'Coming soon: Privacy policy')
-                }>
-                <View style={themedStyles.iconContainer}>
-                  <FontAwesomeIcon
-                    icon={faShield}
-                    size={18}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>
-                    {t('settings.privacyPolicy')}
-                  </Text>
-                  <Text style={themedStyles.settingDescription}>
-                    {t('settings.privacyPolicyDescription')}
-                  </Text>
-                </View>
-                <View style={themedStyles.chevronContainer}>
-                  <FontAwesomeIcon
-                    icon={faChevronRight}
-                    size={16}
-                    color={colors.placeholder}
-                  />
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
                 style={[themedStyles.settingRow, themedStyles.settingRowLast]}
                 activeOpacity={0.7}
                 onPress={() =>
                   Alert.alert(
-                    'About',
-                    'BetterPlay\nVersion 0.0.1\n\nA community event management app.',
+                    t('settings.about'),
+                    "BetterPlay\nVersion 0.0.1\n\n© 2026 Patrick O'Connor\nAll rights reserved.",
+                    [
+                      {
+                        text:
+                          t('settings.termsOfService') || 'Terms of Service',
+                        onPress: () =>
+                          navigation.navigate('TermsOfService' as never),
+                      },
+                      {
+                        text: t('settings.privacyPolicy'),
+                        onPress: () =>
+                          navigation.navigate('PrivacyPolicy' as never),
+                      },
+                      {text: t('common.close') || 'Close', style: 'cancel'},
+                    ],
                   )
                 }>
                 <View style={themedStyles.iconContainer}>

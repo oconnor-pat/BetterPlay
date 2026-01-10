@@ -9,17 +9,20 @@ BetterPlay ("we," "our," or "us") is committed to protecting your privacy. This 
 ## Information We Collect
 
 ### Information You Provide
+
 - **Account Information**: When you create an account, we collect your name, email address, and profile information.
 - **Event Data**: Information about events you create or join, including location, date, time, and participant lists.
 - **Profile Photos**: Images you upload for your profile or events.
 
 ### Information Collected Automatically
+
 - **Location Data**: With your permission, we collect your device's location to show nearby venues and events. You can disable this in your device settings.
 - **Device Information**: We may collect device type, operating system version, and app version for troubleshooting and improving our services.
 
 ## How We Use Your Information
 
 We use the information we collect to:
+
 - Provide and maintain the BetterPlay service
 - Show you relevant events and venues near you
 - Connect you with other users for sporting activities
@@ -30,6 +33,7 @@ We use the information we collect to:
 ## Data Sharing
 
 We do not sell your personal information. We may share your information only in the following circumstances:
+
 - **With Other Users**: Your profile name and event participation are visible to other BetterPlay users.
 - **Service Providers**: We may share data with third-party services that help us operate the app (e.g., cloud hosting, analytics).
 - **Legal Requirements**: We may disclose information if required by law or to protect our rights and safety.
@@ -41,9 +45,10 @@ We implement appropriate technical and organizational measures to protect your p
 ## Your Rights
 
 You have the right to:
+
 - Access the personal information we hold about you
 - Request correction of inaccurate information
-- Request deletion of your account and associated data
+- **Delete your account**: You can delete your account at any time through the app's Settings page. When you delete your account, all your personal data, including your profile information, events you've created, and community posts will be permanently removed from our systems.
 - Opt out of location tracking at any time
 - Opt out of push notifications
 

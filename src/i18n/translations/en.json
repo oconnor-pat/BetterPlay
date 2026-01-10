@@ -177,6 +177,8 @@
     "language": "Language",
     "privacyPolicy": "Privacy Policy",
     "privacyPolicyDescription": "View our privacy policy",
+    "termsOfService": "Terms of Service",
+    "termsOfServiceDescription": "View our terms of service",
     "about": "About",
     "aboutDescription": "App information",
     "selectLanguage": "Select Language",
