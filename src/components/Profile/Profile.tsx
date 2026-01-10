@@ -1,4 +1,4 @@
-import React, {useContext, useEffect, useState, useMemo} from 'react';
+import React, {useContext, useEffect, useState, useMemo, useCallback} from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
@@ -38,6 +39,7 @@ type ProfileScreenRouteProp = RouteProp<
 
 const Profile: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const route = useRoute<ProfileScreenRouteProp>();
   const {_id} = route.params;
 
@@ -311,47 +313,53 @@ const Profile: React.FC = () => {
     [colors],
   );
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!_id) {
-        console.log('Invalid user ID');
-        return;
-      }
+  const fetchUserData = useCallback(async () => {
+    if (!_id) {
+      console.log('Invalid user ID');
+      return;
+    }
 
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await fetch(`${API_BASE_URL}/user/${_id}`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        console.error(`Fetch failed with status ${response.status}:`, text);
+        throw new Error(`Fetch failed with status ${response.status}`);
+      }
+      let data;
       try {
-        const token = await AsyncStorage.getItem('userToken');
-        const response = await fetch(`${API_BASE_URL}/user/${_id}`, {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : '',
-            'Content-Type': 'application/json',
-          },
-        });
-        const text = await response.text();
-        if (!response.ok) {
-          console.error(`Fetch failed with status ${response.status}:`, text);
-          throw new Error(`Fetch failed with status ${response.status}`);
-        }
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (jsonError) {
-          console.error('Failed to parse JSON. Response text:', text);
-          throw jsonError;
-        }
-
-        if (data.user) {
-          setUserData(data.user);
-          setSelectedImage(data.user.profilePicUrl);
-        } else {
-          console.log('User not found');
-        }
-      } catch (error) {
-        console.error('Error during fetch:', error);
+        data = JSON.parse(text);
+      } catch (jsonError) {
+        console.error('Failed to parse JSON. Response text:', text);
+        throw jsonError;
       }
-    };
 
-    fetchUserData();
+      if (data.user) {
+        setUserData(data.user);
+        setSelectedImage(data.user.profilePicUrl);
+      } else {
+        console.log('User not found');
+      }
+    } catch (error) {
+      console.error('Error during fetch:', error);
+    }
   }, [_id, setUserData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchUserData();
+    setRefreshing(false);
+  }, [fetchUserData]);
+
+  useEffect(() => {
+    fetchUserData();
+  }, [fetchUserData]);
 
   const handleChoosePhoto = () => {
     const options: ImagePicker.ImageLibraryOptions = {
@@ -466,7 +474,15 @@ const Profile: React.FC = () => {
       <ScrollView
         style={themedStyles.container}
         contentContainerStyle={themedStyles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }>
         {/* Profile Card */}
         <View style={themedStyles.profileCard}>
           <View style={themedStyles.profileRow}>
