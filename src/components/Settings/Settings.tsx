@@ -1,4 +1,4 @@
-import React, {useState, useMemo, useEffect} from 'react';
+import React, {useState, useMemo, useEffect, useContext} from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,13 @@ import {
   ScrollView,
   Alert,
   Modal,
+  TextInput,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useNavigation, CommonActions} from '@react-navigation/native';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
@@ -24,10 +29,15 @@ import {
   faCircleHalfStroke,
   faCheck,
   faXmark,
+  faTrash,
+  faExclamationTriangle,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 import {useTranslation} from 'react-i18next';
+import axios from 'axios';
+import {API_BASE_URL} from '../../config/api';
+import UserContext, {UserContextType} from '../UserContext';
 
 interface Language {
   code: string;
@@ -55,6 +65,8 @@ const LANGUAGE_STORAGE_KEY = '@app_language';
 const Settings: React.FC = () => {
   const {t, i18n} = useTranslation();
   const {darkMode, themeMode, setThemeMode, colors} = useTheme();
+  const {setUserData} = useContext(UserContext) as UserContextType;
+  const navigation = useNavigation();
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -62,6 +74,10 @@ const Settings: React.FC = () => {
     LANGUAGES.find(l => l.code === i18n.language) || LANGUAGES[0],
   );
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [deleteAccountModalVisible, setDeleteAccountModalVisible] =
+    useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load saved preferences on mount
   useEffect(() => {
@@ -148,6 +164,67 @@ const Settings: React.FC = () => {
       await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, language.code);
     } catch (error) {
       console.error('Error saving language preference:', error);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      Alert.alert(
+        t('settings.deleteAccount'),
+        t('settings.deleteConfirmError'),
+      );
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+
+      if (!token) {
+        Alert.alert(t('common.error'), t('settings.sessionExpired'));
+        setIsDeleting(false);
+        return;
+      }
+
+      await axios.delete(`${API_BASE_URL}/auth/delete-account`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // Close modal first and reset state
+      setDeleteAccountModalVisible(false);
+      setDeleteConfirmText('');
+      setIsDeleting(false);
+
+      // Clear all local data
+      await AsyncStorage.clear();
+      setUserData(null);
+
+      // Show success message and navigate to landing page
+      Alert.alert(
+        t('settings.accountDeleted'),
+        t('settings.accountDeletedMessage'),
+        [
+          {
+            text: t('common.ok'),
+            onPress: () => {
+              // Reset navigation stack to landing page
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{name: 'LandingPage'}],
+                }),
+              );
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      Alert.alert(t('common.error'), t('settings.deleteAccountError'));
+      setIsDeleting(false);
+      setDeleteConfirmText('');
     }
   };
 
@@ -283,6 +360,10 @@ const Settings: React.FC = () => {
         themeOptionTextActive: {
           color: colors.buttonText,
         },
+        // Keyboard Avoiding View
+        keyboardAvoidingView: {
+          flex: 1,
+        },
         // Language Modal Styles
         modalOverlay: {
           flex: 1,
@@ -344,6 +425,152 @@ const Settings: React.FC = () => {
         },
         languageCheck: {
           marginLeft: 12,
+        },
+        // Delete Account Styles
+        dangerSection: {
+          marginTop: 8,
+        },
+        dangerSectionTitle: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: '#DC3545',
+          marginBottom: 12,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+        },
+        deleteButton: {
+          backgroundColor: colors.card,
+          borderRadius: 12,
+          padding: 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+          borderWidth: 1,
+          borderColor: '#DC3545',
+        },
+        deleteIconContainer: {
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: '#DC354520',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 12,
+        },
+        deleteButtonText: {
+          flex: 1,
+        },
+        deleteButtonTitle: {
+          fontSize: 16,
+          fontWeight: '500',
+          color: '#DC3545',
+          marginBottom: 2,
+        },
+        deleteButtonDescription: {
+          fontSize: 13,
+          color: colors.placeholder,
+        },
+        deleteModalContent: {
+          backgroundColor: colors.card,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          paddingBottom: 34,
+          paddingHorizontal: 20,
+        },
+        deleteModalHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 20,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
+        deleteModalIconContainer: {
+          alignItems: 'center',
+          marginBottom: 8,
+        },
+        deleteModalIcon: {
+          marginBottom: 12,
+        },
+        deleteModalTitle: {
+          fontSize: 20,
+          fontWeight: '700',
+          color: '#DC3545',
+          textAlign: 'center',
+        },
+        deleteModalBody: {
+          paddingVertical: 20,
+        },
+        deleteWarningText: {
+          fontSize: 15,
+          color: colors.text,
+          lineHeight: 22,
+          marginBottom: 16,
+          textAlign: 'center',
+        },
+        deleteWarningList: {
+          backgroundColor: '#DC354510',
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 20,
+        },
+        deleteWarningItem: {
+          fontSize: 14,
+          color: colors.text,
+          marginBottom: 8,
+          paddingLeft: 8,
+        },
+        deleteWarningItemLast: {
+          fontSize: 14,
+          color: colors.text,
+          marginBottom: 0,
+          paddingLeft: 8,
+        },
+        deleteConfirmLabel: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 8,
+        },
+        deleteConfirmInput: {
+          backgroundColor: colors.background,
+          borderRadius: 12,
+          padding: 16,
+          fontSize: 16,
+          color: colors.text,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginBottom: 20,
+        },
+        deleteModalButtons: {
+          flexDirection: 'row',
+          gap: 12,
+        },
+        cancelButton: {
+          flex: 1,
+          backgroundColor: colors.background,
+          borderRadius: 12,
+          padding: 16,
+          alignItems: 'center',
+        },
+        cancelButtonText: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        confirmDeleteButton: {
+          flex: 1,
+          backgroundColor: '#DC3545',
+          borderRadius: 12,
+          padding: 16,
+          alignItems: 'center',
+        },
+        confirmDeleteButtonDisabled: {
+          backgroundColor: '#DC354550',
+        },
+        confirmDeleteButtonText: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: '#FFFFFF',
         },
       }),
     [colors],
@@ -645,6 +872,36 @@ const Settings: React.FC = () => {
             </View>
           </View>
 
+          {/* Danger Zone - Delete Account */}
+          <View style={[themedStyles.section, themedStyles.dangerSection]}>
+            <Text style={themedStyles.dangerSectionTitle}>
+              {t('settings.dangerZone')}
+            </Text>
+            <TouchableOpacity
+              style={themedStyles.deleteButton}
+              activeOpacity={0.7}
+              onPress={() => setDeleteAccountModalVisible(true)}>
+              <View style={themedStyles.deleteIconContainer}>
+                <FontAwesomeIcon icon={faTrash} size={18} color="#DC3545" />
+              </View>
+              <View style={themedStyles.deleteButtonText}>
+                <Text style={themedStyles.deleteButtonTitle}>
+                  {t('settings.deleteAccount')}
+                </Text>
+                <Text style={themedStyles.deleteButtonDescription}>
+                  {t('settings.deleteAccountDescription')}
+                </Text>
+              </View>
+              <View style={themedStyles.chevronContainer}>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={16}
+                  color="#DC3545"
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
+
           {/* App Version */}
           <Text style={themedStyles.version}>BetterPlay v0.0.1</Text>
         </View>
@@ -706,6 +963,100 @@ const Settings: React.FC = () => {
             </ScrollView>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Delete Account Modal */}
+      <Modal
+        visible={deleteAccountModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDeleteAccountModalVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={themedStyles.keyboardAvoidingView}>
+          <TouchableOpacity
+            style={themedStyles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setDeleteAccountModalVisible(false)}>
+            <View
+              style={themedStyles.deleteModalContent}
+              onStartShouldSetResponder={() => true}>
+              <View style={themedStyles.deleteModalHeader}>
+                <View>
+                  <View style={themedStyles.deleteModalIconContainer}>
+                    <FontAwesomeIcon
+                      icon={faExclamationTriangle}
+                      size={40}
+                      color="#DC3545"
+                    />
+                  </View>
+                  <Text style={themedStyles.deleteModalTitle}>
+                    {t('settings.deleteAccountTitle')}
+                  </Text>
+                </View>
+              </View>
+              <View style={themedStyles.deleteModalBody}>
+                <Text style={themedStyles.deleteWarningText}>
+                  {t('settings.deleteAccountWarning')}
+                </Text>
+                <View style={themedStyles.deleteWarningList}>
+                  <Text style={themedStyles.deleteWarningItem}>
+                    • {t('settings.deleteWarning1')}
+                  </Text>
+                  <Text style={themedStyles.deleteWarningItem}>
+                    • {t('settings.deleteWarning2')}
+                  </Text>
+                  <Text style={themedStyles.deleteWarningItem}>
+                    • {t('settings.deleteWarning3')}
+                  </Text>
+                  <Text style={themedStyles.deleteWarningItemLast}>
+                    • {t('settings.deleteWarning4')}
+                  </Text>
+                </View>
+                <Text style={themedStyles.deleteConfirmLabel}>
+                  {t('settings.typeDeleteToConfirm')}
+                </Text>
+                <TextInput
+                  style={themedStyles.deleteConfirmInput}
+                  value={deleteConfirmText}
+                  onChangeText={setDeleteConfirmText}
+                  placeholder="DELETE"
+                  placeholderTextColor={colors.placeholder}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <View style={themedStyles.deleteModalButtons}>
+                  <TouchableOpacity
+                    style={themedStyles.cancelButton}
+                    onPress={() => {
+                      setDeleteAccountModalVisible(false);
+                      setDeleteConfirmText('');
+                    }}>
+                    <Text style={themedStyles.cancelButtonText}>
+                      {t('common.cancel')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      themedStyles.confirmDeleteButton,
+                      deleteConfirmText !== 'DELETE' &&
+                        themedStyles.confirmDeleteButtonDisabled,
+                    ]}
+                    onPress={handleDeleteAccount}
+                    disabled={isDeleting || deleteConfirmText !== 'DELETE'}>
+                    {isDeleting ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={themedStyles.confirmDeleteButtonText}>
+                        {t('settings.confirmDelete')}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
