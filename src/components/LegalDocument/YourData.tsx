@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   Share,
 } from 'react-native';
@@ -14,6 +13,7 @@ import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {useTranslation} from 'react-i18next';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {YourDataSkeleton} from '../Skeleton';
 import {
   faArrowLeft,
   faDownload,
@@ -341,9 +341,9 @@ const YourData: React.FC = () => {
             {t('settings.yourData') || 'Your Data'}
           </Text>
         </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <ScrollView style={styles.content}>
+          <YourDataSkeleton />
+        </ScrollView>
       </SafeAreaView>
     );
   }

@@ -26,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {PostListSkeleton} from '../Skeleton';
 import {
   faTrash,
   faReply,
@@ -1438,11 +1439,7 @@ const CommunityNotes: React.FC = () => {
         </View>
 
         {loading && posts.length === 0 ? (
-          <ActivityIndicator
-            size="large"
-            color={colors.primary}
-            style={styles.loadingContainer}
-          />
+          <PostListSkeleton count={4} />
         ) : (
           <FlatList
             data={posts}

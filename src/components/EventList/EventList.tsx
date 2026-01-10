@@ -22,6 +22,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {EventListSkeleton} from '../Skeleton';
 import {
   faPlus,
   faTrash,
@@ -1485,7 +1486,7 @@ const EventList: React.FC = () => {
       )}
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} />
+        <EventListSkeleton count={4} />
       ) : filteredEvents.length === 0 ? (
         <View style={themedStyles.noResultsContainer}>
           <FontAwesomeIcon

@@ -20,6 +20,7 @@ import UserContext, {UserContextType} from '../UserContext';
 import {API_BASE_URL} from '../../config/api';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {useTranslation} from 'react-i18next';
+import {RosterListSkeleton} from '../Skeleton';
 import {
   faChevronDown,
   faChevronUp,
@@ -1204,7 +1205,7 @@ const EventRoster: React.FC = () => {
           </View>
 
           {loading ? (
-            <ActivityIndicator size="large" color={colors.primary} />
+            <RosterListSkeleton count={5} />
           ) : roster.length === 0 ? (
             <Text style={themedStyles.emptyState}>
               {t('roster.noPlayersYet')}
