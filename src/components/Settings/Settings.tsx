@@ -825,6 +825,10 @@ const Settings: React.FC = () => {
                         onPress: () =>
                           navigation.navigate('PrivacyPolicy' as never),
                       },
+                      {
+                        text: t('settings.yourData') || 'Your Data',
+                        onPress: () => navigation.navigate('YourData' as never),
+                      },
                       {text: t('common.close') || 'Close', style: 'cancel'},
                     ],
                   )

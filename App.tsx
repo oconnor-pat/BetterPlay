@@ -10,7 +10,11 @@ import LandingPage from './src/components/Landingpage/LandingPage';
 import BottomNavigator from './src/components/BottomNavigator/BottomNavigator';
 import Settings from './src/components/Settings/Settings';
 import ResetPassword from './src/components/ResetPassword/ResetPassword';
-import {PrivacyPolicy, TermsOfService} from './src/components/LegalDocument';
+import {
+  PrivacyPolicy,
+  TermsOfService,
+  YourData,
+} from './src/components/LegalDocument';
 import {StatusBar, ActivityIndicator, View, StyleSheet} from 'react-native';
 import UserContext from './src/components/UserContext';
 import {
@@ -38,6 +42,7 @@ type RootStackParamList = {
   ResetPassword: {token: string};
   PrivacyPolicy: undefined;
   TermsOfService: undefined;
+  YourData: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -192,6 +197,11 @@ const AppContent = () => {
               <Stack.Screen
                 name="TermsOfService"
                 component={TermsOfService}
+                options={{headerShown: false}}
+              />
+              <Stack.Screen
+                name="YourData"
+                component={YourData}
                 options={{headerShown: false}}
               />
             </Stack.Navigator>
