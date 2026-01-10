@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "android": "npm run emulator:pixel9 && npx react-native run-android",
+    "device": "./scripts/run-device.sh",
     "emulator:pixel9": "emulator -avd Pixel_9_Pro || true",
     "ios": "react-native run-ios --simulator='iPhone 17 Pro (26.1)'",
     "lint": "eslint .",
