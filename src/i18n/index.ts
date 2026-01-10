@@ -59,18 +59,37 @@ const languageDetector = {
   },
 };
 
-i18n
-  .use(languageDetector)
-  .use(initReactI18next)
-  .init({
-    resources,
-    fallbackLng: 'en',
-    interpolation: {
-      escapeValue: false,
-    },
-    react: {
-      useSuspense: false,
-    },
+// Initialize i18n synchronously with English, then load saved language in background
+i18n.use(initReactI18next).init({
+  resources,
+  lng: 'en', // Start with English immediately
+  fallbackLng: 'en',
+  interpolation: {
+    escapeValue: false,
+  },
+  react: {
+    useSuspense: false,
+  },
+});
+
+// Load saved language preference in background (non-blocking)
+AsyncStorage.getItem(LANGUAGE_STORAGE_KEY)
+  .then(savedLanguage => {
+    if (savedLanguage && savedLanguage !== 'en') {
+      i18n.changeLanguage(savedLanguage);
+    }
+  })
+  .catch(error => {
+    console.error('Error loading saved language:', error);
   });
+
+export const changeLanguage = async (language: string) => {
+  await i18n.changeLanguage(language);
+  try {
+    await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+  } catch (error) {
+    console.error('Error saving language:', error);
+  }
+};
 
 export default i18n;

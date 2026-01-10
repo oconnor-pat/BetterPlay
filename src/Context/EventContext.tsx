@@ -6,6 +6,7 @@ import React, {
   ReactNode,
 } from 'react';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Event {
   _id: string;
@@ -40,13 +41,32 @@ export const EventProvider = ({children}: {children: ReactNode}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/events`);
       setEvents(response.data);
+      // Cache for faster startup
+      AsyncStorage.setItem('cachedEvents', JSON.stringify(response.data));
     } catch (error) {
       // Optionally handle error (e.g., set error state)
     }
   };
 
+  // Load cached events immediately, fetch fresh in background
   useEffect(() => {
-    fetchEvents();
+    const loadEvents = async () => {
+      // Try to load cached events first for instant display
+      try {
+        const cached = await AsyncStorage.getItem('cachedEvents');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            setEvents(parsed);
+          }
+        }
+      } catch {
+        // Ignore cache errors
+      }
+      // Always fetch fresh data in background
+      fetchEvents();
+    };
+    loadEvents();
   }, []);
 
   const updateRosterSpots = (eventId: string, newRosterCount: number) => {

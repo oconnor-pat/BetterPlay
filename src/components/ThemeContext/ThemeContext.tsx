@@ -60,9 +60,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider = ({children}: {children: ReactNode}) => {
   const systemColorScheme = useColorScheme();
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
-  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load saved theme preference on mount
+  // Load saved theme preference on mount (non-blocking)
   useEffect(() => {
     const loadThemePreference = async () => {
       try {
@@ -77,8 +76,6 @@ export const ThemeProvider = ({children}: {children: ReactNode}) => {
         }
       } catch (error) {
         console.error('Error loading theme preference:', error);
-      } finally {
-        setIsLoaded(true);
       }
     };
     loadThemePreference();
@@ -100,11 +97,6 @@ export const ThemeProvider = ({children}: {children: ReactNode}) => {
     (themeMode === 'system' && systemColorScheme === 'dark');
 
   const colors = darkMode ? darkColors : lightColors;
-
-  // Don't render until theme preference is loaded to avoid flash
-  if (!isLoaded) {
-    return null;
-  }
 
   return (
     <ThemeContext.Provider value={{darkMode, themeMode, setThemeMode, colors}}>

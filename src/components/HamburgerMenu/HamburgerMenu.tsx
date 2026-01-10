@@ -22,8 +22,8 @@ const HamburgerMenu: React.FC = () => {
   const handleOptionPress = async (option: string) => {
     setMenuVisible(false);
     if (option === 'Sign Out') {
-      // Clear the stored token to fully log out
-      await AsyncStorage.removeItem('userToken');
+      // Clear the stored token and cached data to fully log out
+      await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
       setUserData(null);
       navigation.reset({
         index: 0,

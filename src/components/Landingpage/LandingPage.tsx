@@ -404,6 +404,11 @@ function LandingPage() {
       const responseData = await response.json();
       if (responseData.success) {
         await AsyncStorage.setItem('userToken', responseData.token);
+        // Cache user data for faster app startup
+        await AsyncStorage.setItem(
+          'cachedUserData',
+          JSON.stringify(responseData.user),
+        );
         setSuccessMessage('Account created successfully!');
         setErrorMessage(null);
         setUserData(responseData.user);
@@ -456,6 +461,11 @@ function LandingPage() {
           return;
         }
         await AsyncStorage.setItem('userToken', responseData.token);
+        // Cache user data for faster app startup
+        await AsyncStorage.setItem(
+          'cachedUserData',
+          JSON.stringify(responseData.user),
+        );
         setSuccessMessage('Welcome back!');
         setErrorMessage(null);
 

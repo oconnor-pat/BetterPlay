@@ -843,7 +843,8 @@ const EventList: React.FC = () => {
   );
 
   const [eventData, setEventData] = useState<Event[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true); // Start true to show skeleton
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [newEvent, setNewEvent] = useState(() => createEmptyEvent());
 
@@ -883,15 +884,13 @@ const EventList: React.FC = () => {
 
   const navigation = useNavigation<NavigationProp<any>>();
 
-  // Check if user has seen the events onboarding
+  // Check if user has seen the events onboarding - non-blocking
   useEffect(() => {
-    const checkFirstTimeUser = async () => {
-      const hasSeenHint = await AsyncStorage.getItem('hasSeenEventsHint');
+    AsyncStorage.getItem('hasSeenEventsHint').then(hasSeenHint => {
       if (!hasSeenHint) {
         setShowFirstTimeHint(true);
       }
-    };
-    checkFirstTimeUser();
+    });
   }, []);
 
   // Dismiss hint and save to storage
@@ -900,20 +899,65 @@ const EventList: React.FC = () => {
     setShowFirstTimeHint(false);
   };
 
-  // Fetch events from backend
+  // Fetch events from backend - OPTIMIZED with caching
   useEffect(() => {
-    fetchEvents();
+    const loadEvents = async () => {
+      // FAST PATH: Load cached events immediately
+      try {
+        const cachedEvents = await AsyncStorage.getItem('cachedEvents');
+        if (cachedEvents) {
+          const parsed = JSON.parse(cachedEvents);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setEventData(parsed);
+            setLoading(false);
+            setInitialLoadDone(true);
+            // Fetch fresh data in background
+            fetchEventsInBackground();
+            return;
+          }
+        }
+      } catch {
+        // Invalid cache, fall through
+      }
+
+      // NO CACHE: Fetch from server
+      await fetchEvents();
+    };
+
+    const fetchEventsInBackground = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/events`);
+        if (Array.isArray(response.data)) {
+          setEventData(response.data);
+          // Cache for next launch (fire and forget)
+          AsyncStorage.setItem('cachedEvents', JSON.stringify(response.data));
+        }
+      } catch (error) {
+        console.log('Background events fetch failed:', error);
+      }
+    };
+
+    loadEvents();
   }, []);
 
   const fetchEvents = async () => {
-    setLoading(true);
+    if (initialLoadDone) {
+      // For pull-to-refresh, don't show full loading state
+    } else {
+      setLoading(true);
+    }
     try {
       const response = await axios.get(`${API_BASE_URL}/events`);
       setEventData(response.data);
+      // Cache events for faster startup
+      AsyncStorage.setItem('cachedEvents', JSON.stringify(response.data));
     } catch (error) {
-      Alert.alert(t('common.error'), t('events.fetchError'));
+      if (!initialLoadDone) {
+        Alert.alert(t('common.error'), t('events.fetchError'));
+      }
     } finally {
       setLoading(false);
+      setInitialLoadDone(true);
     }
   };
 

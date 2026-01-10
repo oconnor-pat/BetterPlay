@@ -68,46 +68,142 @@ const linking: LinkingOptions<RootStackParamList> = {
 const AppContent = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [initialRouteChecked, setInitialRouteChecked] = useState(false);
   const {darkMode, colors} = useTheme();
 
-  // Check for existing session on app startup
+  // Check for existing session on app startup - FAST PATH
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
-        if (token) {
-          // Validate token with backend and get user data
-          const response = await fetch(`${API_BASE_URL}/auth/validate`, {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
+        // Read all needed data in parallel for fastest possible startup
+        const [token, cachedUserData] = await Promise.all([
+          AsyncStorage.getItem('userToken'),
+          AsyncStorage.getItem('cachedUserData'),
+        ]);
 
-          // Check if response is OK and is JSON
-          const contentType = response.headers.get('content-type');
-          if (!response.ok || !contentType?.includes('application/json')) {
-            console.warn('Invalid response from server, clearing token');
-            await AsyncStorage.removeItem('userToken');
+        // FAST PATH: If we have cached data, show immediately
+        if (token && cachedUserData) {
+          try {
+            const parsedUser = JSON.parse(cachedUserData);
+            setUserData(parsedUser);
+            setInitialRouteChecked(true);
+            setIsLoading(false);
+
+            // Validate token in background (completely non-blocking)
+            setTimeout(() => validateTokenInBackground(token, parsedUser), 100);
             return;
-          }
-
-          const data = await response.json();
-
-          if (data.success && data.user) {
-            setUserData(data.user);
-          } else {
-            // Token is invalid, clear it
-            await AsyncStorage.removeItem('userToken');
+          } catch {
+            // Invalid cached data, fall through
           }
         }
+
+        // NO CACHE PATH: If we have token but no cache, validate quickly
+        if (token) {
+          // Try quick validation with short timeout
+          const validated = await validateAndSetUser(token);
+          if (!validated) {
+            // Token invalid or network failed
+            setUserData(null);
+          }
+        }
+
+        setInitialRouteChecked(true);
       } catch (error) {
         console.error('Error restoring session:', error);
-        // Clear potentially corrupted token
-        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
+        setInitialRouteChecked(true);
       } finally {
         setIsLoading(false);
+      }
+    };
+
+    const validateTokenInBackground = async (
+      token: string,
+      cachedUser: UserData,
+    ) => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch(`${API_BASE_URL}/auth/validate`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        const contentType = response.headers.get('content-type');
+        if (!response.ok || !contentType?.includes('application/json')) {
+          // Token invalid - log user out
+          await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
+          setUserData(null);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.user) {
+          // Update with fresh data if different
+          if (JSON.stringify(data.user) !== JSON.stringify(cachedUser)) {
+            setUserData(data.user);
+            await AsyncStorage.setItem(
+              'cachedUserData',
+              JSON.stringify(data.user),
+            );
+          }
+        } else {
+          // Token invalid
+          await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
+          setUserData(null);
+        }
+      } catch (error) {
+        // Network error - keep using cached data (offline support)
+        console.log('Background validation failed, using cached data');
+      }
+    };
+
+    const validateAndSetUser = async (token: string): Promise<boolean> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout for initial load
+
+        const response = await fetch(`${API_BASE_URL}/auth/validate`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        const contentType = response.headers.get('content-type');
+        if (!response.ok || !contentType?.includes('application/json')) {
+          console.warn('Invalid response from server, clearing token');
+          await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
+          return false;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.user) {
+          setUserData(data.user);
+          // Cache user data for next launch
+          AsyncStorage.setItem('cachedUserData', JSON.stringify(data.user));
+          return true;
+        } else {
+          await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
+          return false;
+        }
+      } catch (error) {
+        console.error('Token validation failed:', error);
+        // On network failure, don't clear token - let them try again
+        return false;
       }
     };
 
