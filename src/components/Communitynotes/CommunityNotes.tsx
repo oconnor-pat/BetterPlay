@@ -131,6 +131,9 @@ const CommunityNotes: React.FC = () => {
     usernames: string[];
   }>({title: '', usernames: []});
 
+  // Loading states for operations
+  const [postingContent, setPostingContent] = useState(false);
+
   // Edit state
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editingPostText, setEditingPostText] = useState<string>('');
@@ -1073,6 +1076,7 @@ const CommunityNotes: React.FC = () => {
   // Add a new post via backend
   const addPost = async () => {
     if (newPostText.trim() !== '' && userData) {
+      setPostingContent(true);
       try {
         const response = await axios.post(`${API_BASE_URL}/community-notes`, {
           text: newPostText,
@@ -1084,6 +1088,8 @@ const CommunityNotes: React.FC = () => {
         setNewPostText('');
       } catch (error) {
         Alert.alert('Error', 'Failed to add post.');
+      } finally {
+        setPostingContent(false);
       }
     }
   };
@@ -1416,11 +1422,16 @@ const CommunityNotes: React.FC = () => {
               <TouchableOpacity
                 style={[
                   styles.modernButton,
-                  !newPostText.trim() && styles.disabledButton,
+                  (!newPostText.trim() || postingContent) &&
+                    styles.disabledButton,
                 ]}
                 onPress={addPost}
-                disabled={!newPostText.trim()}>
-                <FontAwesomeIcon icon={faPaperPlane} size={16} color="#fff" />
+                disabled={!newPostText.trim() || postingContent}>
+                {postingContent ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <FontAwesomeIcon icon={faPaperPlane} size={16} color="#fff" />
+                )}
               </TouchableOpacity>
             </View>
           </View>

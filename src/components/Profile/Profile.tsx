@@ -14,6 +14,7 @@ import {
   ScrollView,
   RefreshControl,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
@@ -47,6 +48,7 @@ type ProfileScreenRouteProp = RouteProp<
 const Profile: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const route = useRoute<ProfileScreenRouteProp>();
   const {_id} = route.params;
 
@@ -416,6 +418,7 @@ const Profile: React.FC = () => {
     base64Image: string,
     fileName: string | undefined,
   ) => {
+    setUploadingImage(true);
     try {
       const lambdaResponse = await axios.post(
         'https://8nxzl6o6fd.execute-api.us-east-2.amazonaws.com/default/uploadImageFunction',
@@ -427,7 +430,7 @@ const Profile: React.FC = () => {
 
       const imageUrl = lambdaResponse.data.url;
       setSelectedImage(imageUrl);
-      updateUserProfilePic(imageUrl);
+      await updateUserProfilePic(imageUrl);
     } catch (error: any) {
       console.error('Error uploading image to Lambda:', error);
       if (error?.response?.status === 413) {
@@ -441,6 +444,8 @@ const Profile: React.FC = () => {
           'Unable to upload image. Please try again.',
         );
       }
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -531,32 +536,41 @@ const Profile: React.FC = () => {
           </View>
 
           {/* Photo Buttons */}
-          <View style={themedStyles.photoButtonsRow}>
-            <TouchableOpacity
-              style={themedStyles.photoButton}
-              onPress={handleChoosePhoto}>
-              <FontAwesomeIcon
-                icon={faImage}
-                size={16}
-                color={colors.primary}
-              />
+          {uploadingImage ? (
+            <View style={themedStyles.photoButtonsRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
               <Text style={themedStyles.photoButtonText}>
-                {t('profile.gallery')}
+                {t('common.loading') || 'Uploading...'}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={themedStyles.photoButton}
-              onPress={handleTakePhoto}>
-              <FontAwesomeIcon
-                icon={faCamera}
-                size={16}
-                color={colors.primary}
-              />
-              <Text style={themedStyles.photoButtonText}>
-                {t('profile.camera')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            </View>
+          ) : (
+            <View style={themedStyles.photoButtonsRow}>
+              <TouchableOpacity
+                style={themedStyles.photoButton}
+                onPress={handleChoosePhoto}>
+                <FontAwesomeIcon
+                  icon={faImage}
+                  size={16}
+                  color={colors.primary}
+                />
+                <Text style={themedStyles.photoButtonText}>
+                  {t('profile.gallery')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={themedStyles.photoButton}
+                onPress={handleTakePhoto}>
+                <FontAwesomeIcon
+                  icon={faCamera}
+                  size={16}
+                  color={colors.primary}
+                />
+                <Text style={themedStyles.photoButtonText}>
+                  {t('profile.camera')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Stats Card */}

@@ -149,6 +149,7 @@ const EventRoster: React.FC = () => {
   const [positionModalVisible, setPositionModalVisible] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [savingRoster, setSavingRoster] = useState(false);
   const [addPlayerExpanded, setAddPlayerExpanded] = useState(false);
 
   // Edit mode state
@@ -737,6 +738,7 @@ const EventRoster: React.FC = () => {
       setErrorMessage('You are already on this roster.');
       return;
     }
+    setSavingRoster(true);
     const newPlayer: Player = {username, paidStatus, jerseyColor, position};
     const updatedRoster = [...roster, newPlayer];
     setRoster(updatedRoster);
@@ -748,6 +750,7 @@ const EventRoster: React.FC = () => {
     setPosition('');
     setErrorMessage('');
     setAddPlayerExpanded(false);
+    setSavingRoster(false);
   };
 
   // Delete player (only allow logged-in user to remove themselves)
@@ -1161,17 +1164,27 @@ const EventRoster: React.FC = () => {
                   <TouchableOpacity
                     style={[
                       themedStyles.saveButton,
-                      spotsRemaining === 0 && themedStyles.saveButtonDisabled,
+                      (spotsRemaining === 0 || savingRoster) &&
+                        themedStyles.saveButtonDisabled,
                     ]}
                     onPress={handleSave}
-                    disabled={spotsRemaining === 0}>
-                    <FontAwesomeIcon
-                      icon={faUserPlus}
-                      size={16}
-                      color={colors.buttonText}
-                    />
+                    disabled={spotsRemaining === 0 || savingRoster}>
+                    {savingRoster ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.buttonText}
+                      />
+                    ) : (
+                      <FontAwesomeIcon
+                        icon={faUserPlus}
+                        size={16}
+                        color={colors.buttonText}
+                      />
+                    )}
                     <Text style={themedStyles.buttonText}>
-                      {spotsRemaining === 0
+                      {savingRoster
+                        ? t('common.loading') || 'Joining...'
+                        : spotsRemaining === 0
                         ? t('roster.rosterFull')
                         : t('roster.joinEvent')}
                     </Text>

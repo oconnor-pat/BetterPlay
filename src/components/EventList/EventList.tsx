@@ -870,6 +870,10 @@ const EventList: React.FC = () => {
   const [showEventTypePicker, setShowEventTypePicker] = useState(false);
   const [tempEventType, setTempEventType] = useState(newEvent.eventType || '');
 
+  // Loading state for save operations
+  const [savingEvent, setSavingEvent] = useState(false);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
+
   // First-time user onboarding state
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
 
@@ -1017,6 +1021,7 @@ const EventList: React.FC = () => {
       newEvent.totalSpots &&
       newEvent.eventType
     ) {
+      setSavingEvent(true);
       if (isEditing && editingEventId) {
         try {
           const response = await axios.put(
@@ -1040,6 +1045,8 @@ const EventList: React.FC = () => {
           );
         } catch (error) {
           Alert.alert('Error', 'Failed to update event.');
+          setSavingEvent(false);
+          return;
         }
       } else {
         try {
@@ -1058,8 +1065,11 @@ const EventList: React.FC = () => {
           setEventData(prevData => [...prevData, response.data]);
         } catch (error) {
           Alert.alert('Error', 'Failed to create event.');
+          setSavingEvent(false);
+          return;
         }
       }
+      setSavingEvent(false);
       setModalVisible(false);
       setNewEvent(createEmptyEvent());
       setTempRosterSize('');
@@ -1098,6 +1108,7 @@ const EventList: React.FC = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            setDeletingEventId(event._id);
             try {
               await axios.delete(`${API_BASE_URL}/events/${event._id}`);
               setEventData(prevData =>
@@ -1105,6 +1116,8 @@ const EventList: React.FC = () => {
               );
             } catch (error) {
               Alert.alert('Error', 'Failed to delete event.');
+            } finally {
+              setDeletingEventId(null);
             }
           },
         },
@@ -1752,17 +1765,26 @@ const EventList: React.FC = () => {
 
               <View style={themedStyles.buttonContainer}>
                 <TouchableOpacity
-                  style={themedStyles.saveButton}
-                  onPress={handleSaveNewEvent}>
-                  <Text style={themedStyles.buttonText}>
-                    {isEditing
-                      ? t('events.saveChanges')
-                      : t('events.createEvent')}
-                  </Text>
+                  style={[
+                    themedStyles.saveButton,
+                    savingEvent && {opacity: 0.7},
+                  ]}
+                  onPress={handleSaveNewEvent}
+                  disabled={savingEvent}>
+                  {savingEvent ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={themedStyles.buttonText}>
+                      {isEditing
+                        ? t('events.saveChanges')
+                        : t('events.createEvent')}
+                    </Text>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[themedStyles.saveButton, themedStyles.cancelButton]}
-                  onPress={handleCancelModal}>
+                  onPress={handleCancelModal}
+                  disabled={savingEvent}>
                   <Text
                     style={[
                       themedStyles.buttonText,
