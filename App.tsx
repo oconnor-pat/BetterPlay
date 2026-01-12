@@ -6,6 +6,7 @@ import {
   LinkingOptions,
 } from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
+import {LogBox} from 'react-native';
 import LandingPage from './src/components/Landingpage/LandingPage';
 import BottomNavigator from './src/components/BottomNavigator/BottomNavigator';
 import Settings from './src/components/Settings/Settings';
@@ -25,6 +26,9 @@ import {EventProvider} from './src/Context/EventContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from './src/config/api';
 
+// Suppress harmless reanimated warning on logout
+LogBox.ignoreLogs(['Sending `onAnimatedValueUpdate` with no listeners']);
+
 // Import i18n configuration
 import './src/i18n';
 
@@ -33,6 +37,7 @@ type UserData = {
   _id: string;
   username: string;
   email: string;
+  isAdmin?: boolean;
 };
 
 type RootStackParamList = {
@@ -67,9 +72,48 @@ const linking: LinkingOptions<RootStackParamList> = {
 
 const AppContent = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [initialRouteChecked, setInitialRouteChecked] = useState(false);
+  const [_initialRouteChecked, setInitialRouteChecked] = useState(false);
   const {darkMode, colors} = useTheme();
+
+  // Check admin status from API
+  const checkAdminStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        setIsAdmin(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/user/isAdmin`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsAdmin(data.isAdmin === true);
+        // Update userData with admin status
+        if (userData) {
+          const updatedUser = {...userData, isAdmin: data.isAdmin === true};
+          setUserData(updatedUser);
+          await AsyncStorage.setItem(
+            'cachedUserData',
+            JSON.stringify(updatedUser),
+          );
+        }
+      } else {
+        setIsAdmin(false);
+      }
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdmin(false);
+    }
+  };
 
   // Check for existing session on app startup - FAST PATH
   useEffect(() => {
@@ -86,6 +130,8 @@ const AppContent = () => {
           try {
             const parsedUser = JSON.parse(cachedUserData);
             setUserData(parsedUser);
+            // Restore cached admin status
+            setIsAdmin(parsedUser.isAdmin === true);
             setInitialRouteChecked(true);
             setIsLoading(false);
 
@@ -150,19 +196,46 @@ const AppContent = () => {
           // Update with fresh data if different
           if (JSON.stringify(data.user) !== JSON.stringify(cachedUser)) {
             setUserData(data.user);
+            setIsAdmin(data.user.isAdmin === true);
             await AsyncStorage.setItem(
               'cachedUserData',
               JSON.stringify(data.user),
             );
           }
+          // Also check admin status in background
+          checkAdminStatusInBackground(token);
         } else {
           // Token invalid
           await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
           setUserData(null);
+          setIsAdmin(false);
         }
       } catch (error) {
         // Network error - keep using cached data (offline support)
         console.log('Background validation failed, using cached data');
+      }
+    };
+
+    const checkAdminStatusInBackground = async (token: string) => {
+      try {
+        console.log('Checking admin status...');
+        const response = await fetch(`${API_BASE_URL}/api/user/isAdmin`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Admin status response:', data);
+          setIsAdmin(data.isAdmin === true);
+        } else {
+          console.log('Admin check failed with status:', response.status);
+        }
+      } catch (error) {
+        console.log('Background admin check failed:', error);
       }
     };
 
@@ -233,7 +306,8 @@ const AppContent = () => {
         backgroundColor={darkMode ? '#000' : '#02131D'}
         barStyle={darkMode ? 'light-content' : 'dark-content'}
       />
-      <UserContext.Provider value={{userData, setUserData}}>
+      <UserContext.Provider
+        value={{userData, setUserData, isAdmin, checkAdminStatus}}>
         <EventProvider>
           <NavigationContainer
             theme={darkMode ? DarkTheme : DefaultTheme}

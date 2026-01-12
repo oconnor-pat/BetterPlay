@@ -15,6 +15,7 @@ import {
   Share,
   KeyboardAvoidingView,
 } from 'react-native';
+import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, {Marker} from 'react-native-maps';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -30,7 +31,6 @@ import {
   faSearch,
   faTimes,
   faFilter,
-  faChevronDown,
   faShareAlt,
   faLocationArrow,
   faArrowRightToBracket,
@@ -74,11 +74,11 @@ interface Event {
   longitude?: number;
 }
 
-// Google Places API configuration
-const GOOGLE_PLACES_API_KEY = 'AIzaSyB2whAJQnbVtkVlHp98SSGIO-FB_dcK6qY';
+// Google Places API configuration from environment variable
+const GOOGLE_PLACES_API_KEY = Config.GOOGLE_PLACES_API_KEY || '';
 
 // Check if API key is configured
-const isApiKeyConfigured = true;
+const isApiKeyConfigured = !!GOOGLE_PLACES_API_KEY;
 
 // Helper function to create empty event object
 const createEmptyEvent = () => ({
@@ -771,6 +771,15 @@ const EventList: React.FC = () => {
           fontWeight: '600',
           fontSize: 16,
         },
+        noResultsIcon: {
+          marginBottom: 16,
+        },
+        disabledOpacity: {
+          opacity: 0.7,
+        },
+        keyboardAvoidingView: {
+          flex: 1,
+        },
         activeFiltersContainer: {
           flexDirection: 'row',
           flexWrap: 'wrap',
@@ -792,6 +801,15 @@ const EventList: React.FC = () => {
           fontSize: 13,
           fontWeight: '500',
           marginRight: 6,
+        },
+        searchFilterRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 12,
+        },
+        searchContainerInRow: {
+          flex: 1,
+          marginBottom: 0,
         },
       }),
     [colors],
@@ -877,12 +895,33 @@ const EventList: React.FC = () => {
 
   // Loading state for save operations
   const [savingEvent, setSavingEvent] = useState(false);
-  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
+  const [_deletingEventId, setDeletingEventId] = useState<string | null>(null);
 
   // First-time user onboarding state
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
 
   const navigation = useNavigation<NavigationProp<any>>();
+
+  const fetchEvents = React.useCallback(async () => {
+    if (initialLoadDone) {
+      // For pull-to-refresh, don't show full loading state
+    } else {
+      setLoading(true);
+    }
+    try {
+      const response = await axios.get(`${API_BASE_URL}/events`);
+      setEventData(response.data);
+      // Cache events for faster startup
+      AsyncStorage.setItem('cachedEvents', JSON.stringify(response.data));
+    } catch (error) {
+      if (!initialLoadDone) {
+        Alert.alert(t('common.error'), t('events.fetchError'));
+      }
+    } finally {
+      setLoading(false);
+      setInitialLoadDone(true);
+    }
+  }, [initialLoadDone, t]);
 
   // Check if user has seen the events onboarding - non-blocking
   useEffect(() => {
@@ -891,7 +930,7 @@ const EventList: React.FC = () => {
         setShowFirstTimeHint(true);
       }
     });
-  }, []);
+  }, [fetchEvents]);
 
   // Dismiss hint and save to storage
   const dismissFirstTimeHint = async () => {
@@ -938,28 +977,7 @@ const EventList: React.FC = () => {
     };
 
     loadEvents();
-  }, []);
-
-  const fetchEvents = async () => {
-    if (initialLoadDone) {
-      // For pull-to-refresh, don't show full loading state
-    } else {
-      setLoading(true);
-    }
-    try {
-      const response = await axios.get(`${API_BASE_URL}/events`);
-      setEventData(response.data);
-      // Cache events for faster startup
-      AsyncStorage.setItem('cachedEvents', JSON.stringify(response.data));
-    } catch (error) {
-      if (!initialLoadDone) {
-        Alert.alert(t('common.error'), t('events.fetchError'));
-      }
-    } finally {
-      setLoading(false);
-      setInitialLoadDone(true);
-    }
-  };
+  }, [fetchEvents]);
 
   // Filter events based on search query and filters
   const filteredEvents = useMemo(() => {
@@ -1040,16 +1058,24 @@ const EventList: React.FC = () => {
   // Count active filters
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (selectedEventTypes.length > 0) count++;
-    if (selectedDateFilter !== 'all') count++;
-    if (showAvailableOnly) count++;
+    if (selectedEventTypes.length > 0) {
+      count++;
+    }
+    if (selectedDateFilter !== 'all') {
+      count++;
+    }
+    if (showAvailableOnly) {
+      count++;
+    }
     return count;
   }, [selectedEventTypes, selectedDateFilter, showAvailableOnly]);
 
   // Toggle event type selection
   const toggleEventType = (type: string) => {
     setSelectedEventTypes(prev =>
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type],
+      prev.includes(type)
+        ? prev.filter(eventType => eventType !== type)
+        : [...prev, type],
     );
   };
 
@@ -1427,10 +1453,12 @@ const EventList: React.FC = () => {
       </View>
 
       {/* Search Bar with Filter Button */}
-      <View
-        style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
+      <View style={themedStyles.searchFilterRow}>
         <View
-          style={[themedStyles.searchContainer, {flex: 1, marginBottom: 0}]}>
+          style={[
+            themedStyles.searchContainer,
+            themedStyles.searchContainerInRow,
+          ]}>
           <FontAwesomeIcon
             icon={faSearch}
             size={18}
@@ -1537,7 +1565,7 @@ const EventList: React.FC = () => {
             icon={faPlus}
             size={48}
             color={colors.border}
-            style={{marginBottom: 16}}
+            style={themedStyles.noResultsIcon}
           />
           <Text style={themedStyles.noResultsText}>
             {searchQuery ? t('common.noResults') : t('events.noEvents')}
@@ -1579,7 +1607,7 @@ const EventList: React.FC = () => {
       <Modal animationType="fade" transparent={true} visible={modalVisible}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{flex: 1}}>
+          style={themedStyles.keyboardAvoidingView}>
           <View style={themedStyles.modalOverlay}>
             <View style={themedStyles.modalView}>
               <Text style={themedStyles.modalHeader}>
@@ -1621,6 +1649,8 @@ const EventList: React.FC = () => {
                       types: 'establishment|geocode',
                     }}
                     fetchDetails={true}
+                    disableScroll={true}
+                    listViewDisplayed="auto"
                     styles={autocompleteStyles}
                     onFail={error => {
                       console.warn('GooglePlacesAutocomplete error:', error);
@@ -1815,7 +1845,7 @@ const EventList: React.FC = () => {
                 <TouchableOpacity
                   style={[
                     themedStyles.saveButton,
-                    savingEvent && {opacity: 0.7},
+                    savingEvent && themedStyles.disabledOpacity,
                   ]}
                   onPress={handleSaveNewEvent}
                   disabled={savingEvent}>

@@ -14,9 +14,11 @@ export interface ThemeColors {
   background: string;
   card: string;
   text: string;
+  secondaryText: string;
   primary: string;
   border: string;
   error: string;
+  success: string;
   buttonText: string;
   inputBackground: string;
   placeholder: string;
@@ -33,9 +35,11 @@ const lightColors: ThemeColors = {
   background: '#bcbcbc',
   card: '#fff',
   text: '#222',
+  secondaryText: '#666',
   primary: '#2ECC71',
   border: '#ccc',
   error: '#b11313',
+  success: '#4CAF50',
   buttonText: '#fff',
   inputBackground: '#f0f0f0',
   placeholder: '#888',
@@ -45,9 +49,11 @@ const darkColors: ThemeColors = {
   background: '#181818',
   card: '#222',
   text: '#fff',
+  secondaryText: '#aaa',
   primary: '#2ECC71',
   border: '#333',
   error: '#ff4d4f',
+  success: '#4CAF50',
   buttonText: '#fff',
   inputBackground: '#333',
   placeholder: '#aaa',

@@ -7,6 +7,14 @@ DEVICE_ID="00008150-00015590027A401C"
 BUNDLE_ID="com.oconnorpat.betterplay"
 WORKSPACE="/Users/patty/Documents/Projects/BetterPlay/ios/BetterPlay.xcworkspace"
 APP_PATH="/Users/patty/Library/Developer/Xcode/DerivedData/BetterPlay-cirdbgrfixtloihdxubzmtpoletd/Build/Products/Debug-iphoneos/BetterPlay.app"
+PROJECT_DIR="/Users/patty/Documents/Projects/BetterPlay"
+
+# Start Metro bundler in a new Terminal window
+echo "🚇 Starting Metro bundler..."
+osascript -e "tell application \"Terminal\" to do script \"cd '$PROJECT_DIR' && npm start\""
+
+# Give Metro a moment to start
+sleep 3
 
 echo "🔨 Building BetterPlay..."
 xcodebuild -workspace "$WORKSPACE" -scheme BetterPlay -configuration Debug -destination "id=$DEVICE_ID" -allowProvisioningUpdates -quiet

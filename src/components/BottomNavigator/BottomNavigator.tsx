@@ -5,9 +5,11 @@ import EventList from '../EventList/EventList';
 import EventRoster from '../EventRoster/EventRoster';
 import Profile from '../Profile/Profile';
 import CommunityNotes from '../Communitynotes/CommunityNotes';
+import {VenueList, VenueDetail, SpaceDetail} from '../Venues';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
-  faUsers,
+  faMapMarkerAlt,
+  faBuilding,
   faUser,
   faStickyNote,
   faQuestion,
@@ -45,9 +47,10 @@ function createTabBarIcon(colors: {primary: string; text: string}) {
     size: number;
   }) {
     const iconMap: Record<string, IconDefinition> = {
-      Event: faUsers,
-      Profile: faUser,
+      Local: faMapMarkerAlt,
+      Venues: faBuilding,
       CommunityNotes: faStickyNote,
+      Profile: faUser,
     };
     const icon = iconMap[route.name] || faQuestion;
     const iconColor = focused ? colors.primary : colors.text;
@@ -55,8 +58,8 @@ function createTabBarIcon(colors: {primary: string; text: string}) {
   };
 }
 
-// Stack Navigator for Event-related screens
-const EventStack = () => {
+// Stack Navigator for Local Events screens
+const LocalEventsStack = () => {
   const {colors} = useTheme();
   return (
     <Stack.Navigator
@@ -75,6 +78,34 @@ const EventStack = () => {
         options={{
           headerShown: false,
         }}
+      />
+    </Stack.Navigator>
+  );
+};
+
+// Stack Navigator for Venue-related screens
+const VenueStack = () => {
+  const {colors} = useTheme();
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {backgroundColor: colors.card},
+        headerTintColor: colors.text,
+      }}>
+      <Stack.Screen
+        name="VenueList"
+        component={VenueList}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="VenueDetail"
+        component={VenueDetail}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="SpaceDetail"
+        component={SpaceDetail}
+        options={{headerShown: false}}
       />
     </Stack.Navigator>
   );
@@ -120,13 +151,14 @@ const BottomNavigator: React.FC = () => {
 
   return (
     <Tab.Navigator screenOptions={screenOptions}>
-      <Tab.Screen name="Event" component={EventStack} />
+      <Tab.Screen name="Local" component={LocalEventsStack} />
+      <Tab.Screen name="Venues" component={VenueStack} />
+      <Tab.Screen name="CommunityNotes" component={CommunityNotes} />
       <Tab.Screen
         name="Profile"
         component={Profile}
         initialParams={{_id: userId}}
       />
-      <Tab.Screen name="CommunityNotes" component={CommunityNotes} />
     </Tab.Navigator>
   );
 };
