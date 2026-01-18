@@ -54,12 +54,14 @@ export type VenueStackParamList = {
     venueType: string;
     address: string;
     totalSpaces: number;
+    operatingHours?: string;
   };
   SpaceDetail: {
     venueId: string;
     spaceId: string;
     spaceName: string;
     venueType: string;
+    operatingHours?: string;
   };
 };
 
@@ -833,6 +835,7 @@ const VenueList: React.FC = () => {
       venueType: venue.type,
       address: formatAddress(venue.address),
       totalSpaces: venue.subVenues?.length || 0,
+      operatingHours: getTodayHours(venue.operatingHours) || undefined,
     });
   };
 

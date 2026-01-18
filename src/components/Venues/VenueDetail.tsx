@@ -137,7 +137,14 @@ const VenueDetail: React.FC = () => {
   const {colors} = useTheme();
   const {t} = useTranslation();
 
-  const {venueId, venueName, venueType, address, totalSpaces} = route.params;
+  const {
+    venueId,
+    venueName,
+    venueType,
+    address,
+    totalSpaces,
+    operatingHours: passedOperatingHours,
+  } = route.params;
 
   // State
   const [venue, setVenue] = useState<VenueDetails | null>(null);
@@ -457,7 +464,7 @@ const VenueDetail: React.FC = () => {
         contactEmail: backendData.contactEmail,
         operatingHours: backendData.operatingHours?.monday
           ? `${backendData.operatingHours.monday.open} - ${backendData.operatingHours.monday.close}`
-          : undefined,
+          : passedOperatingHours,
         amenities: backendData.amenities,
         createdBy: backendData.createdBy || 'admin',
         latitude: backendData.coordinates?.latitude,
@@ -467,14 +474,14 @@ const VenueDetail: React.FC = () => {
       setVenue(transformedVenue);
     } catch (error) {
       console.error('Error fetching venue details:', error);
-      // Mock data for development
+      // Mock data for development - use passed operatingHours as fallback
       setVenue({
         _id: venueId,
         name: venueName,
         address: address,
         venueType: venueType,
         totalSpaces: totalSpaces,
-        operatingHours: '6:00 AM - 11:00 PM',
+        operatingHours: passedOperatingHours || '6:00 AM - 11:00 PM',
         contactPhone: '(555) 123-4567',
         contactEmail: 'info@venue.com',
         createdBy: 'admin',
@@ -506,7 +513,14 @@ const VenueDetail: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [venueId, venueName, address, venueType, totalSpaces]);
+  }, [
+    venueId,
+    venueName,
+    address,
+    venueType,
+    totalSpaces,
+    passedOperatingHours,
+  ]);
 
   useEffect(() => {
     fetchVenueDetails();
@@ -617,6 +631,17 @@ const VenueDetail: React.FC = () => {
         {headers: {Authorization: `Bearer ${token}`}},
       );
 
+      // Generate time slots for the new space based on venue operating hours
+      try {
+        await axios.post(
+          `${API_BASE_URL}/api/venues/${venueId}/spaces/${newSpaceId}/generate-slots`,
+          {},
+          {headers: {Authorization: `Bearer ${token}`}},
+        );
+      } catch (slotError) {
+        console.log('Time slots will be generated on first view');
+      }
+
       // Update local state
       const newSpace: Space = {
         _id: newSpaceId,
@@ -699,6 +724,7 @@ const VenueDetail: React.FC = () => {
       spaceId: space._id,
       spaceName: space.name,
       venueType: venueType,
+      operatingHours: venue?.operatingHours,
     });
   };
 
