@@ -388,18 +388,18 @@ const VenueList: React.FC = () => {
         filterButton: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingVertical: 8,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
           backgroundColor: colors.card,
           borderRadius: 20,
-          marginRight: 8,
+          marginRight: 10,
           borderWidth: 1,
           borderColor: colors.border,
         },
         filterText: {
           color: colors.text,
           marginLeft: 6,
-          fontSize: 14,
+          fontSize: 13,
         },
         activeFilter: {
           backgroundColor: colors.primary,
@@ -903,7 +903,8 @@ const VenueList: React.FC = () => {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={{marginBottom: 16}}>
+      style={{marginBottom: 16, maxHeight: 44}}
+      contentContainerStyle={{alignItems: 'center'}}>
       <TouchableOpacity
         style={[
           themedStyles.filterButton,
@@ -913,6 +914,7 @@ const VenueList: React.FC = () => {
         <Text
           style={[
             themedStyles.filterText,
+            {marginLeft: 0},
             selectedVenueType === 'all' && themedStyles.activeFilterText,
           ]}>
           All Venues
@@ -926,7 +928,7 @@ const VenueList: React.FC = () => {
             selectedVenueType === option.label && themedStyles.activeFilter,
           ]}
           onPress={() => setSelectedVenueType(option.label)}>
-          <Text style={{fontSize: 16}}>{option.emoji}</Text>
+          <Text style={{fontSize: 14}}>{option.emoji}</Text>
           <Text
             style={[
               themedStyles.filterText,
