@@ -54,6 +54,7 @@ export type RootStackParamList = {
     location: string;
     totalSpots: number;
     roster: any[];
+    jerseyColors?: string[];
   };
   Profile: {_id: string};
 };
@@ -72,6 +73,8 @@ interface Event {
   // Support for coordinates (if available from backend)
   latitude?: number;
   longitude?: number;
+  // Jersey colors for team-based events (exactly 2 colors)
+  jerseyColors?: string[];
 }
 
 // Google Places API configuration from environment variable
@@ -90,6 +93,7 @@ const createEmptyEvent = () => ({
   eventType: '',
   latitude: undefined as number | undefined,
   longitude: undefined as number | undefined,
+  jerseyColors: [] as string[],
 });
 
 const rosterSizeOptions: string[] = Array.from({length: 30}, (_, i) =>
@@ -110,6 +114,29 @@ const activityOptions = [
   {label: 'Lacrosse', emoji: '🥍'},
   {label: 'Volleyball', emoji: '🏐'},
 ];
+
+// Team-based sports that benefit from jersey color selection
+const teamSports = [
+  'Basketball',
+  'Hockey',
+  'Soccer',
+  'Football',
+  'Rugby',
+  'Lacrosse',
+  'Volleyball',
+];
+
+// Available jersey colors for team selection
+const jerseyColorOptions: {label: string; color: string}[] = [
+  {label: 'Red', color: '#E53935'},
+  {label: 'Blue', color: '#1E88E5'},
+  {label: 'Green', color: '#43A047'},
+  {label: 'White', color: '#FAFAFA'},
+  {label: 'Black', color: '#212121'},
+];
+
+const isTeamSport = (eventType: string) =>
+  teamSports.some(sport => sport.toLowerCase() === eventType.toLowerCase());
 
 const dateFilterOptions = [
   {label: 'All Dates', value: 'all'},
@@ -780,6 +807,62 @@ const EventList: React.FC = () => {
         keyboardAvoidingView: {
           flex: 1,
         },
+        // Jersey color picker styles
+        jerseyColorPickerContainer: {
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 16,
+        },
+        jerseyColorTitle: {
+          color: colors.text,
+          fontSize: 14,
+          fontWeight: '600',
+          marginBottom: 12,
+          textAlign: 'center',
+        },
+        jerseyColorGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          gap: 8,
+        },
+        jerseyColorOption: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.card,
+          paddingVertical: 10,
+          paddingHorizontal: 14,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+          minWidth: 100,
+        },
+        jerseyColorOptionSelected: {
+          borderColor: colors.primary,
+          borderWidth: 2,
+          backgroundColor: colors.primary + '15',
+        },
+        jerseyColorSwatch: {
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          marginRight: 8,
+        },
+        jerseyColorSwatchLight: {
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        jerseyColorLabel: {
+          color: colors.text,
+          fontSize: 14,
+        },
+        jerseyColorCheck: {
+          color: colors.primary,
+          fontSize: 16,
+          fontWeight: 'bold',
+          marginLeft: 'auto',
+        },
         activeFiltersContainer: {
           flexDirection: 'row',
           flexWrap: 'wrap',
@@ -892,6 +975,9 @@ const EventList: React.FC = () => {
   );
   const [showEventTypePicker, setShowEventTypePicker] = useState(false);
   const [tempEventType, setTempEventType] = useState(newEvent.eventType || '');
+
+  // Jersey color picker state for team sports
+  const [showJerseyColorPicker, setShowJerseyColorPicker] = useState(false);
 
   // Loading state for save operations
   const [savingEvent, setSavingEvent] = useState(false);
@@ -1087,6 +1173,16 @@ const EventList: React.FC = () => {
   };
 
   const handleSaveNewEvent = async () => {
+    // Validate jersey colors for team sports
+    if (isTeamSport(newEvent.eventType) && newEvent.jerseyColors.length !== 2) {
+      Alert.alert(
+        t('events.missingFields'),
+        t('events.selectTwoJerseyColors') ||
+          'Please select exactly 2 jersey colors for team sports.',
+      );
+      return;
+    }
+
     if (
       newEvent.name &&
       newEvent.location &&
@@ -1110,6 +1206,9 @@ const EventList: React.FC = () => {
               createdByUsername: userData?.username || '',
               latitude: newEvent.latitude,
               longitude: newEvent.longitude,
+              jerseyColors: isTeamSport(newEvent.eventType)
+                ? newEvent.jerseyColors
+                : undefined,
             },
           );
           setEventData(prevData =>
@@ -1135,6 +1234,9 @@ const EventList: React.FC = () => {
             createdByUsername: userData?.username || '',
             latitude: newEvent.latitude,
             longitude: newEvent.longitude,
+            jerseyColors: isTeamSport(newEvent.eventType)
+              ? newEvent.jerseyColors
+              : undefined,
           });
           setEventData(prevData => [...prevData, response.data]);
         } catch (error) {
@@ -1165,6 +1267,7 @@ const EventList: React.FC = () => {
       location: event.location,
       totalSpots: event.totalSpots,
       roster: [],
+      jerseyColors: event.jerseyColors,
     });
   };
 
@@ -1831,7 +1934,12 @@ const EventList: React.FC = () => {
                   </View>
                   <TouchableOpacity
                     onPress={() => {
-                      setNewEvent({...newEvent, eventType: tempEventType});
+                      // Reset jersey colors when changing event type
+                      setNewEvent({
+                        ...newEvent,
+                        eventType: tempEventType,
+                        jerseyColors: [],
+                      });
                       setShowEventTypePicker(false);
                     }}>
                     <Text style={themedStyles.confirmButton}>
@@ -1839,6 +1947,94 @@ const EventList: React.FC = () => {
                     </Text>
                   </TouchableOpacity>
                 </View>
+              )}
+
+              {/* Jersey Color Selector - only for team sports */}
+              {isTeamSport(newEvent.eventType) && (
+                <>
+                  <TouchableOpacity
+                    style={themedStyles.modalInput}
+                    onPress={() => setShowJerseyColorPicker(true)}>
+                    <Text
+                      style={{
+                        color:
+                          newEvent.jerseyColors.length === 2
+                            ? colors.text
+                            : colors.placeholder,
+                      }}>
+                      {newEvent.jerseyColors.length === 2
+                        ? `Team Colors: ${newEvent.jerseyColors.join(' vs ')}`
+                        : t('events.selectJerseyColors') ||
+                          'Select 2 Jersey Colors'}
+                    </Text>
+                  </TouchableOpacity>
+                  {showJerseyColorPicker && (
+                    <View style={themedStyles.jerseyColorPickerContainer}>
+                      <Text style={themedStyles.jerseyColorTitle}>
+                        {t('events.selectTwoColors') ||
+                          'Select 2 team jersey colors:'}
+                      </Text>
+                      <View style={themedStyles.jerseyColorGrid}>
+                        {jerseyColorOptions.map(colorOpt => {
+                          const isSelected = newEvent.jerseyColors.includes(
+                            colorOpt.label,
+                          );
+                          const isLight =
+                            colorOpt.label === 'White' ||
+                            colorOpt.label === 'Yellow';
+                          return (
+                            <TouchableOpacity
+                              key={colorOpt.label}
+                              style={[
+                                themedStyles.jerseyColorOption,
+                                isSelected &&
+                                  themedStyles.jerseyColorOptionSelected,
+                              ]}
+                              onPress={() => {
+                                let updatedColors = [...newEvent.jerseyColors];
+                                if (isSelected) {
+                                  // Remove if already selected
+                                  updatedColors = updatedColors.filter(
+                                    c => c !== colorOpt.label,
+                                  );
+                                } else if (updatedColors.length < 2) {
+                                  // Add if less than 2 selected
+                                  updatedColors.push(colorOpt.label);
+                                }
+                                setNewEvent({
+                                  ...newEvent,
+                                  jerseyColors: updatedColors,
+                                });
+                              }}>
+                              <View
+                                style={[
+                                  themedStyles.jerseyColorSwatch,
+                                  {backgroundColor: colorOpt.color},
+                                  isLight &&
+                                    themedStyles.jerseyColorSwatchLight,
+                                ]}
+                              />
+                              <Text style={themedStyles.jerseyColorLabel}>
+                                {colorOpt.label}
+                              </Text>
+                              {isSelected && (
+                                <Text style={themedStyles.jerseyColorCheck}>
+                                  ✓
+                                </Text>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setShowJerseyColorPicker(false)}>
+                        <Text style={themedStyles.confirmButton}>
+                          {t('common.done') || 'Done'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
               )}
 
               <View style={themedStyles.buttonContainer}>

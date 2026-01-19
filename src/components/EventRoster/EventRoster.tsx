@@ -49,6 +49,7 @@ type EventRosterRouteProp = RouteProp<
       location?: string;
       totalSpots?: number;
       roster?: Player[];
+      jerseyColors?: string[];
     };
   },
   'EventRoster'
@@ -132,11 +133,32 @@ const EventRoster: React.FC = () => {
     location,
     totalSpots = 10,
     roster: initialRoster,
+    jerseyColors: initialJerseyColors,
   } = route.params;
   const {colors} = useTheme();
   const {updateRosterSpots} = useEventContext();
   const {userData} = useContext(UserContext) as UserContextType;
   const {t} = useTranslation();
+
+  // State for event jersey colors (can be updated from backend)
+  const [eventJerseyColors, setEventJerseyColors] = useState<
+    string[] | undefined
+  >(initialJerseyColors);
+
+  // Filter jersey colors if event has specified team colors
+  const availableJerseyColors = useMemo(() => {
+    if (eventJerseyColors && eventJerseyColors.length === 2) {
+      // Only show the 2 team colors specified for this event
+      return Object.entries(jerseyColors)
+        .filter(([name]) => eventJerseyColors.includes(name))
+        .reduce(
+          (acc, [name, color]) => ({...acc, [name]: color}),
+          {} as Record<string, string>,
+        );
+    }
+    // Show all colors if no team colors specified
+    return jerseyColors;
+  }, [eventJerseyColors]);
 
   const [roster, setRoster] = useState<Player[]>(initialRoster || []);
   const [username, setUsername] = useState(userData?.username || '');
@@ -703,19 +725,26 @@ const EventRoster: React.FC = () => {
     [colors],
   );
 
-  // Fetch roster from backend on mount for freshness
+  // Fetch roster and event details from backend on mount for freshness
   useEffect(() => {
-    const fetchRoster = async () => {
+    const fetchEventData = async () => {
       setLoading(true);
       try {
         const response = await axios.get(`${API_BASE_URL}/events/${eventId}`);
         setRoster(response.data.roster || []);
+        // Update jersey colors from backend if available
+        if (
+          response.data.jerseyColors &&
+          response.data.jerseyColors.length === 2
+        ) {
+          setEventJerseyColors(response.data.jerseyColors);
+        }
       } catch (error) {
         setRoster([]);
       }
       setLoading(false);
     };
-    fetchRoster();
+    fetchEventData();
   }, [eventId]);
 
   // Persist roster to backend
@@ -1286,7 +1315,7 @@ const EventRoster: React.FC = () => {
                 {t('roster.jerseyColor')}
               </Text>
               <ScrollView style={themedStyles.modalScrollView}>
-                {Object.keys(jerseyColors).map(color => (
+                {Object.keys(availableJerseyColors).map(color => (
                   <TouchableOpacity
                     key={color}
                     style={[
@@ -1300,7 +1329,7 @@ const EventRoster: React.FC = () => {
                     <View
                       style={[
                         themedStyles.colorSwatch,
-                        {backgroundColor: jerseyColors[color]},
+                        {backgroundColor: availableJerseyColors[color]},
                       ]}
                     />
                     <Text
@@ -1554,7 +1583,7 @@ const EventRoster: React.FC = () => {
                 {t('roster.jerseyColor')}
               </Text>
               <ScrollView style={themedStyles.modalScrollView}>
-                {Object.keys(jerseyColors).map(color => (
+                {Object.keys(availableJerseyColors).map(color => (
                   <TouchableOpacity
                     key={color}
                     style={[
@@ -1569,7 +1598,7 @@ const EventRoster: React.FC = () => {
                     <View
                       style={[
                         themedStyles.colorSwatch,
-                        {backgroundColor: jerseyColors[color]},
+                        {backgroundColor: availableJerseyColors[color]},
                       ]}
                     />
                     <Text
