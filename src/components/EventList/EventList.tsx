@@ -1390,7 +1390,10 @@ const EventList: React.FC = () => {
   };
 
   const renderEventCard = ({item}: {item: Event}) => (
-    <View style={themedStyles.card}>
+    <TouchableOpacity
+      style={themedStyles.card}
+      onPress={() => handleEventPress(item)}
+      activeOpacity={0.9}>
       {/* Event Name */}
       <View style={themedStyles.cardRow}>
         <Text style={themedStyles.cardEmoji}>
@@ -1478,23 +1481,10 @@ const EventList: React.FC = () => {
       {/* Action Buttons */}
       <View style={themedStyles.actionRow}>
         <TouchableOpacity
-          style={themedStyles.actionButton}
+          style={[themedStyles.actionButton, themedStyles.joinButton]}
           onPress={() => openMapsForEvent(item, t)}>
           <FontAwesomeIcon
             icon={faLocationArrow}
-            size={16}
-            color={colors.primary}
-            style={themedStyles.actionButtonIcon}
-          />
-          <Text style={themedStyles.actionButtonText}>
-            {t('events.getDirections')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[themedStyles.actionButton, themedStyles.joinButton]}
-          onPress={() => handleEventPress(item)}>
-          <FontAwesomeIcon
-            icon={faArrowRightToBracket}
             size={16}
             color={colors.buttonText || '#fff'}
             style={themedStyles.actionButtonIcon}
@@ -1504,7 +1494,7 @@ const EventList: React.FC = () => {
               themedStyles.actionButtonText,
               themedStyles.joinButtonText,
             ]}>
-            {t('events.viewEvent')}
+            {t('events.getDirections')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -1535,7 +1525,7 @@ const EventList: React.FC = () => {
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
