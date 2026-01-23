@@ -4,6 +4,7 @@ import {createStackNavigator} from '@react-navigation/stack';
 import EventList from '../EventList/EventList';
 import EventRoster from '../EventRoster/EventRoster';
 import Profile from '../Profile/Profile';
+import PublicProfile from '../Profile/PublicProfile';
 import CommunityNotes from '../Communitynotes/CommunityNotes';
 import {VenueList, VenueDetail, SpaceDetail} from '../Venues';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -79,6 +80,13 @@ const LocalEventsStack = () => {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="PublicProfile"
+        component={PublicProfile}
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -105,6 +113,29 @@ const VenueStack = () => {
       <Stack.Screen
         name="SpaceDetail"
         component={SpaceDetail}
+        options={{headerShown: false}}
+      />
+    </Stack.Navigator>
+  );
+};
+
+// Stack Navigator for Community Notes screens
+const CommunityNotesStack = () => {
+  const {colors} = useTheme();
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {backgroundColor: colors.card},
+        headerTintColor: colors.text,
+      }}>
+      <Stack.Screen
+        name="CommunityNotesList"
+        component={CommunityNotes}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="PublicProfile"
+        component={PublicProfile}
         options={{headerShown: false}}
       />
     </Stack.Navigator>
@@ -153,7 +184,7 @@ const BottomNavigator: React.FC = () => {
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Local" component={LocalEventsStack} />
       <Tab.Screen name="Venues" component={VenueStack} />
-      <Tab.Screen name="CommunityNotes" component={CommunityNotes} />
+      <Tab.Screen name="CommunityNotes" component={CommunityNotesStack} />
       <Tab.Screen
         name="Profile"
         component={Profile}

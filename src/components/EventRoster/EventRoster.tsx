@@ -1,4 +1,10 @@
-import React, {useState, useEffect, useMemo, useContext} from 'react';
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useContext,
+  useCallback,
+} from 'react';
 import {
   View,
   Text,
@@ -10,9 +16,15 @@ import {
   Modal,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {RouteProp, useRoute} from '@react-navigation/native';
+import {
+  RouteProp,
+  useRoute,
+  useNavigation,
+  useFocusEffect,
+} from '@react-navigation/native';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
 import {useEventContext} from '../../Context/EventContext';
@@ -32,10 +44,12 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 export interface Player {
+  userId?: string;
   username: string;
   paidStatus: string;
   jerseyColor: string;
   position: string;
+  profilePicUrl?: string;
 }
 
 type EventRosterRouteProp = RouteProp<
@@ -124,6 +138,7 @@ const getInitials = (name: string) => {
 
 const EventRoster: React.FC = () => {
   const route = useRoute<EventRosterRouteProp>();
+  const navigation = useNavigation<any>();
   const {
     eventId,
     eventName,
@@ -171,7 +186,7 @@ const EventRoster: React.FC = () => {
   const [jerseyColorModalVisible, setJerseyColorModalVisible] = useState(false);
   const [positionModalVisible, setPositionModalVisible] = useState(false);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [savingRoster, setSavingRoster] = useState(false);
   const [addPlayerExpanded, setAddPlayerExpanded] = useState(false);
 
@@ -180,12 +195,7 @@ const EventRoster: React.FC = () => {
   const [editPaidStatus, setEditPaidStatus] = useState('');
   const [editJerseyColor, setEditJerseyColor] = useState('');
   const [editPosition, setEditPosition] = useState('');
-  const [editPaidStatusModalVisible, setEditPaidStatusModalVisible] =
-    useState(false);
-  const [editJerseyColorModalVisible, setEditJerseyColorModalVisible] =
-    useState(false);
-  const [editPositionModalVisible, setEditPositionModalVisible] =
-    useState(false);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   // Check if current user is already on roster
   const isUserOnRoster = useMemo(() => {
@@ -522,6 +532,12 @@ const EventRoster: React.FC = () => {
           justifyContent: 'center',
           marginRight: 14,
         },
+        avatarImage: {
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          marginRight: 14,
+        },
         avatarLight: {
           borderWidth: 2,
           borderColor: colors.border,
@@ -663,6 +679,37 @@ const EventRoster: React.FC = () => {
           flex: 1,
           marginLeft: 12,
         },
+        expandedOptions: {
+          backgroundColor: colors.background,
+          borderRadius: 10,
+          marginBottom: 12,
+          marginTop: -8,
+          paddingHorizontal: 8,
+          paddingVertical: 4,
+        },
+        inlineOption: {
+          padding: 12,
+          borderRadius: 8,
+          marginVertical: 2,
+          backgroundColor: colors.card,
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        inlineOptionSelected: {
+          backgroundColor: colors.primary + '20',
+          borderWidth: 1,
+          borderColor: colors.primary,
+        },
+        inlineOptionText: {
+          color: colors.text,
+          fontSize: 15,
+          flex: 1,
+          marginLeft: 12,
+        },
+        inlineOptionTextSelected: {
+          color: colors.primary,
+          fontWeight: '600',
+        },
         colorSwatch: {
           width: 24,
           height: 24,
@@ -725,27 +772,34 @@ const EventRoster: React.FC = () => {
     [colors],
   );
 
-  // Fetch roster and event details from backend on mount for freshness
-  useEffect(() => {
-    const fetchEventData = async () => {
-      setLoading(true);
-      try {
-        const response = await axios.get(`${API_BASE_URL}/events/${eventId}`);
-        setRoster(response.data.roster || []);
-        // Update jersey colors from backend if available
-        if (
-          response.data.jerseyColors &&
-          response.data.jerseyColors.length === 2
-        ) {
-          setEventJerseyColors(response.data.jerseyColors);
-        }
-      } catch (error) {
-        setRoster([]);
+  // Fetch roster and event details from backend
+  const fetchEventData = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/events/${eventId}`);
+      setRoster(response.data.roster || []);
+      // Update jersey colors from backend if available
+      if (
+        response.data.jerseyColors &&
+        response.data.jerseyColors.length === 2
+      ) {
+        setEventJerseyColors(response.data.jerseyColors);
       }
-      setLoading(false);
-    };
-    fetchEventData();
+    } catch (error) {
+      setRoster([]);
+    }
   }, [eventId]);
+
+  // Auto-refresh when screen comes into focus (e.g., navigating back)
+  useFocusEffect(
+    useCallback(() => {
+      const loadData = async () => {
+        setLoading(true);
+        await fetchEventData();
+        setLoading(false);
+      };
+      loadData();
+    }, [fetchEventData]),
+  );
 
   // Persist roster to backend
   const persistRoster = async (updatedRoster: Player[]) => {
@@ -769,7 +823,14 @@ const EventRoster: React.FC = () => {
       return;
     }
     setSavingRoster(true);
-    const newPlayer: Player = {username, paidStatus, jerseyColor, position};
+    const newPlayer: Player = {
+      userId: userData?._id,
+      username,
+      paidStatus,
+      jerseyColor,
+      position,
+      profilePicUrl: userData?.profilePicUrl,
+    };
     const updatedRoster = [...roster, newPlayer];
     setRoster(updatedRoster);
     await persistRoster(updatedRoster);
@@ -783,33 +844,54 @@ const EventRoster: React.FC = () => {
     setSavingRoster(false);
   };
 
-  // Delete player (only allow logged-in user to remove themselves)
-  const handleDelete = async (index: number) => {
-    const playerToDelete = roster[index];
-    if (!userData?.username || playerToDelete.username !== userData.username) {
-      Alert.alert(
-        t('roster.onlyRemoveSelf'),
-        t('roster.onlyRemoveSelfMessage'),
-      );
+  // Navigate to player's public profile
+  const handlePlayerPress = (player: Player) => {
+    // Don't navigate to your own profile from here
+    if (player.username === userData?.username) {
       return;
     }
-    Alert.alert(t('roster.leaveConfirm'), t('roster.leaveConfirmMessage'), [
-      {text: t('common.cancel'), style: 'cancel'},
-      {
-        text: t('common.leave'),
-        style: 'destructive',
-        onPress: async () => {
-          const updatedRoster = roster.filter((_, i) => i !== index);
-          setRoster(updatedRoster);
-          await persistRoster(updatedRoster);
-          updateRosterSpots(eventId, updatedRoster.length);
-        },
-      },
-    ]);
+    navigation.navigate('PublicProfile', {
+      userId: player.userId,
+      username: player.username,
+      profilePicUrl: player.profilePicUrl,
+    });
   };
 
+  // Delete player (only allow logged-in user to remove themselves)
+  const handleDelete = useCallback(
+    (playerUsername: string) => {
+      if (!userData?.username || playerUsername !== userData.username) {
+        Alert.alert(
+          t('roster.onlyRemoveSelf'),
+          t('roster.onlyRemoveSelfMessage'),
+        );
+        return;
+      }
+      Alert.alert(t('roster.leaveConfirm'), t('roster.leaveConfirmMessage'), [
+        {text: t('common.cancel'), style: 'cancel'},
+        {
+          text: t('common.leave'),
+          style: 'destructive',
+          onPress: async () => {
+            // Use functional update to get latest roster state
+            setRoster(currentRoster => {
+              const updatedRoster = currentRoster.filter(
+                p => p.username !== playerUsername,
+              );
+              // Persist in background
+              persistRoster(updatedRoster);
+              updateRosterSpots(eventId, updatedRoster.length);
+              return updatedRoster;
+            });
+          },
+        },
+      ]);
+    },
+    [userData?.username, t, eventId, updateRosterSpots],
+  );
+
   // Open edit modal for current user
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     const currentPlayer = roster.find(p => p.username === userData?.username);
     if (currentPlayer) {
       setEditPaidStatus(currentPlayer.paidStatus);
@@ -817,33 +899,69 @@ const EventRoster: React.FC = () => {
       setEditPosition(currentPlayer.position);
       setEditModalVisible(true);
     }
-  };
+  }, [roster, userData?.username]);
 
   // Save edited player info
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = useCallback(async () => {
     if (!editPaidStatus || !editJerseyColor || !editPosition) {
       Alert.alert(t('roster.missingFields'), t('roster.missingFieldsMessage'));
       return;
     }
-    const updatedRoster = roster.map(player =>
-      player.username === userData?.username
-        ? {
-            ...player,
-            paidStatus: editPaidStatus,
-            jerseyColor: editJerseyColor,
-            position: editPosition,
-          }
-        : player,
-    );
-    setRoster(updatedRoster);
-    await persistRoster(updatedRoster);
+    setRoster(currentRoster => {
+      const updatedRoster = currentRoster.map(player =>
+        player.username === userData?.username
+          ? {
+              ...player,
+              paidStatus: editPaidStatus,
+              jerseyColor: editJerseyColor,
+              position: editPosition,
+            }
+          : player,
+      );
+      // Persist in background
+      persistRoster(updatedRoster);
+      return updatedRoster;
+    });
     setEditModalVisible(false);
-  };
+  }, [editPaidStatus, editJerseyColor, editPosition, userData?.username, t]);
 
   const renderPlayerCard = ({item, index}: {item: Player; index: number}) => {
     const isSelf = item.username === userData?.username;
     const jerseyColorHex = jerseyColors[item.jerseyColor] || jerseyColors.Other;
     const isLight = isLightColor(item.jerseyColor);
+    // Allow navigation to any other user's profile (not just those with userId)
+    const canNavigateToProfile = !isSelf;
+
+    // For the current user, use their latest profilePicUrl from context
+    // For other users, use the stored profilePicUrl from roster
+    const displayProfilePicUrl = isSelf
+      ? userData?.profilePicUrl || item.profilePicUrl
+      : item.profilePicUrl;
+
+    const avatarContent = displayProfilePicUrl ? (
+      <Image
+        source={{uri: displayProfilePicUrl}}
+        style={[
+          themedStyles.avatarImage,
+          {borderWidth: 3, borderColor: jerseyColorHex},
+        ]}
+      />
+    ) : (
+      <View
+        style={[
+          themedStyles.avatar,
+          {backgroundColor: jerseyColorHex},
+          isLight && themedStyles.avatarLight,
+        ]}>
+        <Text
+          style={[
+            themedStyles.avatarText,
+            isLight && themedStyles.avatarTextDark,
+          ]}>
+          {getInitials(item.username)}
+        </Text>
+      </View>
+    );
 
     return (
       <View
@@ -851,24 +969,27 @@ const EventRoster: React.FC = () => {
           themedStyles.playerCard,
           isSelf && themedStyles.playerCardSelf,
         ]}>
-        <View
-          style={[
-            themedStyles.avatar,
-            {backgroundColor: jerseyColorHex},
-            isLight && themedStyles.avatarLight,
-          ]}>
-          <Text
-            style={[
-              themedStyles.avatarText,
-              isLight && themedStyles.avatarTextDark,
-            ]}>
-            {getInitials(item.username)}
-          </Text>
-        </View>
+        {canNavigateToProfile ? (
+          <TouchableOpacity
+            onPress={() => handlePlayerPress(item)}
+            activeOpacity={0.7}>
+            {avatarContent}
+          </TouchableOpacity>
+        ) : (
+          avatarContent
+        )}
         <View style={themedStyles.playerInfo}>
-          <Text style={themedStyles.playerName}>
-            {item.username} {isSelf && '(You)'}
-          </Text>
+          {canNavigateToProfile ? (
+            <TouchableOpacity onPress={() => handlePlayerPress(item)}>
+              <Text style={[themedStyles.playerName, {color: colors.primary}]}>
+                {item.username}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={themedStyles.playerName}>
+              {item.username} {isSelf && '(You)'}
+            </Text>
+          )}
           <View style={themedStyles.playerDetails}>
             {/* Position Badge */}
             <View style={themedStyles.playerBadge}>
@@ -921,7 +1042,7 @@ const EventRoster: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={themedStyles.deleteButton}
-              onPress={() => handleDelete(index)}>
+              onPress={() => handleDelete(item.username)}>
               <Text style={themedStyles.deleteButtonText}>Leave</Text>
             </TouchableOpacity>
           </View>
@@ -938,7 +1059,8 @@ const EventRoster: React.FC = () => {
     <SafeAreaView style={themedStyles.safeArea} edges={['top']}>
       <ScrollView
         style={themedStyles.container}
-        contentContainerStyle={themedStyles.scrollContent}>
+        contentContainerStyle={themedStyles.scrollContent}
+        showsVerticalScrollIndicator={false}>
         {/* Event Header */}
         <View style={themedStyles.eventHeader}>
           <Text style={themedStyles.eventEmoji}>{sportEmoji}</Text>
@@ -1411,86 +1533,220 @@ const EventRoster: React.FC = () => {
           visible={editModalVisible}
           transparent
           animationType="fade"
-          onRequestClose={() => setEditModalVisible(false)}>
+          onRequestClose={() => {
+            setEditModalVisible(false);
+            setExpandedSection(null);
+          }}>
           <View style={themedStyles.modalOverlay}>
-            <View style={themedStyles.modalContent}>
+            <View style={[themedStyles.modalContent, {maxHeight: '80%'}]}>
               <Text style={themedStyles.modalTitle}>
                 ✏️ {t('roster.editYourInfo')}
               </Text>
 
-              {/* Edit Paid Status */}
-              <TouchableOpacity
-                style={themedStyles.dropdown}
-                onPress={() => setEditPaidStatusModalVisible(true)}>
-                <Text
-                  style={
-                    editPaidStatus
-                      ? themedStyles.dropdownText
-                      : themedStyles.placeholderText
+              <ScrollView
+                style={{flexGrow: 0}}
+                showsVerticalScrollIndicator={false}>
+                {/* Edit Paid Status */}
+                <TouchableOpacity
+                  style={themedStyles.dropdown}
+                  onPress={() =>
+                    setExpandedSection(
+                      expandedSection === 'paid' ? null : 'paid',
+                    )
                   }>
-                  {editPaidStatus || t('roster.selectPaidStatus')}
-                </Text>
-                <FontAwesomeIcon
-                  icon={faChevronDown}
-                  size={14}
-                  color={colors.placeholder}
-                />
-              </TouchableOpacity>
-
-              {/* Edit Jersey Color */}
-              <TouchableOpacity
-                style={themedStyles.dropdown}
-                onPress={() => setEditJerseyColorModalVisible(true)}>
-                <View style={themedStyles.jerseyDropdownRow}>
-                  {editJerseyColor && (
-                    <View
-                      style={[
-                        themedStyles.jerseyIndicatorLarge,
-                        {
-                          backgroundColor:
-                            jerseyColors[editJerseyColor] || jerseyColors.Other,
-                        },
-                      ]}
-                    />
-                  )}
                   <Text
                     style={
-                      editJerseyColor
+                      editPaidStatus
                         ? themedStyles.dropdownText
                         : themedStyles.placeholderText
                     }>
-                    {editJerseyColor || t('roster.selectJerseyColor')}
+                    {editPaidStatus || t('roster.selectPaidStatus')}
                   </Text>
-                </View>
-                <FontAwesomeIcon
-                  icon={faChevronDown}
-                  size={14}
-                  color={colors.placeholder}
-                />
-              </TouchableOpacity>
+                  <FontAwesomeIcon
+                    icon={
+                      expandedSection === 'paid' ? faChevronUp : faChevronDown
+                    }
+                    size={14}
+                    color={colors.placeholder}
+                  />
+                </TouchableOpacity>
+                {expandedSection === 'paid' && (
+                  <View style={themedStyles.expandedOptions}>
+                    {['Paid', 'Unpaid'].map(status => (
+                      <TouchableOpacity
+                        key={status}
+                        style={[
+                          themedStyles.inlineOption,
+                          editPaidStatus === status &&
+                            themedStyles.inlineOptionSelected,
+                        ]}
+                        onPress={() => {
+                          setEditPaidStatus(status);
+                          setExpandedSection(null);
+                        }}>
+                        <FontAwesomeIcon
+                          icon={status === 'Paid' ? faCheck : faTimes}
+                          size={16}
+                          color={
+                            status === 'Paid'
+                              ? '#4CAF50'
+                              : editPaidStatus === status
+                              ? colors.primary
+                              : colors.text
+                          }
+                        />
+                        <Text
+                          style={[
+                            themedStyles.inlineOptionText,
+                            editPaidStatus === status &&
+                              themedStyles.inlineOptionTextSelected,
+                          ]}>
+                          {status}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
-              {/* Edit Position */}
-              <TouchableOpacity
-                style={themedStyles.dropdown}
-                onPress={() => setEditPositionModalVisible(true)}>
-                <Text
-                  style={
-                    editPosition
-                      ? themedStyles.dropdownText
-                      : themedStyles.placeholderText
+                {/* Edit Jersey Color */}
+                <TouchableOpacity
+                  style={themedStyles.dropdown}
+                  onPress={() =>
+                    setExpandedSection(
+                      expandedSection === 'jersey' ? null : 'jersey',
+                    )
                   }>
-                  {editPosition || t('roster.selectPosition')}
-                </Text>
-                <FontAwesomeIcon
-                  icon={faChevronDown}
-                  size={14}
-                  color={colors.placeholder}
-                />
-              </TouchableOpacity>
+                  <View style={themedStyles.jerseyDropdownRow}>
+                    {editJerseyColor && (
+                      <View
+                        style={[
+                          themedStyles.jerseyIndicatorLarge,
+                          {
+                            backgroundColor:
+                              jerseyColors[editJerseyColor] ||
+                              jerseyColors.Other,
+                          },
+                        ]}
+                      />
+                    )}
+                    <Text
+                      style={
+                        editJerseyColor
+                          ? themedStyles.dropdownText
+                          : themedStyles.placeholderText
+                      }>
+                      {editJerseyColor || t('roster.selectJerseyColor')}
+                    </Text>
+                  </View>
+                  <FontAwesomeIcon
+                    icon={
+                      expandedSection === 'jersey' ? faChevronUp : faChevronDown
+                    }
+                    size={14}
+                    color={colors.placeholder}
+                  />
+                </TouchableOpacity>
+                {expandedSection === 'jersey' && (
+                  <View style={themedStyles.expandedOptions}>
+                    {Object.keys(availableJerseyColors).map(color => (
+                      <TouchableOpacity
+                        key={color}
+                        style={[
+                          themedStyles.inlineOption,
+                          editJerseyColor === color &&
+                            themedStyles.inlineOptionSelected,
+                        ]}
+                        onPress={() => {
+                          setEditJerseyColor(color);
+                          setExpandedSection(null);
+                        }}>
+                        <View
+                          style={[
+                            themedStyles.colorSwatch,
+                            {backgroundColor: availableJerseyColors[color]},
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            themedStyles.inlineOptionText,
+                            editJerseyColor === color &&
+                              themedStyles.inlineOptionTextSelected,
+                          ]}>
+                          {color}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Edit Position */}
+                <TouchableOpacity
+                  style={themedStyles.dropdown}
+                  onPress={() =>
+                    setExpandedSection(
+                      expandedSection === 'position' ? null : 'position',
+                    )
+                  }>
+                  <Text
+                    style={
+                      editPosition
+                        ? themedStyles.dropdownText
+                        : themedStyles.placeholderText
+                    }>
+                    {editPosition || t('roster.selectPosition')}
+                  </Text>
+                  <FontAwesomeIcon
+                    icon={
+                      expandedSection === 'position'
+                        ? faChevronUp
+                        : faChevronDown
+                    }
+                    size={14}
+                    color={colors.placeholder}
+                  />
+                </TouchableOpacity>
+                {expandedSection === 'position' && (
+                  <View style={themedStyles.expandedOptions}>
+                    {(
+                      positionOptions[eventType] || positionOptions.Default
+                    ).map(pos => (
+                      <TouchableOpacity
+                        key={pos}
+                        style={[
+                          themedStyles.inlineOption,
+                          editPosition === pos &&
+                            themedStyles.inlineOptionSelected,
+                        ]}
+                        onPress={() => {
+                          setEditPosition(pos);
+                          setExpandedSection(null);
+                        }}>
+                        <FontAwesomeIcon
+                          icon={faFutbol}
+                          size={16}
+                          color={
+                            editPosition === pos
+                              ? colors.primary
+                              : colors.placeholder
+                          }
+                        />
+                        <Text
+                          style={[
+                            themedStyles.inlineOptionText,
+                            editPosition === pos &&
+                              themedStyles.inlineOptionTextSelected,
+                          ]}>
+                          {pos}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
 
               {/* Save & Cancel Buttons */}
               <TouchableOpacity
-                style={themedStyles.saveButton}
+                style={[themedStyles.saveButton, {marginTop: 16}]}
                 onPress={handleSaveEdit}>
                 <FontAwesomeIcon
                   icon={faCheck}
@@ -1506,174 +1762,13 @@ const EventRoster: React.FC = () => {
                   themedStyles.modalClose,
                   {backgroundColor: colors.border},
                 ]}
-                onPress={() => setEditModalVisible(false)}>
+                onPress={() => {
+                  setEditModalVisible(false);
+                  setExpandedSection(null);
+                }}>
                 <Text
                   style={[themedStyles.modalCloseText, {color: colors.text}]}>
                   {t('common.cancel')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Edit Paid Status Modal */}
-        <Modal
-          visible={editPaidStatusModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setEditPaidStatusModalVisible(false)}>
-          <View style={themedStyles.modalOverlay}>
-            <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>
-                {t('roster.paymentStatus')}
-              </Text>
-              {['Paid', 'Unpaid'].map(status => (
-                <TouchableOpacity
-                  key={status}
-                  style={[
-                    themedStyles.modalOption,
-                    editPaidStatus === status &&
-                      themedStyles.modalOptionSelected,
-                  ]}
-                  onPress={() => {
-                    setEditPaidStatus(status);
-                    setEditPaidStatusModalVisible(false);
-                  }}>
-                  <FontAwesomeIcon
-                    icon={status === 'Paid' ? faCheck : faTimes}
-                    size={16}
-                    color={
-                      status === 'Paid'
-                        ? '#4CAF50'
-                        : editPaidStatus === status
-                        ? colors.primary
-                        : colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      themedStyles.modalOptionTextWithMargin,
-                      editPaidStatus === status &&
-                        themedStyles.modalOptionTextSelected,
-                    ]}>
-                    {status}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={themedStyles.modalClose}
-                onPress={() => setEditPaidStatusModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>
-                  {t('common.close')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Edit Jersey Color Modal */}
-        <Modal
-          visible={editJerseyColorModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setEditJerseyColorModalVisible(false)}>
-          <View style={themedStyles.modalOverlay}>
-            <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>
-                {t('roster.jerseyColor')}
-              </Text>
-              <ScrollView style={themedStyles.modalScrollView}>
-                {Object.keys(availableJerseyColors).map(color => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[
-                      themedStyles.modalOption,
-                      editJerseyColor === color &&
-                        themedStyles.modalOptionSelected,
-                    ]}
-                    onPress={() => {
-                      setEditJerseyColor(color);
-                      setEditJerseyColorModalVisible(false);
-                    }}>
-                    <View
-                      style={[
-                        themedStyles.colorSwatch,
-                        {backgroundColor: availableJerseyColors[color]},
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        themedStyles.modalOptionText,
-                        editJerseyColor === color &&
-                          themedStyles.modalOptionTextSelected,
-                      ]}>
-                      {color}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={themedStyles.modalClose}
-                onPress={() => setEditJerseyColorModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>
-                  {t('common.close')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Edit Position Modal */}
-        <Modal
-          visible={editPositionModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setEditPositionModalVisible(false)}>
-          <View style={themedStyles.modalOverlay}>
-            <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>
-                {t('roster.selectPosition')}
-              </Text>
-              <ScrollView style={themedStyles.modalScrollView}>
-                {(positionOptions[eventType] || positionOptions.Default).map(
-                  pos => (
-                    <TouchableOpacity
-                      key={pos}
-                      style={[
-                        themedStyles.modalOption,
-                        editPosition === pos &&
-                          themedStyles.modalOptionSelected,
-                      ]}
-                      onPress={() => {
-                        setEditPosition(pos);
-                        setEditPositionModalVisible(false);
-                      }}>
-                      <FontAwesomeIcon
-                        icon={faFutbol}
-                        size={16}
-                        color={
-                          editPosition === pos
-                            ? colors.primary
-                            : colors.placeholder
-                        }
-                      />
-                      <Text
-                        style={[
-                          themedStyles.modalOptionTextWithMargin,
-                          editPosition === pos &&
-                            themedStyles.modalOptionTextSelected,
-                        ]}>
-                        {pos}
-                      </Text>
-                    </TouchableOpacity>
-                  ),
-                )}
-              </ScrollView>
-              <TouchableOpacity
-                style={themedStyles.modalClose}
-                onPress={() => setEditPositionModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>
-                  {t('common.close')}
                 </Text>
               </TouchableOpacity>
             </View>

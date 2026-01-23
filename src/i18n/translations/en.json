@@ -164,7 +164,8 @@
     "imageTooLarge": "Image Too Large",
     "imageTooLargeMessage": "This photo is too big. Please choose a smaller image or try taking a new one.",
     "uploadFailed": "Upload Failed",
-    "uploadFailedMessage": "Couldn't upload your photo. Please try again."
+    "uploadFailedMessage": "Couldn't upload your photo. Please try again.",
+    "playerProfile": "Player Profile"
   },
   "communityNotes": {
     "title": "Community Notes",

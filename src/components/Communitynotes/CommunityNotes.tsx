@@ -42,6 +42,8 @@ import axios from 'axios';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
+import {useNavigation} from '@react-navigation/native';
+import {StackNavigationProp} from '@react-navigation/stack';
 
 interface Reply {
   _id?: string;
@@ -73,6 +75,17 @@ interface Post {
   likedByUsernames?: string[]; // Array of usernames who liked
   createdAt?: string;
 }
+
+// Navigation type for CommunityNotes stack
+type CommunityNotesStackParamList = {
+  CommunityNotesList: undefined;
+  PublicProfile: {userId: string; username: string; profilePicUrl?: string};
+};
+
+type CommunityNotesNavigationProp = StackNavigationProp<
+  CommunityNotesStackParamList,
+  'CommunityNotesList'
+>;
 
 // Helper to get user initials for avatar
 const getInitials = (name: string): string => {
@@ -150,6 +163,19 @@ const CommunityNotes: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
   const {t} = useTranslation();
+  const navigation = useNavigation<CommunityNotesNavigationProp>();
+
+  // Navigate to user's public profile
+  const navigateToProfile = useCallback(
+    (userId: string, username: string, profilePicUrl?: string) => {
+      // Don't navigate to own profile from here
+      if (userData && userId === userData._id) {
+        return;
+      }
+      navigation.navigate('PublicProfile', {userId, username, profilePicUrl});
+    },
+    [navigation, userData],
+  );
 
   // First-time user onboarding state
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
@@ -1458,18 +1484,28 @@ const CommunityNotes: React.FC = () => {
               <View style={styles.postContainer}>
                 {/* Post Header with Avatar */}
                 <View style={styles.postHeaderRow}>
-                  {item.profilePicUrl ? (
-                    <Image
-                      source={{uri: item.profilePicUrl}}
-                      style={styles.postAvatarImage}
-                    />
-                  ) : (
-                    <View style={styles.postAvatar}>
-                      <Text style={styles.postAvatarText}>
-                        {getInitials(item.username)}
-                      </Text>
-                    </View>
-                  )}
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigateToProfile(
+                        item.userId,
+                        item.username,
+                        item.profilePicUrl,
+                      )
+                    }
+                    disabled={userData && item.userId === userData._id}>
+                    {item.profilePicUrl ? (
+                      <Image
+                        source={{uri: item.profilePicUrl}}
+                        style={styles.postAvatarImage}
+                      />
+                    ) : (
+                      <View style={styles.postAvatar}>
+                        <Text style={styles.postAvatarText}>
+                          {getInitials(item.username)}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
                   <View style={styles.postHeaderContent}>
                     <View style={styles.postUsernameRow}>
                       <Text style={styles.postUsername}>{item.username}</Text>
@@ -1648,18 +1684,30 @@ const CommunityNotes: React.FC = () => {
                           key={comment._id || comment.text}
                           style={styles.commentContainer}>
                           <View style={styles.commentHeaderRow}>
-                            {comment.profilePicUrl ? (
-                              <Image
-                                source={{uri: comment.profilePicUrl}}
-                                style={styles.commentAvatarImage}
-                              />
-                            ) : (
-                              <View style={styles.commentAvatar}>
-                                <Text style={styles.commentAvatarText}>
-                                  {getInitials(comment.username)}
-                                </Text>
-                              </View>
-                            )}
+                            <TouchableOpacity
+                              onPress={() =>
+                                navigateToProfile(
+                                  comment.userId,
+                                  comment.username,
+                                  comment.profilePicUrl,
+                                )
+                              }
+                              disabled={
+                                userData && comment.userId === userData._id
+                              }>
+                              {comment.profilePicUrl ? (
+                                <Image
+                                  source={{uri: comment.profilePicUrl}}
+                                  style={styles.commentAvatarImage}
+                                />
+                              ) : (
+                                <View style={styles.commentAvatar}>
+                                  <Text style={styles.commentAvatarText}>
+                                    {getInitials(comment.username)}
+                                  </Text>
+                                </View>
+                              )}
+                            </TouchableOpacity>
                             <View style={styles.commentContent}>
                               <View style={styles.postUsernameRow}>
                                 <Text style={styles.commentUsername}>
@@ -1826,18 +1874,31 @@ const CommunityNotes: React.FC = () => {
                                   key={reply._id || reply.text}
                                   style={styles.replyContainer}>
                                   <View style={styles.replyHeaderRow}>
-                                    {reply.profilePicUrl ? (
-                                      <Image
-                                        source={{uri: reply.profilePicUrl}}
-                                        style={styles.replyAvatarImage}
-                                      />
-                                    ) : (
-                                      <View style={styles.replyAvatar}>
-                                        <Text style={styles.replyAvatarText}>
-                                          {getInitials(reply.username)}
-                                        </Text>
-                                      </View>
-                                    )}
+                                    <TouchableOpacity
+                                      onPress={() =>
+                                        navigateToProfile(
+                                          reply.userId,
+                                          reply.username,
+                                          reply.profilePicUrl,
+                                        )
+                                      }
+                                      disabled={
+                                        userData &&
+                                        reply.userId === userData._id
+                                      }>
+                                      {reply.profilePicUrl ? (
+                                        <Image
+                                          source={{uri: reply.profilePicUrl}}
+                                          style={styles.replyAvatarImage}
+                                        />
+                                      ) : (
+                                        <View style={styles.replyAvatar}>
+                                          <Text style={styles.replyAvatarText}>
+                                            {getInitials(reply.username)}
+                                          </Text>
+                                        </View>
+                                      )}
+                                    </TouchableOpacity>
                                     <View style={styles.replyContent}>
                                       <View style={styles.postUsernameRow}>
                                         <Text style={styles.replyUsername}>
