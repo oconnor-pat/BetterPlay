@@ -32,17 +32,17 @@ interface ThemeContextType {
 }
 
 const lightColors: ThemeColors = {
-  background: '#bcbcbc',
-  card: '#fff',
-  text: '#222',
-  secondaryText: '#666',
+  background: '#f5f5f7',
+  card: '#ffffff',
+  text: '#1d1d1f',
+  secondaryText: '#86868b',
   primary: '#2ECC71',
-  border: '#ccc',
+  border: '#d2d2d7',
   error: '#b11313',
   success: '#4CAF50',
   buttonText: '#fff',
-  inputBackground: '#f0f0f0',
-  placeholder: '#888',
+  inputBackground: '#e8e8ed',
+  placeholder: '#8e8e93',
 };
 
 const darkColors: ThemeColors = {

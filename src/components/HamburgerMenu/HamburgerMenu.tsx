@@ -41,7 +41,7 @@ const HamburgerMenu: React.FC = () => {
         style={styles.hamburgerButton}
         onPress={handleMenuToggle}
         activeOpacity={0.6}>
-        <FontAwesomeIcon icon={faBars} size={24} color="#fff" />
+        <FontAwesomeIcon icon={faBars} size={24} color={colors.text} />
       </TouchableOpacity>
 
       {/* Modal for Menu */}
