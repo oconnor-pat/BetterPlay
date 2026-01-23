@@ -42,7 +42,12 @@ import axios from 'axios';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
-import {useNavigation} from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  RouteProp,
+  CommonActions,
+} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 
 interface Reply {
@@ -74,11 +79,24 @@ interface Post {
   likes?: string[]; // Array of user IDs who liked
   likedByUsernames?: string[]; // Array of usernames who liked
   createdAt?: string;
+  // Event linking fields
+  eventId?: string;
+  eventName?: string;
+  eventType?: string;
+}
+
+// Route params for event linking
+export interface EventLinkParams {
+  eventId: string;
+  eventName: string;
+  eventType: string;
 }
 
 // Navigation type for CommunityNotes stack
 type CommunityNotesStackParamList = {
-  CommunityNotesList: undefined;
+  CommunityNotesList:
+    | {eventLink?: EventLinkParams; scrollToEventId?: string}
+    | undefined;
   PublicProfile: {userId: string; username: string; profilePicUrl?: string};
 };
 
@@ -86,6 +104,30 @@ type CommunityNotesNavigationProp = StackNavigationProp<
   CommunityNotesStackParamList,
   'CommunityNotesList'
 >;
+
+type CommunityNotesRouteProp = RouteProp<
+  CommunityNotesStackParamList,
+  'CommunityNotesList'
+>;
+
+// Helper to get event type emoji
+const getEventTypeEmoji = (eventType: string): string => {
+  const activityOptions: {[key: string]: string} = {
+    Basketball: '🏀',
+    Hockey: '🏒',
+    Soccer: '⚽',
+    'Figure Skating': '⛸️',
+    Tennis: '🎾',
+    Golf: '⛳',
+    Football: '🏈',
+    Rugby: '🏉',
+    Baseball: '⚾',
+    Softball: '🥎',
+    Lacrosse: '🥍',
+    Volleyball: '🏐',
+  };
+  return activityOptions[eventType] || '🎯';
+};
 
 // Helper to get user initials for avatar
 const getInitials = (name: string): string => {
@@ -145,6 +187,9 @@ const CommunityNotes: React.FC = () => {
     usernames: string[];
   }>({title: '', usernames: []});
 
+  // Event linking state
+  const [linkedEvent, setLinkedEvent] = useState<EventLinkParams | null>(null);
+
   // Loading states for operations
   const [postingContent, setPostingContent] = useState(false);
 
@@ -164,6 +209,41 @@ const CommunityNotes: React.FC = () => {
   const {colors} = useTheme();
   const {t} = useTranslation();
   const navigation = useNavigation<CommunityNotesNavigationProp>();
+  const route = useRoute<CommunityNotesRouteProp>();
+
+  // Handle event link from navigation params (for creating new post)
+  useEffect(() => {
+    if (route.params?.eventLink) {
+      setLinkedEvent(route.params.eventLink);
+      // Focus on composer when navigating from an event
+      setTimeout(() => {
+        composerInputRef.current?.focus();
+      }, 300);
+    }
+  }, [route.params?.eventLink]);
+
+  // Handle scrolling to existing post for an event
+  useEffect(() => {
+    if (route.params?.scrollToEventId && posts.length > 0) {
+      const postIndex = posts.findIndex(
+        p => p.eventId === route.params?.scrollToEventId,
+      );
+      if (postIndex !== -1) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index: postIndex,
+            animated: true,
+            viewPosition: 0.3,
+          });
+        }, 300);
+      }
+    }
+  }, [route.params?.scrollToEventId, posts]);
+
+  // Clear linked event
+  const clearLinkedEvent = () => {
+    setLinkedEvent(null);
+  };
 
   // Navigate to user's public profile
   const navigateToProfile = useCallback(
@@ -177,12 +257,30 @@ const CommunityNotes: React.FC = () => {
     [navigation, userData],
   );
 
+  // Navigate to an event from a linked post
+  const navigateToEvent = useCallback(
+    (eventId: string) => {
+      // Navigate to the Local Events tab and potentially to the event
+      navigation.dispatch(
+        CommonActions.navigate({
+          name: 'Local',
+          params: {
+            screen: 'EventList',
+            params: {highlightEventId: eventId},
+          },
+        }),
+      );
+    },
+    [navigation],
+  );
+
   // First-time user onboarding state
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
 
   // --- Autofocus logic for reply input ---
   const replyInputRefs = useRef<{[key: string]: TextInput | null}>({});
   const composerInputRef = useRef<TextInput | null>(null);
+  const flatListRef = useRef<FlatList<Post> | null>(null);
 
   // Check if user has seen the community notes onboarding
   useEffect(() => {
@@ -258,6 +356,59 @@ const CommunityNotes: React.FC = () => {
           shadowOpacity: 0.08,
           shadowRadius: 8,
           elevation: 3,
+        },
+        // Event link badge in composer
+        eventLinkBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary + '15',
+          borderRadius: 12,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          marginBottom: 12,
+          borderWidth: 1,
+          borderColor: colors.primary + '30',
+        },
+        eventLinkBadgeEmoji: {
+          fontSize: 20,
+          marginRight: 10,
+        },
+        eventLinkBadgeTextContainer: {
+          flex: 1,
+          marginRight: 8,
+        },
+        eventLinkBadgeText: {
+          color: colors.text,
+          fontSize: 15,
+          fontWeight: '600',
+          marginBottom: 2,
+        },
+        eventLinkBadgeSubtext: {
+          color: colors.secondaryText,
+          fontSize: 12,
+        },
+        eventLinkClearButton: {
+          padding: 6,
+        },
+        // Event badge on posts
+        postEventBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary + '15',
+          borderRadius: 8,
+          paddingVertical: 6,
+          paddingHorizontal: 10,
+          marginBottom: 10,
+          alignSelf: 'flex-start',
+        },
+        postEventBadgeEmoji: {
+          fontSize: 14,
+          marginRight: 6,
+        },
+        postEventBadgeText: {
+          color: colors.primary,
+          fontSize: 13,
+          fontWeight: '600',
         },
         composerRow: {
           flexDirection: 'row',
@@ -1105,14 +1256,36 @@ const CommunityNotes: React.FC = () => {
     if (newPostText.trim() !== '' && userData) {
       setPostingContent(true);
       try {
-        const response = await axios.post(`${API_BASE_URL}/community-notes`, {
+        const postData: {
+          text: string;
+          userId: string;
+          username: string;
+          profilePicUrl: string;
+          eventId?: string;
+          eventName?: string;
+          eventType?: string;
+        } = {
           text: newPostText,
           userId: userData._id,
           username: userData.username,
           profilePicUrl: userData.profilePicUrl || '',
-        });
+        };
+
+        // Include event linking data if present
+        if (linkedEvent) {
+          postData.eventId = linkedEvent.eventId;
+          postData.eventName = linkedEvent.eventName;
+          postData.eventType = linkedEvent.eventType;
+        }
+
+        const response = await axios.post(
+          `${API_BASE_URL}/community-notes`,
+          postData,
+        );
         setPosts(prev => [...prev, response.data]);
         setNewPostText('');
+        // Clear linked event after posting
+        setLinkedEvent(null);
       } catch (error) {
         Alert.alert(t('common.error'), t('communityNotes.postError'));
       } finally {
@@ -1423,6 +1596,31 @@ const CommunityNotes: React.FC = () => {
 
         {/* Composer Card */}
         <View style={styles.composerCard}>
+          {/* Event Link Badge (when linking from an event) */}
+          {linkedEvent && (
+            <View style={styles.eventLinkBadge}>
+              <Text style={styles.eventLinkBadgeEmoji}>
+                {getEventTypeEmoji(linkedEvent.eventType)}
+              </Text>
+              <View style={styles.eventLinkBadgeTextContainer}>
+                <Text style={styles.eventLinkBadgeText} numberOfLines={1}>
+                  {linkedEvent.eventName}
+                </Text>
+                <Text style={styles.eventLinkBadgeSubtext}>
+                  {t('communityNotes.postingAboutEvent')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.eventLinkClearButton}
+                onPress={clearLinkedEvent}>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={18}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
           <View style={styles.composerRow}>
             {userData?.profilePicUrl ? (
               <Image
@@ -1468,6 +1666,7 @@ const CommunityNotes: React.FC = () => {
           <PostListSkeleton count={4} />
         ) : (
           <FlatList
+            ref={flatListRef}
             data={posts}
             keyExtractor={item => item._id}
             contentContainerStyle={styles.listContent}
@@ -1480,6 +1679,15 @@ const CommunityNotes: React.FC = () => {
               />
             }
             ListEmptyComponent={renderEmptyState}
+            onScrollToIndexFailed={info => {
+              // Handle scroll failure gracefully
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                });
+              }, 100);
+            }}
             renderItem={({item}) => (
               <View style={styles.postContainer}>
                 {/* Post Header with Avatar */}
@@ -1570,7 +1778,22 @@ const CommunityNotes: React.FC = () => {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <Text style={styles.postText}>{item.text}</Text>
+                  <>
+                    {/* Event Badge (if post is linked to an event) */}
+                    {item.eventId && item.eventName && (
+                      <TouchableOpacity
+                        style={styles.postEventBadge}
+                        onPress={() => navigateToEvent(item.eventId!)}>
+                        <Text style={styles.postEventBadgeEmoji}>
+                          {getEventTypeEmoji(item.eventType || '')}
+                        </Text>
+                        <Text style={styles.postEventBadgeText}>
+                          {item.eventName}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    <Text style={styles.postText}>{item.text}</Text>
+                  </>
                 )}
 
                 {/* Social Actions Row */}

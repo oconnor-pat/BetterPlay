@@ -1,4 +1,4 @@
-import React, {useState, useContext, useMemo, useEffect} from 'react';
+import React, {useState, useContext, useMemo, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -34,8 +34,15 @@ import {
   faShareAlt,
   faLocationArrow,
   faArrowRightToBracket,
+  faComments,
 } from '@fortawesome/free-solid-svg-icons';
-import {useNavigation, NavigationProp} from '@react-navigation/native';
+import {
+  useNavigation,
+  NavigationProp,
+  CommonActions,
+  useRoute,
+  RouteProp,
+} from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
@@ -44,7 +51,7 @@ import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
 
 export type RootStackParamList = {
-  EventList: undefined;
+  EventList: {highlightEventId?: string} | undefined;
   EventRoster: {
     eventId: string;
     eventName: string;
@@ -986,7 +993,11 @@ const EventList: React.FC = () => {
   // First-time user onboarding state
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
 
+  // Ref for scrolling to specific events
+  const flatListRef = useRef<FlatList<Event> | null>(null);
+
   const navigation = useNavigation<NavigationProp<any>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'EventList'>>();
 
   const fetchEvents = React.useCallback(async () => {
     if (initialLoadDone) {
@@ -1147,6 +1158,24 @@ const EventList: React.FC = () => {
     selectedDateFilter,
     showAvailableOnly,
   ]);
+
+  // Scroll to highlighted event when navigating from Community Notes
+  useEffect(() => {
+    if (route.params?.highlightEventId && filteredEvents.length > 0) {
+      const eventIndex = filteredEvents.findIndex(
+        e => e._id === route.params?.highlightEventId,
+      );
+      if (eventIndex !== -1) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index: eventIndex,
+            animated: true,
+            viewPosition: 0.3,
+          });
+        }, 300);
+      }
+    }
+  }, [route.params?.highlightEventId, filteredEvents]);
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -1320,6 +1349,7 @@ const EventList: React.FC = () => {
       eventType: event.eventType,
       latitude: event.latitude,
       longitude: event.longitude,
+      jerseyColors: event.jerseyColors || [],
     });
     setModalVisible(true);
     setTempRosterSize(event.totalSpots.toString());
@@ -1361,6 +1391,65 @@ const EventList: React.FC = () => {
       Alert.alert(
         t('common.error'),
         t('events.shareError') || 'Failed to share event',
+      );
+    }
+  };
+
+  // Navigate to Community Notes - either to existing post or to create new one
+  const handleDiscussEvent = async (event: Event) => {
+    try {
+      // Check if a post already exists for this event
+      const response = await axios.get(
+        `${API_BASE_URL}/community-notes/event/${event._id}`,
+      );
+
+      if (response.data && response.data._id) {
+        // Post exists - navigate to it
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: 'CommunityNotes',
+            params: {
+              screen: 'CommunityNotesList',
+              params: {
+                scrollToEventId: event._id,
+              },
+            },
+          }),
+        );
+      } else {
+        // No post exists - navigate to create one
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: 'CommunityNotes',
+            params: {
+              screen: 'CommunityNotesList',
+              params: {
+                eventLink: {
+                  eventId: event._id,
+                  eventName: event.name,
+                  eventType: event.eventType,
+                },
+              },
+            },
+          }),
+        );
+      }
+    } catch {
+      // If error (likely 404 - no post found), navigate to create one
+      navigation.dispatch(
+        CommonActions.navigate({
+          name: 'CommunityNotes',
+          params: {
+            screen: 'CommunityNotesList',
+            params: {
+              eventLink: {
+                eventId: event._id,
+                eventName: event.name,
+                eventType: event.eventType,
+              },
+            },
+          },
+        }),
       );
     }
   };
@@ -1499,12 +1588,17 @@ const EventList: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Share/Settings/Delete Icons */}
+      {/* Share/Discuss/Settings/Delete Icons */}
       <View style={themedStyles.iconContainer}>
         <TouchableOpacity
           style={themedStyles.iconButton}
           onPress={() => handleShareEvent(item)}>
           <FontAwesomeIcon icon={faShareAlt} size={18} color={colors.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={themedStyles.iconButton}
+          onPress={() => handleDiscussEvent(item)}>
+          <FontAwesomeIcon icon={faComments} size={18} color={colors.primary} />
         </TouchableOpacity>
         {userData?._id === item.createdBy && (
           <TouchableOpacity
@@ -1696,11 +1790,21 @@ const EventList: React.FC = () => {
         </View>
       ) : (
         <FlatList
+          ref={flatListRef}
           data={filteredEvents}
           renderItem={renderEventCard}
           keyExtractor={item => item._id}
           refreshing={loading}
           onRefresh={fetchEvents}
+          onScrollToIndexFailed={info => {
+            // Handle scroll failure gracefully
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({
+                index: info.index,
+                animated: true,
+              });
+            }, 100);
+          }}
         />
       )}
 

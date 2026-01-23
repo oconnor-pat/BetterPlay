@@ -198,7 +198,8 @@
     "deletePostError": "Couldn't delete this post. Please try again.",
     "deleteCommentError": "Couldn't delete this comment. Please try again.",
     "deleteReplyError": "Couldn't delete this reply. Please try again.",
-    "likeError": "Couldn't update like. Please try again."
+    "likeError": "Couldn't update like. Please try again.",
+    "postingAboutEvent": "Posting about this event"
   },
   "settings": {
     "title": "Settings",
