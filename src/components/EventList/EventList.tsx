@@ -1132,6 +1132,13 @@ const EventList: React.FC = () => {
       );
     }
 
+    // Sort by date (soonest first) so new events appear in chronological order
+    filtered = [...filtered].sort((a, b) => {
+      const dateA = new Date(`${a.date} ${a.time}`);
+      const dateB = new Date(`${b.date} ${b.time}`);
+      return dateA.getTime() - dateB.getTime();
+    });
+
     return filtered;
   }, [
     eventData,
@@ -1238,7 +1245,7 @@ const EventList: React.FC = () => {
               ? newEvent.jerseyColors
               : undefined,
           });
-          setEventData(prevData => [...prevData, response.data]);
+          setEventData(prevData => [response.data, ...prevData]);
         } catch (error) {
           Alert.alert(t('common.error'), t('events.createError'));
           setSavingEvent(false);
