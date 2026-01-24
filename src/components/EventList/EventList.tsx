@@ -148,7 +148,54 @@ const isTeamSport = (eventType: string) =>
 // Helper function to check if an event date/time has passed
 const isEventPast = (eventDate: string, eventTime: string): boolean => {
   const now = new Date();
-  const eventDateTime = new Date(`${eventDate} ${eventTime}`);
+
+  // Parse the date - handle formats like "Fri Jan 23 2026" or "Jan 23, 2026"
+  // Remove day name if present (e.g., "Fri ", "Mon ", etc.)
+  let cleanDate = eventDate.replace(/^[A-Za-z]{3}\s+/, '');
+
+  // Try to parse the date with multiple approaches
+  let eventDateTime: Date | null = null;
+
+  // Approach 1: Parse "Jan 23 2026" or "Jan 23, 2026" format
+  const monthDayYearMatch = cleanDate.match(
+    /([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/,
+  );
+  if (monthDayYearMatch) {
+    const [, month, day, year] = monthDayYearMatch;
+    eventDateTime = new Date(`${month} ${day}, ${year}`);
+  }
+
+  // Approach 2: If first approach failed, try direct parsing
+  if (!eventDateTime || isNaN(eventDateTime.getTime())) {
+    eventDateTime = new Date(cleanDate);
+  }
+
+  // Approach 3: Try the original date string
+  if (!eventDateTime || isNaN(eventDateTime.getTime())) {
+    eventDateTime = new Date(eventDate);
+  }
+
+  // If we still don't have a valid date, return false (treat as not past)
+  if (!eventDateTime || isNaN(eventDateTime.getTime())) {
+    return false;
+  }
+
+  // Parse time - handle formats like "6:30 PM" or "18:30"
+  let hours = 0;
+  let minutes = 0;
+  const timeMatch = eventTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (timeMatch) {
+    hours = parseInt(timeMatch[1], 10);
+    minutes = parseInt(timeMatch[2], 10);
+    const period = timeMatch[3]?.toUpperCase();
+    if (period === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+      hours = 0;
+    }
+  }
+
+  eventDateTime.setHours(hours, minutes, 0, 0);
   return eventDateTime < now;
 };
 
