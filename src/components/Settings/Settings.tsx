@@ -37,6 +37,7 @@ import {useTranslation} from 'react-i18next';
 import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
 import UserContext, {UserContextType} from '../UserContext';
+import {version as appVersion} from '../../../package.json';
 
 interface Language {
   code: string;
@@ -812,7 +813,7 @@ const Settings: React.FC = () => {
                 onPress={() =>
                   Alert.alert(
                     t('settings.about'),
-                    "BetterPlay\nVersion 0.0.1\n\n© 2026 Patrick O'Connor\nAll rights reserved.",
+                    `BetterPlay\nVersion ${appVersion}\n\n© 2026 Patrick O'Connor\nAll rights reserved.`,
                     [
                       {
                         text:
@@ -890,7 +891,7 @@ const Settings: React.FC = () => {
           </View>
 
           {/* App Version */}
-          <Text style={themedStyles.version}>BetterPlay v0.0.1</Text>
+          <Text style={themedStyles.version}>BetterPlay v{appVersion}</Text>
         </View>
       </ScrollView>
 

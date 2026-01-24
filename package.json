@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
     "android": "npm run emulator:pixel9 && npx react-native run-android",
@@ -8,7 +8,8 @@
     "ios": "react-native run-ios --simulator='iPhone 17 Pro (26.1)'",
     "lint": "eslint .",
     "start": "react-native start --port 8082",
-    "test": "jest"
+    "test": "jest",
+    "postinstall": "sed -i '' 's|boostorg.jfrog.io/artifactory/main|archives.boost.io|g' node_modules/react-native/third-party-podspecs/boost.podspec 2>/dev/null || true"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^6.5.1",
@@ -25,6 +26,7 @@
     "axios": "^1.6.8",
     "i18next": "^25.7.3",
     "node": "^18.20.2",
+    "qs": "^6.14.1",
     "react": "18.2.0",
     "react-i18next": "^16.5.0",
     "react-native": "0.73.1",

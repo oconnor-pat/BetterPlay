@@ -145,6 +145,13 @@ const jerseyColorOptions: {label: string; color: string}[] = [
 const isTeamSport = (eventType: string) =>
   teamSports.some(sport => sport.toLowerCase() === eventType.toLowerCase());
 
+// Helper function to check if an event date/time has passed
+const isEventPast = (eventDate: string, eventTime: string): boolean => {
+  const now = new Date();
+  const eventDateTime = new Date(`${eventDate} ${eventTime}`);
+  return eventDateTime < now;
+};
+
 const dateFilterOptions = [
   {label: 'All Dates', value: 'all'},
   {label: 'Today', value: 'today'},
@@ -334,6 +341,27 @@ const EventList: React.FC = () => {
           shadowOpacity: 0.08,
           shadowRadius: 6,
           elevation: 3,
+        },
+        pastEventCard: {
+          opacity: 0.6,
+          backgroundColor: colors.card,
+        },
+        pastEventBadge: {
+          position: 'absolute' as const,
+          top: 12,
+          right: 12,
+          backgroundColor: colors.placeholder || '#888',
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 12,
+          zIndex: 1,
+        },
+        pastEventBadgeText: {
+          color: '#fff',
+          fontSize: 11,
+          fontWeight: '700',
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.5,
         },
         cardRow: {
           flexDirection: 'row',
@@ -964,6 +992,7 @@ const EventList: React.FC = () => {
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
   const [selectedDateFilter, setSelectedDateFilter] = useState('all');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+  const [hidePastEvents, setHidePastEvents] = useState(true);
 
   // Location autocomplete state - removed manual toggle, now seamless
 
@@ -1143,6 +1172,11 @@ const EventList: React.FC = () => {
       );
     }
 
+    // Hide past events filter
+    if (hidePastEvents) {
+      filtered = filtered.filter(event => !isEventPast(event.date, event.time));
+    }
+
     // Sort by date (soonest first) so new events appear in chronological order
     filtered = [...filtered].sort((a, b) => {
       const dateA = new Date(`${a.date} ${a.time}`);
@@ -1157,6 +1191,7 @@ const EventList: React.FC = () => {
     selectedEventTypes,
     selectedDateFilter,
     showAvailableOnly,
+    hidePastEvents,
   ]);
 
   // Scroll to highlighted event when navigating from Community Notes
@@ -1206,6 +1241,7 @@ const EventList: React.FC = () => {
     setSelectedEventTypes([]);
     setSelectedDateFilter('all');
     setShowAvailableOnly(false);
+    setHidePastEvents(true);
   };
 
   const handleSaveNewEvent = async () => {
@@ -1478,149 +1514,169 @@ const EventList: React.FC = () => {
     }
   };
 
-  const renderEventCard = ({item}: {item: Event}) => (
-    <TouchableOpacity
-      style={themedStyles.card}
-      onPress={() => handleEventPress(item)}
-      activeOpacity={0.9}>
-      {/* Event Name */}
-      <View style={themedStyles.cardRow}>
-        <Text style={themedStyles.cardEmoji}>
-          {getEventTypeEmoji(item.eventType)}
-        </Text>
-        <Text style={themedStyles.cardTitle}>{item.name}</Text>
-      </View>
-      {/* Username of event creator */}
-      {item.createdByUsername && (
-        <View style={themedStyles.creatorRow}>
-          <Text style={themedStyles.cardEmoji}>👤</Text>
-          <Text style={themedStyles.eventUsername}>
-            {t('events.createdBy')} {item.createdByUsername}
-          </Text>
-        </View>
-      )}
-      {/* Location */}
-      <View style={themedStyles.cardRow}>
-        <Text style={themedStyles.cardEmoji}>📍</Text>
-        <Text style={themedStyles.cardText}>{item.location}</Text>
-      </View>
-      {/* Date and Time */}
-      <View style={themedStyles.cardRow}>
-        <Text style={themedStyles.cardEmoji}>🗓️</Text>
-        <Text style={themedStyles.cardText}>
-          {item.date} @ {item.time}
-        </Text>
-      </View>
-      {/* Roster */}
-      <View style={themedStyles.cardRow}>
-        <Text style={themedStyles.cardEmoji}>👥</Text>
-        <Text style={themedStyles.cardText}>
-          {item.rosterSpotsFilled} / {item.totalSpots}{' '}
-          {t('events.playersJoined')}
-        </Text>
-      </View>
+  const renderEventCard = ({item}: {item: Event}) => {
+    const isPast = isEventPast(item.date, item.time);
 
-      {/* Spacer */}
-      <View style={themedStyles.cardSpacer} />
-
-      {/* Interactive Map View */}
+    return (
       <TouchableOpacity
-        style={themedStyles.mapBox}
-        onPress={() => openMapsForEvent(item, t)}
-        activeOpacity={0.7}>
-        {(() => {
-          // Use exact coordinates if available, otherwise use location lookup
-          const coords =
-            item.latitude && item.longitude
-              ? {latitude: item.latitude, longitude: item.longitude}
-              : getCoordinatesFromLocation(item.location);
-
-          return (
-            <MapView
-              style={themedStyles.mapView}
-              initialRegion={{
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-              scrollEnabled={false}
-              zoomEnabled={false}
-              rotateEnabled={false}
-              pitchEnabled={false}>
-              <Marker
-                coordinate={coords}
-                title={item.name}
-                description={item.location}
-              />
-            </MapView>
-          );
-        })()}
-        <View style={themedStyles.mapOverlay}>
-          <Text style={themedStyles.mapText}>📍 {item.location}</Text>
-          <Text style={themedStyles.mapSubtext}>
-            {t('events.tapToOpenMaps')}
+        style={[themedStyles.card, isPast && themedStyles.pastEventCard]}
+        onPress={() => handleEventPress(item)}
+        activeOpacity={0.9}>
+        {/* Past Event Badge */}
+        {isPast && (
+          <View style={themedStyles.pastEventBadge}>
+            <Text style={themedStyles.pastEventBadgeText}>
+              {t('events.past') || 'Past'}
+            </Text>
+          </View>
+        )}
+        {/* Event Name */}
+        <View style={themedStyles.cardRow}>
+          <Text style={themedStyles.cardEmoji}>
+            {getEventTypeEmoji(item.eventType)}
+          </Text>
+          <Text style={themedStyles.cardTitle}>{item.name}</Text>
+        </View>
+        {/* Username of event creator */}
+        {item.createdByUsername && (
+          <View style={themedStyles.creatorRow}>
+            <Text style={themedStyles.cardEmoji}>👤</Text>
+            <Text style={themedStyles.eventUsername}>
+              {t('events.createdBy')} {item.createdByUsername}
+            </Text>
+          </View>
+        )}
+        {/* Location */}
+        <View style={themedStyles.cardRow}>
+          <Text style={themedStyles.cardEmoji}>📍</Text>
+          <Text style={themedStyles.cardText}>{item.location}</Text>
+        </View>
+        {/* Date and Time */}
+        <View style={themedStyles.cardRow}>
+          <Text style={themedStyles.cardEmoji}>🗓️</Text>
+          <Text style={themedStyles.cardText}>
+            {item.date} @ {item.time}
           </Text>
         </View>
-      </TouchableOpacity>
-
-      {/* Spacer */}
-      <View style={themedStyles.cardSpacer} />
-
-      {/* Action Buttons */}
-      <View style={themedStyles.actionRow}>
-        <TouchableOpacity
-          style={[themedStyles.actionButton, themedStyles.joinButton]}
-          onPress={() => openMapsForEvent(item, t)}>
-          <FontAwesomeIcon
-            icon={faLocationArrow}
-            size={16}
-            color={colors.buttonText || '#fff'}
-            style={themedStyles.actionButtonIcon}
-          />
-          <Text
-            style={[
-              themedStyles.actionButtonText,
-              themedStyles.joinButtonText,
-            ]}>
-            {t('events.getDirections')}
+        {/* Roster */}
+        <View style={themedStyles.cardRow}>
+          <Text style={themedStyles.cardEmoji}>👥</Text>
+          <Text style={themedStyles.cardText}>
+            {item.rosterSpotsFilled} / {item.totalSpots}{' '}
+            {t('events.playersJoined')}
           </Text>
-        </TouchableOpacity>
-      </View>
+        </View>
 
-      {/* Share/Discuss/Settings/Delete Icons */}
-      <View style={themedStyles.iconContainer}>
+        {/* Spacer */}
+        <View style={themedStyles.cardSpacer} />
+
+        {/* Interactive Map View */}
         <TouchableOpacity
-          style={themedStyles.iconButton}
-          onPress={() => handleShareEvent(item)}>
-          <FontAwesomeIcon icon={faShareAlt} size={18} color={colors.primary} />
+          style={themedStyles.mapBox}
+          onPress={() => openMapsForEvent(item, t)}
+          activeOpacity={0.7}>
+          {(() => {
+            // Use exact coordinates if available, otherwise use location lookup
+            const coords =
+              item.latitude && item.longitude
+                ? {latitude: item.latitude, longitude: item.longitude}
+                : getCoordinatesFromLocation(item.location);
+
+            return (
+              <MapView
+                style={themedStyles.mapView}
+                initialRegion={{
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }}
+                scrollEnabled={false}
+                zoomEnabled={false}
+                rotateEnabled={false}
+                pitchEnabled={false}>
+                <Marker
+                  coordinate={coords}
+                  title={item.name}
+                  description={item.location}
+                />
+              </MapView>
+            );
+          })()}
+          <View style={themedStyles.mapOverlay}>
+            <Text style={themedStyles.mapText}>📍 {item.location}</Text>
+            <Text style={themedStyles.mapSubtext}>
+              {t('events.tapToOpenMaps')}
+            </Text>
+          </View>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={themedStyles.iconButton}
-          onPress={() => handleDiscussEvent(item)}>
-          <FontAwesomeIcon icon={faComments} size={18} color={colors.primary} />
-        </TouchableOpacity>
-        {userData?._id === item.createdBy && (
+
+        {/* Spacer */}
+        <View style={themedStyles.cardSpacer} />
+
+        {/* Action Buttons */}
+        <View style={themedStyles.actionRow}>
           <TouchableOpacity
-            style={themedStyles.iconButton}
-            onPress={() => handleEditEvent(item)}>
-            <FontAwesomeIcon icon={faCog} size={18} color={colors.text} />
-          </TouchableOpacity>
-        )}
-        {userData?._id === item.createdBy && (
-          <TouchableOpacity
-            style={themedStyles.iconButton}
-            onPress={() => handleDeleteEvent(item)}>
+            style={[themedStyles.actionButton, themedStyles.joinButton]}
+            onPress={() => openMapsForEvent(item, t)}>
             <FontAwesomeIcon
-              icon={faTrash}
+              icon={faLocationArrow}
+              size={16}
+              color={colors.buttonText || '#fff'}
+              style={themedStyles.actionButtonIcon}
+            />
+            <Text
+              style={[
+                themedStyles.actionButtonText,
+                themedStyles.joinButtonText,
+              ]}>
+              {t('events.getDirections')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Share/Discuss/Settings/Delete Icons */}
+        <View style={themedStyles.iconContainer}>
+          <TouchableOpacity
+            style={themedStyles.iconButton}
+            onPress={() => handleShareEvent(item)}>
+            <FontAwesomeIcon
+              icon={faShareAlt}
               size={18}
-              color={colors.error || '#e74c3c'}
+              color={colors.primary}
             />
           </TouchableOpacity>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+          <TouchableOpacity
+            style={themedStyles.iconButton}
+            onPress={() => handleDiscussEvent(item)}>
+            <FontAwesomeIcon
+              icon={faComments}
+              size={18}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+          {userData?._id === item.createdBy && (
+            <TouchableOpacity
+              style={themedStyles.iconButton}
+              onPress={() => handleEditEvent(item)}>
+              <FontAwesomeIcon icon={faCog} size={18} color={colors.text} />
+            </TouchableOpacity>
+          )}
+          {userData?._id === item.createdBy && (
+            <TouchableOpacity
+              style={themedStyles.iconButton}
+              onPress={() => handleDeleteEvent(item)}>
+              <FontAwesomeIcon
+                icon={faTrash}
+                size={18}
+                color={colors.error || '#e74c3c'}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={themedStyles.container} edges={['top']}>
@@ -2272,6 +2328,30 @@ const EventList: React.FC = () => {
                       'Show only events with available spots'}
                   </Text>
                   {showAvailableOnly && (
+                    <Text style={{color: colors.buttonText || '#fff'}}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Past Events Filter */}
+              <View style={themedStyles.filterSection}>
+                <Text style={themedStyles.filterSectionTitle}>
+                  {t('events.pastEvents') || 'Past Events'}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    themedStyles.toggleOption,
+                    !hidePastEvents && themedStyles.toggleOptionSelected,
+                  ]}
+                  onPress={() => setHidePastEvents(!hidePastEvents)}>
+                  <Text
+                    style={[
+                      themedStyles.toggleOptionText,
+                      !hidePastEvents && themedStyles.toggleOptionTextSelected,
+                    ]}>
+                    {t('events.showPastEvents') || 'Show past events'}
+                  </Text>
+                  {!hidePastEvents && (
                     <Text style={{color: colors.buttonText || '#fff'}}>✓</Text>
                   )}
                 </TouchableOpacity>
