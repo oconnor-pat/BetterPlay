@@ -51,7 +51,13 @@ import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
 
 export type RootStackParamList = {
-  EventList: {highlightEventId?: string} | undefined;
+  EventList:
+    | {
+        highlightEventId?: string;
+        profileFilter?: 'created' | 'joined';
+        userId?: string;
+      }
+    | undefined;
   EventRoster: {
     eventId: string;
     eventName: string;
@@ -739,6 +745,36 @@ const EventList: React.FC = () => {
           fontSize: 11,
           fontWeight: 'bold',
         },
+        profileFilterBanner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: colors.primary + '20',
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          marginHorizontal: 16,
+          marginBottom: 8,
+          borderRadius: 8,
+          borderLeftWidth: 3,
+          borderLeftColor: colors.primary,
+        },
+        profileFilterText: {
+          fontSize: 14,
+          color: colors.text,
+          flex: 1,
+        },
+        profileFilterClear: {
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          backgroundColor: colors.primary,
+          borderRadius: 16,
+          marginLeft: 8,
+        },
+        profileFilterClearText: {
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: '600',
+        },
         filterModalOverlay: {
           flex: 1,
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1040,6 +1076,12 @@ const EventList: React.FC = () => {
   const [selectedDateFilter, setSelectedDateFilter] = useState('all');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [hidePastEvents, setHidePastEvents] = useState(true);
+  const [profileFilter, setProfileFilter] = useState<
+    'created' | 'joined' | null
+  >(null);
+  const [profileFilterUserId, setProfileFilterUserId] = useState<string | null>(
+    null,
+  );
 
   // Location autocomplete state - removed manual toggle, now seamless
 
@@ -1224,6 +1266,21 @@ const EventList: React.FC = () => {
       filtered = filtered.filter(event => !isEventPast(event.date, event.time));
     }
 
+    // Profile filter (from Profile page navigation)
+    if (profileFilter && profileFilterUserId) {
+      if (profileFilter === 'created') {
+        filtered = filtered.filter(
+          event => event.createdBy === profileFilterUserId,
+        );
+      } else if (profileFilter === 'joined') {
+        filtered = filtered.filter(event =>
+          (event as any).roster?.some(
+            (r: any) => r.userId === profileFilterUserId,
+          ),
+        );
+      }
+    }
+
     // Sort by date (soonest first) so new events appear in chronological order
     filtered = [...filtered].sort((a, b) => {
       const dateA = new Date(`${a.date} ${a.time}`);
@@ -1239,7 +1296,19 @@ const EventList: React.FC = () => {
     selectedDateFilter,
     showAvailableOnly,
     hidePastEvents,
+    profileFilter,
+    profileFilterUserId,
   ]);
+
+  // Handle profile filter from navigation params
+  useEffect(() => {
+    if (route.params?.profileFilter && route.params?.userId) {
+      setProfileFilter(route.params.profileFilter);
+      setProfileFilterUserId(route.params.userId);
+      // Also disable hide past events to show all relevant events
+      setHidePastEvents(false);
+    }
+  }, [route.params?.profileFilter, route.params?.userId]);
 
   // Scroll to highlighted event when navigating from Community Notes
   useEffect(() => {
@@ -1289,6 +1358,8 @@ const EventList: React.FC = () => {
     setSelectedDateFilter('all');
     setShowAvailableOnly(false);
     setHidePastEvents(true);
+    setProfileFilter(null);
+    setProfileFilterUserId(null);
   };
 
   const handleSaveNewEvent = async () => {
@@ -1748,7 +1819,6 @@ const EventList: React.FC = () => {
           />
         </TouchableOpacity>
       </View>
-
       {/* Search Bar with Filter Button */}
       <View style={themedStyles.searchFilterRow}>
         <View
@@ -1800,7 +1870,24 @@ const EventList: React.FC = () => {
           )}
         </TouchableOpacity>
       </View>
-
+      {/* Profile Filter Banner */}
+      {profileFilter && (
+        <View style={themedStyles.profileFilterBanner}>
+          <Text style={themedStyles.profileFilterText}>
+            {profileFilter === 'created'
+              ? t('profile.showingEventsCreated') ||
+                'Showing events you created'
+              : t('profile.showingEventsJoined') || 'Showing events you joined'}
+          </Text>
+          <TouchableOpacity
+            style={themedStyles.profileFilterClear}
+            onPress={clearFilters}>
+            <Text style={themedStyles.profileFilterClearText}>
+              {t('profile.clearFilter') || 'Clear'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {/* Active Filters Display */}
       {activeFilterCount > 0 && (
         <View style={themedStyles.activeFiltersContainer}>
@@ -1853,7 +1940,6 @@ const EventList: React.FC = () => {
           )}
         </View>
       )}
-
       {loading ? (
         <EventListSkeleton count={4} />
       ) : filteredEvents.length === 0 ? (
@@ -1910,7 +1996,6 @@ const EventList: React.FC = () => {
           }}
         />
       )}
-
       <Modal animationType="fade" transparent={true} visible={modalVisible}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

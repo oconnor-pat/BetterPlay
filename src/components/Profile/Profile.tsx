@@ -20,7 +20,7 @@ import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
 import UserContext, {UserContextType} from '../UserContext';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useRoute, RouteProp} from '@react-navigation/native';
+import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
@@ -31,11 +31,13 @@ import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarCheck,
   faCalendarPlus,
-  faMoon,
-  faSun,
   faCamera,
   faImage,
-  faUsers,
+  faChevronRight,
+  faCalendarDays,
+  faGear,
+  faRightFromBracket,
+  faPlus,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 
@@ -45,24 +47,100 @@ type ProfileScreenRouteProp = RouteProp<
   'Profile'
 >;
 
+// Available sports for the favorite sports section
+const SPORTS_OPTIONS = [
+  {id: 'basketball', emoji: '🏀', label: 'Basketball'},
+  {id: 'hockey', emoji: '🏒', label: 'Hockey'},
+  {id: 'soccer', emoji: '⚽', label: 'Soccer'},
+  {id: 'football', emoji: '🏈', label: 'Football'},
+  {id: 'baseball', emoji: '⚾', label: 'Baseball'},
+  {id: 'tennis', emoji: '🎾', label: 'Tennis'},
+  {id: 'golf', emoji: '⛳', label: 'Golf'},
+  {id: 'volleyball', emoji: '🏐', label: 'Volleyball'},
+];
+
 const Profile: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [favoriteSports, setFavoriteSports] = useState<string[]>([]);
+  const [showSportsPicker, setShowSportsPicker] = useState(false);
+
   const route = useRoute<ProfileScreenRouteProp>();
+  const navigation = useNavigation<any>();
   const {_id} = route.params;
 
   const {userData, setUserData} = useContext(UserContext) as UserContextType;
-  const {colors, darkMode, themeMode} = useTheme();
+  const {colors} = useTheme();
   const {events} = useEventContext();
   const {t} = useTranslation();
+
+  // Load favorite sports from backend on mount
+  useEffect(() => {
+    const loadFavoriteSports = async () => {
+      if (!_id) return;
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await fetch(
+          `${API_BASE_URL}/user/${_id}/favorite-sports`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setFavoriteSports(data.favoriteSports || ['hockey']);
+        } else {
+          setFavoriteSports(['hockey']);
+        }
+      } catch (error) {
+        console.error('Error loading favorite sports:', error);
+        setFavoriteSports(['hockey']);
+      }
+    };
+    loadFavoriteSports();
+  }, [_id]);
+
+  // Save favorite sports to backend when they change
+  const saveFavoriteSports = useCallback(
+    async (sports: string[]) => {
+      if (!_id) return;
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        await fetch(`${API_BASE_URL}/user/${_id}/favorite-sports`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({favoriteSports: sports}),
+        });
+      } catch (error) {
+        console.error('Error saving favorite sports:', error);
+      }
+    },
+    [_id],
+  );
 
   // Calculate user stats
   const userStats = useMemo(() => {
     const eventsCreated = events.filter(e => e.createdBy === _id).length;
-    const eventsJoined = events.filter(e => e.rosterSpotsFilled > 0).length;
+    // Events joined: events where user is in roster (including their own events)
+    const eventsJoined = events.filter(e =>
+      e.roster?.some((r: any) => r.userId === _id),
+    ).length;
     return {eventsCreated, eventsJoined};
   }, [events, _id]);
+
+  // Get member since year from user data
+  const memberSinceYear = useMemo(() => {
+    if (userData?.createdAt) {
+      return new Date(userData.createdAt).getFullYear();
+    }
+    return new Date().getFullYear();
+  }, [userData?.createdAt]);
 
   // Themed styles
   const themedStyles = useMemo(
@@ -77,14 +155,13 @@ const Profile: React.FC = () => {
           backgroundColor: colors.background,
         },
         scrollContent: {
-          padding: 16,
           paddingBottom: 32,
         },
         header: {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 20,
+          marginBottom: 8,
           paddingHorizontal: 16,
           paddingTop: 8,
           backgroundColor: colors.background,
@@ -102,51 +179,40 @@ const Profile: React.FC = () => {
           top: 8,
           zIndex: -1,
         },
-        // Profile Card
-        profileCard: {
-          backgroundColor: colors.card,
-          borderRadius: 20,
-          padding: 24,
-          marginBottom: 16,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
-        },
-        profileRow: {
-          flexDirection: 'row',
+        // Profile Header Section
+        profileSection: {
           alignItems: 'center',
-          marginBottom: 20,
+          paddingVertical: 24,
+          paddingHorizontal: 16,
         },
         avatarContainer: {
           position: 'relative',
+          marginBottom: 16,
         },
         avatar: {
-          width: 90,
-          height: 90,
-          borderRadius: 45,
-          backgroundColor: colors.border,
+          width: 110,
+          height: 110,
+          borderRadius: 55,
+          borderWidth: 3,
+          borderColor: colors.primary,
         },
         avatarPlaceholder: {
-          width: 90,
-          height: 90,
-          borderRadius: 45,
+          width: 110,
+          height: 110,
+          borderRadius: 55,
           backgroundColor: colors.primary + '20',
           alignItems: 'center',
           justifyContent: 'center',
+          borderWidth: 3,
+          borderColor: colors.primary,
         },
         avatarInitials: {
-          fontSize: 32,
+          fontSize: 38,
           fontWeight: '700',
           color: colors.primary,
         },
-        userInfo: {
-          flex: 1,
-          marginLeft: 18,
-        },
         userName: {
-          fontSize: 24,
+          fontSize: 26,
           fontWeight: '700',
           color: colors.text,
           marginBottom: 4,
@@ -154,19 +220,19 @@ const Profile: React.FC = () => {
         emailText: {
           fontSize: 15,
           color: colors.placeholder,
+          marginBottom: 16,
         },
         photoButtonsRow: {
           flexDirection: 'row',
-          justifyContent: 'center',
           gap: 12,
         },
         photoButton: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.background,
+          backgroundColor: colors.card,
           paddingVertical: 10,
-          paddingHorizontal: 16,
-          borderRadius: 12,
+          paddingHorizontal: 18,
+          borderRadius: 20,
           borderWidth: 1,
           borderColor: colors.border,
         },
@@ -176,147 +242,203 @@ const Profile: React.FC = () => {
           fontWeight: '600',
           marginLeft: 8,
         },
-        // Stats Section
-        statsCard: {
+        // Stats Row - Compact inline
+        statsRow: {
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingVertical: 16,
+          paddingHorizontal: 16,
+          marginHorizontal: 16,
           backgroundColor: colors.card,
-          borderRadius: 20,
-          padding: 20,
+          borderRadius: 12,
           marginBottom: 16,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
         },
-        sectionTitle: {
+        statItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        statValue: {
           fontSize: 18,
           fontWeight: '700',
           color: colors.text,
-          marginBottom: 16,
-        },
-        statsRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-around',
-        },
-        statItem: {
-          alignItems: 'center',
-          flex: 1,
-        },
-        statIconContainer: {
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 10,
-        },
-        statValue: {
-          fontSize: 28,
-          fontWeight: '700',
-          color: colors.text,
+          marginRight: 4,
         },
         statLabel: {
-          fontSize: 13,
+          fontSize: 14,
           color: colors.placeholder,
-          marginTop: 4,
         },
-        // Quick Settings
-        settingsCard: {
+        statDivider: {
+          width: 1,
+          height: 20,
+          backgroundColor: colors.border,
+          marginHorizontal: 24,
+        },
+        // Section Card
+        sectionCard: {
           backgroundColor: colors.card,
-          borderRadius: 20,
-          padding: 20,
+          marginHorizontal: 16,
           marginBottom: 16,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
+          borderRadius: 12,
+          overflow: 'hidden',
         },
-        settingRow: {
+        sectionHeader: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.placeholder,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 8,
+        },
+        // Menu Row
+        menuRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingVertical: 12,
+          paddingVertical: 14,
+          paddingHorizontal: 16,
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
         },
-        settingRowLast: {
+        menuRowLast: {
           borderBottomWidth: 0,
         },
-        settingLeft: {
-          flexDirection: 'row',
-          alignItems: 'center',
-        },
-        settingIconContainer: {
-          width: 40,
-          height: 40,
-          borderRadius: 12,
+        menuIcon: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 14,
         },
-        settingText: {
+        menuContent: {
+          flex: 1,
+        },
+        menuTitle: {
           fontSize: 16,
           fontWeight: '500',
           color: colors.text,
         },
-        settingSubtext: {
+        menuSubtitle: {
           fontSize: 13,
           color: colors.placeholder,
           marginTop: 2,
         },
-        settingSubtextRight: {
-          fontSize: 13,
+        menuChevron: {
+          marginLeft: 8,
+        },
+        menuValue: {
+          fontSize: 14,
           color: colors.placeholder,
-          marginTop: 2,
-          marginLeft: 'auto',
+          marginRight: 8,
         },
-        // Achievements Preview
-        achievementsCard: {
-          backgroundColor: colors.card,
-          borderRadius: 20,
-          padding: 20,
-          marginBottom: 16,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
-        },
-        achievementsRow: {
+        // Favorite Sports
+        sportsContainer: {
           flexDirection: 'row',
-          justifyContent: 'space-around',
-          marginTop: 8,
+          flexWrap: 'wrap',
+          paddingHorizontal: 16,
+          paddingBottom: 16,
+          gap: 10,
         },
-        achievementBadge: {
+        sportTag: {
+          flexDirection: 'row',
           alignItems: 'center',
-          opacity: 0.4,
+          backgroundColor: colors.primary + '20',
+          paddingVertical: 8,
+          paddingHorizontal: 14,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: colors.primary + '40',
         },
-        achievementBadgeEarned: {
-          opacity: 1,
-        },
-        achievementEmoji: {
-          fontSize: 24,
-        },
-        achievementIcon: {
-          width: 50,
-          height: 50,
-          borderRadius: 25,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 8,
-        },
-        achievementName: {
-          fontSize: 12,
+        sportTagText: {
+          fontSize: 14,
+          marginLeft: 6,
           color: colors.text,
           fontWeight: '500',
         },
-        // Member Since
-        memberSince: {
-          textAlign: 'center',
-          fontSize: 13,
+        addSportButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.background,
+          paddingVertical: 8,
+          paddingHorizontal: 14,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderStyle: 'dashed',
+        },
+        addSportText: {
+          fontSize: 14,
+          marginLeft: 6,
           color: colors.placeholder,
-          marginTop: 8,
+          fontWeight: '500',
+        },
+        // Sports Picker Modal
+        sportsPickerOverlay: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'center',
+          padding: 16,
+        },
+        sportsPickerCard: {
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          padding: 20,
+          maxHeight: '70%',
+        },
+        sportsPickerTitle: {
+          fontSize: 18,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 16,
+          textAlign: 'center',
+        },
+        sportsPickerGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 10,
+          justifyContent: 'center',
+        },
+        sportPickerItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.background,
+          paddingVertical: 10,
+          paddingHorizontal: 16,
+          borderRadius: 12,
+          borderWidth: 2,
+          borderColor: colors.border,
+          minWidth: '45%',
+        },
+        sportPickerItemSelected: {
+          borderColor: colors.primary,
+          backgroundColor: colors.primary + '15',
+        },
+        sportPickerEmoji: {
+          fontSize: 20,
+          marginRight: 8,
+        },
+        sportPickerLabel: {
+          fontSize: 14,
+          color: colors.text,
+          fontWeight: '500',
+        },
+        sportsPickerDone: {
+          backgroundColor: colors.primary,
+          paddingVertical: 14,
+          borderRadius: 12,
+          marginTop: 20,
+          alignItems: 'center',
+        },
+        sportsPickerDoneText: {
+          color: '#fff',
+          fontSize: 16,
+          fontWeight: '600',
         },
       }),
     [colors],
@@ -481,6 +603,46 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    Alert.alert(
+      t('auth.signOut'),
+      t('profile.signOutConfirm') || 'Are you sure you want to sign out?',
+      [
+        {text: t('common.cancel'), style: 'cancel'},
+        {
+          text: t('auth.signOut'),
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.multiRemove([
+              'userToken',
+              '@profilePicUrl',
+              '@app_language',
+            ]);
+            setUserData(null);
+            navigation.reset({
+              index: 0,
+              routes: [{name: 'LandingPage'}],
+            });
+          },
+        },
+      ],
+    );
+  };
+
+  const toggleSport = (sportId: string) => {
+    setFavoriteSports(prev => {
+      const newSports = prev.includes(sportId)
+        ? prev.filter(s => s !== sportId)
+        : [...prev, sportId];
+      saveFavoriteSports(newSports);
+      return newSports;
+    });
+  };
+
+  const getFavoriteSportsDisplay = () => {
+    return SPORTS_OPTIONS.filter(s => favoriteSports.includes(s.id));
+  };
+
   const getInitials = (name: string | undefined) => {
     if (!name) {
       return '?';
@@ -512,36 +674,30 @@ const Profile: React.FC = () => {
             tintColor={colors.primary}
           />
         }>
-        {/* Profile Card */}
-        <View style={themedStyles.profileCard}>
-          <View style={themedStyles.profileRow}>
-            <View style={themedStyles.avatarContainer}>
-              {selectedImage ? (
-                <Image
-                  source={{uri: selectedImage}}
-                  style={themedStyles.avatar}
-                />
-              ) : (
-                <View style={themedStyles.avatarPlaceholder}>
-                  <Text style={themedStyles.avatarInitials}>
-                    {getInitials(userData?.username)}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View style={themedStyles.userInfo}>
-              <Text style={themedStyles.userName}>{userData?.username}</Text>
-              <Text style={themedStyles.emailText}>{userData?.email}</Text>
-            </View>
+        {/* Profile Header */}
+        <View style={themedStyles.profileSection}>
+          <View style={themedStyles.avatarContainer}>
+            {selectedImage ? (
+              <Image
+                source={{uri: selectedImage}}
+                style={themedStyles.avatar}
+              />
+            ) : (
+              <View style={themedStyles.avatarPlaceholder}>
+                <Text style={themedStyles.avatarInitials}>
+                  {getInitials(userData?.username)}
+                </Text>
+              </View>
+            )}
           </View>
+
+          <Text style={themedStyles.userName}>{userData?.username}</Text>
+          <Text style={themedStyles.emailText}>{userData?.email}</Text>
 
           {/* Photo Buttons */}
           {uploadingImage ? (
             <View style={themedStyles.photoButtonsRow}>
               <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={themedStyles.photoButtonText}>
-                {t('common.loading') || 'Uploading...'}
-              </Text>
             </View>
           ) : (
             <View style={themedStyles.photoButtonsRow}>
@@ -550,7 +706,7 @@ const Profile: React.FC = () => {
                 onPress={handleChoosePhoto}>
                 <FontAwesomeIcon
                   icon={faImage}
-                  size={16}
+                  size={14}
                   color={colors.primary}
                 />
                 <Text style={themedStyles.photoButtonText}>
@@ -562,7 +718,7 @@ const Profile: React.FC = () => {
                 onPress={handleTakePhoto}>
                 <FontAwesomeIcon
                   icon={faCamera}
-                  size={16}
+                  size={14}
                   color={colors.primary}
                 />
                 <Text style={themedStyles.photoButtonText}>
@@ -573,191 +729,246 @@ const Profile: React.FC = () => {
           )}
         </View>
 
-        {/* Stats Card */}
-        <View style={themedStyles.statsCard}>
-          <Text style={themedStyles.sectionTitle}>
-            📊 {t('profile.yourActivity')}
-          </Text>
-          <View style={themedStyles.statsRow}>
-            <View style={themedStyles.statItem}>
-              <View
-                style={[
-                  themedStyles.statIconContainer,
-                  {backgroundColor: colors.primary + '20'},
-                ]}>
-                <FontAwesomeIcon
-                  icon={faCalendarPlus}
-                  size={24}
-                  color={colors.primary}
-                />
-              </View>
-              <Text style={themedStyles.statValue}>
-                {userStats.eventsCreated}
-              </Text>
-              <Text style={themedStyles.statLabel}>
-                {t('profile.eventsCreated')}
-              </Text>
-            </View>
-            <View style={themedStyles.statItem}>
-              <View
-                style={[
-                  themedStyles.statIconContainer,
-                  {backgroundColor: '#4CAF50' + '20'},
-                ]}>
-                <FontAwesomeIcon
-                  icon={faCalendarCheck}
-                  size={24}
-                  color="#4CAF50"
-                />
-              </View>
-              <Text style={themedStyles.statValue}>
-                {userStats.eventsJoined}
-              </Text>
-              <Text style={themedStyles.statLabel}>
-                {t('profile.eventsJoined')}
-              </Text>
-            </View>
-            <View style={themedStyles.statItem}>
-              <View
-                style={[
-                  themedStyles.statIconContainer,
-                  {backgroundColor: '#FF9800' + '20'},
-                ]}>
-                <FontAwesomeIcon icon={faUsers} size={24} color="#FF9800" />
-              </View>
-              <Text style={themedStyles.statValue}>{events.length}</Text>
-              <Text style={themedStyles.statLabel}>
-                {t('profile.totalEvents')}
-              </Text>
-            </View>
+        {/* Stats Row */}
+        <View style={themedStyles.statsRow}>
+          <View style={themedStyles.statItem}>
+            <Text style={themedStyles.statValue}>
+              {userStats.eventsCreated}
+            </Text>
+            <Text style={themedStyles.statLabel}>
+              {t('profile.created') || 'Created'}
+            </Text>
           </View>
-        </View>
-
-        {/* Quick Settings Card */}
-        <View style={themedStyles.settingsCard}>
-          <Text style={themedStyles.sectionTitle}>
-            ⚙️ {t('profile.quickSettings')}
-          </Text>
-          <View style={[themedStyles.settingRow, themedStyles.settingRowLast]}>
-            <View style={themedStyles.settingLeft}>
-              <View
-                style={[
-                  themedStyles.settingIconContainer,
-                  {
-                    backgroundColor: darkMode
-                      ? '#5C6BC0' + '20'
-                      : '#FFC107' + '20',
-                  },
-                ]}>
-                <FontAwesomeIcon
-                  icon={darkMode ? faMoon : faSun}
-                  size={18}
-                  color={darkMode ? '#5C6BC0' : '#FFC107'}
-                />
-              </View>
-              <View>
-                <Text style={themedStyles.settingText}>
-                  {t('profile.darkMode')}
-                </Text>
-                <Text style={themedStyles.settingSubtext}>
-                  {darkMode
-                    ? t('profile.currentlyOn')
-                    : t('profile.currentlyOff')}
-                </Text>
-              </View>
-            </View>
-            <Text style={themedStyles.settingSubtextRight}>
-              {themeMode === 'system'
-                ? t('settings.system')
-                : themeMode === 'dark'
-                ? t('settings.dark')
-                : t('settings.light')}
+          <View style={themedStyles.statDivider} />
+          <View style={themedStyles.statItem}>
+            <Text style={themedStyles.statValue}>{userStats.eventsJoined}</Text>
+            <Text style={themedStyles.statLabel}>
+              {t('profile.joined') || 'Joined'}
             </Text>
           </View>
         </View>
 
-        {/* Achievements Preview Card */}
-        <View style={themedStyles.achievementsCard}>
-          <Text style={themedStyles.sectionTitle}>
-            🏆 {t('profile.achievements')}
+        {/* My Events Section */}
+        <View style={themedStyles.sectionCard}>
+          <Text style={themedStyles.sectionHeader}>
+            {t('profile.myEvents') || 'My Events'}
           </Text>
-          <View style={themedStyles.achievementsRow}>
+
+          <TouchableOpacity
+            style={themedStyles.menuRow}
+            onPress={() =>
+              navigation.navigate('EventList', {
+                profileFilter: 'created',
+                userId: _id,
+              })
+            }>
             <View
               style={[
-                themedStyles.achievementBadge,
-                userStats.eventsCreated >= 1 &&
-                  themedStyles.achievementBadgeEarned,
+                themedStyles.menuIcon,
+                {backgroundColor: colors.primary + '20'},
               ]}>
-              <View
-                style={[
-                  themedStyles.achievementIcon,
-                  {backgroundColor: '#FFD700' + '30'},
-                ]}>
-                <Text style={themedStyles.achievementEmoji}>🎯</Text>
-              </View>
-              <Text style={themedStyles.achievementName}>
-                {t('profile.firstEvent')}
+              <FontAwesomeIcon
+                icon={faCalendarPlus}
+                size={16}
+                color={colors.primary}
+              />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>
+                {t('profile.eventsCreated') || 'Events Created'}
+              </Text>
+              <Text style={themedStyles.menuSubtitle}>
+                {userStats.eventsCreated}{' '}
+                {userStats.eventsCreated === 1 ? 'event' : 'events'}
               </Text>
             </View>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={14}
+              color={colors.placeholder}
+              style={themedStyles.menuChevron}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[themedStyles.menuRow, themedStyles.menuRowLast]}
+            onPress={() =>
+              navigation.navigate('EventList', {
+                profileFilter: 'joined',
+                userId: _id,
+              })
+            }>
             <View
               style={[
-                themedStyles.achievementBadge,
-                userStats.eventsCreated >= 5 &&
-                  themedStyles.achievementBadgeEarned,
+                themedStyles.menuIcon,
+                {backgroundColor: '#4CAF50' + '20'},
               ]}>
-              <View
-                style={[
-                  themedStyles.achievementIcon,
-                  {backgroundColor: '#C0C0C0' + '30'},
-                ]}>
-                <Text style={themedStyles.achievementEmoji}>⭐</Text>
-              </View>
-              <Text style={themedStyles.achievementName}>
-                {t('profile.fiveEvents')}
+              <FontAwesomeIcon
+                icon={faCalendarCheck}
+                size={16}
+                color="#4CAF50"
+              />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>
+                {t('profile.eventsJoined') || 'Events Joined'}
+              </Text>
+              <Text style={themedStyles.menuSubtitle}>
+                {userStats.eventsJoined}{' '}
+                {userStats.eventsJoined === 1 ? 'event' : 'events'}
               </Text>
             </View>
-            <View
-              style={[
-                themedStyles.achievementBadge,
-                userStats.eventsCreated >= 10 &&
-                  themedStyles.achievementBadgeEarned,
-              ]}>
-              <View
-                style={[
-                  themedStyles.achievementIcon,
-                  {backgroundColor: '#CD7F32' + '30'},
-                ]}>
-                <Text style={themedStyles.achievementEmoji}>🏅</Text>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={14}
+              color={colors.placeholder}
+              style={themedStyles.menuChevron}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Favorite Sports Section */}
+        <View style={themedStyles.sectionCard}>
+          <Text style={themedStyles.sectionHeader}>
+            {t('profile.favoriteSports') || 'Favorite Sports'}
+          </Text>
+          <View style={themedStyles.sportsContainer}>
+            {getFavoriteSportsDisplay().map(sport => (
+              <View key={sport.id} style={themedStyles.sportTag}>
+                <Text style={{fontSize: 18}}>{sport.emoji}</Text>
+                <Text style={themedStyles.sportTagText}>{sport.label}</Text>
               </View>
-              <Text style={themedStyles.achievementName}>
-                {t('profile.tenEvents')}
+            ))}
+            <TouchableOpacity
+              style={themedStyles.addSportButton}
+              onPress={() => setShowSportsPicker(true)}>
+              <FontAwesomeIcon
+                icon={faPlus}
+                size={12}
+                color={colors.placeholder}
+              />
+              <Text style={themedStyles.addSportText}>
+                {t('profile.edit') || 'Edit'}
               </Text>
-            </View>
-            <View
-              style={[
-                themedStyles.achievementBadge,
-                userStats.eventsJoined >= 10 &&
-                  themedStyles.achievementBadgeEarned,
-              ]}>
-              <View
-                style={[
-                  themedStyles.achievementIcon,
-                  {backgroundColor: colors.primary + '30'},
-                ]}>
-                <Text style={themedStyles.achievementEmoji}>🤝</Text>
-              </View>
-              <Text style={themedStyles.achievementName}>
-                {t('profile.teamPlayer')}
-              </Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Member Since */}
-        <Text style={themedStyles.memberSince}>
-          {t('profile.memberSince')} {new Date().getFullYear()}
-        </Text>
+        {/* Account Section */}
+        <View style={themedStyles.sectionCard}>
+          <Text style={themedStyles.sectionHeader}>
+            {t('profile.account') || 'Account'}
+          </Text>
+
+          <View style={themedStyles.menuRow}>
+            <View
+              style={[
+                themedStyles.menuIcon,
+                {backgroundColor: '#9C27B0' + '20'},
+              ]}>
+              <FontAwesomeIcon
+                icon={faCalendarDays}
+                size={16}
+                color="#9C27B0"
+              />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>
+                {t('profile.memberSince') || 'Member since'}
+              </Text>
+            </View>
+            <Text style={themedStyles.menuValue}>{memberSinceYear}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={themedStyles.menuRow}
+            onPress={() => navigation.navigate('Settings')}>
+            <View
+              style={[
+                themedStyles.menuIcon,
+                {backgroundColor: colors.placeholder + '20'},
+              ]}>
+              <FontAwesomeIcon
+                icon={faGear}
+                size={16}
+                color={colors.placeholder}
+              />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>
+                {t('navigation.settings') || 'Settings'}
+              </Text>
+            </View>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={14}
+              color={colors.placeholder}
+              style={themedStyles.menuChevron}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[themedStyles.menuRow, themedStyles.menuRowLast]}
+            onPress={handleSignOut}>
+            <View
+              style={[
+                themedStyles.menuIcon,
+                {backgroundColor: '#DC3545' + '20'},
+              ]}>
+              <FontAwesomeIcon
+                icon={faRightFromBracket}
+                size={16}
+                color="#DC3545"
+              />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={[themedStyles.menuTitle, {color: '#DC3545'}]}>
+                {t('auth.signOut') || 'Sign Out'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* Sports Picker Modal */}
+      {showSportsPicker && (
+        <View style={themedStyles.sportsPickerOverlay}>
+          <View style={themedStyles.sportsPickerCard}>
+            <Text style={themedStyles.sportsPickerTitle}>
+              {t('profile.selectFavoriteSports') ||
+                'Select Your Favorite Sports'}
+            </Text>
+            <ScrollView>
+              <View style={themedStyles.sportsPickerGrid}>
+                {SPORTS_OPTIONS.map(sport => (
+                  <TouchableOpacity
+                    key={sport.id}
+                    style={[
+                      themedStyles.sportPickerItem,
+                      favoriteSports.includes(sport.id) &&
+                        themedStyles.sportPickerItemSelected,
+                    ]}
+                    onPress={() => toggleSport(sport.id)}>
+                    <Text style={themedStyles.sportPickerEmoji}>
+                      {sport.emoji}
+                    </Text>
+                    <Text style={themedStyles.sportPickerLabel}>
+                      {sport.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            <TouchableOpacity
+              style={themedStyles.sportsPickerDone}
+              onPress={() => setShowSportsPicker(false)}>
+              <Text style={themedStyles.sportsPickerDoneText}>
+                {t('common.done') || 'Done'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };

@@ -53,9 +53,10 @@ const PublicProfile: React.FC = () => {
   // Calculate user stats based on events
   const userStats = useMemo(() => {
     const eventsCreated = events.filter(e => e.createdBy === userId).length;
-    // Count events where this user is on the roster
-    // Note: This is a simplified count since we don't have full roster data in EventContext
-    return {eventsCreated};
+    const eventsJoined = events.filter(e =>
+      (e as any).roster?.some((r: any) => r.userId === userId),
+    ).length;
+    return {eventsCreated, eventsJoined};
   }, [events, userId]);
 
   // Fetch user data if needed
@@ -109,13 +110,12 @@ const PublicProfile: React.FC = () => {
           backgroundColor: colors.background,
         },
         scrollContent: {
-          padding: 16,
           paddingBottom: 32,
         },
         header: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 20,
+          marginBottom: 8,
           paddingHorizontal: 16,
           paddingTop: 8,
           backgroundColor: colors.background,
@@ -134,132 +134,130 @@ const PublicProfile: React.FC = () => {
           justifyContent: 'center',
           alignItems: 'center',
         },
-        // Profile Card
-        profileCard: {
-          backgroundColor: colors.card,
-          borderRadius: 20,
-          padding: 24,
-          marginBottom: 16,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
+        // Profile Header Section
+        profileSection: {
           alignItems: 'center',
+          paddingVertical: 24,
+          paddingHorizontal: 16,
         },
         avatarContainer: {
           marginBottom: 16,
         },
         avatar: {
-          width: 100,
-          height: 100,
-          borderRadius: 50,
-          backgroundColor: colors.border,
+          width: 110,
+          height: 110,
+          borderRadius: 55,
+          borderWidth: 3,
+          borderColor: colors.primary,
         },
         avatarPlaceholder: {
-          width: 100,
-          height: 100,
-          borderRadius: 50,
+          width: 110,
+          height: 110,
+          borderRadius: 55,
           backgroundColor: colors.primary + '20',
           alignItems: 'center',
           justifyContent: 'center',
+          borderWidth: 3,
+          borderColor: colors.primary,
         },
         avatarInitials: {
-          fontSize: 36,
+          fontSize: 38,
           fontWeight: '700',
           color: colors.primary,
         },
         userName: {
-          fontSize: 24,
+          fontSize: 26,
           fontWeight: '700',
           color: colors.text,
-          marginBottom: 4,
           textAlign: 'center',
         },
-        // Stats Card
-        statsCard: {
+        // Stats Row - Compact inline
+        statsRow: {
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingVertical: 16,
+          paddingHorizontal: 16,
+          marginHorizontal: 16,
           backgroundColor: colors.card,
-          borderRadius: 20,
-          padding: 20,
+          borderRadius: 12,
           marginBottom: 16,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
         },
-        sectionTitle: {
+        statItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        statValue: {
           fontSize: 18,
           fontWeight: '700',
           color: colors.text,
-          marginBottom: 16,
-        },
-        statsRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-around',
-        },
-        statItem: {
-          alignItems: 'center',
-          flex: 1,
-        },
-        statIconContainer: {
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 10,
-        },
-        statValue: {
-          fontSize: 28,
-          fontWeight: '700',
-          color: colors.text,
+          marginRight: 4,
         },
         statLabel: {
-          fontSize: 13,
+          fontSize: 14,
           color: colors.placeholder,
-          marginTop: 4,
-          textAlign: 'center',
         },
-        // Achievements Card
-        achievementsCard: {
+        statDivider: {
+          width: 1,
+          height: 20,
+          backgroundColor: colors.border,
+          marginHorizontal: 24,
+        },
+        // Section Card
+        sectionCard: {
           backgroundColor: colors.card,
-          borderRadius: 20,
-          padding: 20,
+          marginHorizontal: 16,
           marginBottom: 16,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
+          borderRadius: 12,
+          overflow: 'hidden',
         },
-        achievementsRow: {
+        sectionHeader: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.placeholder,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 8,
+        },
+        // Menu Row
+        menuRow: {
           flexDirection: 'row',
-          justifyContent: 'space-around',
-          marginTop: 8,
-        },
-        achievementBadge: {
           alignItems: 'center',
-          opacity: 0.4,
+          paddingVertical: 14,
+          paddingHorizontal: 16,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
         },
-        achievementBadgeEarned: {
-          opacity: 1,
+        menuRowLast: {
+          borderBottomWidth: 0,
         },
-        achievementIcon: {
-          width: 48,
-          height: 48,
-          borderRadius: 24,
+        menuIcon: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: 6,
+          marginRight: 14,
         },
-        achievementEmoji: {
-          fontSize: 24,
+        menuContent: {
+          flex: 1,
         },
-        achievementName: {
-          fontSize: 11,
+        menuTitle: {
+          fontSize: 16,
+          fontWeight: '500',
+          color: colors.text,
+        },
+        menuSubtitle: {
+          fontSize: 13,
           color: colors.placeholder,
-          textAlign: 'center',
+          marginTop: 2,
+        },
+        menuValue: {
+          fontSize: 14,
+          color: colors.placeholder,
+          marginRight: 8,
         },
       }),
     [colors],
@@ -291,8 +289,8 @@ const PublicProfile: React.FC = () => {
         style={themedStyles.container}
         contentContainerStyle={themedStyles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Profile Card */}
-        <View style={themedStyles.profileCard}>
+        {/* Profile Header */}
+        <View style={themedStyles.profileSection}>
           <View style={themedStyles.avatarContainer}>
             {userData?.profilePicUrl ? (
               <Image
@@ -310,106 +308,73 @@ const PublicProfile: React.FC = () => {
           <Text style={themedStyles.userName}>{userData?.username}</Text>
         </View>
 
-        {/* Stats Card - Limited public view */}
-        <View style={themedStyles.statsCard}>
-          <Text style={themedStyles.sectionTitle}>
-            📊 {t('profile.activity')}
-          </Text>
-          <View style={themedStyles.statsRow}>
-            <View style={themedStyles.statItem}>
-              <View
-                style={[
-                  themedStyles.statIconContainer,
-                  {backgroundColor: colors.primary + '20'},
-                ]}>
-                <FontAwesomeIcon
-                  icon={faCalendarPlus}
-                  size={24}
-                  color={colors.primary}
-                />
-              </View>
-              <Text style={themedStyles.statValue}>
-                {userStats.eventsCreated}
-              </Text>
-              <Text style={themedStyles.statLabel}>
-                {t('profile.eventsCreated')}
-              </Text>
-            </View>
-            <View style={themedStyles.statItem}>
-              <View
-                style={[
-                  themedStyles.statIconContainer,
-                  {backgroundColor: '#4CAF50' + '20'},
-                ]}>
-                <FontAwesomeIcon
-                  icon={faCalendarCheck}
-                  size={24}
-                  color="#4CAF50"
-                />
-              </View>
-              <Text style={themedStyles.statValue}>-</Text>
-              <Text style={themedStyles.statLabel}>
-                {t('profile.eventsJoined')}
-              </Text>
-            </View>
+        {/* Stats Row */}
+        <View style={themedStyles.statsRow}>
+          <View style={themedStyles.statItem}>
+            <Text style={themedStyles.statValue}>
+              {userStats.eventsCreated}
+            </Text>
+            <Text style={themedStyles.statLabel}>
+              {t('profile.created') || 'Created'}
+            </Text>
+          </View>
+          <View style={themedStyles.statDivider} />
+          <View style={themedStyles.statItem}>
+            <Text style={themedStyles.statValue}>{userStats.eventsJoined}</Text>
+            <Text style={themedStyles.statLabel}>
+              {t('profile.joined') || 'Joined'}
+            </Text>
           </View>
         </View>
 
-        {/* Achievements Preview - Public view */}
-        <View style={themedStyles.achievementsCard}>
-          <Text style={themedStyles.sectionTitle}>
-            🏆 {t('profile.achievements')}
+        {/* Activity Section */}
+        <View style={themedStyles.sectionCard}>
+          <Text style={themedStyles.sectionHeader}>
+            {t('profile.activity') || 'Activity'}
           </Text>
-          <View style={themedStyles.achievementsRow}>
+
+          <View style={themedStyles.menuRow}>
             <View
               style={[
-                themedStyles.achievementBadge,
-                userStats.eventsCreated >= 1 &&
-                  themedStyles.achievementBadgeEarned,
+                themedStyles.menuIcon,
+                {backgroundColor: colors.primary + '20'},
               ]}>
-              <View
-                style={[
-                  themedStyles.achievementIcon,
-                  {backgroundColor: '#FFD700' + '30'},
-                ]}>
-                <Text style={themedStyles.achievementEmoji}>🎯</Text>
-              </View>
-              <Text style={themedStyles.achievementName}>
-                {t('profile.firstEvent')}
+              <FontAwesomeIcon
+                icon={faCalendarPlus}
+                size={16}
+                color={colors.primary}
+              />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>
+                {t('profile.eventsCreated') || 'Events Created'}
+              </Text>
+              <Text style={themedStyles.menuSubtitle}>
+                {userStats.eventsCreated}{' '}
+                {userStats.eventsCreated === 1 ? 'event' : 'events'}
               </Text>
             </View>
+          </View>
+
+          <View style={[themedStyles.menuRow, themedStyles.menuRowLast]}>
             <View
               style={[
-                themedStyles.achievementBadge,
-                userStats.eventsCreated >= 5 &&
-                  themedStyles.achievementBadgeEarned,
+                themedStyles.menuIcon,
+                {backgroundColor: '#4CAF50' + '20'},
               ]}>
-              <View
-                style={[
-                  themedStyles.achievementIcon,
-                  {backgroundColor: '#C0C0C0' + '30'},
-                ]}>
-                <Text style={themedStyles.achievementEmoji}>⭐</Text>
-              </View>
-              <Text style={themedStyles.achievementName}>
-                {t('profile.fiveEvents')}
-              </Text>
+              <FontAwesomeIcon
+                icon={faCalendarCheck}
+                size={16}
+                color="#4CAF50"
+              />
             </View>
-            <View
-              style={[
-                themedStyles.achievementBadge,
-                userStats.eventsCreated >= 10 &&
-                  themedStyles.achievementBadgeEarned,
-              ]}>
-              <View
-                style={[
-                  themedStyles.achievementIcon,
-                  {backgroundColor: '#CD7F32' + '30'},
-                ]}>
-                <Text style={themedStyles.achievementEmoji}>🏅</Text>
-              </View>
-              <Text style={themedStyles.achievementName}>
-                {t('profile.tenEvents')}
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>
+                {t('profile.eventsJoined') || 'Events Joined'}
+              </Text>
+              <Text style={themedStyles.menuSubtitle}>
+                {userStats.eventsJoined}{' '}
+                {userStats.eventsJoined === 1 ? 'event' : 'events'}
               </Text>
             </View>
           </View>

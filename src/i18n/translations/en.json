@@ -168,7 +168,16 @@
     "imageTooLargeMessage": "This photo is too big. Please choose a smaller image or try taking a new one.",
     "uploadFailed": "Upload Failed",
     "uploadFailedMessage": "Couldn't upload your photo. Please try again.",
-    "playerProfile": "Player Profile"
+    "playerProfile": "Player Profile",
+    "myEvents": "My Events",
+    "favoriteSports": "Favorite Sports",
+    "selectFavoriteSports": "Select Your Favorite Sports",
+    "account": "Account",
+    "edit": "Edit",
+    "signOutConfirm": "Are you sure you want to sign out?",
+    "showingEventsCreated": "Showing events you created",
+    "showingEventsJoined": "Showing events you joined",
+    "clearFilter": "Clear"
   },
   "communityNotes": {
     "title": "Community Notes",
