@@ -7,6 +7,8 @@ import Profile from '../Profile/Profile';
 import PublicProfile from '../Profile/PublicProfile';
 import CommunityNotes from '../Communitynotes/CommunityNotes';
 import {VenueList, VenueDetail, SpaceDetail} from '../Venues';
+import {UserSearch} from '../UserSearch';
+import {FriendsList, FriendRequests} from '../Friends';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faMapMarkerAlt,
@@ -87,6 +89,13 @@ const LocalEventsStack = () => {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="UserSearch"
+        component={UserSearch}
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -142,6 +151,45 @@ const CommunityNotesStack = () => {
   );
 };
 
+// Stack Navigator for Profile screens
+const ProfileStack = ({userId}: {userId: string}) => {
+  const {colors} = useTheme();
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {backgroundColor: colors.card},
+        headerTintColor: colors.text,
+      }}>
+      <Stack.Screen
+        name="ProfileMain"
+        component={Profile}
+        options={{headerShown: false}}
+        initialParams={{_id: userId}}
+      />
+      <Stack.Screen
+        name="UserSearch"
+        component={UserSearch}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="PublicProfile"
+        component={PublicProfile}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="FriendsList"
+        component={FriendsList}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="FriendRequests"
+        component={FriendRequests}
+        options={{headerShown: false}}
+      />
+    </Stack.Navigator>
+  );
+};
+
 const BottomNavigator: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
@@ -185,11 +233,9 @@ const BottomNavigator: React.FC = () => {
       <Tab.Screen name="Local" component={LocalEventsStack} />
       <Tab.Screen name="Venues" component={VenueStack} />
       <Tab.Screen name="CommunityNotes" component={CommunityNotesStack} />
-      <Tab.Screen
-        name="Profile"
-        component={Profile}
-        initialParams={{_id: userId}}
-      />
+      <Tab.Screen name="Profile">
+        {() => <ProfileStack userId={userId} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 };

@@ -1,4 +1,10 @@
-import React, {useEffect, useState, useMemo} from 'react';
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+  useContext,
+} from 'react';
 import {
   View,
   Text,
@@ -6,10 +12,12 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
 import {useEventContext} from '../../Context/EventContext';
@@ -18,9 +26,16 @@ import {
   faCalendarCheck,
   faCalendarPlus,
   faArrowLeft,
+  faUserPlus,
+  faUserCheck,
+  faUserClock,
+  faUserMinus,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 import {TouchableOpacity} from 'react-native';
+import UserContext, {UserContextType} from '../UserContext';
+
+type FriendStatus = 'none' | 'friends' | 'pending' | 'incoming' | 'loading';
 
 type PublicProfileRouteProp = RouteProp<
   {
@@ -46,9 +61,172 @@ const PublicProfile: React.FC = () => {
   const {colors} = useTheme();
   const {events} = useEventContext();
   const {t} = useTranslation();
+  const {userData: currentUser} = useContext(UserContext) as UserContextType;
 
   const [loading, setLoading] = useState(false);
   const [userData, setUserData] = useState<PublicUserData | null>(null);
+  const [friendStatus, setFriendStatus] = useState<FriendStatus>('none');
+
+  // Fetch friend status
+  const fetchFriendStatus = useCallback(async () => {
+    // Don't check friend status for own profile
+    if (userId === currentUser?._id) {
+      return;
+    }
+
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+
+      // Check if already friends
+      const friendsRes = await fetch(`${API_BASE_URL}/users/me/friends`, {
+        headers: {Authorization: `Bearer ${token}`},
+      });
+      if (friendsRes.ok) {
+        const data = await friendsRes.json();
+        const friends = Array.isArray(data) ? data : data.friends || [];
+        if (friends.some((f: any) => f._id === userId)) {
+          setFriendStatus('friends');
+          return;
+        }
+      }
+
+      // Check outgoing requests
+      const outgoingRes = await fetch(
+        `${API_BASE_URL}/users/me/friend-requests/outgoing`,
+        {headers: {Authorization: `Bearer ${token}`}},
+      );
+      if (outgoingRes.ok) {
+        const data = await outgoingRes.json();
+        const requests = Array.isArray(data) ? data : data.requests || [];
+        if (requests.some((r: any) => r._id === userId)) {
+          setFriendStatus('pending');
+          return;
+        }
+      }
+
+      // Check incoming requests
+      const incomingRes = await fetch(
+        `${API_BASE_URL}/users/me/friend-requests/incoming`,
+        {headers: {Authorization: `Bearer ${token}`}},
+      );
+      if (incomingRes.ok) {
+        const data = await incomingRes.json();
+        const requests = Array.isArray(data) ? data : data.requests || [];
+        if (requests.some((r: any) => r._id === userId)) {
+          setFriendStatus('incoming');
+          return;
+        }
+      }
+
+      setFriendStatus('none');
+    } catch (error) {
+      console.error('Error fetching friend status:', error);
+    }
+  }, [userId, currentUser?._id]);
+
+  useEffect(() => {
+    fetchFriendStatus();
+  }, [fetchFriendStatus]);
+
+  // Handle friend action
+  const handleFriendAction = useCallback(async () => {
+    const token = await AsyncStorage.getItem('userToken');
+    setFriendStatus('loading');
+
+    try {
+      switch (friendStatus) {
+        case 'none':
+          const sendRes = await fetch(
+            `${API_BASE_URL}/users/${userId}/friend-request`,
+            {
+              method: 'POST',
+              headers: {Authorization: `Bearer ${token}`},
+            },
+          );
+          if (sendRes.ok) {
+            setFriendStatus('pending');
+            Alert.alert('Success', 'Friend request sent!');
+          } else {
+            setFriendStatus('none');
+            Alert.alert('Error', 'Failed to send friend request');
+          }
+          break;
+
+        case 'pending':
+          Alert.alert('Cancel Request', 'Cancel this friend request?', [
+            {text: 'No', onPress: () => setFriendStatus('pending')},
+            {
+              text: 'Yes',
+              onPress: async () => {
+                const cancelRes = await fetch(
+                  `${API_BASE_URL}/users/me/friend-requests/${userId}/cancel`,
+                  {
+                    method: 'DELETE',
+                    headers: {Authorization: `Bearer ${token}`},
+                  },
+                );
+                setFriendStatus(cancelRes.ok ? 'none' : 'pending');
+              },
+            },
+          ]);
+          break;
+
+        case 'incoming':
+          const acceptRes = await fetch(
+            `${API_BASE_URL}/users/me/friend-requests/${userId}/accept`,
+            {
+              method: 'POST',
+              headers: {Authorization: `Bearer ${token}`},
+            },
+          );
+          if (acceptRes.ok) {
+            setFriendStatus('friends');
+            Alert.alert('Success', 'Friend request accepted!');
+          } else {
+            setFriendStatus('incoming');
+          }
+          break;
+
+        case 'friends':
+          Alert.alert('Remove Friend', 'Are you sure you want to unfriend?', [
+            {text: 'Cancel', onPress: () => setFriendStatus('friends')},
+            {
+              text: 'Remove',
+              style: 'destructive',
+              onPress: async () => {
+                const removeRes = await fetch(
+                  `${API_BASE_URL}/users/me/friends/${userId}`,
+                  {
+                    method: 'DELETE',
+                    headers: {Authorization: `Bearer ${token}`},
+                  },
+                );
+                setFriendStatus(removeRes.ok ? 'none' : 'friends');
+              },
+            },
+          ]);
+          break;
+      }
+    } catch (error) {
+      console.error('Friend action error:', error);
+      fetchFriendStatus();
+    }
+  }, [friendStatus, userId, fetchFriendStatus]);
+
+  const getFriendButtonConfig = () => {
+    switch (friendStatus) {
+      case 'friends':
+        return {icon: faUserMinus, label: 'Friends', color: '#4CAF50'};
+      case 'pending':
+        return {icon: faUserClock, label: 'Pending', color: '#FF9800'};
+      case 'incoming':
+        return {icon: faUserCheck, label: 'Accept', color: '#2196F3'};
+      default:
+        return {icon: faUserPlus, label: 'Add Friend', color: colors.primary};
+    }
+  };
+
+  const friendButtonConfig = getFriendButtonConfig();
 
   // Calculate user stats based on events
   const userStats = useMemo(() => {
@@ -170,6 +348,20 @@ const PublicProfile: React.FC = () => {
           fontWeight: '700',
           color: colors.text,
           textAlign: 'center',
+          marginBottom: 16,
+        },
+        friendButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 24,
+          paddingVertical: 12,
+          borderRadius: 24,
+          marginBottom: 8,
+        },
+        friendButtonText: {
+          fontSize: 16,
+          fontWeight: '600',
+          marginLeft: 8,
         },
         // Stats Row - Compact inline
         statsRow: {
@@ -306,6 +498,36 @@ const PublicProfile: React.FC = () => {
             )}
           </View>
           <Text style={themedStyles.userName}>{userData?.username}</Text>
+
+          {/* Friend Action Button - Only show for other users */}
+          {userId !== currentUser?._id && (
+            <TouchableOpacity
+              style={[
+                themedStyles.friendButton,
+                {backgroundColor: friendButtonConfig.color + '20'},
+              ]}
+              onPress={handleFriendAction}
+              disabled={friendStatus === 'loading'}>
+              {friendStatus === 'loading' ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <FontAwesomeIcon
+                    icon={friendButtonConfig.icon}
+                    size={18}
+                    color={friendButtonConfig.color}
+                  />
+                  <Text
+                    style={[
+                      themedStyles.friendButtonText,
+                      {color: friendButtonConfig.color},
+                    ]}>
+                    {friendButtonConfig.label}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Stats Row */}

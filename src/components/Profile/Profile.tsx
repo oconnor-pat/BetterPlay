@@ -38,6 +38,9 @@ import {
   faGear,
   faRightFromBracket,
   faPlus,
+  faUsers,
+  faUserPlus,
+  faUserClock,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 
@@ -816,6 +819,81 @@ const Profile: React.FC = () => {
               <Text style={themedStyles.menuSubtitle}>
                 {userStats.eventsJoined}{' '}
                 {userStats.eventsJoined === 1 ? 'event' : 'events'}
+              </Text>
+            </View>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={14}
+              color={colors.placeholder}
+              style={themedStyles.menuChevron}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Friends Section */}
+        <View style={themedStyles.sectionCard}>
+          <Text style={themedStyles.sectionHeader}>Friends</Text>
+
+          <TouchableOpacity
+            style={themedStyles.menuRow}
+            onPress={() => navigation.navigate('FriendsList')}>
+            <View
+              style={[
+                themedStyles.menuIcon,
+                {backgroundColor: '#2196F3' + '20'},
+              ]}>
+              <FontAwesomeIcon icon={faUsers} size={16} color="#2196F3" />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>My Friends</Text>
+              <Text style={themedStyles.menuSubtitle}>
+                View and manage your friends
+              </Text>
+            </View>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={14}
+              color={colors.placeholder}
+              style={themedStyles.menuChevron}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={themedStyles.menuRow}
+            onPress={() => navigation.navigate('FriendRequests')}>
+            <View
+              style={[
+                themedStyles.menuIcon,
+                {backgroundColor: '#FF9800' + '20'},
+              ]}>
+              <FontAwesomeIcon icon={faUserClock} size={16} color="#FF9800" />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>Friend Requests</Text>
+              <Text style={themedStyles.menuSubtitle}>Pending requests</Text>
+            </View>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={14}
+              color={colors.placeholder}
+              style={themedStyles.menuChevron}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[themedStyles.menuRow, themedStyles.menuRowLast]}
+            onPress={() => navigation.navigate('UserSearch')}>
+            <View
+              style={[
+                themedStyles.menuIcon,
+                {backgroundColor: '#9C27B0' + '20'},
+              ]}>
+              <FontAwesomeIcon icon={faUserPlus} size={16} color="#9C27B0" />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>Find Players</Text>
+              <Text style={themedStyles.menuSubtitle}>
+                Search for new friends
               </Text>
             </View>
             <FontAwesomeIcon
