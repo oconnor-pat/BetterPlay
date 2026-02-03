@@ -38,6 +38,7 @@ import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
 import UserContext, {UserContextType} from '../UserContext';
 import {version as appVersion} from '../../../package.json';
+import NotificationSettings from './NotificationSettings';
 
 interface Language {
   code: string;
@@ -76,6 +77,10 @@ const Settings: React.FC = () => {
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [deleteAccountModalVisible, setDeleteAccountModalVisible] =
     useState(false);
+  const [
+    notificationSettingsModalVisible,
+    setNotificationSettingsModalVisible,
+  ] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -374,8 +379,7 @@ const Settings: React.FC = () => {
           backgroundColor: colors.card,
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
-          paddingBottom: 34,
-          maxHeight: '70%',
+          paddingBottom: 40,
         },
         modalHeader: {
           flexDirection: 'row',
@@ -746,7 +750,7 @@ const Settings: React.FC = () => {
 
               <TouchableOpacity
                 style={[themedStyles.settingRow, themedStyles.settingRowLast]}
-                onPress={handleNotificationsToggle}
+                onPress={() => setNotificationSettingsModalVisible(true)}
                 activeOpacity={0.7}>
                 <View style={themedStyles.iconContainer}>
                   <FontAwesomeIcon
@@ -764,11 +768,10 @@ const Settings: React.FC = () => {
                   </Text>
                 </View>
                 <View style={themedStyles.settingAction}>
-                  <Switch
-                    value={notificationsEnabled}
-                    onValueChange={handleNotificationsToggle}
-                    trackColor={{false: colors.border, true: colors.primary}}
-                    thumbColor={colors.buttonText}
+                  <FontAwesomeIcon
+                    icon={faChevronRight}
+                    size={16}
+                    color={colors.placeholder}
                   />
                 </View>
               </TouchableOpacity>
@@ -1045,6 +1048,38 @@ const Settings: React.FC = () => {
             </View>
           </TouchableOpacity>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Notification Settings Modal */}
+      <Modal
+        visible={notificationSettingsModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setNotificationSettingsModalVisible(false)}>
+        <TouchableOpacity
+          style={themedStyles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setNotificationSettingsModalVisible(false)}>
+          <View
+            style={[themedStyles.modalContent, {maxHeight: '85%'}]}
+            onStartShouldSetResponder={() => true}>
+            <View style={themedStyles.modalHeader}>
+              <Text style={themedStyles.modalTitle}>
+                {t('settings.notifications')}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.modalCloseButton}
+                onPress={() => setNotificationSettingsModalVisible(false)}>
+                <FontAwesomeIcon icon={faXmark} size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={true}>
+              <NotificationSettings
+                onClose={() => setNotificationSettingsModalVisible(false)}
+              />
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );

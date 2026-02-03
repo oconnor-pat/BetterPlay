@@ -23,6 +23,11 @@ import {
   useTheme,
 } from './src/components/ThemeContext/ThemeContext';
 import {EventProvider} from './src/Context/EventContext';
+import {
+  NotificationProvider,
+  useNotifications,
+} from './src/Context/NotificationContext';
+import notificationService from './src/services/NotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from './src/config/api';
 
@@ -68,6 +73,21 @@ const linking: LinkingOptions<RootStackParamList> = {
       Settings: 'settings',
     },
   },
+};
+
+// Component to set up navigation ref for notifications
+const NotificationNavigationSetup: React.FC<{children: React.ReactNode}> = ({
+  children,
+}) => {
+  const navigation = require('@react-navigation/native').useNavigation();
+  const {setNavigationRef} = useNotifications();
+
+  useEffect(() => {
+    setNavigationRef(navigation);
+    return () => setNavigationRef(null);
+  }, [navigation, setNavigationRef]);
+
+  return <>{children}</>;
 };
 
 const AppContent = () => {
@@ -308,75 +328,81 @@ const AppContent = () => {
       />
       <UserContext.Provider
         value={{userData, setUserData, isAdmin, checkAdminStatus}}>
-        <EventProvider>
-          <NavigationContainer
-            theme={darkMode ? DarkTheme : DefaultTheme}
-            linking={linking}
-            fallback={
-              <View style={[styles.centeredView, backgroundStyle]}>
-                <ActivityIndicator
-                  size="large"
-                  color={colors?.primary || '#007AFF'}
-                />
-              </View>
-            }>
-            <Stack.Navigator
-              initialRouteName={userData ? 'BottomNavigator' : 'LandingPage'}
-              screenOptions={{
-                headerStyle: {
-                  backgroundColor: darkMode ? '#000' : '#02131D',
-                },
-                headerTintColor: '#fff',
-                headerTitleAlign: 'center',
-                headerBackTitleVisible: false,
-                headerTitleStyle: {
-                  fontWeight: 'bold',
-                },
-              }}>
-              <Stack.Screen
-                name="LandingPage"
-                component={LandingPage}
-                options={{headerShown: false}}
-              />
-              <Stack.Screen
-                name="BottomNavigator"
-                component={BottomNavigator}
-                options={{headerShown: false, gestureEnabled: false}}
-              />
-              <Stack.Screen
-                name="Settings"
-                component={Settings}
-                options={{
-                  headerShown: true,
-                  title: 'Settings',
-                }}
-              />
-              <Stack.Screen
-                name="ResetPassword"
-                component={ResetPassword}
-                options={{
-                  headerShown: true,
-                  title: 'Reset Password',
-                }}
-              />
-              <Stack.Screen
-                name="PrivacyPolicy"
-                component={PrivacyPolicy}
-                options={{headerShown: false}}
-              />
-              <Stack.Screen
-                name="TermsOfService"
-                component={TermsOfService}
-                options={{headerShown: false}}
-              />
-              <Stack.Screen
-                name="YourData"
-                component={YourData}
-                options={{headerShown: false}}
-              />
-            </Stack.Navigator>
-          </NavigationContainer>
-        </EventProvider>
+        <NotificationProvider>
+          <EventProvider>
+            <NavigationContainer
+              theme={darkMode ? DarkTheme : DefaultTheme}
+              linking={linking}
+              fallback={
+                <View style={[styles.centeredView, backgroundStyle]}>
+                  <ActivityIndicator
+                    size="large"
+                    color={colors?.primary || '#007AFF'}
+                  />
+                </View>
+              }>
+              <NotificationNavigationSetup>
+                <Stack.Navigator
+                  initialRouteName={
+                    userData ? 'BottomNavigator' : 'LandingPage'
+                  }
+                  screenOptions={{
+                    headerStyle: {
+                      backgroundColor: darkMode ? '#000' : '#02131D',
+                    },
+                    headerTintColor: '#fff',
+                    headerTitleAlign: 'center',
+                    headerBackTitleVisible: false,
+                    headerTitleStyle: {
+                      fontWeight: 'bold',
+                    },
+                  }}>
+                  <Stack.Screen
+                    name="LandingPage"
+                    component={LandingPage}
+                    options={{headerShown: false}}
+                  />
+                  <Stack.Screen
+                    name="BottomNavigator"
+                    component={BottomNavigator}
+                    options={{headerShown: false, gestureEnabled: false}}
+                  />
+                  <Stack.Screen
+                    name="Settings"
+                    component={Settings}
+                    options={{
+                      headerShown: true,
+                      title: 'Settings',
+                    }}
+                  />
+                  <Stack.Screen
+                    name="ResetPassword"
+                    component={ResetPassword}
+                    options={{
+                      headerShown: true,
+                      title: 'Reset Password',
+                    }}
+                  />
+                  <Stack.Screen
+                    name="PrivacyPolicy"
+                    component={PrivacyPolicy}
+                    options={{headerShown: false}}
+                  />
+                  <Stack.Screen
+                    name="TermsOfService"
+                    component={TermsOfService}
+                    options={{headerShown: false}}
+                  />
+                  <Stack.Screen
+                    name="YourData"
+                    component={YourData}
+                    options={{headerShown: false}}
+                  />
+                </Stack.Navigator>
+              </NotificationNavigationSetup>
+            </NavigationContainer>
+          </EventProvider>
+        </NotificationProvider>
       </UserContext.Provider>
     </>
   );

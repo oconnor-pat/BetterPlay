@@ -67,6 +67,11 @@ yarn-error.log
 # Temporary files created by Metro to check the health of the file watcher
 .metro-health-check*
 
+# Firebase config (contains API keys)
+ios/BetterPlay/GoogleService-Info.plist
+ios/GoogleService-Info.plist
+android/app/google-services.json
+
 # testing
 /coverage
 .qodo
