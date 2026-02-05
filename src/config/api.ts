@@ -13,7 +13,7 @@ const LOCAL_API_URL_DEVICE = 'http://192.168.1.27:8001'; // Replace YOUR_MAC_IP 
 const USE_LOCAL_API = false;
 
 // Set to true if testing on physical device with local backend
-const IS_PHYSICAL_DEVICE = true;
+const IS_PHYSICAL_DEVICE = false;
 
 // Automatically select the correct API URL
 export const API_BASE_URL = USE_LOCAL_API
