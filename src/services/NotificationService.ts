@@ -412,6 +412,22 @@ class NotificationService {
 
   /**
    * Process notification data and navigate accordingly
+   * Note: Navigation uses nested structure - first navigate to tab, then to screen within stack
+   *
+   * Navigation Structure:
+   * - Tab.Navigator: Local, Venues, CommunityNotes, Profile
+   *   - LocalEventsStack: EventList, EventRoster, PublicProfile, UserSearch
+   *   - VenueStack: VenueList, VenueDetail, SpaceDetail
+   *   - CommunityNotesStack: CommunityNotesList, PublicProfile
+   *   - ProfileStack: ProfileMain, UserSearch, PublicProfile, FriendsList, FriendRequests
+   *
+   * Backend notification types and their data fields:
+   * - friend_request: { senderId, senderUsername }
+   * - friend_accepted: { accepterId, accepterUsername }
+   * - event_update: { eventId, eventName }
+   * - event_roster: { eventId, eventName } - when added to event roster
+   * - event_reminder: { eventId, eventName }
+   * - community_note: { postId, eventId?, commenterUsername? }
    */
   private handleNotificationData(data: Record<string, string>): void {
     if (!this.navigationCallback) {
@@ -419,30 +435,132 @@ class NotificationService {
       return;
     }
 
-    const {type, id, screen} = data;
+    // Extract all possible data fields from backend
+    const {
+      type,
+      id,
+      screen,
+      eventId,
+      userId,
+      venueId,
+      spaceId,
+      // Backend-specific fields
+      senderId,
+      accepterId,
+      postId,
+    } = data;
 
     // Handle different notification types
     switch (type) {
+      // Friend-related notifications -> Profile tab
       case 'friend_request':
-        this.navigationCallback('Friends', {tab: 'requests'});
+        this.navigationCallback('Profile', {
+          screen: 'FriendRequests',
+          initial: false,
+        });
         break;
+
       case 'friend_accepted':
-        this.navigationCallback('Friends', {tab: 'list'});
-        break;
-      case 'event_update':
-        this.navigationCallback('EventDetail', {eventId: id});
-        break;
-      case 'event_reminder':
-        this.navigationCallback('EventDetail', {eventId: id});
-        break;
-      case 'community_note':
-        this.navigationCallback('CommunityNotes', {noteId: id});
-        break;
-      default:
-        // If a screen is specified directly, navigate to it
-        if (screen) {
-          this.navigationCallback(screen, data);
+        // Navigate to the friend's profile using accepterId (backend field) or userId
+        const friendUserId = accepterId || userId;
+        if (friendUserId) {
+          this.navigationCallback('Profile', {
+            screen: 'PublicProfile',
+            params: {userId: friendUserId},
+            initial: false,
+          });
+        } else {
+          this.navigationCallback('Profile', {
+            screen: 'FriendsList',
+            initial: false,
+          });
         }
+        break;
+
+      // Event-related notifications -> Local tab
+      case 'event_update':
+      case 'event_reminder':
+      case 'event_invitation':
+      case 'event_roster': // When user is added to an event roster
+        // Use eventId from data, or fallback to generic id
+        const targetEventId = eventId || id;
+        if (targetEventId) {
+          this.navigationCallback('Local', {
+            screen: 'EventRoster',
+            params: {eventId: targetEventId},
+            initial: false,
+          });
+        } else {
+          // No event ID, just go to event list
+          this.navigationCallback('Local', {
+            screen: 'EventList',
+            initial: false,
+          });
+        }
+        break;
+
+      // Community note notifications -> CommunityNotes tab
+      case 'community_note':
+        // Backend sends postId, use it or fallback to id
+        const noteId = postId || id;
+        this.navigationCallback('CommunityNotes', {
+          screen: 'CommunityNotesList',
+          params: noteId ? {noteId} : undefined,
+          initial: false,
+        });
+        break;
+
+      // Venue-related notifications (if added in future)
+      case 'venue_update':
+        if (venueId) {
+          this.navigationCallback('Venues', {
+            screen: 'VenueDetail',
+            params: {venueId},
+            initial: false,
+          });
+        } else {
+          this.navigationCallback('Venues', {
+            screen: 'VenueList',
+            initial: false,
+          });
+        }
+        break;
+
+      case 'space_update':
+        if (spaceId && venueId) {
+          this.navigationCallback('Venues', {
+            screen: 'SpaceDetail',
+            params: {spaceId, venueId},
+            initial: false,
+          });
+        } else if (venueId) {
+          this.navigationCallback('Venues', {
+            screen: 'VenueDetail',
+            params: {venueId},
+            initial: false,
+          });
+        }
+        break;
+
+      // General notifications - just go to main screen or specified screen
+      case 'general':
+      default:
+        // If a specific screen is specified in the data, navigate to it
+        if (screen) {
+          // Check if it's a nested screen path (e.g., "Profile/FriendRequests")
+          const screenParts = screen.split('/');
+          if (screenParts.length === 2) {
+            this.navigationCallback(screenParts[0], {
+              screen: screenParts[1],
+              params: data,
+              initial: false,
+            });
+          } else {
+            // Try to navigate directly
+            this.navigationCallback(screen, data);
+          }
+        }
+        // If no screen specified for general/unknown, do nothing (app stays on current screen)
         break;
     }
   }

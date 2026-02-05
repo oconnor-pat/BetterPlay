@@ -28,6 +28,18 @@ export interface NotificationData {
   type: NotificationType;
   id?: string;
   screen?: string;
+  eventId?: string;
+  userId?: string;
+  venueId?: string;
+  spaceId?: string;
+  // Backend-specific fields
+  senderId?: string;
+  senderUsername?: string;
+  accepterId?: string;
+  accepterUsername?: string;
+  postId?: string;
+  eventName?: string;
+  commenterUsername?: string;
   [key: string]: string | undefined;
 }
 
@@ -38,7 +50,10 @@ export type NotificationType =
   | 'event_update'
   | 'event_reminder'
   | 'event_invitation'
+  | 'event_roster'
   | 'community_note'
+  | 'venue_update'
+  | 'space_update'
   | 'general';
 
 // User notification preferences (stored in MongoDB)

@@ -1,4 +1,4 @@
-import React, {useContext} from 'react';
+import React, {useContext, useEffect, useRef} from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
 import EventList from '../EventList/EventList';
@@ -21,6 +21,7 @@ import {UserContextType} from '../UserContext';
 import UserContext from '../UserContext';
 import {IconDefinition} from '@fortawesome/fontawesome-svg-core';
 import {useTheme} from '../ThemeContext/ThemeContext';
+import {useNotifications} from '../../Context/NotificationContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -193,6 +194,25 @@ const ProfileStack = ({userId}: {userId: string}) => {
 const BottomNavigator: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
+  const {hasPermission, isInitialized, requestPermission} = useNotifications();
+  const hasPromptedRef = useRef(false);
+
+  // Request notification permission after login (once per session)
+  useEffect(() => {
+    if (
+      isInitialized &&
+      !hasPermission &&
+      !hasPromptedRef.current &&
+      userData
+    ) {
+      hasPromptedRef.current = true;
+      // Small delay to let the user see the main screen first
+      const timer = setTimeout(() => {
+        requestPermission();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isInitialized, hasPermission, requestPermission, userData]);
 
   if (!userData) {
     // Prevent crash during sign out navigation transition
