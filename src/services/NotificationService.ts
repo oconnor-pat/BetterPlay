@@ -58,6 +58,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
 class NotificationService {
   private navigationCallback: NotificationNavigationCallback | null = null;
   private isInitialized = false;
+  private pendingNotificationData: Record<string, string> | null = null;
 
   /**
    * Initialize the notification service
@@ -77,6 +78,16 @@ class NotificationService {
 
       // Set up notifee foreground event handler
       this.setupNotifeeHandlers();
+
+      // Check if permission already granted and register token
+      // This ensures token is registered on app launch (not just when requesting permission)
+      const status = await this.checkPermissionStatus();
+      if (
+        status === AuthorizationStatus.AUTHORIZED ||
+        status === AuthorizationStatus.PROVISIONAL
+      ) {
+        await this.getAndRegisterToken();
+      }
 
       this.isInitialized = true;
       console.log('NotificationService initialized successfully');
@@ -253,9 +264,20 @@ class NotificationService {
 
   /**
    * Set navigation callback for handling notification taps
+   * Also processes any pending notifications that arrived before navigation was ready
    */
   setNavigationCallback(callback: NotificationNavigationCallback): void {
     this.navigationCallback = callback;
+
+    // Process any pending notification that arrived before navigation was ready
+    if (this.pendingNotificationData) {
+      console.log(
+        'Processing pending notification:',
+        this.pendingNotificationData,
+      );
+      this.handleNotificationData(this.pendingNotificationData);
+      this.pendingNotificationData = null;
+    }
   }
 
   /**
@@ -431,7 +453,10 @@ class NotificationService {
    */
   private handleNotificationData(data: Record<string, string>): void {
     if (!this.navigationCallback) {
-      console.warn('Navigation callback not set');
+      console.log(
+        'Navigation callback not set, queueing notification for later',
+      );
+      this.pendingNotificationData = data;
       return;
     }
 

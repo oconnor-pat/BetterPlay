@@ -31,6 +31,10 @@
     [FIRApp configure];
   }
 
+  // Set this class as the delegate for UNUserNotificationCenter
+  // Required because FirebaseAppDelegateProxyEnabled is set to NO
+  [UNUserNotificationCenter currentNotificationCenter].delegate = self;
+
   self.moduleName = @"BetterPlay";
   // You can add your custom initial props in the dictionary below.
   // They will be passed down to the ViewController used by React Native.
@@ -63,6 +67,36 @@
 #else
   return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
 #endif
+}
+
+#pragma mark - UNUserNotificationCenterDelegate
+
+// Handle notifications when app is in foreground
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+       willPresentNotification:(UNNotification *)notification
+         withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler
+{
+  NSDictionary *userInfo = notification.request.content.userInfo;
+  NSLog(@"Foreground notification received: %@", userInfo);
+  
+  // Show the notification even when app is in foreground
+  // This allows the JavaScript side (Notifee) to handle the display
+  completionHandler(UNNotificationPresentationOptionAlert |
+                    UNNotificationPresentationOptionBadge |
+                    UNNotificationPresentationOptionSound);
+}
+
+// Handle notification tap (when user taps on notification)
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+didReceiveNotificationResponse:(UNNotificationResponse *)response
+         withCompletionHandler:(void (^)(void))completionHandler
+{
+  NSDictionary *userInfo = response.notification.request.content.userInfo;
+  NSLog(@"Notification tapped: %@", userInfo);
+  
+  // The notification tap will be handled by React Native Firebase Messaging
+  // and Notifee through their respective handlers
+  completionHandler();
 }
 
 @end
