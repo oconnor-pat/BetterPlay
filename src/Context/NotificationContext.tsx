@@ -17,6 +17,8 @@ import notificationService, {
   NotificationSettings,
 } from '../services/NotificationService';
 import {AuthorizationStatus} from '@notifee/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {API_BASE_URL} from '../config/api';
 
 // Navigation reference type
 type NavigationRef = {
@@ -39,6 +41,7 @@ interface NotificationContextType {
 
   // Badge
   badgeCount: number;
+  setBadgeCount: (count: number) => void;
   clearBadge: () => Promise<void>;
 
   // Initialization
@@ -121,9 +124,30 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       const savedSettings = await notificationService.getNotificationSettings();
       setSettings(savedSettings);
 
-      // Get badge count
-      const count = await notificationService.getBadgeCount();
-      setBadgeCount(count);
+      // Get unread count from backend (source of truth)
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (token) {
+          const response = await fetch(
+            `${API_BASE_URL}/api/notifications/unread-count`,
+            {
+              headers: {Authorization: `Bearer ${token}`},
+            },
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setBadgeCount(data.count || 0);
+          } else {
+            setBadgeCount(0);
+          }
+        } else {
+          setBadgeCount(0);
+        }
+      } catch {
+        // Fallback to OS badge count if backend is unreachable
+        const count = await notificationService.getBadgeCount();
+        setBadgeCount(count);
+      }
 
       setIsInitialized(true);
     } catch (error) {
@@ -203,6 +227,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     requestPermission,
     checkPermission,
     badgeCount,
+    setBadgeCount,
     clearBadge,
     isInitialized,
     setNavigationRef,

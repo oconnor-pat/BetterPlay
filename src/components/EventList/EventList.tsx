@@ -47,6 +47,10 @@ import {
   faArrowRightToBracket,
   faComments,
   faHeart,
+  faGlobe,
+  faLock,
+  faEnvelope,
+  faBell,
 } from '@fortawesome/free-solid-svg-icons';
 import {
   useNavigation,
@@ -62,6 +66,7 @@ import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
 import EventComments from './EventComments';
+import {useNotifications} from '../../Context/NotificationContext';
 
 export type RootStackParamList = {
   EventList:
@@ -85,6 +90,35 @@ export type RootStackParamList = {
   Profile: {_id: string};
 };
 
+// Privacy options for events
+type EventPrivacy = 'public' | 'private' | 'invite-only';
+
+const privacyOptions: {
+  value: EventPrivacy;
+  label: string;
+  icon: any;
+  description: string;
+}[] = [
+  {
+    value: 'public',
+    label: 'Public',
+    icon: faGlobe,
+    description: 'Anyone can see and join',
+  },
+  {
+    value: 'private',
+    label: 'Private',
+    icon: faLock,
+    description: 'Only you can see this event',
+  },
+  {
+    value: 'invite-only',
+    label: 'Invite Only',
+    icon: faEnvelope,
+    description: 'Only invited users can see and join',
+  },
+];
+
 interface Event {
   _id: string;
   name: string;
@@ -103,6 +137,10 @@ interface Event {
   longitude?: number;
   // Jersey colors for team-based events (exactly 2 colors)
   jerseyColors?: string[];
+  // Privacy setting
+  privacy?: EventPrivacy;
+  // Invited users (for invite-only events)
+  invitedUsers?: string[];
 }
 
 // Google Places API configuration from environment variable
@@ -122,6 +160,8 @@ const createEmptyEvent = () => ({
   latitude: undefined as number | undefined,
   longitude: undefined as number | undefined,
   jerseyColors: [] as string[],
+  privacy: 'public' as EventPrivacy,
+  invitedUsers: [] as string[],
 });
 
 const rosterSizeOptions: string[] = Array.from({length: 30}, (_, i) =>
@@ -421,6 +461,7 @@ const EventList: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
   const {t} = useTranslation();
+  const {badgeCount} = useNotifications();
 
   const themedStyles = useMemo(
     () =>
@@ -434,10 +475,15 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 20,
+          marginBottom: 16,
           paddingTop: 8,
           backgroundColor: colors.background,
           zIndex: 1,
+        },
+        headerSide: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          width: 90,
         },
         title: {
           fontSize: 25,
@@ -445,11 +491,6 @@ const EventList: React.FC = () => {
           color: colors.primary,
           textAlign: 'center',
           flex: 1,
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: 8,
-          zIndex: -1,
         },
         card: {
           backgroundColor: colors.card,
@@ -621,13 +662,42 @@ const EventList: React.FC = () => {
           color: colors.primary,
         },
         addButton: {
-          paddingHorizontal: 20,
-          paddingVertical: 10,
-          zIndex: 1,
+          width: 38,
+          height: 38,
           backgroundColor: colors.primary,
-          borderRadius: 8,
+          borderRadius: 10,
           alignItems: 'center',
           justifyContent: 'center',
+        },
+        headerRight: {
+          justifyContent: 'flex-end',
+          gap: 14,
+        },
+        bellButton: {
+          width: 38,
+          height: 38,
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+        },
+        badge: {
+          position: 'absolute',
+          top: -4,
+          right: -6,
+          backgroundColor: '#FF3B30',
+          borderRadius: 10,
+          minWidth: 18,
+          height: 18,
+          paddingHorizontal: 3,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 2,
+          borderColor: colors.background,
+        },
+        badgeText: {
+          color: '#fff',
+          fontSize: 10,
+          fontWeight: '700',
         },
         modalOverlay: {
           flex: 1,
@@ -638,18 +708,22 @@ const EventList: React.FC = () => {
         modalView: {
           backgroundColor: colors.card,
           borderRadius: 16,
-          padding: 24,
+          padding: 20,
+          paddingTop: 16,
           shadowColor: '#000',
           shadowOffset: {width: 0, height: 4},
           shadowOpacity: 0.25,
           shadowRadius: 12,
           elevation: 8,
-          maxHeight: '90%',
+          maxHeight: '85%',
+        },
+        modalFormScroll: {
+          flexGrow: 0,
         },
         modalHeader: {
           color: colors.text,
-          fontSize: 24,
-          marginBottom: 24,
+          fontSize: 22,
+          marginBottom: 16,
           textAlign: 'center',
           fontWeight: '700',
         },
@@ -663,26 +737,27 @@ const EventList: React.FC = () => {
         modalInput: {
           backgroundColor: colors.inputBackground || colors.background,
           color: colors.text,
-          padding: 14,
-          marginBottom: 16,
-          borderRadius: 12,
+          padding: 12,
+          marginBottom: 12,
+          borderRadius: 10,
           borderWidth: 1,
           borderColor: colors.border,
-          fontSize: 16,
+          fontSize: 15,
         },
         autocompleteContainer: {
-          marginBottom: 16,
+          marginBottom: 12,
           zIndex: 1000,
         },
         saveButton: {
           backgroundColor: colors.primary,
-          padding: 16,
-          borderRadius: 12,
-          marginVertical: 5,
+          paddingVertical: 12,
+          paddingHorizontal: 16,
+          borderRadius: 10,
+          marginVertical: 4,
           flex: 1,
           alignItems: 'center',
-          marginHorizontal: 6,
-          minWidth: 100,
+          marginHorizontal: 5,
+          minWidth: 90,
           shadowColor: colors.primary,
           shadowOffset: {width: 0, height: 2},
           shadowOpacity: 0.3,
@@ -708,19 +783,19 @@ const EventList: React.FC = () => {
         buttonContainer: {
           flexDirection: 'row',
           justifyContent: 'center',
-          marginTop: 24,
+          marginTop: 16,
           alignItems: 'center',
         },
         confirmButton: {
           color: colors.buttonText || '#fff',
           textAlign: 'center',
-          marginTop: 12,
-          marginBottom: 16,
-          fontSize: 16,
+          marginTop: 8,
+          marginBottom: 12,
+          fontSize: 15,
           fontWeight: '600',
           backgroundColor: colors.primary,
-          paddingVertical: 10,
-          paddingHorizontal: 20,
+          paddingVertical: 8,
+          paddingHorizontal: 16,
           borderRadius: 8,
           overflow: 'hidden',
         },
@@ -1108,6 +1183,167 @@ const EventList: React.FC = () => {
           flex: 1,
           marginBottom: 0,
         },
+        // Privacy selector styles
+        privacyContainer: {
+          marginBottom: 12,
+        },
+        privacyLabel: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 8,
+        },
+        privacyOptions: {
+          flexDirection: 'row',
+          gap: 8,
+        },
+        privacyOption: {
+          flex: 1,
+          alignItems: 'center',
+          backgroundColor: colors.inputBackground || colors.background,
+          paddingVertical: 10,
+          paddingHorizontal: 8,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        privacyOptionSelected: {
+          borderColor: colors.primary,
+          borderWidth: 2,
+          backgroundColor: colors.primary + '10',
+        },
+        privacyOptionTextContainer: {
+          alignItems: 'center',
+          marginTop: 6,
+        },
+        privacyOptionLabel: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.text,
+          textAlign: 'center',
+        },
+        privacyOptionLabelSelected: {
+          color: colors.primary,
+        },
+        privacyOptionDescription: {
+          fontSize: 10,
+          color: colors.secondaryText,
+          marginTop: 2,
+          textAlign: 'center',
+        },
+        // Privacy badge on event cards
+        privacyBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.inputBackground || colors.background,
+          paddingHorizontal: 8,
+          paddingVertical: 4,
+          borderRadius: 12,
+          marginLeft: 8,
+          gap: 4,
+        },
+        privacyBadgeText: {
+          fontSize: 11,
+          color: colors.secondaryText,
+          fontWeight: '500',
+        },
+        // Invite users styles
+        inviteContainer: {
+          marginBottom: 16,
+        },
+        inviteSearchContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+          paddingHorizontal: 12,
+          marginBottom: 8,
+        },
+        inviteSearchIcon: {
+          marginRight: 8,
+        },
+        inviteSearchInput: {
+          flex: 1,
+          paddingVertical: 12,
+          fontSize: 14,
+          color: colors.text,
+        },
+        inviteSearchResults: {
+          backgroundColor: colors.card,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginBottom: 12,
+          maxHeight: 150,
+        },
+        inviteSearchResultRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
+        inviteUserAvatar: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          marginRight: 10,
+        },
+        inviteUserAvatarPlaceholder: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: colors.primary,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginRight: 10,
+        },
+        inviteUserAvatarText: {
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: '600',
+        },
+        inviteUserName: {
+          flex: 1,
+          fontSize: 14,
+          color: colors.text,
+        },
+        invitedUsersList: {
+          marginTop: 8,
+        },
+        invitedUsersLabel: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 8,
+        },
+        invitedUsersChips: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+        },
+        invitedUserChip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary + '20',
+          paddingVertical: 6,
+          paddingHorizontal: 10,
+          borderRadius: 16,
+          gap: 6,
+        },
+        invitedUserChipText: {
+          fontSize: 13,
+          color: colors.primary,
+          fontWeight: '500',
+        },
+        inviteHint: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          fontStyle: 'italic',
+          marginTop: 4,
+        },
         // Likes modal styles
         likesModalOverlay: {
           flex: 1,
@@ -1285,6 +1521,16 @@ const EventList: React.FC = () => {
   // Jersey color picker state for team sports
   const [showJerseyColorPicker, setShowJerseyColorPicker] = useState(false);
 
+  // Invite users state (for invite-only events)
+  const [inviteSearchQuery, setInviteSearchQuery] = useState('');
+  const [availableUsersToInvite, setAvailableUsersToInvite] = useState<
+    LikedByUser[]
+  >([]);
+  const [loadingInviteUsers, setLoadingInviteUsers] = useState(false);
+  const [invitedUserDetails, setInvitedUserDetails] = useState<LikedByUser[]>(
+    [],
+  );
+
   // Expanded comments state - tracks which event's comments are shown inline
   const [expandedCommentsEventId, setExpandedCommentsEventId] = useState<
     string | null
@@ -1321,7 +1567,10 @@ const EventList: React.FC = () => {
       setLoading(true);
     }
     try {
-      const response = await axios.get(`${API_BASE_URL}/events`);
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(`${API_BASE_URL}/events`, {
+        headers: token ? {Authorization: `Bearer ${token}`} : {},
+      });
       setEventData(response.data);
       // Cache events for faster startup
       AsyncStorage.setItem('cachedEvents', JSON.stringify(response.data));
@@ -1387,7 +1636,10 @@ const EventList: React.FC = () => {
 
     const fetchEventsInBackground = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/events`);
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await axios.get(`${API_BASE_URL}/events`, {
+          headers: token ? {Authorization: `Bearer ${token}`} : {},
+        });
         if (Array.isArray(response.data)) {
           setEventData(response.data);
           // Cache for next launch (fire and forget)
@@ -1606,11 +1858,19 @@ const EventList: React.FC = () => {
               jerseyColors: isTeamSport(newEvent.eventType)
                 ? newEvent.jerseyColors
                 : undefined,
+              privacy: newEvent.privacy,
+              invitedUsers: newEvent.invitedUsers,
             },
           );
+          // Merge the response with local privacy settings in case backend doesn't return them
+          const updatedEvent = {
+            ...response.data,
+            privacy: response.data.privacy || newEvent.privacy,
+            invitedUsers: response.data.invitedUsers || newEvent.invitedUsers,
+          };
           setEventData(prevData =>
             prevData.map(event =>
-              event._id === editingEventId ? response.data : event,
+              event._id === editingEventId ? updatedEvent : event,
             ),
           );
         } catch (error) {
@@ -1634,8 +1894,16 @@ const EventList: React.FC = () => {
             jerseyColors: isTeamSport(newEvent.eventType)
               ? newEvent.jerseyColors
               : undefined,
+            privacy: newEvent.privacy,
+            invitedUsers: newEvent.invitedUsers,
           });
-          setEventData(prevData => [response.data, ...prevData]);
+          // Merge the response with local privacy settings in case backend doesn't return them
+          const createdEvent = {
+            ...response.data,
+            privacy: response.data.privacy || newEvent.privacy,
+            invitedUsers: response.data.invitedUsers || newEvent.invitedUsers,
+          };
+          setEventData(prevData => [createdEvent, ...prevData]);
         } catch (error) {
           Alert.alert(t('common.error'), t('events.createError'));
           setSavingEvent(false);
@@ -1649,6 +1917,9 @@ const EventList: React.FC = () => {
       setTempEventType('');
       setIsEditing(false);
       setEditingEventId(null);
+      setInviteSearchQuery('');
+      setAvailableUsersToInvite([]);
+      setInvitedUserDetails([]);
     } else {
       Alert.alert(t('events.missingFields'), t('events.missingFieldsMessage'));
     }
@@ -1700,7 +1971,7 @@ const EventList: React.FC = () => {
     );
   };
 
-  const handleEditEvent = (event: Event) => {
+  const handleEditEvent = async (event: Event) => {
     setNewEvent({
       name: event.name,
       location: event.location,
@@ -1711,12 +1982,22 @@ const EventList: React.FC = () => {
       latitude: event.latitude,
       longitude: event.longitude,
       jerseyColors: event.jerseyColors || [],
+      privacy: event.privacy || 'public',
+      invitedUsers: event.invitedUsers || [],
     });
     setModalVisible(true);
     setTempRosterSize(event.totalSpots.toString());
     setTempEventType(event.eventType);
     setIsEditing(true);
     setEditingEventId(event._id);
+
+    // Load invited user details if editing an invite-only event
+    if (event.invitedUsers && event.invitedUsers.length > 0) {
+      const users = await fetchUsersByIds(event.invitedUsers);
+      setInvitedUserDetails(users);
+    } else {
+      setInvitedUserDetails([]);
+    }
   };
 
   const handleShareEvent = async (event: Event) => {
@@ -1794,6 +2075,61 @@ const EventList: React.FC = () => {
       // Return empty on error
       return [];
     }
+  };
+
+  // Search users for invite picker
+  const searchUsersForInvite = async (query: string) => {
+    if (query.length < 2) {
+      setAvailableUsersToInvite([]);
+      return;
+    }
+    setLoadingInviteUsers(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(`${API_BASE_URL}/users`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const allUsers = response.data?.users || response.data || [];
+      // Filter users by search query (exclude current user and already invited)
+      const filteredUsers = allUsers.filter(
+        (user: LikedByUser) =>
+          user.username.toLowerCase().includes(query.toLowerCase()) &&
+          user._id !== userData?._id &&
+          !newEvent.invitedUsers.includes(user._id),
+      );
+      setAvailableUsersToInvite(
+        filteredUsers.slice(0, 10).map((user: LikedByUser) => ({
+          _id: user._id,
+          username: user.username,
+          profilePicUrl: user.profilePicUrl,
+        })),
+      );
+    } catch {
+      setAvailableUsersToInvite([]);
+    }
+    setLoadingInviteUsers(false);
+  };
+
+  // Add user to invite list
+  const addUserToInvite = (user: LikedByUser) => {
+    setNewEvent(prev => ({
+      ...prev,
+      invitedUsers: [...prev.invitedUsers, user._id],
+    }));
+    setInvitedUserDetails(prev => [...prev, user]);
+    setInviteSearchQuery('');
+    setAvailableUsersToInvite([]);
+  };
+
+  // Remove user from invite list
+  const removeUserFromInvite = (userId: string) => {
+    setNewEvent(prev => ({
+      ...prev,
+      invitedUsers: prev.invitedUsers.filter(id => id !== userId),
+    }));
+    setInvitedUserDetails(prev => prev.filter(u => u._id !== userId));
   };
 
   // Show who liked the event
@@ -1908,6 +2244,9 @@ const EventList: React.FC = () => {
     setTempEventType('');
     setIsEditing(false);
     setEditingEventId(null);
+    setInviteSearchQuery('');
+    setAvailableUsersToInvite([]);
+    setInvitedUserDetails([]);
   };
 
   const onDateChange = (evt: any, selectedDate?: Date) => {
@@ -1948,6 +2287,19 @@ const EventList: React.FC = () => {
               {getEventTypeEmoji(item.eventType)}
             </Text>
             <Text style={themedStyles.cardTitle}>{item.name}</Text>
+            {/* Privacy Indicator */}
+            {item.privacy && item.privacy !== 'public' && (
+              <View style={themedStyles.privacyBadge}>
+                <FontAwesomeIcon
+                  icon={item.privacy === 'private' ? faLock : faEnvelope}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+                <Text style={themedStyles.privacyBadgeText}>
+                  {item.privacy === 'private' ? 'Private' : 'Invite Only'}
+                </Text>
+              </View>
+            )}
           </View>
           {/* Username of event creator */}
           {item.createdByUsername && (
@@ -2134,24 +2486,40 @@ const EventList: React.FC = () => {
     <SafeAreaView style={themedStyles.container} edges={['top']}>
       {/* Header */}
       <View style={themedStyles.header}>
-        <HamburgerMenu />
+        <View style={themedStyles.headerSide}>
+          <HamburgerMenu />
+        </View>
         <Text style={themedStyles.title}>{t('events.title')}</Text>
-        <TouchableOpacity
-          style={themedStyles.addButton}
-          onPress={() => {
-            setModalVisible(true);
-            setIsEditing(false);
-            setEditingEventId(null);
-            setNewEvent(createEmptyEvent());
-            setTempRosterSize('');
-            setTempEventType('');
-          }}>
-          <FontAwesomeIcon
-            icon={faPlus}
-            size={20}
-            color={colors.buttonText || '#fff'}
-          />
-        </TouchableOpacity>
+        <View style={[themedStyles.headerSide, themedStyles.headerRight]}>
+          <TouchableOpacity
+            style={themedStyles.bellButton}
+            onPress={() => navigation.navigate('Notifications' as never)}>
+            <FontAwesomeIcon icon={faBell} size={22} color={colors.primary} />
+            {badgeCount > 0 && (
+              <View style={themedStyles.badge}>
+                <Text style={themedStyles.badgeText}>
+                  {badgeCount > 99 ? '99+' : badgeCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={themedStyles.addButton}
+            onPress={() => {
+              setModalVisible(true);
+              setIsEditing(false);
+              setEditingEventId(null);
+              setNewEvent(createEmptyEvent());
+              setTempRosterSize('');
+              setTempEventType('');
+            }}>
+            <FontAwesomeIcon
+              icon={faPlus}
+              size={18}
+              color={colors.buttonText || '#fff'}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
       {/* Search Bar with Filter Button */}
       <View style={themedStyles.searchFilterRow}>
@@ -2342,323 +2710,496 @@ const EventList: React.FC = () => {
                   : `🎉 ${t('events.createEvent')}`}
               </Text>
 
-              <TextInput
-                style={themedStyles.modalInput}
-                placeholder={t('events.eventName')}
-                placeholderTextColor={colors.placeholder || '#888'}
-                value={newEvent.name}
-                onChangeText={text => setNewEvent({...newEvent, name: text})}
-              />
-              {/* Location Input with Autocomplete */}
-              <View style={themedStyles.autocompleteContainer}>
-                {isApiKeyConfigured ? (
-                  <GooglePlacesAutocomplete
-                    placeholder="Location/Facility"
-                    onPress={(data, details = null) => {
-                      console.log('Selected place:', data, details);
-                      const location =
-                        data.description ||
-                        data.structured_formatting?.main_text ||
-                        '';
-                      const coords = details?.geometry?.location;
+              <ScrollView
+                style={themedStyles.modalFormScroll}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled">
+                <TextInput
+                  style={themedStyles.modalInput}
+                  placeholder={t('events.eventName')}
+                  placeholderTextColor={colors.placeholder || '#888'}
+                  value={newEvent.name}
+                  onChangeText={text => setNewEvent({...newEvent, name: text})}
+                />
+                {/* Location Input with Autocomplete */}
+                <View style={themedStyles.autocompleteContainer}>
+                  {isApiKeyConfigured ? (
+                    <GooglePlacesAutocomplete
+                      placeholder="Location/Facility"
+                      onPress={(data, details = null) => {
+                        console.log('Selected place:', data, details);
+                        const location =
+                          data.description ||
+                          data.structured_formatting?.main_text ||
+                          '';
+                        const coords = details?.geometry?.location;
 
-                      setNewEvent({
-                        ...newEvent,
-                        location: location,
-                        latitude: coords?.lat,
-                        longitude: coords?.lng,
-                      });
-                    }}
-                    query={{
-                      key: GOOGLE_PLACES_API_KEY,
-                      language: 'en',
-                      types: 'establishment|geocode',
-                    }}
-                    fetchDetails={true}
-                    disableScroll={true}
-                    listViewDisplayed="auto"
-                    styles={autocompleteStyles}
-                    onFail={error => {
-                      console.warn('GooglePlacesAutocomplete error:', error);
-                    }}
-                    textInputProps={{
-                      placeholderTextColor: colors.placeholder || '#888',
-                    }}
-                    enablePoweredByContainer={false}
-                    debounce={200}
-                  />
-                ) : (
-                  <TextInput
-                    style={themedStyles.modalInput}
-                    placeholder={t('events.eventLocation')}
-                    placeholderTextColor={colors.placeholder || '#888'}
-                    value={newEvent.location}
-                    onChangeText={text =>
-                      setNewEvent({...newEvent, location: text})
-                    }
-                  />
-                )}
-              </View>
-
-              {/* Event Date selector */}
-              <TouchableOpacity
-                style={themedStyles.modalInput}
-                onPress={() => setShowDatePicker(true)}>
-                <Text
-                  style={{
-                    color: newEvent.date ? colors.text : colors.placeholder,
-                  }}>
-                  {newEvent.date ? newEvent.date : t('events.selectEventDate')}
-                </Text>
-              </TouchableOpacity>
-              {showDatePicker && (
-                <View>
-                  <DateTimePicker
-                    value={date || new Date()}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={onDateChange}
-                    textColor={colors.text}
-                  />
-                  <TouchableOpacity
-                    onPress={() => {
-                      setNewEvent({...newEvent, date: date?.toDateString()});
-                      setShowDatePicker(false);
-                    }}>
-                    <Text style={themedStyles.confirmButton}>
-                      {t('events.confirmDate')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Event Time selector */}
-              <TouchableOpacity
-                style={themedStyles.modalInput}
-                onPress={() => setShowTimePicker(true)}>
-                <Text
-                  style={{
-                    color: newEvent.time ? colors.text : colors.placeholder,
-                  }}>
-                  {newEvent.time ? newEvent.time : t('events.selectEventTime')}
-                </Text>
-              </TouchableOpacity>
-              {showTimePicker && (
-                <View>
-                  <DateTimePicker
-                    value={time || new Date()}
-                    mode="time"
-                    minuteInterval={15}
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={onTimeChange}
-                    textColor={colors.text}
-                  />
-                  <TouchableOpacity
-                    onPress={() => {
-                      setNewEvent({
-                        ...newEvent,
-                        time: time?.toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        }),
-                      });
-                      setShowTimePicker(false);
-                    }}>
-                    <Text style={themedStyles.confirmButton}>
-                      {t('events.confirmTime')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Roster Size selector */}
-              <TouchableOpacity
-                style={themedStyles.modalInput}
-                onPress={() => {
-                  setShowRosterSizePicker(true);
-                  setTempRosterSize(newEvent.totalSpots || '');
-                }}>
-                <Text
-                  style={{
-                    color: newEvent.totalSpots
-                      ? colors.text
-                      : colors.placeholder,
-                  }}>
-                  {newEvent.totalSpots
-                    ? newEvent.totalSpots
-                    : t('events.selectRosterSize')}
-                </Text>
-              </TouchableOpacity>
-              {showRosterSizePicker && (
-                <View>
-                  <View style={themedStyles.pickerContainer}>
-                    <Picker
-                      selectedValue={tempRosterSize}
-                      onValueChange={itemValue => setTempRosterSize(itemValue)}
-                      style={themedStyles.picker}
-                      dropdownIconColor={colors.text}>
-                      {rosterSizeOptions.map(value => (
-                        <Picker.Item
-                          key={value}
-                          label={value}
-                          value={value}
-                          color={colors.text}
-                        />
-                      ))}
-                    </Picker>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setNewEvent({...newEvent, totalSpots: tempRosterSize});
-                      setShowRosterSizePicker(false);
-                    }}>
-                    <Text style={themedStyles.confirmButton}>
-                      {t('events.confirmRosterSize')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Event Type selector */}
-              <TouchableOpacity
-                style={themedStyles.modalInput}
-                onPress={() => {
-                  setShowEventTypePicker(true);
-                  setTempEventType(newEvent.eventType || '');
-                }}>
-                <Text
-                  style={{
-                    color: newEvent.eventType
-                      ? colors.text
-                      : colors.placeholder,
-                  }}>
-                  {newEvent.eventType
-                    ? newEvent.eventType
-                    : t('events.selectEventType')}
-                </Text>
-              </TouchableOpacity>
-              {showEventTypePicker && (
-                <View>
-                  <View style={themedStyles.pickerContainer}>
-                    <Picker
-                      selectedValue={tempEventType}
-                      onValueChange={itemValue => setTempEventType(itemValue)}
-                      style={themedStyles.picker}
-                      dropdownIconColor={colors.text}>
-                      {activityOptions.map(opt => (
-                        <Picker.Item
-                          key={opt.label}
-                          label={`${opt.emoji} ${opt.label}`}
-                          value={opt.label}
-                          color={colors.text}
-                        />
-                      ))}
-                    </Picker>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => {
-                      // Reset jersey colors when changing event type
-                      setNewEvent({
-                        ...newEvent,
-                        eventType: tempEventType,
-                        jerseyColors: [],
-                      });
-                      setShowEventTypePicker(false);
-                    }}>
-                    <Text style={themedStyles.confirmButton}>
-                      {t('events.confirmEventType')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Jersey Color Selector - only for team sports */}
-              {isTeamSport(newEvent.eventType) && (
-                <>
-                  <TouchableOpacity
-                    style={themedStyles.modalInput}
-                    onPress={() => setShowJerseyColorPicker(true)}>
-                    <Text
-                      style={{
-                        color:
-                          newEvent.jerseyColors.length === 2
-                            ? colors.text
-                            : colors.placeholder,
-                      }}>
-                      {newEvent.jerseyColors.length === 2
-                        ? `Team Colors: ${newEvent.jerseyColors.join(' vs ')}`
-                        : t('events.selectJerseyColors') ||
-                          'Select 2 Jersey Colors'}
-                    </Text>
-                  </TouchableOpacity>
-                  {showJerseyColorPicker && (
-                    <View style={themedStyles.jerseyColorPickerContainer}>
-                      <Text style={themedStyles.jerseyColorTitle}>
-                        {t('events.selectTwoColors') ||
-                          'Select 2 team jersey colors:'}
-                      </Text>
-                      <View style={themedStyles.jerseyColorGrid}>
-                        {jerseyColorOptions.map(colorOpt => {
-                          const isSelected = newEvent.jerseyColors.includes(
-                            colorOpt.label,
-                          );
-                          const isLight =
-                            colorOpt.label === 'White' ||
-                            colorOpt.label === 'Yellow';
-                          return (
-                            <TouchableOpacity
-                              key={colorOpt.label}
-                              style={[
-                                themedStyles.jerseyColorOption,
-                                isSelected &&
-                                  themedStyles.jerseyColorOptionSelected,
-                              ]}
-                              onPress={() => {
-                                let updatedColors = [...newEvent.jerseyColors];
-                                if (isSelected) {
-                                  // Remove if already selected
-                                  updatedColors = updatedColors.filter(
-                                    c => c !== colorOpt.label,
-                                  );
-                                } else if (updatedColors.length < 2) {
-                                  // Add if less than 2 selected
-                                  updatedColors.push(colorOpt.label);
-                                }
-                                setNewEvent({
-                                  ...newEvent,
-                                  jerseyColors: updatedColors,
-                                });
-                              }}>
-                              <View
-                                style={[
-                                  themedStyles.jerseyColorSwatch,
-                                  {backgroundColor: colorOpt.color},
-                                  isLight &&
-                                    themedStyles.jerseyColorSwatchLight,
-                                ]}
-                              />
-                              <Text style={themedStyles.jerseyColorLabel}>
-                                {colorOpt.label}
-                              </Text>
-                              {isSelected && (
-                                <Text style={themedStyles.jerseyColorCheck}>
-                                  ✓
-                                </Text>
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => setShowJerseyColorPicker(false)}>
-                        <Text style={themedStyles.confirmButton}>
-                          {t('common.done') || 'Done'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                        setNewEvent({
+                          ...newEvent,
+                          location: location,
+                          latitude: coords?.lat,
+                          longitude: coords?.lng,
+                        });
+                      }}
+                      query={{
+                        key: GOOGLE_PLACES_API_KEY,
+                        language: 'en',
+                        types: 'establishment|geocode',
+                      }}
+                      fetchDetails={true}
+                      disableScroll={true}
+                      listViewDisplayed="auto"
+                      styles={autocompleteStyles}
+                      onFail={error => {
+                        console.warn('GooglePlacesAutocomplete error:', error);
+                      }}
+                      textInputProps={{
+                        placeholderTextColor: colors.placeholder || '#888',
+                      }}
+                      enablePoweredByContainer={false}
+                      debounce={200}
+                    />
+                  ) : (
+                    <TextInput
+                      style={themedStyles.modalInput}
+                      placeholder={t('events.eventLocation')}
+                      placeholderTextColor={colors.placeholder || '#888'}
+                      value={newEvent.location}
+                      onChangeText={text =>
+                        setNewEvent({...newEvent, location: text})
+                      }
+                    />
                   )}
-                </>
-              )}
+                </View>
+
+                {/* Event Date selector */}
+                <TouchableOpacity
+                  style={themedStyles.modalInput}
+                  onPress={() => setShowDatePicker(true)}>
+                  <Text
+                    style={{
+                      color: newEvent.date ? colors.text : colors.placeholder,
+                    }}>
+                    {newEvent.date
+                      ? newEvent.date
+                      : t('events.selectEventDate')}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <View>
+                    <DateTimePicker
+                      value={date || new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={onDateChange}
+                      textColor={colors.text}
+                    />
+                    <TouchableOpacity
+                      onPress={() => {
+                        setNewEvent({...newEvent, date: date?.toDateString()});
+                        setShowDatePicker(false);
+                      }}>
+                      <Text style={themedStyles.confirmButton}>
+                        {t('events.confirmDate')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Event Time selector */}
+                <TouchableOpacity
+                  style={themedStyles.modalInput}
+                  onPress={() => setShowTimePicker(true)}>
+                  <Text
+                    style={{
+                      color: newEvent.time ? colors.text : colors.placeholder,
+                    }}>
+                    {newEvent.time
+                      ? newEvent.time
+                      : t('events.selectEventTime')}
+                  </Text>
+                </TouchableOpacity>
+                {showTimePicker && (
+                  <View>
+                    <DateTimePicker
+                      value={time || new Date()}
+                      mode="time"
+                      minuteInterval={15}
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={onTimeChange}
+                      textColor={colors.text}
+                    />
+                    <TouchableOpacity
+                      onPress={() => {
+                        setNewEvent({
+                          ...newEvent,
+                          time: time?.toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }),
+                        });
+                        setShowTimePicker(false);
+                      }}>
+                      <Text style={themedStyles.confirmButton}>
+                        {t('events.confirmTime')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Roster Size selector */}
+                <TouchableOpacity
+                  style={themedStyles.modalInput}
+                  onPress={() => {
+                    setShowRosterSizePicker(true);
+                    setTempRosterSize(newEvent.totalSpots || '');
+                  }}>
+                  <Text
+                    style={{
+                      color: newEvent.totalSpots
+                        ? colors.text
+                        : colors.placeholder,
+                    }}>
+                    {newEvent.totalSpots
+                      ? newEvent.totalSpots
+                      : t('events.selectRosterSize')}
+                  </Text>
+                </TouchableOpacity>
+                {showRosterSizePicker && (
+                  <View>
+                    <View style={themedStyles.pickerContainer}>
+                      <Picker
+                        selectedValue={tempRosterSize}
+                        onValueChange={itemValue =>
+                          setTempRosterSize(itemValue)
+                        }
+                        style={themedStyles.picker}
+                        dropdownIconColor={colors.text}>
+                        {rosterSizeOptions.map(value => (
+                          <Picker.Item
+                            key={value}
+                            label={value}
+                            value={value}
+                            color={colors.text}
+                          />
+                        ))}
+                      </Picker>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setNewEvent({...newEvent, totalSpots: tempRosterSize});
+                        setShowRosterSizePicker(false);
+                      }}>
+                      <Text style={themedStyles.confirmButton}>
+                        {t('events.confirmRosterSize')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Event Type selector */}
+                <TouchableOpacity
+                  style={themedStyles.modalInput}
+                  onPress={() => {
+                    setShowEventTypePicker(true);
+                    setTempEventType(newEvent.eventType || '');
+                  }}>
+                  <Text
+                    style={{
+                      color: newEvent.eventType
+                        ? colors.text
+                        : colors.placeholder,
+                    }}>
+                    {newEvent.eventType
+                      ? newEvent.eventType
+                      : t('events.selectEventType')}
+                  </Text>
+                </TouchableOpacity>
+                {showEventTypePicker && (
+                  <View>
+                    <View style={themedStyles.pickerContainer}>
+                      <Picker
+                        selectedValue={tempEventType}
+                        onValueChange={itemValue => setTempEventType(itemValue)}
+                        style={themedStyles.picker}
+                        dropdownIconColor={colors.text}>
+                        {activityOptions.map(opt => (
+                          <Picker.Item
+                            key={opt.label}
+                            label={`${opt.emoji} ${opt.label}`}
+                            value={opt.label}
+                            color={colors.text}
+                          />
+                        ))}
+                      </Picker>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Reset jersey colors when changing event type
+                        setNewEvent({
+                          ...newEvent,
+                          eventType: tempEventType,
+                          jerseyColors: [],
+                        });
+                        setShowEventTypePicker(false);
+                      }}>
+                      <Text style={themedStyles.confirmButton}>
+                        {t('events.confirmEventType')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Jersey Color Selector - only for team sports */}
+                {isTeamSport(newEvent.eventType) && (
+                  <>
+                    <TouchableOpacity
+                      style={themedStyles.modalInput}
+                      onPress={() => setShowJerseyColorPicker(true)}>
+                      <Text
+                        style={{
+                          color:
+                            newEvent.jerseyColors.length === 2
+                              ? colors.text
+                              : colors.placeholder,
+                        }}>
+                        {newEvent.jerseyColors.length === 2
+                          ? `Team Colors: ${newEvent.jerseyColors.join(' vs ')}`
+                          : t('events.selectJerseyColors') ||
+                            'Select 2 Jersey Colors'}
+                      </Text>
+                    </TouchableOpacity>
+                    {showJerseyColorPicker && (
+                      <View style={themedStyles.jerseyColorPickerContainer}>
+                        <Text style={themedStyles.jerseyColorTitle}>
+                          {t('events.selectTwoColors') ||
+                            'Select 2 team jersey colors:'}
+                        </Text>
+                        <View style={themedStyles.jerseyColorGrid}>
+                          {jerseyColorOptions.map(colorOpt => {
+                            const isSelected = newEvent.jerseyColors.includes(
+                              colorOpt.label,
+                            );
+                            const isLight =
+                              colorOpt.label === 'White' ||
+                              colorOpt.label === 'Yellow';
+                            return (
+                              <TouchableOpacity
+                                key={colorOpt.label}
+                                style={[
+                                  themedStyles.jerseyColorOption,
+                                  isSelected &&
+                                    themedStyles.jerseyColorOptionSelected,
+                                ]}
+                                onPress={() => {
+                                  let updatedColors = [
+                                    ...newEvent.jerseyColors,
+                                  ];
+                                  if (isSelected) {
+                                    // Remove if already selected
+                                    updatedColors = updatedColors.filter(
+                                      c => c !== colorOpt.label,
+                                    );
+                                  } else if (updatedColors.length < 2) {
+                                    // Add if less than 2 selected
+                                    updatedColors.push(colorOpt.label);
+                                  }
+                                  setNewEvent({
+                                    ...newEvent,
+                                    jerseyColors: updatedColors,
+                                  });
+                                }}>
+                                <View
+                                  style={[
+                                    themedStyles.jerseyColorSwatch,
+                                    {backgroundColor: colorOpt.color},
+                                    isLight &&
+                                      themedStyles.jerseyColorSwatchLight,
+                                  ]}
+                                />
+                                <Text style={themedStyles.jerseyColorLabel}>
+                                  {colorOpt.label}
+                                </Text>
+                                {isSelected && (
+                                  <Text style={themedStyles.jerseyColorCheck}>
+                                    ✓
+                                  </Text>
+                                )}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => setShowJerseyColorPicker(false)}>
+                          <Text style={themedStyles.confirmButton}>
+                            {t('common.done') || 'Done'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </>
+                )}
+
+                {/* Privacy Selector */}
+                <View style={themedStyles.privacyContainer}>
+                  <Text style={themedStyles.privacyLabel}>
+                    {t('events.eventPrivacy') || 'Event Privacy'}
+                  </Text>
+                  <View style={themedStyles.privacyOptions}>
+                    {privacyOptions.map(option => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          themedStyles.privacyOption,
+                          newEvent.privacy === option.value &&
+                            themedStyles.privacyOptionSelected,
+                        ]}
+                        onPress={() =>
+                          setNewEvent({...newEvent, privacy: option.value})
+                        }>
+                        <FontAwesomeIcon
+                          icon={option.icon}
+                          size={16}
+                          color={
+                            newEvent.privacy === option.value
+                              ? colors.primary
+                              : colors.secondaryText
+                          }
+                        />
+                        <View style={themedStyles.privacyOptionTextContainer}>
+                          <Text
+                            style={[
+                              themedStyles.privacyOptionLabel,
+                              newEvent.privacy === option.value &&
+                                themedStyles.privacyOptionLabelSelected,
+                            ]}>
+                            {option.label}
+                          </Text>
+                          <Text style={themedStyles.privacyOptionDescription}>
+                            {option.description}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Invite Users Section - only for invite-only events */}
+                {newEvent.privacy === 'invite-only' && (
+                  <View style={themedStyles.inviteContainer}>
+                    <Text style={themedStyles.privacyLabel}>
+                      {t('events.inviteUsers') || 'Invite Users'}
+                    </Text>
+
+                    {/* Search Input */}
+                    <View style={themedStyles.inviteSearchContainer}>
+                      <FontAwesomeIcon
+                        icon={faSearch}
+                        size={16}
+                        color={colors.placeholder}
+                        style={themedStyles.inviteSearchIcon}
+                      />
+                      <TextInput
+                        style={themedStyles.inviteSearchInput}
+                        placeholder={
+                          t('events.searchUsersToInvite') ||
+                          'Search users to invite...'
+                        }
+                        placeholderTextColor={colors.placeholder}
+                        value={inviteSearchQuery}
+                        onChangeText={text => {
+                          setInviteSearchQuery(text);
+                          searchUsersForInvite(text);
+                        }}
+                      />
+                      {loadingInviteUsers && (
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.primary}
+                        />
+                      )}
+                    </View>
+
+                    {/* Search Results */}
+                    {availableUsersToInvite.length > 0 && (
+                      <View style={themedStyles.inviteSearchResults}>
+                        {availableUsersToInvite.map(user => (
+                          <TouchableOpacity
+                            key={user._id}
+                            style={themedStyles.inviteSearchResultRow}
+                            onPress={() => addUserToInvite(user)}>
+                            {user.profilePicUrl ? (
+                              <Image
+                                source={{uri: user.profilePicUrl}}
+                                style={themedStyles.inviteUserAvatar}
+                              />
+                            ) : (
+                              <View
+                                style={
+                                  themedStyles.inviteUserAvatarPlaceholder
+                                }>
+                                <Text style={themedStyles.inviteUserAvatarText}>
+                                  {getInitials(user.username)}
+                                </Text>
+                              </View>
+                            )}
+                            <Text style={themedStyles.inviteUserName}>
+                              {user.username}
+                            </Text>
+                            <FontAwesomeIcon
+                              icon={faPlus}
+                              size={16}
+                              color={colors.primary}
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Invited Users List */}
+                    {invitedUserDetails.length > 0 && (
+                      <View style={themedStyles.invitedUsersList}>
+                        <Text style={themedStyles.invitedUsersLabel}>
+                          {t('events.invitedUsers') || 'Invited'} (
+                          {invitedUserDetails.length})
+                        </Text>
+                        <View style={themedStyles.invitedUsersChips}>
+                          {invitedUserDetails.map(user => (
+                            <View
+                              key={user._id}
+                              style={themedStyles.invitedUserChip}>
+                              <Text style={themedStyles.invitedUserChipText}>
+                                {user.username}
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() => removeUserFromInvite(user._id)}
+                                hitSlop={{
+                                  top: 10,
+                                  bottom: 10,
+                                  left: 10,
+                                  right: 10,
+                                }}>
+                                <FontAwesomeIcon
+                                  icon={faTimes}
+                                  size={12}
+                                  color={colors.secondaryText}
+                                />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {invitedUserDetails.length === 0 && (
+                      <Text style={themedStyles.inviteHint}>
+                        {t('events.inviteHint') ||
+                          'Search and add users who can see and join this event'}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </ScrollView>
 
               <View style={themedStyles.buttonContainer}>
                 <TouchableOpacity

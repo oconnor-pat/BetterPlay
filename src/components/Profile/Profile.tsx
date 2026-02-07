@@ -41,6 +41,7 @@ import {
   faUsers,
   faUserPlus,
   faUserClock,
+  faBell,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 
@@ -81,7 +82,9 @@ const Profile: React.FC = () => {
   // Load favorite sports from backend on mount
   useEffect(() => {
     const loadFavoriteSports = async () => {
-      if (!_id) return;
+      if (!_id) {
+        return;
+      }
       try {
         const token = await AsyncStorage.getItem('userToken');
         const response = await fetch(
@@ -109,7 +112,9 @@ const Profile: React.FC = () => {
   // Save favorite sports to backend when they change
   const saveFavoriteSports = useCallback(
     async (sports: string[]) => {
-      if (!_id) return;
+      if (!_id) {
+        return;
+      }
       try {
         const token = await AsyncStorage.getItem('userToken');
         await fetch(`${API_BASE_URL}/user/${_id}/favorite-sports`, {
@@ -131,19 +136,20 @@ const Profile: React.FC = () => {
   const userStats = useMemo(() => {
     const eventsCreated = events.filter(e => e.createdBy === _id).length;
     // Events joined: events where user is in roster (including their own events)
-    const eventsJoined = events.filter(e =>
-      e.roster?.some((r: any) => r.userId === _id),
-    ).length;
+    const eventsJoined = events.filter(e => {
+      const roster = (e as any).roster || (e as any).participants || [];
+      return roster.some((r: any) => r.userId === _id || r._id === _id);
+    }).length;
     return {eventsCreated, eventsJoined};
   }, [events, _id]);
 
   // Get member since year from user data
   const memberSinceYear = useMemo(() => {
-    if (userData?.createdAt) {
-      return new Date(userData.createdAt).getFullYear();
+    if (userData && 'createdAt' in userData && userData.createdAt) {
+      return new Date(userData.createdAt as string).getFullYear();
     }
     return new Date().getFullYear();
-  }, [userData?.createdAt]);
+  }, [userData]);
 
   // Themed styles
   const themedStyles = useMemo(
@@ -354,6 +360,9 @@ const Profile: React.FC = () => {
           borderWidth: 1,
           borderColor: colors.primary + '40',
         },
+        sportEmoji: {
+          fontSize: 18,
+        },
         sportTagText: {
           fontSize: 14,
           marginLeft: 6,
@@ -442,6 +451,9 @@ const Profile: React.FC = () => {
           color: '#fff',
           fontSize: 16,
           fontWeight: '600',
+        },
+        signOutText: {
+          color: '#DC3545',
         },
       }),
     [colors],
@@ -590,6 +602,9 @@ const Profile: React.FC = () => {
           },
         },
       );
+      if (!userData) {
+        return;
+      }
       const updatedUserData = {
         ...userData,
         profilePicUrl: imageUrl,
@@ -830,6 +845,40 @@ const Profile: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Notifications Section */}
+        <View style={themedStyles.sectionCard}>
+          <Text style={themedStyles.sectionHeader}>
+            {t('profile.notifications') || 'Notifications'}
+          </Text>
+
+          <TouchableOpacity
+            style={[themedStyles.menuRow, themedStyles.menuRowLast]}
+            onPress={() => navigation.navigate('Notifications')}>
+            <View
+              style={[
+                themedStyles.menuIcon,
+                {backgroundColor: '#FF5722' + '20'},
+              ]}>
+              <FontAwesomeIcon icon={faBell} size={16} color="#FF5722" />
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>
+                {t('profile.allNotifications') || 'All Notifications'}
+              </Text>
+              <Text style={themedStyles.menuSubtitle}>
+                {t('profile.viewAllNotifications') ||
+                  'View all your notifications'}
+              </Text>
+            </View>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={14}
+              color={colors.placeholder}
+              style={themedStyles.menuChevron}
+            />
+          </TouchableOpacity>
+        </View>
+
         {/* Friends Section */}
         <View style={themedStyles.sectionCard}>
           <Text style={themedStyles.sectionHeader}>Friends</Text>
@@ -913,7 +962,7 @@ const Profile: React.FC = () => {
           <View style={themedStyles.sportsContainer}>
             {getFavoriteSportsDisplay().map(sport => (
               <View key={sport.id} style={themedStyles.sportTag}>
-                <Text style={{fontSize: 18}}>{sport.emoji}</Text>
+                <Text style={themedStyles.sportEmoji}>{sport.emoji}</Text>
                 <Text style={themedStyles.sportTagText}>{sport.label}</Text>
               </View>
             ))}
@@ -1000,7 +1049,7 @@ const Profile: React.FC = () => {
               />
             </View>
             <View style={themedStyles.menuContent}>
-              <Text style={[themedStyles.menuTitle, {color: '#DC3545'}]}>
+              <Text style={[themedStyles.menuTitle, themedStyles.signOutText]}>
                 {t('auth.signOut') || 'Sign Out'}
               </Text>
             </View>

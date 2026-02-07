@@ -17,6 +17,8 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
@@ -41,7 +43,11 @@ import {
   faCheck,
   faTimes,
   faFutbol,
+  faEnvelope,
+  faSearch,
+  faPlus,
 } from '@fortawesome/free-solid-svg-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Player {
   userId?: string;
@@ -196,6 +202,45 @@ const EventRoster: React.FC = () => {
   const [editJerseyColor, setEditJerseyColor] = useState('');
   const [editPosition, setEditPosition] = useState('');
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
+  // Event privacy and invite state
+  const [eventPrivacy, setEventPrivacy] = useState<
+    'public' | 'private' | 'invite-only'
+  >('public');
+  const [eventCreatedBy, setEventCreatedBy] = useState<string>('');
+  const [invitedUsers, setInvitedUsers] = useState<string[]>([]);
+  const [inviteExpanded, setInviteExpanded] = useState(false);
+  const [inviteSearchQuery, setInviteSearchQuery] = useState('');
+  const [inviteSearchResults, setInviteSearchResults] = useState<
+    {_id: string; username: string; profilePicUrl?: string}[]
+  >([]);
+  const [loadingInviteSearch, setLoadingInviteSearch] = useState(false);
+  const [invitedUserDetails, setInvitedUserDetails] = useState<
+    {_id: string; username: string; profilePicUrl?: string}[]
+  >([]);
+
+  // Check if current user is the event creator
+  const isEventCreator = useMemo(() => {
+    return userData?._id === eventCreatedBy;
+  }, [userData?._id, eventCreatedBy]);
+
+  // Check if current user is invited to the event
+  const isUserInvited = useMemo(() => {
+    return invitedUsers.includes(userData?._id || '');
+  }, [invitedUsers, userData?._id]);
+
+  // Check if user can join this event
+  const canJoinEvent = useMemo(() => {
+    // Public events: anyone can join
+    if (eventPrivacy === 'public') return true;
+    // Private events: anyone can join (they just can't see it in the list)
+    if (eventPrivacy === 'private') return true;
+    // Invite-only: only invited users or the creator can join
+    if (eventPrivacy === 'invite-only') {
+      return isEventCreator || isUserInvited;
+    }
+    return true;
+  }, [eventPrivacy, isEventCreator, isUserInvited]);
 
   // Check if current user is already on roster
   const isUserOnRoster = useMemo(() => {
@@ -491,6 +536,114 @@ const EventRoster: React.FC = () => {
           textAlign: 'center',
           fontSize: 14,
         },
+        // Invite Players Section
+        inviteSection: {
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          marginBottom: 16,
+          overflow: 'hidden',
+        },
+        inviteContent: {
+          padding: 16,
+          paddingTop: 0,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        },
+        inviteSearchContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.inputBackground,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          paddingHorizontal: 12,
+          marginTop: 12,
+        },
+        inviteSearchIcon: {
+          marginRight: 8,
+        },
+        inviteSearchInput: {
+          flex: 1,
+          paddingVertical: 12,
+          fontSize: 14,
+          color: colors.text,
+        },
+        inviteSearchResults: {
+          backgroundColor: colors.inputBackground,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginTop: 8,
+          maxHeight: 200,
+        },
+        inviteSearchResultRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
+        inviteUserAvatar: {
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          marginRight: 12,
+        },
+        inviteUserAvatarPlaceholder: {
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: colors.primary,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginRight: 12,
+        },
+        inviteUserAvatarText: {
+          color: '#fff',
+          fontSize: 14,
+          fontWeight: '600',
+        },
+        inviteUserName: {
+          flex: 1,
+          fontSize: 14,
+          color: colors.text,
+          fontWeight: '500',
+        },
+        invitedUsersList: {
+          marginTop: 12,
+        },
+        invitedUsersLabel: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 8,
+        },
+        invitedUsersChips: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+        },
+        invitedUserChip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary + '20',
+          paddingVertical: 6,
+          paddingHorizontal: 12,
+          borderRadius: 16,
+          gap: 6,
+        },
+        invitedUserChipText: {
+          fontSize: 13,
+          color: colors.primary,
+          fontWeight: '500',
+        },
+        inviteHint: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          fontStyle: 'italic',
+          marginTop: 12,
+          textAlign: 'center',
+        },
         // Roster Section
         rosterSection: {
           marginBottom: 16,
@@ -775,7 +928,10 @@ const EventRoster: React.FC = () => {
   // Fetch roster and event details from backend
   const fetchEventData = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/events/${eventId}`);
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(`${API_BASE_URL}/events/${eventId}`, {
+        headers: token ? {Authorization: `Bearer ${token}`} : {},
+      });
       setRoster(response.data.roster || []);
       // Update jersey colors from backend if available
       if (
@@ -783,6 +939,29 @@ const EventRoster: React.FC = () => {
         response.data.jerseyColors.length === 2
       ) {
         setEventJerseyColors(response.data.jerseyColors);
+      }
+      // Update privacy settings
+      setEventPrivacy(response.data.privacy || 'public');
+      setEventCreatedBy(response.data.createdBy || '');
+      setInvitedUsers(response.data.invitedUsers || []);
+
+      // Fetch invited user details if invite-only
+      if (
+        response.data.privacy === 'invite-only' &&
+        response.data.invitedUsers?.length > 0
+      ) {
+        const usersResponse = await axios.get(`${API_BASE_URL}/users`, {
+          headers: token ? {Authorization: `Bearer ${token}`} : {},
+        });
+        const allUsers = usersResponse.data?.users || usersResponse.data || [];
+        const invitedDetails = allUsers
+          .filter((u: any) => response.data.invitedUsers.includes(u._id))
+          .map((u: any) => ({
+            _id: u._id,
+            username: u.username,
+            profilePicUrl: u.profilePicUrl,
+          }));
+        setInvitedUserDetails(invitedDetails);
       }
     } catch (error) {
       setRoster([]);
@@ -842,6 +1021,83 @@ const EventRoster: React.FC = () => {
     setErrorMessage('');
     setAddPlayerExpanded(false);
     setSavingRoster(false);
+  };
+
+  // Search users to invite
+  const searchUsersToInvite = async (query: string) => {
+    if (query.length < 2) {
+      setInviteSearchResults([]);
+      return;
+    }
+    setLoadingInviteSearch(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(`${API_BASE_URL}/users`, {
+        headers: token ? {Authorization: `Bearer ${token}`} : {},
+      });
+      const allUsers = response.data?.users || response.data || [];
+      // Filter users by search query (exclude current user and already invited)
+      const filteredUsers = allUsers.filter(
+        (user: any) =>
+          user.username.toLowerCase().includes(query.toLowerCase()) &&
+          user._id !== userData?._id &&
+          !invitedUsers.includes(user._id),
+      );
+      setInviteSearchResults(
+        filteredUsers.slice(0, 8).map((user: any) => ({
+          _id: user._id,
+          username: user.username,
+          profilePicUrl: user.profilePicUrl,
+        })),
+      );
+    } catch {
+      setInviteSearchResults([]);
+    }
+    setLoadingInviteSearch(false);
+  };
+
+  // Invite a user to the event
+  const inviteUserToEvent = async (user: {
+    _id: string;
+    username: string;
+    profilePicUrl?: string;
+  }) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(
+        `${API_BASE_URL}/events/${eventId}/invite`,
+        {userIds: [user._id]},
+        {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+      );
+      // Update local state
+      setInvitedUsers(prev => [...prev, user._id]);
+      setInvitedUserDetails(prev => [...prev, user]);
+      setInviteSearchQuery('');
+      setInviteSearchResults([]);
+    } catch (error) {
+      Alert.alert(
+        t('common.error'),
+        t('roster.inviteError') || 'Failed to invite user',
+      );
+    }
+  };
+
+  // Remove invite from a user
+  const removeInvite = async (userId: string) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.delete(`${API_BASE_URL}/events/${eventId}/invite/${userId}`, {
+        headers: token ? {Authorization: `Bearer ${token}`} : {},
+      });
+      // Update local state
+      setInvitedUsers(prev => prev.filter(id => id !== userId));
+      setInvitedUserDetails(prev => prev.filter(u => u._id !== userId));
+    } catch (error) {
+      Alert.alert(
+        t('common.error'),
+        t('roster.removeInviteError') || 'Failed to remove invite',
+      );
+    }
   };
 
   // Navigate to player's public profile
@@ -1057,724 +1313,877 @@ const EventRoster: React.FC = () => {
 
   return (
     <SafeAreaView style={themedStyles.safeArea} edges={['top']}>
-      <ScrollView
-        style={themedStyles.container}
-        contentContainerStyle={themedStyles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-        {/* Event Header */}
-        <View style={themedStyles.eventHeader}>
-          <Text style={themedStyles.eventEmoji}>{sportEmoji}</Text>
-          <Text style={themedStyles.eventName} numberOfLines={2}>
-            {eventName}
-          </Text>
-        </View>
-
-        {/* Event Details Card */}
-        <View style={themedStyles.eventCard}>
-          <View style={themedStyles.eventTypeRow}>
-            <View style={themedStyles.eventTypeBadge}>
-              <Text style={themedStyles.eventTypeText}>{eventType}</Text>
-            </View>
-          </View>
-
-          {date && (
-            <View style={themedStyles.eventDetailRow}>
-              <Text style={themedStyles.eventDetailIcon}>📅</Text>
-              <Text style={themedStyles.eventDetailText}>{date}</Text>
-            </View>
-          )}
-          {time && (
-            <View style={themedStyles.eventDetailRow}>
-              <Text style={themedStyles.eventDetailIcon}>🕐</Text>
-              <Text style={themedStyles.eventDetailText}>{time}</Text>
-            </View>
-          )}
-          {location && (
-            <View style={themedStyles.eventDetailRow}>
-              <Text style={themedStyles.eventDetailIcon}>📍</Text>
-              <Text style={themedStyles.eventDetailText}>{location}</Text>
-            </View>
-          )}
-
-          {/* Progress Bar */}
-          <View style={themedStyles.progressSection}>
-            <View style={themedStyles.progressHeader}>
-              <Text style={themedStyles.progressLabel}>
-                {t('roster.rosterSpots')}
-              </Text>
-              <Text style={themedStyles.progressCount}>
-                {roster.length} / {totalSpots}
-              </Text>
-            </View>
-            <View style={themedStyles.progressBarBg}>
-              <View
-                style={[
-                  themedStyles.progressBarFill,
-                  {width: `${progressPercentage}%`},
-                ]}
-              />
-            </View>
-            <Text style={themedStyles.progressRemaining}>
-              {spotsRemaining > 0
-                ? t('roster.spotsRemaining', {count: spotsRemaining})
-                : t('roster.rosterFull')}
+      <KeyboardAvoidingView
+        style={{flex: 1}}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+        <ScrollView
+          style={themedStyles.container}
+          contentContainerStyle={themedStyles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          {/* Event Header */}
+          <View style={themedStyles.eventHeader}>
+            <Text style={themedStyles.eventEmoji}>{sportEmoji}</Text>
+            <Text style={themedStyles.eventName} numberOfLines={2}>
+              {eventName}
             </Text>
           </View>
-        </View>
 
-        {/* Stats Section */}
-        {roster.length > 0 && (
-          <View style={themedStyles.statsSection}>
-            <Text style={themedStyles.statsSectionTitle}>
-              📊 {t('roster.rosterStats')}
-            </Text>
-            <View style={themedStyles.statsRow}>
-              <View style={themedStyles.statItem}>
-                <Text style={themedStyles.statValue}>{roster.length}</Text>
-                <Text style={themedStyles.statLabel}>
-                  {t('roster.players')}
-                </Text>
-              </View>
-              <View style={themedStyles.statItem}>
-                <Text style={themedStyles.statValueGreen}>
-                  {rosterStats.paidCount}
-                </Text>
-                <Text style={themedStyles.statLabel}>{t('roster.paid')}</Text>
-              </View>
-              <View style={themedStyles.statItem}>
-                <Text style={themedStyles.statValueError}>
-                  {rosterStats.unpaidCount}
-                </Text>
-                <Text style={themedStyles.statLabel}>{t('roster.unpaid')}</Text>
+          {/* Event Details Card */}
+          <View style={themedStyles.eventCard}>
+            <View style={themedStyles.eventTypeRow}>
+              <View style={themedStyles.eventTypeBadge}>
+                <Text style={themedStyles.eventTypeText}>{eventType}</Text>
               </View>
             </View>
 
-            {/* Team Breakdown */}
-            {Object.keys(rosterStats.teamCounts).length > 1 && (
-              <View style={themedStyles.teamBreakdown}>
-                <Text style={themedStyles.statsSectionTitleSmall}>
-                  {t('roster.teamsByJersey')}
-                </Text>
-                <View style={themedStyles.teamRow}>
-                  {Object.entries(rosterStats.teamCounts).map(
-                    ([color, count]) => (
-                      <View
-                        key={color}
-                        style={[
-                          themedStyles.teamBadge,
-                          {
-                            borderColor:
-                              jerseyColors[color] || jerseyColors.Other,
-                          },
-                        ]}>
-                        <View
-                          style={[
-                            themedStyles.jerseyIndicator,
-                            {
-                              backgroundColor:
-                                jerseyColors[color] || jerseyColors.Other,
-                            },
-                          ]}
-                        />
-                        <Text style={themedStyles.teamBadgeText}>
-                          {color}: {count}
-                        </Text>
-                      </View>
-                    ),
-                  )}
-                </View>
+            {date && (
+              <View style={themedStyles.eventDetailRow}>
+                <Text style={themedStyles.eventDetailIcon}>📅</Text>
+                <Text style={themedStyles.eventDetailText}>{date}</Text>
               </View>
             )}
-          </View>
-        )}
+            {time && (
+              <View style={themedStyles.eventDetailRow}>
+                <Text style={themedStyles.eventDetailIcon}>🕐</Text>
+                <Text style={themedStyles.eventDetailText}>{time}</Text>
+              </View>
+            )}
+            {location && (
+              <View style={themedStyles.eventDetailRow}>
+                <Text style={themedStyles.eventDetailIcon}>📍</Text>
+                <Text style={themedStyles.eventDetailText}>{location}</Text>
+              </View>
+            )}
 
-        {/* Add Player Section (Collapsible) */}
-        <View style={themedStyles.addPlayerSection}>
-          <TouchableOpacity
-            style={themedStyles.addPlayerHeader}
-            onPress={() => setAddPlayerExpanded(!addPlayerExpanded)}
-            activeOpacity={0.7}>
-            <View style={themedStyles.addPlayerHeaderLeft}>
-              <FontAwesomeIcon
-                icon={faUserPlus}
-                size={18}
-                color={colors.primary}
-              />
-              <Text style={themedStyles.addPlayerTitle}>
-                {isUserOnRoster
-                  ? t('roster.alreadyJoined')
-                  : t('roster.joinThisEvent')}
+            {/* Progress Bar */}
+            <View style={themedStyles.progressSection}>
+              <View style={themedStyles.progressHeader}>
+                <Text style={themedStyles.progressLabel}>
+                  {t('roster.rosterSpots')}
+                </Text>
+                <Text style={themedStyles.progressCount}>
+                  {roster.length} / {totalSpots}
+                </Text>
+              </View>
+              <View style={themedStyles.progressBarBg}>
+                <View
+                  style={[
+                    themedStyles.progressBarFill,
+                    {width: `${progressPercentage}%`},
+                  ]}
+                />
+              </View>
+              <Text style={themedStyles.progressRemaining}>
+                {spotsRemaining > 0
+                  ? t('roster.spotsRemaining', {count: spotsRemaining})
+                  : t('roster.rosterFull')}
               </Text>
             </View>
-            <FontAwesomeIcon
-              icon={addPlayerExpanded ? faChevronUp : faChevronDown}
-              size={16}
-              color={colors.placeholder}
-            />
-          </TouchableOpacity>
+          </View>
 
-          {addPlayerExpanded && (
-            <View style={themedStyles.addPlayerContent}>
-              {isUserOnRoster ? (
-                <View style={themedStyles.alreadyJoinedBadge}>
-                  <FontAwesomeIcon
-                    icon={faCheck}
-                    size={14}
-                    color={colors.primary}
-                  />
-                  <Text style={themedStyles.alreadyJoinedText}>
-                    {t('roster.youreOnTheRoster')}
+          {/* Stats Section */}
+          {roster.length > 0 && (
+            <View style={themedStyles.statsSection}>
+              <Text style={themedStyles.statsSectionTitle}>
+                📊 {t('roster.rosterStats')}
+              </Text>
+              <View style={themedStyles.statsRow}>
+                <View style={themedStyles.statItem}>
+                  <Text style={themedStyles.statValue}>{roster.length}</Text>
+                  <Text style={themedStyles.statLabel}>
+                    {t('roster.players')}
                   </Text>
                 </View>
-              ) : (
-                <>
-                  {errorMessage ? (
-                    <Text style={themedStyles.errorMessage}>
-                      {errorMessage}
-                    </Text>
-                  ) : null}
+                <View style={themedStyles.statItem}>
+                  <Text style={themedStyles.statValueGreen}>
+                    {rosterStats.paidCount}
+                  </Text>
+                  <Text style={themedStyles.statLabel}>{t('roster.paid')}</Text>
+                </View>
+                <View style={themedStyles.statItem}>
+                  <Text style={themedStyles.statValueError}>
+                    {rosterStats.unpaidCount}
+                  </Text>
+                  <Text style={themedStyles.statLabel}>
+                    {t('roster.unpaid')}
+                  </Text>
+                </View>
+              </View>
 
-                  <TextInput
-                    style={themedStyles.input}
-                    placeholder={t('roster.yourName')}
-                    placeholderTextColor={colors.placeholder}
-                    value={username}
-                    onChangeText={setUsername}
-                  />
-
-                  {/* Paid Status Dropdown */}
-                  <TouchableOpacity
-                    style={themedStyles.dropdown}
-                    onPress={() => setPaidStatusModalVisible(true)}>
-                    <Text
-                      style={
-                        paidStatus
-                          ? themedStyles.dropdownText
-                          : themedStyles.placeholderText
-                      }>
-                      {paidStatus || t('roster.selectPaidStatus')}
-                    </Text>
-                    <FontAwesomeIcon
-                      icon={faChevronDown}
-                      size={14}
-                      color={colors.placeholder}
-                    />
-                  </TouchableOpacity>
-
-                  {/* Jersey Color Dropdown */}
-                  <TouchableOpacity
-                    style={themedStyles.dropdown}
-                    onPress={() => setJerseyColorModalVisible(true)}>
-                    <View style={themedStyles.jerseyDropdownRow}>
-                      {jerseyColor && (
+              {/* Team Breakdown */}
+              {Object.keys(rosterStats.teamCounts).length > 1 && (
+                <View style={themedStyles.teamBreakdown}>
+                  <Text style={themedStyles.statsSectionTitleSmall}>
+                    {t('roster.teamsByJersey')}
+                  </Text>
+                  <View style={themedStyles.teamRow}>
+                    {Object.entries(rosterStats.teamCounts).map(
+                      ([color, count]) => (
                         <View
+                          key={color}
                           style={[
-                            themedStyles.jerseyIndicatorLarge,
+                            themedStyles.teamBadge,
                             {
-                              backgroundColor:
-                                jerseyColors[jerseyColor] || jerseyColors.Other,
+                              borderColor:
+                                jerseyColors[color] || jerseyColors.Other,
                             },
-                          ]}
-                        />
-                      )}
-                      <Text
-                        style={
-                          jerseyColor
-                            ? themedStyles.dropdownText
-                            : themedStyles.placeholderText
-                        }>
-                        {jerseyColor || t('roster.selectJerseyColor')}
-                      </Text>
-                    </View>
-                    <FontAwesomeIcon
-                      icon={faChevronDown}
-                      size={14}
-                      color={colors.placeholder}
-                    />
-                  </TouchableOpacity>
-
-                  {/* Position Dropdown */}
-                  <TouchableOpacity
-                    style={themedStyles.dropdown}
-                    onPress={() => setPositionModalVisible(true)}>
-                    <Text
-                      style={
-                        position
-                          ? themedStyles.dropdownText
-                          : themedStyles.placeholderText
-                      }>
-                      {position || t('roster.selectPosition')}
-                    </Text>
-                    <FontAwesomeIcon
-                      icon={faChevronDown}
-                      size={14}
-                      color={colors.placeholder}
-                    />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      themedStyles.saveButton,
-                      (spotsRemaining === 0 || savingRoster) &&
-                        themedStyles.saveButtonDisabled,
-                    ]}
-                    onPress={handleSave}
-                    disabled={spotsRemaining === 0 || savingRoster}>
-                    {savingRoster ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={colors.buttonText}
-                      />
-                    ) : (
-                      <FontAwesomeIcon
-                        icon={faUserPlus}
-                        size={16}
-                        color={colors.buttonText}
-                      />
+                          ]}>
+                          <View
+                            style={[
+                              themedStyles.jerseyIndicator,
+                              {
+                                backgroundColor:
+                                  jerseyColors[color] || jerseyColors.Other,
+                              },
+                            ]}
+                          />
+                          <Text style={themedStyles.teamBadgeText}>
+                            {color}: {count}
+                          </Text>
+                        </View>
+                      ),
                     )}
-                    <Text style={themedStyles.buttonText}>
-                      {savingRoster
-                        ? t('common.loading') || 'Joining...'
-                        : spotsRemaining === 0
-                        ? t('roster.rosterFull')
-                        : t('roster.joinEvent')}
-                    </Text>
-                  </TouchableOpacity>
-                </>
+                  </View>
+                </View>
               )}
             </View>
           )}
-        </View>
 
-        {/* Rostered Players Section */}
-        <View style={themedStyles.rosterSection}>
-          <View style={themedStyles.sectionHeader}>
-            <FontAwesomeIcon icon={faUsers} size={18} color={colors.primary} />
-            <Text style={themedStyles.sectionTitle}>
-              {t('roster.rosteredPlayers')} ({roster.length})
-            </Text>
-          </View>
-
-          {loading ? (
-            <RosterListSkeleton count={5} />
-          ) : roster.length === 0 ? (
-            <Text style={themedStyles.emptyState}>
-              {t('roster.noPlayersYet')}
-            </Text>
-          ) : (
-            <FlatList
-              data={roster}
-              renderItem={renderPlayerCard}
-              keyExtractor={(_, idx) => idx.toString()}
-              scrollEnabled={false}
-            />
-          )}
-        </View>
-
-        {/* Paid Status Modal */}
-        <Modal
-          visible={paidStatusModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setPaidStatusModalVisible(false)}>
-          <View style={themedStyles.modalOverlay}>
-            <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>
-                {t('roster.paymentStatus')}
-              </Text>
-              {['Paid', 'Unpaid'].map(status => (
-                <TouchableOpacity
-                  key={status}
-                  style={[
-                    themedStyles.modalOption,
-                    paidStatus === status && themedStyles.modalOptionSelected,
-                  ]}
-                  onPress={() => {
-                    setPaidStatus(status);
-                    setPaidStatusModalVisible(false);
-                  }}>
-                  <FontAwesomeIcon
-                    icon={status === 'Paid' ? faCheck : faTimes}
-                    size={16}
-                    color={
-                      status === 'Paid'
-                        ? '#4CAF50'
-                        : paidStatus === status
-                        ? colors.primary
-                        : colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      themedStyles.modalOptionTextWithMargin,
-                      paidStatus === status &&
-                        themedStyles.modalOptionTextSelected,
-                    ]}>
-                    {status}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {/* Add Player Section (Collapsible) - Only show if user can join */}
+          {canJoinEvent && (
+            <View style={themedStyles.addPlayerSection}>
               <TouchableOpacity
-                style={themedStyles.modalClose}
-                onPress={() => setPaidStatusModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>
-                  {t('common.close')}
-                </Text>
+                style={themedStyles.addPlayerHeader}
+                onPress={() => setAddPlayerExpanded(!addPlayerExpanded)}
+                activeOpacity={0.7}>
+                <View style={themedStyles.addPlayerHeaderLeft}>
+                  <FontAwesomeIcon
+                    icon={faUserPlus}
+                    size={18}
+                    color={colors.primary}
+                  />
+                  <Text style={themedStyles.addPlayerTitle}>
+                    {isUserOnRoster
+                      ? t('roster.alreadyJoined')
+                      : t('roster.joinThisEvent')}
+                  </Text>
+                </View>
+                <FontAwesomeIcon
+                  icon={addPlayerExpanded ? faChevronUp : faChevronDown}
+                  size={16}
+                  color={colors.placeholder}
+                />
               </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
 
-        {/* Jersey Color Modal */}
-        <Modal
-          visible={jerseyColorModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setJerseyColorModalVisible(false)}>
-          <View style={themedStyles.modalOverlay}>
-            <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>
-                {t('roster.jerseyColor')}
+              {addPlayerExpanded && (
+                <View style={themedStyles.addPlayerContent}>
+                  {isUserOnRoster ? (
+                    <View style={themedStyles.alreadyJoinedBadge}>
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={14}
+                        color={colors.primary}
+                      />
+                      <Text style={themedStyles.alreadyJoinedText}>
+                        {t('roster.youreOnTheRoster')}
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      {errorMessage ? (
+                        <Text style={themedStyles.errorMessage}>
+                          {errorMessage}
+                        </Text>
+                      ) : null}
+
+                      <TextInput
+                        style={themedStyles.input}
+                        placeholder={t('roster.yourName')}
+                        placeholderTextColor={colors.placeholder}
+                        value={username}
+                        onChangeText={setUsername}
+                      />
+
+                      {/* Paid Status Dropdown */}
+                      <TouchableOpacity
+                        style={themedStyles.dropdown}
+                        onPress={() => setPaidStatusModalVisible(true)}>
+                        <Text
+                          style={
+                            paidStatus
+                              ? themedStyles.dropdownText
+                              : themedStyles.placeholderText
+                          }>
+                          {paidStatus || t('roster.selectPaidStatus')}
+                        </Text>
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          size={14}
+                          color={colors.placeholder}
+                        />
+                      </TouchableOpacity>
+
+                      {/* Jersey Color Dropdown */}
+                      <TouchableOpacity
+                        style={themedStyles.dropdown}
+                        onPress={() => setJerseyColorModalVisible(true)}>
+                        <View style={themedStyles.jerseyDropdownRow}>
+                          {jerseyColor && (
+                            <View
+                              style={[
+                                themedStyles.jerseyIndicatorLarge,
+                                {
+                                  backgroundColor:
+                                    jerseyColors[jerseyColor] ||
+                                    jerseyColors.Other,
+                                },
+                              ]}
+                            />
+                          )}
+                          <Text
+                            style={
+                              jerseyColor
+                                ? themedStyles.dropdownText
+                                : themedStyles.placeholderText
+                            }>
+                            {jerseyColor || t('roster.selectJerseyColor')}
+                          </Text>
+                        </View>
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          size={14}
+                          color={colors.placeholder}
+                        />
+                      </TouchableOpacity>
+
+                      {/* Position Dropdown */}
+                      <TouchableOpacity
+                        style={themedStyles.dropdown}
+                        onPress={() => setPositionModalVisible(true)}>
+                        <Text
+                          style={
+                            position
+                              ? themedStyles.dropdownText
+                              : themedStyles.placeholderText
+                          }>
+                          {position || t('roster.selectPosition')}
+                        </Text>
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          size={14}
+                          color={colors.placeholder}
+                        />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          themedStyles.saveButton,
+                          (spotsRemaining === 0 || savingRoster) &&
+                            themedStyles.saveButtonDisabled,
+                        ]}
+                        onPress={handleSave}
+                        disabled={spotsRemaining === 0 || savingRoster}>
+                        {savingRoster ? (
+                          <ActivityIndicator
+                            size="small"
+                            color={colors.buttonText}
+                          />
+                        ) : (
+                          <FontAwesomeIcon
+                            icon={faUserPlus}
+                            size={16}
+                            color={colors.buttonText}
+                          />
+                        )}
+                        <Text style={themedStyles.buttonText}>
+                          {savingRoster
+                            ? t('common.loading') || 'Joining...'
+                            : spotsRemaining === 0
+                            ? t('roster.rosterFull')
+                            : t('roster.joinEvent')}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Invite Players Section - Only for invite-only events and creator */}
+          {eventPrivacy === 'invite-only' && isEventCreator && (
+            <View style={themedStyles.inviteSection}>
+              <TouchableOpacity
+                style={themedStyles.addPlayerHeader}
+                onPress={() => setInviteExpanded(!inviteExpanded)}
+                activeOpacity={0.7}>
+                <View style={themedStyles.addPlayerHeaderLeft}>
+                  <FontAwesomeIcon
+                    icon={faEnvelope}
+                    size={18}
+                    color={colors.primary}
+                  />
+                  <Text style={themedStyles.addPlayerTitle}>
+                    {t('roster.invitePlayers') || 'Invite Players'}
+                  </Text>
+                </View>
+                <FontAwesomeIcon
+                  icon={inviteExpanded ? faChevronUp : faChevronDown}
+                  size={16}
+                  color={colors.placeholder}
+                />
+              </TouchableOpacity>
+
+              {inviteExpanded && (
+                <View style={themedStyles.inviteContent}>
+                  {/* Search Input */}
+                  <View style={themedStyles.inviteSearchContainer}>
+                    <FontAwesomeIcon
+                      icon={faSearch}
+                      size={16}
+                      color={colors.placeholder}
+                      style={themedStyles.inviteSearchIcon}
+                    />
+                    <TextInput
+                      style={themedStyles.inviteSearchInput}
+                      placeholder={
+                        t('roster.searchUsersToInvite') ||
+                        'Search users to invite...'
+                      }
+                      placeholderTextColor={colors.placeholder}
+                      value={inviteSearchQuery}
+                      onChangeText={text => {
+                        setInviteSearchQuery(text);
+                        searchUsersToInvite(text);
+                      }}
+                    />
+                    {loadingInviteSearch && (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    )}
+                  </View>
+
+                  {/* Search Results */}
+                  {inviteSearchResults.length > 0 && (
+                    <View style={themedStyles.inviteSearchResults}>
+                      {inviteSearchResults.map(user => (
+                        <TouchableOpacity
+                          key={user._id}
+                          style={themedStyles.inviteSearchResultRow}
+                          onPress={() => inviteUserToEvent(user)}>
+                          {user.profilePicUrl ? (
+                            <Image
+                              source={{uri: user.profilePicUrl}}
+                              style={themedStyles.inviteUserAvatar}
+                            />
+                          ) : (
+                            <View
+                              style={themedStyles.inviteUserAvatarPlaceholder}>
+                              <Text style={themedStyles.inviteUserAvatarText}>
+                                {getInitials(user.username)}
+                              </Text>
+                            </View>
+                          )}
+                          <Text style={themedStyles.inviteUserName}>
+                            {user.username}
+                          </Text>
+                          <FontAwesomeIcon
+                            icon={faPlus}
+                            size={16}
+                            color={colors.primary}
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Invited Users List */}
+                  {invitedUserDetails.length > 0 && (
+                    <View style={themedStyles.invitedUsersList}>
+                      <Text style={themedStyles.invitedUsersLabel}>
+                        {t('roster.invitedUsers') || 'Invited'} (
+                        {invitedUserDetails.length})
+                      </Text>
+                      <View style={themedStyles.invitedUsersChips}>
+                        {invitedUserDetails.map(user => (
+                          <View
+                            key={user._id}
+                            style={themedStyles.invitedUserChip}>
+                            <Text style={themedStyles.invitedUserChipText}>
+                              {user.username}
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => removeInvite(user._id)}
+                              hitSlop={{
+                                top: 10,
+                                bottom: 10,
+                                left: 10,
+                                right: 10,
+                              }}>
+                              <FontAwesomeIcon
+                                icon={faTimes}
+                                size={12}
+                                color={colors.secondaryText}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {invitedUserDetails.length === 0 &&
+                    inviteSearchQuery.length === 0 && (
+                      <Text style={themedStyles.inviteHint}>
+                        {t('roster.inviteHint') ||
+                          'Search and add users who can see and join this event'}
+                      </Text>
+                    )}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Rostered Players Section */}
+          <View style={themedStyles.rosterSection}>
+            <View style={themedStyles.sectionHeader}>
+              <FontAwesomeIcon
+                icon={faUsers}
+                size={18}
+                color={colors.primary}
+              />
+              <Text style={themedStyles.sectionTitle}>
+                {t('roster.rosteredPlayers')} ({roster.length})
               </Text>
-              <ScrollView style={themedStyles.modalScrollView}>
-                {Object.keys(availableJerseyColors).map(color => (
+            </View>
+
+            {loading ? (
+              <RosterListSkeleton count={5} />
+            ) : roster.length === 0 ? (
+              <Text style={themedStyles.emptyState}>
+                {t('roster.noPlayersYet')}
+              </Text>
+            ) : (
+              <FlatList
+                data={roster}
+                renderItem={renderPlayerCard}
+                keyExtractor={(_, idx) => idx.toString()}
+                scrollEnabled={false}
+              />
+            )}
+          </View>
+
+          {/* Paid Status Modal */}
+          <Modal
+            visible={paidStatusModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setPaidStatusModalVisible(false)}>
+            <View style={themedStyles.modalOverlay}>
+              <View style={themedStyles.modalContent}>
+                <Text style={themedStyles.modalTitle}>
+                  {t('roster.paymentStatus')}
+                </Text>
+                {['Paid', 'Unpaid'].map(status => (
                   <TouchableOpacity
-                    key={color}
+                    key={status}
                     style={[
                       themedStyles.modalOption,
-                      jerseyColor === color && themedStyles.modalOptionSelected,
+                      paidStatus === status && themedStyles.modalOptionSelected,
                     ]}
                     onPress={() => {
-                      setJerseyColor(color);
-                      setJerseyColorModalVisible(false);
+                      setPaidStatus(status);
+                      setPaidStatusModalVisible(false);
                     }}>
-                    <View
-                      style={[
-                        themedStyles.colorSwatch,
-                        {backgroundColor: availableJerseyColors[color]},
-                      ]}
+                    <FontAwesomeIcon
+                      icon={status === 'Paid' ? faCheck : faTimes}
+                      size={16}
+                      color={
+                        status === 'Paid'
+                          ? '#4CAF50'
+                          : paidStatus === status
+                          ? colors.primary
+                          : colors.text
+                      }
                     />
                     <Text
                       style={[
-                        themedStyles.modalOptionText,
-                        jerseyColor === color &&
+                        themedStyles.modalOptionTextWithMargin,
+                        paidStatus === status &&
                           themedStyles.modalOptionTextSelected,
                       ]}>
-                      {color}
+                      {status}
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={themedStyles.modalClose}
-                onPress={() => setJerseyColorModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>
-                  {t('common.close')}
-                </Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={themedStyles.modalClose}
+                  onPress={() => setPaidStatusModalVisible(false)}>
+                  <Text style={themedStyles.modalCloseText}>
+                    {t('common.close')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
+          </Modal>
 
-        {/* Position Modal */}
-        <Modal
-          visible={positionModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setPositionModalVisible(false)}>
-          <View style={themedStyles.modalOverlay}>
-            <View style={themedStyles.modalContent}>
-              <Text style={themedStyles.modalTitle}>Select Position</Text>
-              <ScrollView style={themedStyles.modalScrollView}>
-                {(positionOptions[eventType] || positionOptions.Default).map(
-                  pos => (
+          {/* Jersey Color Modal */}
+          <Modal
+            visible={jerseyColorModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setJerseyColorModalVisible(false)}>
+            <View style={themedStyles.modalOverlay}>
+              <View style={themedStyles.modalContent}>
+                <Text style={themedStyles.modalTitle}>
+                  {t('roster.jerseyColor')}
+                </Text>
+                <ScrollView style={themedStyles.modalScrollView}>
+                  {Object.keys(availableJerseyColors).map(color => (
                     <TouchableOpacity
-                      key={pos}
+                      key={color}
                       style={[
                         themedStyles.modalOption,
-                        position === pos && themedStyles.modalOptionSelected,
+                        jerseyColor === color &&
+                          themedStyles.modalOptionSelected,
                       ]}
                       onPress={() => {
-                        setPosition(pos);
-                        setPositionModalVisible(false);
+                        setJerseyColor(color);
+                        setJerseyColorModalVisible(false);
                       }}>
-                      <FontAwesomeIcon
-                        icon={faFutbol}
-                        size={16}
-                        color={
-                          position === pos ? colors.primary : colors.placeholder
-                        }
+                      <View
+                        style={[
+                          themedStyles.colorSwatch,
+                          {backgroundColor: availableJerseyColors[color]},
+                        ]}
                       />
                       <Text
                         style={[
-                          themedStyles.modalOptionTextWithMargin,
-                          position === pos &&
+                          themedStyles.modalOptionText,
+                          jerseyColor === color &&
                             themedStyles.modalOptionTextSelected,
                         ]}>
-                        {pos}
+                        {color}
                       </Text>
                     </TouchableOpacity>
-                  ),
-                )}
-              </ScrollView>
-              <TouchableOpacity
-                style={themedStyles.modalClose}
-                onPress={() => setPositionModalVisible(false)}>
-                <Text style={themedStyles.modalCloseText}>
-                  {t('common.close')}
-                </Text>
-              </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={themedStyles.modalClose}
+                  onPress={() => setJerseyColorModalVisible(false)}>
+                  <Text style={themedStyles.modalCloseText}>
+                    {t('common.close')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
+          </Modal>
 
-        {/* Edit Player Modal */}
-        <Modal
-          visible={editModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            setEditModalVisible(false);
-            setExpandedSection(null);
-          }}>
-          <View style={themedStyles.modalOverlay}>
-            <View style={[themedStyles.modalContent, {maxHeight: '80%'}]}>
-              <Text style={themedStyles.modalTitle}>
-                ✏️ {t('roster.editYourInfo')}
-              </Text>
-
-              <ScrollView
-                style={{flexGrow: 0}}
-                showsVerticalScrollIndicator={false}>
-                {/* Edit Paid Status */}
-                <TouchableOpacity
-                  style={themedStyles.dropdown}
-                  onPress={() =>
-                    setExpandedSection(
-                      expandedSection === 'paid' ? null : 'paid',
-                    )
-                  }>
-                  <Text
-                    style={
-                      editPaidStatus
-                        ? themedStyles.dropdownText
-                        : themedStyles.placeholderText
-                    }>
-                    {editPaidStatus || t('roster.selectPaidStatus')}
-                  </Text>
-                  <FontAwesomeIcon
-                    icon={
-                      expandedSection === 'paid' ? faChevronUp : faChevronDown
-                    }
-                    size={14}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-                {expandedSection === 'paid' && (
-                  <View style={themedStyles.expandedOptions}>
-                    {['Paid', 'Unpaid'].map(status => (
-                      <TouchableOpacity
-                        key={status}
-                        style={[
-                          themedStyles.inlineOption,
-                          editPaidStatus === status &&
-                            themedStyles.inlineOptionSelected,
-                        ]}
-                        onPress={() => {
-                          setEditPaidStatus(status);
-                          setExpandedSection(null);
-                        }}>
-                        <FontAwesomeIcon
-                          icon={status === 'Paid' ? faCheck : faTimes}
-                          size={16}
-                          color={
-                            status === 'Paid'
-                              ? '#4CAF50'
-                              : editPaidStatus === status
-                              ? colors.primary
-                              : colors.text
-                          }
-                        />
-                        <Text
-                          style={[
-                            themedStyles.inlineOptionText,
-                            editPaidStatus === status &&
-                              themedStyles.inlineOptionTextSelected,
-                          ]}>
-                          {status}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Edit Jersey Color */}
-                <TouchableOpacity
-                  style={themedStyles.dropdown}
-                  onPress={() =>
-                    setExpandedSection(
-                      expandedSection === 'jersey' ? null : 'jersey',
-                    )
-                  }>
-                  <View style={themedStyles.jerseyDropdownRow}>
-                    {editJerseyColor && (
-                      <View
-                        style={[
-                          themedStyles.jerseyIndicatorLarge,
-                          {
-                            backgroundColor:
-                              jerseyColors[editJerseyColor] ||
-                              jerseyColors.Other,
-                          },
-                        ]}
-                      />
-                    )}
-                    <Text
-                      style={
-                        editJerseyColor
-                          ? themedStyles.dropdownText
-                          : themedStyles.placeholderText
-                      }>
-                      {editJerseyColor || t('roster.selectJerseyColor')}
-                    </Text>
-                  </View>
-                  <FontAwesomeIcon
-                    icon={
-                      expandedSection === 'jersey' ? faChevronUp : faChevronDown
-                    }
-                    size={14}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-                {expandedSection === 'jersey' && (
-                  <View style={themedStyles.expandedOptions}>
-                    {Object.keys(availableJerseyColors).map(color => (
-                      <TouchableOpacity
-                        key={color}
-                        style={[
-                          themedStyles.inlineOption,
-                          editJerseyColor === color &&
-                            themedStyles.inlineOptionSelected,
-                        ]}
-                        onPress={() => {
-                          setEditJerseyColor(color);
-                          setExpandedSection(null);
-                        }}>
-                        <View
-                          style={[
-                            themedStyles.colorSwatch,
-                            {backgroundColor: availableJerseyColors[color]},
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            themedStyles.inlineOptionText,
-                            editJerseyColor === color &&
-                              themedStyles.inlineOptionTextSelected,
-                          ]}>
-                          {color}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Edit Position */}
-                <TouchableOpacity
-                  style={themedStyles.dropdown}
-                  onPress={() =>
-                    setExpandedSection(
-                      expandedSection === 'position' ? null : 'position',
-                    )
-                  }>
-                  <Text
-                    style={
-                      editPosition
-                        ? themedStyles.dropdownText
-                        : themedStyles.placeholderText
-                    }>
-                    {editPosition || t('roster.selectPosition')}
-                  </Text>
-                  <FontAwesomeIcon
-                    icon={
-                      expandedSection === 'position'
-                        ? faChevronUp
-                        : faChevronDown
-                    }
-                    size={14}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-                {expandedSection === 'position' && (
-                  <View style={themedStyles.expandedOptions}>
-                    {(
-                      positionOptions[eventType] || positionOptions.Default
-                    ).map(pos => (
+          {/* Position Modal */}
+          <Modal
+            visible={positionModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setPositionModalVisible(false)}>
+            <View style={themedStyles.modalOverlay}>
+              <View style={themedStyles.modalContent}>
+                <Text style={themedStyles.modalTitle}>Select Position</Text>
+                <ScrollView style={themedStyles.modalScrollView}>
+                  {(positionOptions[eventType] || positionOptions.Default).map(
+                    pos => (
                       <TouchableOpacity
                         key={pos}
                         style={[
-                          themedStyles.inlineOption,
-                          editPosition === pos &&
-                            themedStyles.inlineOptionSelected,
+                          themedStyles.modalOption,
+                          position === pos && themedStyles.modalOptionSelected,
                         ]}
                         onPress={() => {
-                          setEditPosition(pos);
-                          setExpandedSection(null);
+                          setPosition(pos);
+                          setPositionModalVisible(false);
                         }}>
                         <FontAwesomeIcon
                           icon={faFutbol}
                           size={16}
                           color={
-                            editPosition === pos
+                            position === pos
                               ? colors.primary
                               : colors.placeholder
                           }
                         />
                         <Text
                           style={[
-                            themedStyles.inlineOptionText,
-                            editPosition === pos &&
-                              themedStyles.inlineOptionTextSelected,
+                            themedStyles.modalOptionTextWithMargin,
+                            position === pos &&
+                              themedStyles.modalOptionTextSelected,
                           ]}>
                           {pos}
                         </Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </ScrollView>
-
-              {/* Save & Cancel Buttons */}
-              <TouchableOpacity
-                style={[themedStyles.saveButton, {marginTop: 16}]}
-                onPress={handleSaveEdit}>
-                <FontAwesomeIcon
-                  icon={faCheck}
-                  size={18}
-                  color={colors.buttonText}
-                />
-                <Text style={themedStyles.buttonText}>
-                  {t('roster.saveChanges')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  themedStyles.modalClose,
-                  {backgroundColor: colors.border},
-                ]}
-                onPress={() => {
-                  setEditModalVisible(false);
-                  setExpandedSection(null);
-                }}>
-                <Text
-                  style={[themedStyles.modalCloseText, {color: colors.text}]}>
-                  {t('common.cancel')}
-                </Text>
-              </TouchableOpacity>
+                    ),
+                  )}
+                </ScrollView>
+                <TouchableOpacity
+                  style={themedStyles.modalClose}
+                  onPress={() => setPositionModalVisible(false)}>
+                  <Text style={themedStyles.modalCloseText}>
+                    {t('common.close')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
-      </ScrollView>
+          </Modal>
+
+          {/* Edit Player Modal */}
+          <Modal
+            visible={editModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => {
+              setEditModalVisible(false);
+              setExpandedSection(null);
+            }}>
+            <View style={themedStyles.modalOverlay}>
+              <View style={[themedStyles.modalContent, {maxHeight: '80%'}]}>
+                <Text style={themedStyles.modalTitle}>
+                  ✏️ {t('roster.editYourInfo')}
+                </Text>
+
+                <ScrollView
+                  style={{flexGrow: 0}}
+                  showsVerticalScrollIndicator={false}>
+                  {/* Edit Paid Status */}
+                  <TouchableOpacity
+                    style={themedStyles.dropdown}
+                    onPress={() =>
+                      setExpandedSection(
+                        expandedSection === 'paid' ? null : 'paid',
+                      )
+                    }>
+                    <Text
+                      style={
+                        editPaidStatus
+                          ? themedStyles.dropdownText
+                          : themedStyles.placeholderText
+                      }>
+                      {editPaidStatus || t('roster.selectPaidStatus')}
+                    </Text>
+                    <FontAwesomeIcon
+                      icon={
+                        expandedSection === 'paid' ? faChevronUp : faChevronDown
+                      }
+                      size={14}
+                      color={colors.placeholder}
+                    />
+                  </TouchableOpacity>
+                  {expandedSection === 'paid' && (
+                    <View style={themedStyles.expandedOptions}>
+                      {['Paid', 'Unpaid'].map(status => (
+                        <TouchableOpacity
+                          key={status}
+                          style={[
+                            themedStyles.inlineOption,
+                            editPaidStatus === status &&
+                              themedStyles.inlineOptionSelected,
+                          ]}
+                          onPress={() => {
+                            setEditPaidStatus(status);
+                            setExpandedSection(null);
+                          }}>
+                          <FontAwesomeIcon
+                            icon={status === 'Paid' ? faCheck : faTimes}
+                            size={16}
+                            color={
+                              status === 'Paid'
+                                ? '#4CAF50'
+                                : editPaidStatus === status
+                                ? colors.primary
+                                : colors.text
+                            }
+                          />
+                          <Text
+                            style={[
+                              themedStyles.inlineOptionText,
+                              editPaidStatus === status &&
+                                themedStyles.inlineOptionTextSelected,
+                            ]}>
+                            {status}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Edit Jersey Color */}
+                  <TouchableOpacity
+                    style={themedStyles.dropdown}
+                    onPress={() =>
+                      setExpandedSection(
+                        expandedSection === 'jersey' ? null : 'jersey',
+                      )
+                    }>
+                    <View style={themedStyles.jerseyDropdownRow}>
+                      {editJerseyColor && (
+                        <View
+                          style={[
+                            themedStyles.jerseyIndicatorLarge,
+                            {
+                              backgroundColor:
+                                jerseyColors[editJerseyColor] ||
+                                jerseyColors.Other,
+                            },
+                          ]}
+                        />
+                      )}
+                      <Text
+                        style={
+                          editJerseyColor
+                            ? themedStyles.dropdownText
+                            : themedStyles.placeholderText
+                        }>
+                        {editJerseyColor || t('roster.selectJerseyColor')}
+                      </Text>
+                    </View>
+                    <FontAwesomeIcon
+                      icon={
+                        expandedSection === 'jersey'
+                          ? faChevronUp
+                          : faChevronDown
+                      }
+                      size={14}
+                      color={colors.placeholder}
+                    />
+                  </TouchableOpacity>
+                  {expandedSection === 'jersey' && (
+                    <View style={themedStyles.expandedOptions}>
+                      {Object.keys(availableJerseyColors).map(color => (
+                        <TouchableOpacity
+                          key={color}
+                          style={[
+                            themedStyles.inlineOption,
+                            editJerseyColor === color &&
+                              themedStyles.inlineOptionSelected,
+                          ]}
+                          onPress={() => {
+                            setEditJerseyColor(color);
+                            setExpandedSection(null);
+                          }}>
+                          <View
+                            style={[
+                              themedStyles.colorSwatch,
+                              {backgroundColor: availableJerseyColors[color]},
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              themedStyles.inlineOptionText,
+                              editJerseyColor === color &&
+                                themedStyles.inlineOptionTextSelected,
+                            ]}>
+                            {color}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Edit Position */}
+                  <TouchableOpacity
+                    style={themedStyles.dropdown}
+                    onPress={() =>
+                      setExpandedSection(
+                        expandedSection === 'position' ? null : 'position',
+                      )
+                    }>
+                    <Text
+                      style={
+                        editPosition
+                          ? themedStyles.dropdownText
+                          : themedStyles.placeholderText
+                      }>
+                      {editPosition || t('roster.selectPosition')}
+                    </Text>
+                    <FontAwesomeIcon
+                      icon={
+                        expandedSection === 'position'
+                          ? faChevronUp
+                          : faChevronDown
+                      }
+                      size={14}
+                      color={colors.placeholder}
+                    />
+                  </TouchableOpacity>
+                  {expandedSection === 'position' && (
+                    <View style={themedStyles.expandedOptions}>
+                      {(
+                        positionOptions[eventType] || positionOptions.Default
+                      ).map(pos => (
+                        <TouchableOpacity
+                          key={pos}
+                          style={[
+                            themedStyles.inlineOption,
+                            editPosition === pos &&
+                              themedStyles.inlineOptionSelected,
+                          ]}
+                          onPress={() => {
+                            setEditPosition(pos);
+                            setExpandedSection(null);
+                          }}>
+                          <FontAwesomeIcon
+                            icon={faFutbol}
+                            size={16}
+                            color={
+                              editPosition === pos
+                                ? colors.primary
+                                : colors.placeholder
+                            }
+                          />
+                          <Text
+                            style={[
+                              themedStyles.inlineOptionText,
+                              editPosition === pos &&
+                                themedStyles.inlineOptionTextSelected,
+                            ]}>
+                            {pos}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </ScrollView>
+
+                {/* Save & Cancel Buttons */}
+                <TouchableOpacity
+                  style={[themedStyles.saveButton, {marginTop: 16}]}
+                  onPress={handleSaveEdit}>
+                  <FontAwesomeIcon
+                    icon={faCheck}
+                    size={18}
+                    color={colors.buttonText}
+                  />
+                  <Text style={themedStyles.buttonText}>
+                    {t('roster.saveChanges')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    themedStyles.modalClose,
+                    {backgroundColor: colors.border},
+                  ]}
+                  onPress={() => {
+                    setEditModalVisible(false);
+                    setExpandedSection(null);
+                  }}>
+                  <Text
+                    style={[themedStyles.modalCloseText, {color: colors.text}]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

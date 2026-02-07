@@ -139,7 +139,12 @@
     "mapsErrorMessage": "Please make sure you have a maps app installed.",
     "discussion": "Discussion",
     "noDiscussion": "No discussion yet. Start the conversation!",
-    "writeDiscussion": "Write something..."
+    "writeDiscussion": "Write something...",
+    "eventPrivacy": "Event Privacy",
+    "inviteUsers": "Invite Users",
+    "searchUsersToInvite": "Search users to invite...",
+    "invitedUsers": "Invited",
+    "inviteHint": "Search and add users who can see and join this event"
   },
   "profile": {
     "title": "Profile",
@@ -180,7 +185,34 @@
     "signOutConfirm": "Are you sure you want to sign out?",
     "showingEventsCreated": "Showing events you created",
     "showingEventsJoined": "Showing events you joined",
-    "clearFilter": "Clear"
+    "clearFilter": "Clear",
+    "notifications": "Notifications",
+    "allNotifications": "All Notifications",
+    "viewAllNotifications": "View all your notifications"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "noNotifications": "No notifications yet",
+    "noNotificationsMessage": "When you receive notifications, they'll appear here",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "earlier": "Earlier",
+    "justNow": "Just now",
+    "minutesAgo": "m ago",
+    "hoursAgo": "h ago",
+    "daysAgo": "d ago",
+    "deleteSelected": "Delete Selected",
+    "deleteSelectedMessage": "Delete selected notification(s)?",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "markAllRead": "Mark all as read",
+    "friendRequest": "Friend Request",
+    "friendAccepted": "Friend Accepted",
+    "eventUpdate": "Event Update",
+    "eventReminder": "Event Reminder",
+    "eventInvitation": "Event Invitation",
+    "eventRoster": "Roster Update",
+    "communityNote": "Community Note"
   },
   "communityNotes": {
     "title": "Community Notes",
@@ -259,7 +291,6 @@
     "accountDeletedMessage": "Your account has been permanently deleted.",
     "deleteAccountError": "Failed to delete account. Please try again later.",
     "sessionExpired": "Your session has expired. Please log out and log back in to delete your account.",
-    "deleteAccountError": "Failed to delete account. Please try again later.",
     "yourData": "Your Data",
     "yourDataExport": "BetterPlay - Your Data Export",
     "yourDataIntro": "Here is all the data we have collected about you. You can export this data using the download button above.",
@@ -331,7 +362,13 @@
     "onlyRemoveSelf": "Hold on!",
     "onlyRemoveSelfMessage": "You can only remove yourself from the roster.",
     "leaveConfirm": "Leave Event?",
-    "leaveConfirmMessage": "Are you sure you want to remove yourself from this event?"
+    "leaveConfirmMessage": "Are you sure you want to remove yourself from this event?",
+    "invitePlayers": "Invite Players",
+    "searchUsersToInvite": "Search users to invite...",
+    "invitedUsers": "Invited Users",
+    "inviteHint": "Search for users by name to invite them to this event",
+    "inviteError": "Failed to invite user",
+    "removeInviteError": "Failed to remove invite"
   },
   "resetPassword": {
     "title": "Reset Password",
