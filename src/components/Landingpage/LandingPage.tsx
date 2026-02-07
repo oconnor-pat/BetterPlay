@@ -16,6 +16,7 @@ import {NavigationProp, useNavigation} from '@react-navigation/native';
 import UserContext from '../UserContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from '../../config/api';
+import notificationService from '../../services/NotificationService';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -409,6 +410,10 @@ function LandingPage() {
           'cachedUserData',
           JSON.stringify(responseData.user),
         );
+
+        // Register device for push notifications now that user is logged in
+        await notificationService.ensureTokenRegistered();
+
         setSuccessMessage('Account created successfully!');
         setErrorMessage(null);
         setUserData(responseData.user);
@@ -466,6 +471,10 @@ function LandingPage() {
           'cachedUserData',
           JSON.stringify(responseData.user),
         );
+
+        // Register device for push notifications now that user is logged in
+        await notificationService.ensureTokenRegistered();
+
         setSuccessMessage('Welcome back!');
         setErrorMessage(null);
 

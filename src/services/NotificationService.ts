@@ -192,6 +192,45 @@ class NotificationService {
   }
 
   /**
+   * Ensure device token is registered with backend
+   * Call this after login/registration to ensure token is registered
+   * even if permission was granted before user was authenticated
+   */
+  async ensureTokenRegistered(): Promise<void> {
+    try {
+      const userToken = await AsyncStorage.getItem('userToken');
+      if (!userToken) {
+        console.log('No user token, cannot register device');
+        return;
+      }
+
+      // Check if we already have a cached device token
+      const cachedDeviceToken = await AsyncStorage.getItem(DEVICE_TOKEN_KEY);
+      if (cachedDeviceToken) {
+        // Re-register the cached token with backend
+        console.log('Re-registering cached device token with backend');
+        await this.registerTokenWithBackend(cachedDeviceToken);
+      } else {
+        // No cached token, try to get a new one
+        const status = await this.checkPermissionStatus();
+        if (
+          status === AuthorizationStatus.AUTHORIZED ||
+          status === AuthorizationStatus.PROVISIONAL
+        ) {
+          console.log('Getting and registering new device token');
+          await this.getAndRegisterToken();
+        } else {
+          console.log(
+            'Notification permission not granted, skipping token registration',
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error ensuring token registration:', error);
+    }
+  }
+
+  /**
    * Register device token with backend
    */
   async registerTokenWithBackend(deviceToken: string): Promise<boolean> {

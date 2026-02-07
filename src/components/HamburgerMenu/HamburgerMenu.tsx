@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import UserContext from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {useTranslation} from 'react-i18next';
+import notificationService from '../../services/NotificationService';
 
 const HamburgerMenu: React.FC = () => {
   const [menuVisible, setMenuVisible] = useState(false);
@@ -22,6 +23,8 @@ const HamburgerMenu: React.FC = () => {
   const handleOptionPress = async (option: string) => {
     setMenuVisible(false);
     if (option === 'Sign Out') {
+      // Unregister device from push notifications before clearing tokens
+      await notificationService.unregisterDevice();
       // Clear the stored token and cached data to fully log out
       await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
       setUserData(null);
