@@ -136,7 +136,10 @@
     "deleteConfirm": "Delete Event?",
     "deleteConfirmMessage": "Are you sure you want to delete this event? This can't be undone.",
     "mapsError": "Couldn't open maps",
-    "mapsErrorMessage": "Please make sure you have a maps app installed."
+    "mapsErrorMessage": "Please make sure you have a maps app installed.",
+    "discussion": "Discussion",
+    "noDiscussion": "No discussion yet. Start the conversation!",
+    "writeDiscussion": "Write something..."
   },
   "profile": {
     "title": "Profile",

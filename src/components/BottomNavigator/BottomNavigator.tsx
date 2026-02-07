@@ -5,7 +5,6 @@ import EventList from '../EventList/EventList';
 import EventRoster from '../EventRoster/EventRoster';
 import Profile from '../Profile/Profile';
 import PublicProfile from '../Profile/PublicProfile';
-import CommunityNotes from '../Communitynotes/CommunityNotes';
 import {VenueList, VenueDetail, SpaceDetail} from '../Venues';
 import {UserSearch} from '../UserSearch';
 import {FriendsList, FriendRequests} from '../Friends';
@@ -14,7 +13,6 @@ import {
   faMapMarkerAlt,
   faBuilding,
   faUser,
-  faStickyNote,
   faQuestion,
 } from '@fortawesome/free-solid-svg-icons';
 import {UserContextType} from '../UserContext';
@@ -53,7 +51,6 @@ function createTabBarIcon(colors: {primary: string; text: string}) {
     const iconMap: Record<string, IconDefinition> = {
       Local: faMapMarkerAlt,
       Venues: faBuilding,
-      CommunityNotes: faStickyNote,
       Profile: faUser,
     };
     const icon = iconMap[route.name] || faQuestion;
@@ -123,29 +120,6 @@ const VenueStack = () => {
       <Stack.Screen
         name="SpaceDetail"
         component={SpaceDetail}
-        options={{headerShown: false}}
-      />
-    </Stack.Navigator>
-  );
-};
-
-// Stack Navigator for Community Notes screens
-const CommunityNotesStack = () => {
-  const {colors} = useTheme();
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {backgroundColor: colors.card},
-        headerTintColor: colors.text,
-      }}>
-      <Stack.Screen
-        name="CommunityNotesList"
-        component={CommunityNotes}
-        options={{headerShown: false}}
-      />
-      <Stack.Screen
-        name="PublicProfile"
-        component={PublicProfile}
         options={{headerShown: false}}
       />
     </Stack.Navigator>
@@ -252,7 +226,6 @@ const BottomNavigator: React.FC = () => {
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Local" component={LocalEventsStack} />
       <Tab.Screen name="Venues" component={VenueStack} />
-      <Tab.Screen name="CommunityNotes" component={CommunityNotesStack} />
       <Tab.Screen name="Profile">
         {() => <ProfileStack userId={userId} />}
       </Tab.Screen>

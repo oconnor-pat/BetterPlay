@@ -14,7 +14,18 @@ import {
   ScrollView,
   Share,
   KeyboardAvoidingView,
+  LayoutAnimation,
+  UIManager,
+  Image,
 } from 'react-native';
+
+// Enable LayoutAnimation on Android
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, {Marker} from 'react-native-maps';
@@ -35,6 +46,7 @@ import {
   faLocationArrow,
   faArrowRightToBracket,
   faComments,
+  faHeart,
 } from '@fortawesome/free-solid-svg-icons';
 import {
   useNavigation,
@@ -49,6 +61,7 @@ import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
+import EventComments from './EventComments';
 
 export type RootStackParamList = {
   EventList:
@@ -83,6 +96,8 @@ interface Event {
   eventType: string;
   createdBy: string;
   createdByUsername?: string;
+  createdAt?: string;
+  likes?: string[];
   // Support for coordinates (if available from backend)
   latitude?: number;
   longitude?: number;
@@ -150,6 +165,60 @@ const jerseyColorOptions: {label: string; color: string}[] = [
 
 const isTeamSport = (eventType: string) =>
   teamSports.some(sport => sport.toLowerCase() === eventType.toLowerCase());
+
+// Helper to format relative timestamp
+const formatRelativeTime = (dateString?: string): string => {
+  if (!dateString) {
+    return '';
+  }
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+  const diffYears = Math.floor(diffDays / 365);
+
+  if (diffMins < 1) {
+    return 'Just now';
+  }
+  if (diffMins < 60) {
+    return `${diffMins}m ago`;
+  }
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+  if (diffDays === 1) {
+    return 'Yesterday';
+  }
+  if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  }
+  if (diffWeeks < 4) {
+    return `${diffWeeks}w ago`;
+  }
+  if (diffMonths < 12) {
+    return `${diffMonths}mo ago`;
+  }
+  return `${diffYears}y ago`;
+};
+
+// Helper to get initials from username
+const getInitials = (username: string): string => {
+  if (!username) {
+    return '?';
+  }
+  return username.slice(0, 2).toUpperCase();
+};
+
+// Interface for liked by user data
+interface LikedByUser {
+  _id: string;
+  username: string;
+  profilePicUrl?: string;
+}
 
 // Helper function to check if an event date/time has passed
 const isEventPast = (eventDate: string, eventTime: string): boolean => {
@@ -530,6 +599,27 @@ const EventList: React.FC = () => {
           borderRadius: 20,
           backgroundColor: colors.inputBackground || colors.background,
         },
+        likeButtonContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: 10,
+          borderRadius: 20,
+          backgroundColor: colors.inputBackground || colors.background,
+          gap: 6,
+        },
+        eventLikeCountBadge: {
+          backgroundColor: colors.primary + '20',
+          paddingHorizontal: 8,
+          paddingVertical: 2,
+          borderRadius: 10,
+          minWidth: 24,
+          alignItems: 'center',
+        },
+        eventLikeCountText: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.primary,
+        },
         addButton: {
           paddingHorizontal: 20,
           paddingVertical: 10,
@@ -651,6 +741,12 @@ const EventList: React.FC = () => {
           fontSize: 13,
           fontWeight: '600',
           marginLeft: 4,
+        },
+        eventTimestamp: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          fontWeight: '400',
+          marginLeft: 8,
         },
         creatorRow: {
           flexDirection: 'row',
@@ -1012,6 +1108,91 @@ const EventList: React.FC = () => {
           flex: 1,
           marginBottom: 0,
         },
+        // Likes modal styles
+        likesModalOverlay: {
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        likesModalContent: {
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          padding: 20,
+          width: '80%',
+          maxWidth: 300,
+          maxHeight: '50%',
+        },
+        likesModalTitle: {
+          fontSize: 16,
+          fontWeight: '700',
+          color: colors.text,
+          textAlign: 'center',
+          marginBottom: 14,
+        },
+        likesModalScroll: {
+          maxHeight: 220,
+        },
+        likesModalUserRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
+        likesModalAvatar: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          marginRight: 10,
+        },
+        likesModalAvatarPlaceholder: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: colors.primary,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginRight: 10,
+        },
+        likesModalAvatarText: {
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: '600',
+        },
+        likesModalUsername: {
+          fontSize: 14,
+          color: colors.text,
+          flex: 1,
+        },
+        likesModalUsernameClickable: {
+          color: colors.primary,
+        },
+        likesModalAnonymous: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          fontStyle: 'italic',
+          paddingVertical: 8,
+          textAlign: 'center',
+        },
+        likesModalEmpty: {
+          textAlign: 'center',
+          color: colors.placeholder || '#888',
+          fontSize: 13,
+          paddingVertical: 16,
+        },
+        likesModalClose: {
+          marginTop: 14,
+          paddingVertical: 10,
+          backgroundColor: colors.primary,
+          borderRadius: 8,
+          alignItems: 'center',
+        },
+        likesModalCloseText: {
+          color: '#fff',
+          fontWeight: '600',
+          fontSize: 14,
+        },
       }),
     [colors],
   );
@@ -1104,6 +1285,22 @@ const EventList: React.FC = () => {
   // Jersey color picker state for team sports
   const [showJerseyColorPicker, setShowJerseyColorPicker] = useState(false);
 
+  // Expanded comments state - tracks which event's comments are shown inline
+  const [expandedCommentsEventId, setExpandedCommentsEventId] = useState<
+    string | null
+  >(null);
+
+  // Liked events state
+  const [likedEvents, setLikedEvents] = useState<Set<string>>(new Set());
+
+  // Likes modal state
+  const [likesModalVisible, setLikesModalVisible] = useState(false);
+  const [likesModalData, setLikesModalData] = useState<{
+    title: string;
+    users: LikedByUser[];
+    anonymousCount: number;
+  }>({title: '', users: [], anonymousCount: 0});
+
   // Loading state for save operations
   const [savingEvent, setSavingEvent] = useState(false);
   const [_deletingEventId, setDeletingEventId] = useState<string | null>(null);
@@ -1146,6 +1343,16 @@ const EventList: React.FC = () => {
       }
     });
   }, [fetchEvents]);
+
+  // Initialize liked events from event data
+  useEffect(() => {
+    if (userData && eventData.length > 0) {
+      const userLikedEvents = eventData
+        .filter(event => event.likes?.includes(userData._id))
+        .map(event => event._id);
+      setLikedEvents(new Set(userLikedEvents));
+    }
+  }, [eventData, userData]);
 
   // Dismiss hint and save to storage
   const dismissFirstTimeHint = async () => {
@@ -1549,62 +1756,148 @@ const EventList: React.FC = () => {
     }
   };
 
-  // Navigate to Community Notes - either to existing post or to create new one
-  const handleDiscussEvent = async (event: Event) => {
-    try {
-      // Check if a post already exists for this event
-      const response = await axios.get(
-        `${API_BASE_URL}/community-notes/event/${event._id}`,
-      );
+  // Toggle inline comments for an event
+  const handleDiscussEvent = (event: Event) => {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(
+        250,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity,
+      ),
+    );
+    setExpandedCommentsEventId(prev => (prev === event._id ? null : event._id));
+  };
 
-      if (response.data && response.data._id) {
-        // Post exists - navigate to it
-        navigation.dispatch(
-          CommonActions.navigate({
-            name: 'CommunityNotes',
-            params: {
-              screen: 'CommunityNotesList',
-              params: {
-                scrollToEventId: event._id,
-              },
-            },
-          }),
-        );
-      } else {
-        // No post exists - navigate to create one
-        navigation.dispatch(
-          CommonActions.navigate({
-            name: 'CommunityNotes',
-            params: {
-              screen: 'CommunityNotesList',
-              params: {
-                eventLink: {
-                  eventId: event._id,
-                  eventName: event.name,
-                  eventType: event.eventType,
-                },
-              },
-            },
-          }),
-        );
-      }
-    } catch {
-      // If error (likely 404 - no post found), navigate to create one
-      navigation.dispatch(
-        CommonActions.navigate({
-          name: 'CommunityNotes',
-          params: {
-            screen: 'CommunityNotesList',
-            params: {
-              eventLink: {
-                eventId: event._id,
-                eventName: event.name,
-                eventType: event.eventType,
-              },
-            },
-          },
-        }),
+  // Fetch user details by user IDs
+  const fetchUsersByIds = async (userIds: string[]): Promise<LikedByUser[]> => {
+    if (userIds.length === 0) {
+      return [];
+    }
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(`${API_BASE_URL}/users`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const allUsers = response.data?.users || response.data || [];
+      // Filter to only users whose _id is in our list
+      const matchedUsers = allUsers.filter((user: LikedByUser) =>
+        userIds.includes(user._id),
       );
+      return matchedUsers.map((user: LikedByUser) => ({
+        _id: user._id,
+        username: user.username,
+        profilePicUrl: user.profilePicUrl,
+      }));
+    } catch {
+      // Return empty on error
+      return [];
+    }
+  };
+
+  // Show who liked the event
+  const showEventLikedBy = async (event: Event) => {
+    const likes = event.likes || [];
+    if (likes.length === 0) {
+      return;
+    }
+
+    // Fetch user details for the user IDs
+    const users = await fetchUsersByIds(likes);
+
+    // Calculate how many likes don't have user info attached
+    const anonymousCount = Math.max(0, likes.length - users.length);
+
+    setLikesModalData({
+      title: 'Liked by',
+      users,
+      anonymousCount,
+    });
+    setLikesModalVisible(true);
+  };
+
+  // Navigate to a user's public profile
+  const navigateToProfile = (
+    userId: string,
+    username: string,
+    profilePicUrl?: string,
+  ) => {
+    navigation.navigate('PublicProfile', {
+      userId,
+      username,
+      profilePicUrl,
+    });
+  };
+
+  // Toggle like on event
+  const toggleEventLike = async (event: Event) => {
+    if (!userData) {
+      return;
+    }
+
+    const isLiked = likedEvents.has(event._id);
+
+    // Optimistic update
+    setLikedEvents(prev => {
+      const newSet = new Set(prev);
+      if (isLiked) {
+        newSet.delete(event._id);
+      } else {
+        newSet.add(event._id);
+      }
+      return newSet;
+    });
+
+    // Update event data optimistically
+    setEventData(prev =>
+      prev.map(e =>
+        e._id === event._id
+          ? {
+              ...e,
+              likes: isLiked
+                ? (e.likes || []).filter(id => id !== userData._id)
+                : [...(e.likes || []), userData._id],
+            }
+          : e,
+      ),
+    );
+
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(
+        `${API_BASE_URL}/events/${event._id}/like`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+    } catch (error) {
+      // Revert on error
+      setLikedEvents(prev => {
+        const newSet = new Set(prev);
+        if (isLiked) {
+          newSet.add(event._id);
+        } else {
+          newSet.delete(event._id);
+        }
+        return newSet;
+      });
+      setEventData(prev =>
+        prev.map(e =>
+          e._id === event._id
+            ? {
+                ...e,
+                likes: isLiked
+                  ? [...(e.likes || []), userData._id]
+                  : (e.likes || []).filter(id => id !== userData._id),
+              }
+            : e,
+        ),
+      );
+      console.error('Failed to toggle event like:', error);
     }
   };
 
@@ -1634,56 +1927,63 @@ const EventList: React.FC = () => {
 
   const renderEventCard = ({item}: {item: Event}) => {
     const isPast = isEventPast(item.date, item.time);
+    const isCommentsExpanded = expandedCommentsEventId === item._id;
 
     return (
-      <TouchableOpacity
-        style={[themedStyles.card, isPast && themedStyles.pastEventCard]}
-        onPress={() => handleEventPress(item)}
-        activeOpacity={0.9}>
-        {/* Past Event Badge */}
-        {isPast && (
-          <View style={themedStyles.pastEventBadge}>
-            <Text style={themedStyles.pastEventBadgeText}>
-              {t('events.past') || 'Past'}
+      <View style={[themedStyles.card, isPast && themedStyles.pastEventCard]}>
+        <TouchableOpacity
+          onPress={() => handleEventPress(item)}
+          activeOpacity={0.9}>
+          {/* Past Event Badge */}
+          {isPast && (
+            <View style={themedStyles.pastEventBadge}>
+              <Text style={themedStyles.pastEventBadgeText}>
+                {t('events.past') || 'Past'}
+              </Text>
+            </View>
+          )}
+          {/* Event Name */}
+          <View style={themedStyles.cardRow}>
+            <Text style={themedStyles.cardEmoji}>
+              {getEventTypeEmoji(item.eventType)}
+            </Text>
+            <Text style={themedStyles.cardTitle}>{item.name}</Text>
+          </View>
+          {/* Username of event creator */}
+          {item.createdByUsername && (
+            <View style={themedStyles.creatorRow}>
+              <Text style={themedStyles.cardEmoji}>👤</Text>
+              <Text style={themedStyles.eventUsername}>
+                {t('events.createdBy')} {item.createdByUsername}
+              </Text>
+              {item.createdAt && (
+                <Text style={themedStyles.eventTimestamp}>
+                  {formatRelativeTime(item.createdAt)}
+                </Text>
+              )}
+            </View>
+          )}
+          {/* Location */}
+          <View style={themedStyles.cardRow}>
+            <Text style={themedStyles.cardEmoji}>📍</Text>
+            <Text style={themedStyles.cardText}>{item.location}</Text>
+          </View>
+          {/* Date and Time */}
+          <View style={themedStyles.cardRow}>
+            <Text style={themedStyles.cardEmoji}>🗓️</Text>
+            <Text style={themedStyles.cardText}>
+              {item.date} @ {item.time}
             </Text>
           </View>
-        )}
-        {/* Event Name */}
-        <View style={themedStyles.cardRow}>
-          <Text style={themedStyles.cardEmoji}>
-            {getEventTypeEmoji(item.eventType)}
-          </Text>
-          <Text style={themedStyles.cardTitle}>{item.name}</Text>
-        </View>
-        {/* Username of event creator */}
-        {item.createdByUsername && (
-          <View style={themedStyles.creatorRow}>
-            <Text style={themedStyles.cardEmoji}>👤</Text>
-            <Text style={themedStyles.eventUsername}>
-              {t('events.createdBy')} {item.createdByUsername}
+          {/* Roster */}
+          <View style={themedStyles.cardRow}>
+            <Text style={themedStyles.cardEmoji}>👥</Text>
+            <Text style={themedStyles.cardText}>
+              {item.rosterSpotsFilled} / {item.totalSpots}{' '}
+              {t('events.playersJoined')}
             </Text>
           </View>
-        )}
-        {/* Location */}
-        <View style={themedStyles.cardRow}>
-          <Text style={themedStyles.cardEmoji}>📍</Text>
-          <Text style={themedStyles.cardText}>{item.location}</Text>
-        </View>
-        {/* Date and Time */}
-        <View style={themedStyles.cardRow}>
-          <Text style={themedStyles.cardEmoji}>🗓️</Text>
-          <Text style={themedStyles.cardText}>
-            {item.date} @ {item.time}
-          </Text>
-        </View>
-        {/* Roster */}
-        <View style={themedStyles.cardRow}>
-          <Text style={themedStyles.cardEmoji}>👥</Text>
-          <Text style={themedStyles.cardText}>
-            {item.rosterSpotsFilled} / {item.totalSpots}{' '}
-            {t('events.playersJoined')}
-          </Text>
-        </View>
+        </TouchableOpacity>
 
         {/* Spacer */}
         <View style={themedStyles.cardSpacer} />
@@ -1753,8 +2053,29 @@ const EventList: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Share/Discuss/Settings/Delete Icons */}
+        {/* Share/Discuss/Like/Settings/Delete Icons */}
         <View style={themedStyles.iconContainer}>
+          {/* Like Button with Count */}
+          <View style={themedStyles.likeButtonContainer}>
+            <TouchableOpacity onPress={() => toggleEventLike(item)}>
+              <FontAwesomeIcon
+                icon={faHeart}
+                size={18}
+                color={
+                  likedEvents.has(item._id) ? '#e74c3c' : colors.secondaryText
+                }
+              />
+            </TouchableOpacity>
+            {(item.likes?.length || 0) > 0 && (
+              <TouchableOpacity
+                style={themedStyles.eventLikeCountBadge}
+                onPress={() => showEventLikedBy(item)}>
+                <Text style={themedStyles.eventLikeCountText}>
+                  {item.likes?.length || 0}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <TouchableOpacity
             style={themedStyles.iconButton}
             onPress={() => handleShareEvent(item)}>
@@ -1765,12 +2086,15 @@ const EventList: React.FC = () => {
             />
           </TouchableOpacity>
           <TouchableOpacity
-            style={themedStyles.iconButton}
+            style={[
+              themedStyles.iconButton,
+              isCommentsExpanded && {backgroundColor: colors.primary + '20'},
+            ]}
             onPress={() => handleDiscussEvent(item)}>
             <FontAwesomeIcon
               icon={faComments}
               size={18}
-              color={colors.primary}
+              color={isCommentsExpanded ? colors.primary : colors.primary}
             />
           </TouchableOpacity>
           {userData?._id === item.createdBy && (
@@ -1792,7 +2116,17 @@ const EventList: React.FC = () => {
             </TouchableOpacity>
           )}
         </View>
-      </TouchableOpacity>
+
+        {/* Inline Event Comments */}
+        {isCommentsExpanded && (
+          <EventComments
+            eventId={item._id}
+            eventName={item.name}
+            eventType={item.eventType}
+            onClose={() => setExpandedCommentsEventId(null)}
+          />
+        )}
+      </View>
     );
   };
 
@@ -2508,6 +2842,88 @@ const EventList: React.FC = () => {
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Likes Modal */}
+      <Modal
+        visible={likesModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLikesModalVisible(false)}>
+        <TouchableOpacity
+          style={themedStyles.likesModalOverlay}
+          activeOpacity={1}
+          onPress={() => setLikesModalVisible(false)}>
+          <View style={themedStyles.likesModalContent}>
+            <Text style={themedStyles.likesModalTitle}>
+              {likesModalData.title}
+            </Text>
+            <ScrollView style={themedStyles.likesModalScroll}>
+              {likesModalData.users.length > 0 ? (
+                <>
+                  {likesModalData.users.map((user, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={themedStyles.likesModalUserRow}
+                      onPress={() => {
+                        if (user._id) {
+                          setLikesModalVisible(false);
+                          navigateToProfile(
+                            user._id,
+                            user.username,
+                            user.profilePicUrl,
+                          );
+                        }
+                      }}
+                      disabled={!user._id}
+                      activeOpacity={user._id ? 0.7 : 1}>
+                      {user.profilePicUrl ? (
+                        <Image
+                          source={{uri: user.profilePicUrl}}
+                          style={themedStyles.likesModalAvatar}
+                        />
+                      ) : (
+                        <View style={themedStyles.likesModalAvatarPlaceholder}>
+                          <Text style={themedStyles.likesModalAvatarText}>
+                            {getInitials(user.username)}
+                          </Text>
+                        </View>
+                      )}
+                      <Text
+                        style={[
+                          themedStyles.likesModalUsername,
+                          !!user._id &&
+                            themedStyles.likesModalUsernameClickable,
+                        ]}>
+                        {user.username}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  {likesModalData.anonymousCount > 0 && (
+                    <Text style={themedStyles.likesModalAnonymous}>
+                      {`and ${likesModalData.anonymousCount} other${
+                        likesModalData.anonymousCount === 1 ? '' : 's'
+                      }`}
+                    </Text>
+                  )}
+                </>
+              ) : likesModalData.anonymousCount > 0 ? (
+                <Text style={themedStyles.likesModalAnonymous}>
+                  {`${likesModalData.anonymousCount} ${
+                    likesModalData.anonymousCount === 1 ? 'person' : 'people'
+                  } liked this`}
+                </Text>
+              ) : (
+                <Text style={themedStyles.likesModalEmpty}>No likes yet</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={themedStyles.likesModalClose}
+              onPress={() => setLikesModalVisible(false)}>
+              <Text style={themedStyles.likesModalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
