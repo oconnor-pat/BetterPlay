@@ -281,14 +281,14 @@ const Notifications: React.FC = () => {
       case 'event_invitation':
       case 'event_roster':
         if (notification.data?.eventId) {
-          navigation.navigate('Local', {
+          navigation.navigate('Events', {
             screen: 'EventRoster',
             params: {eventId: notification.data.eventId},
           });
         }
         break;
       case 'community_note':
-        navigation.navigate('Local', {
+        navigation.navigate('Events', {
           screen: 'CommunityNotes',
         });
         break;

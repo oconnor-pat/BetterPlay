@@ -12,7 +12,7 @@ import {Notifications} from '../Notifications';
 import CommunityNotes from '../Communitynotes/CommunityNotes';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
-  faMapMarkerAlt,
+  faCalendarAlt,
   faBuilding,
   faUser,
   faQuestion,
@@ -51,7 +51,7 @@ function createTabBarIcon(colors: {primary: string; text: string}) {
     size: number;
   }) {
     const iconMap: Record<string, IconDefinition> = {
-      Local: faMapMarkerAlt,
+      Events: faCalendarAlt,
       Venues: faBuilding,
       Profile: faUser,
     };
@@ -245,7 +245,7 @@ const BottomNavigator: React.FC = () => {
 
   return (
     <Tab.Navigator screenOptions={screenOptions}>
-      <Tab.Screen name="Local" component={LocalEventsStack} />
+      <Tab.Screen name="Events" component={LocalEventsStack} />
       <Tab.Screen name="Venues" component={VenueStack} />
       <Tab.Screen name="Profile">
         {() => <ProfileStack userId={userId} />}

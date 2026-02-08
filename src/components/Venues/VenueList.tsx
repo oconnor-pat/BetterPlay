@@ -67,6 +67,7 @@ export type VenueStackParamList = {
 
 // Venue types with emojis
 const venueTypeOptions = [
+  // Sports Facilities
   {label: 'Hockey Rink', emoji: '🏒', type: 'rink'},
   {label: 'Basketball Court', emoji: '🏀', type: 'court'},
   {label: 'Soccer Field', emoji: '⚽', type: 'field'},
@@ -77,7 +78,24 @@ const venueTypeOptions = [
   {label: 'Volleyball Court', emoji: '🏐', type: 'court'},
   {label: 'Swimming Pool', emoji: '🏊', type: 'pool'},
   {label: 'Gym', emoji: '💪', type: 'gym'},
+  // Bars & Restaurants
+  {label: 'Bar', emoji: '🍺', type: 'bar'},
+  {label: 'Brewery', emoji: '🍻', type: 'brewery'},
+  {label: 'Restaurant', emoji: '🍽️', type: 'restaurant'},
+  {label: 'Café', emoji: '☕', type: 'cafe'},
+  // Entertainment
+  {label: 'Bowling Alley', emoji: '🎳', type: 'bowling'},
+  {label: 'Arcade', emoji: '🕹️', type: 'arcade'},
+  {label: 'Theater', emoji: '🎭', type: 'theater'},
+  {label: 'Music Venue', emoji: '🎵', type: 'music'},
+  // Community
+  {label: 'Community Center', emoji: '🏛️', type: 'community'},
+  {label: 'Park', emoji: '🌳', type: 'park'},
+  {label: 'Library', emoji: '📚', type: 'library'},
+  {label: 'Co-Working Space', emoji: '💻', type: 'coworking'},
+  // General
   {label: 'Multi-Purpose', emoji: '🏟️', type: 'multipurpose'},
+  {label: 'Other', emoji: '📍', type: 'other'},
 ];
 
 // Matches backend ISubVenue
@@ -183,6 +201,24 @@ const getSpaceLabel = (venueType: string) => {
     case 'pool':
       return 'Lanes/Pools';
     case 'gym':
+      return 'Areas';
+    case 'bar':
+    case 'brewery':
+    case 'restaurant':
+    case 'cafe':
+      return 'Rooms/Areas';
+    case 'bowling':
+      return 'Lanes';
+    case 'arcade':
+      return 'Stations';
+    case 'theater':
+    case 'music':
+      return 'Stages/Rooms';
+    case 'community':
+    case 'coworking':
+    case 'library':
+      return 'Rooms';
+    case 'park':
       return 'Areas';
     default:
       return 'Spaces';

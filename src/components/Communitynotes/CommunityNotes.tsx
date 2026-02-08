@@ -260,10 +260,10 @@ const CommunityNotes: React.FC = () => {
   // Navigate to an event from a linked post
   const navigateToEvent = useCallback(
     (eventId: string) => {
-      // Navigate to the Local Events tab and potentially to the event
+      // Navigate to the Events tab and potentially to the event
       navigation.dispatch(
         CommonActions.navigate({
-          name: 'Local',
+          name: 'Events',
           params: {
             screen: 'EventList',
             params: {highlightEventId: eventId},

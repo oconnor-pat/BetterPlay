@@ -51,8 +51,9 @@ type ProfileScreenRouteProp = RouteProp<
   'Profile'
 >;
 
-// Available sports for the favorite sports section
-const SPORTS_OPTIONS = [
+// Available interests/activities for the favorites section
+const INTERESTS_OPTIONS = [
+  // Sports
   {id: 'basketball', emoji: '🏀', label: 'Basketball'},
   {id: 'hockey', emoji: '🏒', label: 'Hockey'},
   {id: 'soccer', emoji: '⚽', label: 'Soccer'},
@@ -61,6 +62,21 @@ const SPORTS_OPTIONS = [
   {id: 'tennis', emoji: '🎾', label: 'Tennis'},
   {id: 'golf', emoji: '⛳', label: 'Golf'},
   {id: 'volleyball', emoji: '🏐', label: 'Volleyball'},
+  // Social & Entertainment
+  {id: 'trivia', emoji: '🧠', label: 'Trivia'},
+  {id: 'game-nights', emoji: '🎲', label: 'Game Nights'},
+  {id: 'karaoke', emoji: '🎤', label: 'Karaoke'},
+  {id: 'live-music', emoji: '🎵', label: 'Live Music'},
+  // Outdoor & Fitness
+  {id: 'hiking', emoji: '🥾', label: 'Hiking'},
+  {id: 'cycling', emoji: '🚴', label: 'Cycling'},
+  {id: 'running', emoji: '🏃', label: 'Running'},
+  {id: 'yoga', emoji: '🧘', label: 'Yoga'},
+  // Community
+  {id: 'book-club', emoji: '📚', label: 'Book Club'},
+  {id: 'volunteering', emoji: '💚', label: 'Volunteering'},
+  {id: 'cooking', emoji: '🍲', label: 'Cooking'},
+  {id: 'workshops', emoji: '🛠️', label: 'Workshops'},
 ];
 
 const Profile: React.FC = () => {
@@ -68,7 +84,7 @@ const Profile: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [favoriteSports, setFavoriteSports] = useState<string[]>([]);
-  const [showSportsPicker, setShowSportsPicker] = useState(false);
+  const [showInterestsPicker, setShowInterestsPicker] = useState(false);
 
   const route = useRoute<ProfileScreenRouteProp>();
   const navigation = useNavigation<any>();
@@ -658,7 +674,7 @@ const Profile: React.FC = () => {
   };
 
   const getFavoriteSportsDisplay = () => {
-    return SPORTS_OPTIONS.filter(s => favoriteSports.includes(s.id));
+    return INTERESTS_OPTIONS.filter(s => favoriteSports.includes(s.id));
   };
 
   const getInitials = (name: string | undefined) => {
@@ -940,7 +956,7 @@ const Profile: React.FC = () => {
               <FontAwesomeIcon icon={faUserPlus} size={16} color="#9C27B0" />
             </View>
             <View style={themedStyles.menuContent}>
-              <Text style={themedStyles.menuTitle}>Find Players</Text>
+              <Text style={themedStyles.menuTitle}>Find People</Text>
               <Text style={themedStyles.menuSubtitle}>
                 Search for new friends
               </Text>
@@ -954,10 +970,10 @@ const Profile: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Favorite Sports Section */}
+        {/* Interests Section */}
         <View style={themedStyles.sectionCard}>
           <Text style={themedStyles.sectionHeader}>
-            {t('profile.favoriteSports') || 'Favorite Sports'}
+            {t('profile.interests') || 'Interests'}
           </Text>
           <View style={themedStyles.sportsContainer}>
             {getFavoriteSportsDisplay().map(sport => (
@@ -968,7 +984,7 @@ const Profile: React.FC = () => {
             ))}
             <TouchableOpacity
               style={themedStyles.addSportButton}
-              onPress={() => setShowSportsPicker(true)}>
+              onPress={() => setShowInterestsPicker(true)}>
               <FontAwesomeIcon
                 icon={faPlus}
                 size={12}
@@ -1057,17 +1073,16 @@ const Profile: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Sports Picker Modal */}
-      {showSportsPicker && (
+      {/* Interests Picker Modal */}
+      {showInterestsPicker && (
         <View style={themedStyles.sportsPickerOverlay}>
           <View style={themedStyles.sportsPickerCard}>
             <Text style={themedStyles.sportsPickerTitle}>
-              {t('profile.selectFavoriteSports') ||
-                'Select Your Favorite Sports'}
+              {t('profile.selectInterests') || 'Select Your Interests'}
             </Text>
             <ScrollView>
               <View style={themedStyles.sportsPickerGrid}>
-                {SPORTS_OPTIONS.map(sport => (
+                {INTERESTS_OPTIONS.map(sport => (
                   <TouchableOpacity
                     key={sport.id}
                     style={[
@@ -1088,7 +1103,7 @@ const Profile: React.FC = () => {
             </ScrollView>
             <TouchableOpacity
               style={themedStyles.sportsPickerDone}
-              onPress={() => setShowSportsPicker(false)}>
+              onPress={() => setShowInterestsPicker(false)}>
               <Text style={themedStyles.sportsPickerDoneText}>
                 {t('common.done') || 'Done'}
               </Text>

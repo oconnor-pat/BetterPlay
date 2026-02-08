@@ -50,9 +50,9 @@ interface User {
   eventsJoined?: number;
 }
 
-// Available sports for filtering
-const SPORTS_FILTERS = [
-  {id: 'all', label: 'All Sports', emoji: '🏃'},
+// Available interests for filtering
+const INTEREST_FILTERS = [
+  {id: 'all', label: 'All Interests', emoji: '🎯'},
   {id: 'basketball', label: 'Basketball', emoji: '🏀'},
   {id: 'hockey', label: 'Hockey', emoji: '🏒'},
   {id: 'soccer', label: 'Soccer', emoji: '⚽'},
@@ -61,6 +61,12 @@ const SPORTS_FILTERS = [
   {id: 'tennis', label: 'Tennis', emoji: '🎾'},
   {id: 'golf', label: 'Golf', emoji: '⛳'},
   {id: 'volleyball', label: 'Volleyball', emoji: '🏐'},
+  {id: 'trivia', label: 'Trivia', emoji: '🧠'},
+  {id: 'game-nights', label: 'Game Nights', emoji: '🎲'},
+  {id: 'hiking', label: 'Hiking', emoji: '🥾'},
+  {id: 'yoga', label: 'Yoga', emoji: '🧘'},
+  {id: 'live-music', label: 'Live Music', emoji: '🎵'},
+  {id: 'book-club', label: 'Book Club', emoji: '📚'},
 ];
 
 const UserSearch: React.FC = () => {
@@ -73,7 +79,7 @@ const UserSearch: React.FC = () => {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedSport, setSelectedSport] = useState('all');
+  const [selectedInterest, setSelectedInterest] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
 
   // Friend status tracking
@@ -204,7 +210,7 @@ const UserSearch: React.FC = () => {
     fetchFriendData();
   }, [fetchUsers, fetchFriendData]);
 
-  // Filter users based on search query and selected sport
+  // Filter users based on search query and selected interest
   useEffect(() => {
     let results = users;
 
@@ -218,17 +224,17 @@ const UserSearch: React.FC = () => {
       );
     }
 
-    // Filter by selected sport
-    if (selectedSport !== 'all') {
+    // Filter by selected interest
+    if (selectedInterest !== 'all') {
       results = results.filter(user =>
         user.favoriteSports?.some(
-          sport => sport.toLowerCase() === selectedSport.toLowerCase(),
+          sport => sport.toLowerCase() === selectedInterest.toLowerCase(),
         ),
       );
     }
 
     setFilteredUsers(results);
-  }, [searchQuery, selectedSport, users]);
+  }, [searchQuery, selectedInterest, users]);
 
   // Handle friend action (send request, cancel, accept, etc.)
   const handleFriendAction = useCallback(
@@ -487,7 +493,7 @@ const UserSearch: React.FC = () => {
     <View style={styles.emptyContainer}>
       <FontAwesomeIcon icon={faSearch} size={48} color={colors.border} />
       <Text style={styles.emptyText}>
-        {searchQuery || selectedSport !== 'all'
+        {searchQuery || selectedInterest !== 'all'
           ? 'No players found matching your criteria'
           : 'No players available'}
       </Text>
@@ -528,7 +534,7 @@ const UserSearch: React.FC = () => {
           <FontAwesomeIcon
             icon={faFilter}
             size={18}
-            color={selectedSport !== 'all' ? colors.primary : colors.text}
+            color={selectedInterest !== 'all' ? colors.primary : colors.text}
           />
         </TouchableOpacity>
       </View>
@@ -557,29 +563,29 @@ const UserSearch: React.FC = () => {
         )}
       </View>
 
-      {/* Sport Filters */}
+      {/* Interest Filters */}
       {showFilters && (
         <View style={styles.filtersContainer}>
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
-            data={SPORTS_FILTERS}
+            data={INTEREST_FILTERS}
             keyExtractor={item => item.id}
             contentContainerStyle={styles.filtersScroll}
             renderItem={({item}) => (
               <TouchableOpacity
                 style={[
                   styles.filterChip,
-                  selectedSport === item.id
+                  selectedInterest === item.id
                     ? styles.filterChipActive
                     : styles.filterChipInactive,
                 ]}
-                onPress={() => setSelectedSport(item.id)}>
+                onPress={() => setSelectedInterest(item.id)}>
                 <Text style={styles.filterEmoji}>{item.emoji}</Text>
                 <Text
                   style={[
                     styles.filterLabel,
-                    selectedSport === item.id
+                    selectedInterest === item.id
                       ? styles.filterLabelActive
                       : styles.filterLabelInactive,
                   ]}>

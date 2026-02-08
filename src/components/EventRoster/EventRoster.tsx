@@ -62,8 +62,8 @@ type EventRosterRouteProp = RouteProp<
   {
     EventRoster: {
       eventId: string;
-      eventName: string;
-      eventType: string;
+      eventName?: string;
+      eventType?: string;
       date?: string;
       time?: string;
       location?: string;
@@ -94,7 +94,26 @@ const positionOptions: Record<string, string[]> = {
   Softball: ['Pitcher', 'Catcher', 'Infield', 'Outfield'],
   Lacrosse: ['Attack', 'Midfield', 'Defense', 'Goalie'],
   Volleyball: ['Setter', 'Outside Hitter', 'Middle Blocker', 'Libero'],
-  Default: ['Player'],
+  // General activity roles
+  'Trivia Night': ['Player', 'Team Captain', 'Host'],
+  'Game Night': ['Player', 'Host'],
+  Karaoke: ['Singer', 'Audience'],
+  'Open Mic': ['Performer', 'Audience'],
+  'Watch Party': ['Attendee', 'Host'],
+  'Live Music': ['Attendee'],
+  Hiking: ['Hiker', 'Guide'],
+  Cycling: ['Cyclist', 'Guide'],
+  Running: ['Runner', 'Pacer'],
+  Yoga: ['Participant', 'Instructor'],
+  Fishing: ['Angler'],
+  Camping: ['Camper', 'Organizer'],
+  'Book Club': ['Reader', 'Discussion Leader'],
+  Workshop: ['Participant', 'Instructor'],
+  Meetup: ['Attendee', 'Organizer'],
+  Potluck: ['Guest', 'Host'],
+  Volunteer: ['Volunteer', 'Coordinator'],
+  Other: ['Participant'],
+  Default: ['Participant'],
 };
 
 const sportEmojis: Record<string, string> = {
@@ -110,6 +129,27 @@ const sportEmojis: Record<string, string> = {
   Softball: '🥎',
   Lacrosse: '🥍',
   Volleyball: '🏐',
+  // Social & Entertainment
+  'Trivia Night': '🧠',
+  'Game Night': '🎲',
+  Karaoke: '🎤',
+  'Open Mic': '🎙️',
+  'Watch Party': '📺',
+  'Live Music': '🎵',
+  // Outdoor & Fitness
+  Hiking: '🥾',
+  Cycling: '🚴',
+  Running: '🏃',
+  Yoga: '🧘',
+  Fishing: '🎣',
+  Camping: '🏕️',
+  // Community
+  'Book Club': '📚',
+  Workshop: '🛠️',
+  Meetup: '🤝',
+  Potluck: '🍲',
+  Volunteer: '💚',
+  Other: '🎯',
 };
 
 const jerseyColors: Record<string, string> = {
@@ -131,6 +171,26 @@ const lightJerseyColors = ['White', 'Yellow'];
 const isLightColor = (colorName: string) =>
   lightJerseyColors.includes(colorName);
 
+// Team sports that use jersey colors and paid status
+const teamSports = [
+  'Basketball',
+  'Hockey',
+  'Soccer',
+  'Football',
+  'Rugby',
+  'Lacrosse',
+  'Volleyball',
+  'Baseball',
+  'Softball',
+  'Tennis',
+  'Golf',
+  'Figure Skating',
+];
+
+const isTeamSport = (type?: string) =>
+  !!type &&
+  teamSports.some(sport => sport.toLowerCase() === type.toLowerCase());
+
 const getInitials = (name: string) => {
   if (!name) {
     return '?';
@@ -147,12 +207,12 @@ const EventRoster: React.FC = () => {
   const navigation = useNavigation<any>();
   const {
     eventId,
-    eventName,
-    eventType,
-    date,
-    time,
-    location,
-    totalSpots = 10,
+    eventName: paramEventName,
+    eventType: paramEventType,
+    date: paramDate,
+    time: paramTime,
+    location: paramLocation,
+    totalSpots: paramTotalSpots = 10,
     roster: initialRoster,
     jerseyColors: initialJerseyColors,
   } = route.params;
@@ -160,6 +220,14 @@ const EventRoster: React.FC = () => {
   const {updateRosterSpots} = useEventContext();
   const {userData} = useContext(UserContext) as UserContextType;
   const {t} = useTranslation();
+
+  // State for event details (populated from params or fetched from API)
+  const [eventName, setEventName] = useState(paramEventName || '');
+  const [eventType, setEventType] = useState(paramEventType || '');
+  const [date, setDate] = useState(paramDate || '');
+  const [time, setTime] = useState(paramTime || '');
+  const [location, setLocation] = useState(paramLocation || '');
+  const [totalSpots, setTotalSpots] = useState(paramTotalSpots);
 
   // State for event jersey colors (can be updated from backend)
   const [eventJerseyColors, setEventJerseyColors] = useState<
@@ -933,6 +1001,26 @@ const EventRoster: React.FC = () => {
         headers: token ? {Authorization: `Bearer ${token}`} : {},
       });
       setRoster(response.data.roster || []);
+      // Populate event details from API if not provided via route params
+      // API returns 'name' not 'eventName'
+      if (response.data.name) {
+        setEventName(prev => prev || response.data.name);
+      }
+      if (response.data.eventType) {
+        setEventType(prev => prev || response.data.eventType);
+      }
+      if (response.data.date) {
+        setDate(prev => prev || response.data.date);
+      }
+      if (response.data.time) {
+        setTime(prev => prev || response.data.time);
+      }
+      if (response.data.location) {
+        setLocation(prev => prev || response.data.location);
+      }
+      if (response.data.totalSpots) {
+        setTotalSpots(prev => (prev === 10 ? response.data.totalSpots : prev));
+      }
       // Update jersey colors from backend if available
       if (
         response.data.jerseyColors &&
@@ -993,7 +1081,8 @@ const EventRoster: React.FC = () => {
 
   // Add player
   const handleSave = async () => {
-    if (!username || !paidStatus || !jerseyColor || !position) {
+    const isSport = isTeamSport(eventType);
+    if (!username || !position || (isSport && (!paidStatus || !jerseyColor))) {
       setErrorMessage('Please fill out all fields.');
       return;
     }
@@ -1005,8 +1094,8 @@ const EventRoster: React.FC = () => {
     const newPlayer: Player = {
       userId: userData?._id,
       username,
-      paidStatus,
-      jerseyColor,
+      paidStatus: isSport ? paidStatus : 'N/A',
+      jerseyColor: isSport ? jerseyColor : 'N/A',
       position,
       profilePicUrl: userData?.profilePicUrl,
     };
@@ -1159,7 +1248,8 @@ const EventRoster: React.FC = () => {
 
   // Save edited player info
   const handleSaveEdit = useCallback(async () => {
-    if (!editPaidStatus || !editJerseyColor || !editPosition) {
+    const isSport = isTeamSport(eventType);
+    if (!editPosition || (isSport && (!editPaidStatus || !editJerseyColor))) {
       Alert.alert(t('roster.missingFields'), t('roster.missingFieldsMessage'));
       return;
     }
@@ -1252,41 +1342,45 @@ const EventRoster: React.FC = () => {
               <FontAwesomeIcon icon={faFutbol} size={10} color={colors.text} />
               <Text style={themedStyles.playerBadgeText}>{item.position}</Text>
             </View>
-            {/* Paid Status Badge */}
-            <View
-              style={[
-                themedStyles.playerBadge,
-                item.paidStatus === 'Paid'
-                  ? themedStyles.paidBadge
-                  : themedStyles.unpaidBadge,
-              ]}>
-              <FontAwesomeIcon
-                icon={item.paidStatus === 'Paid' ? faCheck : faTimes}
-                size={10}
-                color={item.paidStatus === 'Paid' ? '#4CAF50' : colors.error}
-              />
-              <Text
-                style={[
-                  themedStyles.playerBadgeText,
-                  item.paidStatus === 'Paid'
-                    ? themedStyles.paidBadgeText
-                    : themedStyles.unpaidBadgeText,
-                ]}>
-                {item.paidStatus}
-              </Text>
-            </View>
-            {/* Jersey Color */}
-            <View style={themedStyles.playerBadge}>
+            {/* Paid Status Badge - Sports only */}
+            {isTeamSport(eventType) && item.paidStatus !== 'N/A' && (
               <View
                 style={[
-                  themedStyles.jerseyIndicator,
-                  {backgroundColor: jerseyColorHex},
-                ]}
-              />
-              <Text style={themedStyles.playerBadgeText}>
-                {item.jerseyColor}
-              </Text>
-            </View>
+                  themedStyles.playerBadge,
+                  item.paidStatus === 'Paid'
+                    ? themedStyles.paidBadge
+                    : themedStyles.unpaidBadge,
+                ]}>
+                <FontAwesomeIcon
+                  icon={item.paidStatus === 'Paid' ? faCheck : faTimes}
+                  size={10}
+                  color={item.paidStatus === 'Paid' ? '#4CAF50' : colors.error}
+                />
+                <Text
+                  style={[
+                    themedStyles.playerBadgeText,
+                    item.paidStatus === 'Paid'
+                      ? themedStyles.paidBadgeText
+                      : themedStyles.unpaidBadgeText,
+                  ]}>
+                  {item.paidStatus}
+                </Text>
+              </View>
+            )}
+            {/* Jersey Color - Sports only */}
+            {isTeamSport(eventType) && item.jerseyColor !== 'N/A' && (
+              <View style={themedStyles.playerBadge}>
+                <View
+                  style={[
+                    themedStyles.jerseyIndicator,
+                    {backgroundColor: jerseyColorHex},
+                  ]}
+                />
+                <Text style={themedStyles.playerBadgeText}>
+                  {item.jerseyColor}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         {isSelf && (
@@ -1396,58 +1490,65 @@ const EventRoster: React.FC = () => {
                     {t('roster.players')}
                   </Text>
                 </View>
-                <View style={themedStyles.statItem}>
-                  <Text style={themedStyles.statValueGreen}>
-                    {rosterStats.paidCount}
-                  </Text>
-                  <Text style={themedStyles.statLabel}>{t('roster.paid')}</Text>
-                </View>
-                <View style={themedStyles.statItem}>
-                  <Text style={themedStyles.statValueError}>
-                    {rosterStats.unpaidCount}
-                  </Text>
-                  <Text style={themedStyles.statLabel}>
-                    {t('roster.unpaid')}
-                  </Text>
-                </View>
+                {isTeamSport(eventType) && (
+                  <View style={themedStyles.statItem}>
+                    <Text style={themedStyles.statValueGreen}>
+                      {rosterStats.paidCount}
+                    </Text>
+                    <Text style={themedStyles.statLabel}>
+                      {t('roster.paid')}
+                    </Text>
+                  </View>
+                )}
+                {isTeamSport(eventType) && (
+                  <View style={themedStyles.statItem}>
+                    <Text style={themedStyles.statValueError}>
+                      {rosterStats.unpaidCount}
+                    </Text>
+                    <Text style={themedStyles.statLabel}>
+                      {t('roster.unpaid')}
+                    </Text>
+                  </View>
+                )}
               </View>
 
-              {/* Team Breakdown */}
-              {Object.keys(rosterStats.teamCounts).length > 1 && (
-                <View style={themedStyles.teamBreakdown}>
-                  <Text style={themedStyles.statsSectionTitleSmall}>
-                    {t('roster.teamsByJersey')}
-                  </Text>
-                  <View style={themedStyles.teamRow}>
-                    {Object.entries(rosterStats.teamCounts).map(
-                      ([color, count]) => (
-                        <View
-                          key={color}
-                          style={[
-                            themedStyles.teamBadge,
-                            {
-                              borderColor:
-                                jerseyColors[color] || jerseyColors.Other,
-                            },
-                          ]}>
+              {/* Team Breakdown - Sports only */}
+              {isTeamSport(eventType) &&
+                Object.keys(rosterStats.teamCounts).length > 1 && (
+                  <View style={themedStyles.teamBreakdown}>
+                    <Text style={themedStyles.statsSectionTitleSmall}>
+                      {t('roster.teamsByJersey')}
+                    </Text>
+                    <View style={themedStyles.teamRow}>
+                      {Object.entries(rosterStats.teamCounts).map(
+                        ([color, count]) => (
                           <View
+                            key={color}
                             style={[
-                              themedStyles.jerseyIndicator,
+                              themedStyles.teamBadge,
                               {
-                                backgroundColor:
+                                borderColor:
                                   jerseyColors[color] || jerseyColors.Other,
                               },
-                            ]}
-                          />
-                          <Text style={themedStyles.teamBadgeText}>
-                            {color}: {count}
-                          </Text>
-                        </View>
-                      ),
-                    )}
+                            ]}>
+                            <View
+                              style={[
+                                themedStyles.jerseyIndicator,
+                                {
+                                  backgroundColor:
+                                    jerseyColors[color] || jerseyColors.Other,
+                                },
+                              ]}
+                            />
+                            <Text style={themedStyles.teamBadgeText}>
+                              {color}: {count}
+                            </Text>
+                          </View>
+                        ),
+                      )}
+                    </View>
                   </View>
-                </View>
-              )}
+                )}
             </View>
           )}
 
@@ -1506,57 +1607,61 @@ const EventRoster: React.FC = () => {
                         onChangeText={setUsername}
                       />
 
-                      {/* Paid Status Dropdown */}
-                      <TouchableOpacity
-                        style={themedStyles.dropdown}
-                        onPress={() => setPaidStatusModalVisible(true)}>
-                        <Text
-                          style={
-                            paidStatus
-                              ? themedStyles.dropdownText
-                              : themedStyles.placeholderText
-                          }>
-                          {paidStatus || t('roster.selectPaidStatus')}
-                        </Text>
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          size={14}
-                          color={colors.placeholder}
-                        />
-                      </TouchableOpacity>
-
-                      {/* Jersey Color Dropdown */}
-                      <TouchableOpacity
-                        style={themedStyles.dropdown}
-                        onPress={() => setJerseyColorModalVisible(true)}>
-                        <View style={themedStyles.jerseyDropdownRow}>
-                          {jerseyColor && (
-                            <View
-                              style={[
-                                themedStyles.jerseyIndicatorLarge,
-                                {
-                                  backgroundColor:
-                                    jerseyColors[jerseyColor] ||
-                                    jerseyColors.Other,
-                                },
-                              ]}
-                            />
-                          )}
+                      {/* Paid Status Dropdown - Sports only */}
+                      {isTeamSport(eventType) && (
+                        <TouchableOpacity
+                          style={themedStyles.dropdown}
+                          onPress={() => setPaidStatusModalVisible(true)}>
                           <Text
                             style={
-                              jerseyColor
+                              paidStatus
                                 ? themedStyles.dropdownText
                                 : themedStyles.placeholderText
                             }>
-                            {jerseyColor || t('roster.selectJerseyColor')}
+                            {paidStatus || t('roster.selectPaidStatus')}
                           </Text>
-                        </View>
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          size={14}
-                          color={colors.placeholder}
-                        />
-                      </TouchableOpacity>
+                          <FontAwesomeIcon
+                            icon={faChevronDown}
+                            size={14}
+                            color={colors.placeholder}
+                          />
+                        </TouchableOpacity>
+                      )}
+
+                      {/* Jersey Color Dropdown - Sports only */}
+                      {isTeamSport(eventType) && (
+                        <TouchableOpacity
+                          style={themedStyles.dropdown}
+                          onPress={() => setJerseyColorModalVisible(true)}>
+                          <View style={themedStyles.jerseyDropdownRow}>
+                            {jerseyColor && (
+                              <View
+                                style={[
+                                  themedStyles.jerseyIndicatorLarge,
+                                  {
+                                    backgroundColor:
+                                      jerseyColors[jerseyColor] ||
+                                      jerseyColors.Other,
+                                  },
+                                ]}
+                              />
+                            )}
+                            <Text
+                              style={
+                                jerseyColor
+                                  ? themedStyles.dropdownText
+                                  : themedStyles.placeholderText
+                              }>
+                              {jerseyColor || t('roster.selectJerseyColor')}
+                            </Text>
+                          </View>
+                          <FontAwesomeIcon
+                            icon={faChevronDown}
+                            size={14}
+                            color={colors.placeholder}
+                          />
+                        </TouchableOpacity>
+                      )}
 
                       {/* Position Dropdown */}
                       <TouchableOpacity
@@ -1952,139 +2057,152 @@ const EventRoster: React.FC = () => {
                 <ScrollView
                   style={{flexGrow: 0}}
                   showsVerticalScrollIndicator={false}>
-                  {/* Edit Paid Status */}
-                  <TouchableOpacity
-                    style={themedStyles.dropdown}
-                    onPress={() =>
-                      setExpandedSection(
-                        expandedSection === 'paid' ? null : 'paid',
-                      )
-                    }>
-                    <Text
-                      style={
-                        editPaidStatus
-                          ? themedStyles.dropdownText
-                          : themedStyles.placeholderText
-                      }>
-                      {editPaidStatus || t('roster.selectPaidStatus')}
-                    </Text>
-                    <FontAwesomeIcon
-                      icon={
-                        expandedSection === 'paid' ? faChevronUp : faChevronDown
-                      }
-                      size={14}
-                      color={colors.placeholder}
-                    />
-                  </TouchableOpacity>
-                  {expandedSection === 'paid' && (
-                    <View style={themedStyles.expandedOptions}>
-                      {['Paid', 'Unpaid'].map(status => (
-                        <TouchableOpacity
-                          key={status}
-                          style={[
-                            themedStyles.inlineOption,
-                            editPaidStatus === status &&
-                              themedStyles.inlineOptionSelected,
-                          ]}
-                          onPress={() => {
-                            setEditPaidStatus(status);
-                            setExpandedSection(null);
-                          }}>
-                          <FontAwesomeIcon
-                            icon={status === 'Paid' ? faCheck : faTimes}
-                            size={16}
-                            color={
-                              status === 'Paid'
-                                ? '#4CAF50'
-                                : editPaidStatus === status
-                                ? colors.primary
-                                : colors.text
-                            }
-                          />
-                          <Text
-                            style={[
-                              themedStyles.inlineOptionText,
-                              editPaidStatus === status &&
-                                themedStyles.inlineOptionTextSelected,
-                            ]}>
-                            {status}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
+                  {/* Edit Paid Status - Sports only */}
+                  {isTeamSport(eventType) && (
+                    <>
+                      <TouchableOpacity
+                        style={themedStyles.dropdown}
+                        onPress={() =>
+                          setExpandedSection(
+                            expandedSection === 'paid' ? null : 'paid',
+                          )
+                        }>
+                        <Text
+                          style={
+                            editPaidStatus
+                              ? themedStyles.dropdownText
+                              : themedStyles.placeholderText
+                          }>
+                          {editPaidStatus || t('roster.selectPaidStatus')}
+                        </Text>
+                        <FontAwesomeIcon
+                          icon={
+                            expandedSection === 'paid'
+                              ? faChevronUp
+                              : faChevronDown
+                          }
+                          size={14}
+                          color={colors.placeholder}
+                        />
+                      </TouchableOpacity>
+                      {expandedSection === 'paid' && (
+                        <View style={themedStyles.expandedOptions}>
+                          {['Paid', 'Unpaid'].map(status => (
+                            <TouchableOpacity
+                              key={status}
+                              style={[
+                                themedStyles.inlineOption,
+                                editPaidStatus === status &&
+                                  themedStyles.inlineOptionSelected,
+                              ]}
+                              onPress={() => {
+                                setEditPaidStatus(status);
+                                setExpandedSection(null);
+                              }}>
+                              <FontAwesomeIcon
+                                icon={status === 'Paid' ? faCheck : faTimes}
+                                size={16}
+                                color={
+                                  status === 'Paid'
+                                    ? '#4CAF50'
+                                    : editPaidStatus === status
+                                    ? colors.primary
+                                    : colors.text
+                                }
+                              />
+                              <Text
+                                style={[
+                                  themedStyles.inlineOptionText,
+                                  editPaidStatus === status &&
+                                    themedStyles.inlineOptionTextSelected,
+                                ]}>
+                                {status}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </>
                   )}
 
-                  {/* Edit Jersey Color */}
-                  <TouchableOpacity
-                    style={themedStyles.dropdown}
-                    onPress={() =>
-                      setExpandedSection(
-                        expandedSection === 'jersey' ? null : 'jersey',
-                      )
-                    }>
-                    <View style={themedStyles.jerseyDropdownRow}>
-                      {editJerseyColor && (
-                        <View
-                          style={[
-                            themedStyles.jerseyIndicatorLarge,
-                            {
-                              backgroundColor:
-                                jerseyColors[editJerseyColor] ||
-                                jerseyColors.Other,
-                            },
-                          ]}
-                        />
-                      )}
-                      <Text
-                        style={
-                          editJerseyColor
-                            ? themedStyles.dropdownText
-                            : themedStyles.placeholderText
+                  {/* Edit Jersey Color - Sports only */}
+                  {isTeamSport(eventType) && (
+                    <>
+                      <TouchableOpacity
+                        style={themedStyles.dropdown}
+                        onPress={() =>
+                          setExpandedSection(
+                            expandedSection === 'jersey' ? null : 'jersey',
+                          )
                         }>
-                        {editJerseyColor || t('roster.selectJerseyColor')}
-                      </Text>
-                    </View>
-                    <FontAwesomeIcon
-                      icon={
-                        expandedSection === 'jersey'
-                          ? faChevronUp
-                          : faChevronDown
-                      }
-                      size={14}
-                      color={colors.placeholder}
-                    />
-                  </TouchableOpacity>
-                  {expandedSection === 'jersey' && (
-                    <View style={themedStyles.expandedOptions}>
-                      {Object.keys(availableJerseyColors).map(color => (
-                        <TouchableOpacity
-                          key={color}
-                          style={[
-                            themedStyles.inlineOption,
-                            editJerseyColor === color &&
-                              themedStyles.inlineOptionSelected,
-                          ]}
-                          onPress={() => {
-                            setEditJerseyColor(color);
-                            setExpandedSection(null);
-                          }}>
-                          <View
-                            style={[
-                              themedStyles.colorSwatch,
-                              {backgroundColor: availableJerseyColors[color]},
-                            ]}
-                          />
+                        <View style={themedStyles.jerseyDropdownRow}>
+                          {editJerseyColor && (
+                            <View
+                              style={[
+                                themedStyles.jerseyIndicatorLarge,
+                                {
+                                  backgroundColor:
+                                    jerseyColors[editJerseyColor] ||
+                                    jerseyColors.Other,
+                                },
+                              ]}
+                            />
+                          )}
                           <Text
-                            style={[
-                              themedStyles.inlineOptionText,
-                              editJerseyColor === color &&
-                                themedStyles.inlineOptionTextSelected,
-                            ]}>
-                            {color}
+                            style={
+                              editJerseyColor
+                                ? themedStyles.dropdownText
+                                : themedStyles.placeholderText
+                            }>
+                            {editJerseyColor || t('roster.selectJerseyColor')}
                           </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
+                        </View>
+                        <FontAwesomeIcon
+                          icon={
+                            expandedSection === 'jersey'
+                              ? faChevronUp
+                              : faChevronDown
+                          }
+                          size={14}
+                          color={colors.placeholder}
+                        />
+                      </TouchableOpacity>
+                      {expandedSection === 'jersey' && (
+                        <View style={themedStyles.expandedOptions}>
+                          {Object.keys(availableJerseyColors).map(color => (
+                            <TouchableOpacity
+                              key={color}
+                              style={[
+                                themedStyles.inlineOption,
+                                editJerseyColor === color &&
+                                  themedStyles.inlineOptionSelected,
+                              ]}
+                              onPress={() => {
+                                setEditJerseyColor(color);
+                                setExpandedSection(null);
+                              }}>
+                              <View
+                                style={[
+                                  themedStyles.colorSwatch,
+                                  {
+                                    backgroundColor:
+                                      availableJerseyColors[color],
+                                  },
+                                ]}
+                              />
+                              <Text
+                                style={[
+                                  themedStyles.inlineOptionText,
+                                  editJerseyColor === color &&
+                                    themedStyles.inlineOptionTextSelected,
+                                ]}>
+                                {color}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </>
                   )}
 
                   {/* Edit Position */}

@@ -135,8 +135,10 @@ interface Event {
   // Support for coordinates (if available from backend)
   latitude?: number;
   longitude?: number;
-  // Jersey colors for team-based events (exactly 2 colors)
+  // Jersey colors for team-based events (exactly 2 colors, sports only)
   jerseyColors?: string[];
+  // Description for the event
+  description?: string;
   // Privacy setting
   privacy?: EventPrivacy;
   // Invited users (for invite-only events)
@@ -169,18 +171,41 @@ const rosterSizeOptions: string[] = Array.from({length: 30}, (_, i) =>
 );
 
 const activityOptions = [
-  {label: 'Basketball', emoji: '🏀'},
-  {label: 'Hockey', emoji: '🏒'},
-  {label: 'Soccer', emoji: '⚽'},
-  {label: 'Figure Skating', emoji: '⛸️'},
-  {label: 'Tennis', emoji: '🎾'},
-  {label: 'Golf', emoji: '⛳'},
-  {label: 'Football', emoji: '🏈'},
-  {label: 'Rugby', emoji: '🏉'},
-  {label: 'Baseball', emoji: '⚾'},
-  {label: 'Softball', emoji: '🥎'},
-  {label: 'Lacrosse', emoji: '🥍'},
-  {label: 'Volleyball', emoji: '🏐'},
+  // Sports
+  {label: 'Basketball', emoji: '🏀', category: 'sports'},
+  {label: 'Hockey', emoji: '🏒', category: 'sports'},
+  {label: 'Soccer', emoji: '⚽', category: 'sports'},
+  {label: 'Figure Skating', emoji: '⛸️', category: 'sports'},
+  {label: 'Tennis', emoji: '🎾', category: 'sports'},
+  {label: 'Golf', emoji: '⛳', category: 'sports'},
+  {label: 'Football', emoji: '🏈', category: 'sports'},
+  {label: 'Rugby', emoji: '🏉', category: 'sports'},
+  {label: 'Baseball', emoji: '⚾', category: 'sports'},
+  {label: 'Softball', emoji: '🥎', category: 'sports'},
+  {label: 'Lacrosse', emoji: '🥍', category: 'sports'},
+  {label: 'Volleyball', emoji: '🏐', category: 'sports'},
+  // Social & Entertainment
+  {label: 'Trivia Night', emoji: '🧠', category: 'social'},
+  {label: 'Game Night', emoji: '🎲', category: 'social'},
+  {label: 'Karaoke', emoji: '🎤', category: 'social'},
+  {label: 'Open Mic', emoji: '🎙️', category: 'social'},
+  {label: 'Watch Party', emoji: '📺', category: 'social'},
+  {label: 'Live Music', emoji: '🎵', category: 'social'},
+  // Outdoor & Fitness
+  {label: 'Hiking', emoji: '🥾', category: 'outdoor'},
+  {label: 'Cycling', emoji: '🚴', category: 'outdoor'},
+  {label: 'Running', emoji: '🏃', category: 'outdoor'},
+  {label: 'Yoga', emoji: '🧘', category: 'outdoor'},
+  {label: 'Fishing', emoji: '🎣', category: 'outdoor'},
+  {label: 'Camping', emoji: '🏕️', category: 'outdoor'},
+  // Community & Learning
+  {label: 'Book Club', emoji: '📚', category: 'community'},
+  {label: 'Workshop', emoji: '🛠️', category: 'community'},
+  {label: 'Meetup', emoji: '🤝', category: 'community'},
+  {label: 'Potluck', emoji: '🍲', category: 'community'},
+  {label: 'Volunteer', emoji: '💚', category: 'community'},
+  // Other
+  {label: 'Other', emoji: '🎯', category: 'other'},
 ];
 
 // Team-based sports that benefit from jersey color selection

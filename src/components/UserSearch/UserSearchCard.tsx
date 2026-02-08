@@ -39,8 +39,8 @@ interface UserSearchCardProps {
   onFriendAction?: () => void;
 }
 
-// Sport emoji mapping
-const sportEmojis: Record<string, string> = {
+// Interest emoji mapping
+const interestEmojis: Record<string, string> = {
   basketball: '🏀',
   hockey: '🏒',
   soccer: '⚽',
@@ -49,6 +49,18 @@ const sportEmojis: Record<string, string> = {
   tennis: '🎾',
   golf: '⛳',
   volleyball: '🏐',
+  trivia: '🧠',
+  'game-nights': '🎲',
+  karaoke: '🎤',
+  'live-music': '🎵',
+  hiking: '🥾',
+  cycling: '🚴',
+  running: '🏃',
+  yoga: '🧘',
+  'book-club': '📚',
+  volunteering: '💚',
+  cooking: '🍲',
+  workshops: '🛠️',
 };
 
 const UserSearchCard: React.FC<UserSearchCardProps> = ({
@@ -201,7 +213,7 @@ const UserSearchCard: React.FC<UserSearchCardProps> = ({
           <View style={styles.sportsRow}>
             {user.favoriteSports.slice(0, 4).map((sport, index) => (
               <Text key={index} style={styles.sportEmoji}>
-                {sportEmojis[sport.toLowerCase()] || '🏃'}
+                {interestEmojis[sport.toLowerCase()] || '🎯'}
               </Text>
             ))}
           </View>
