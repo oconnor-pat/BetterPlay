@@ -2,9 +2,16 @@
   "postman.settings.dotenv-detection-notification-visibility": false,
   "codium.codeCompletion.enable": true,
   "cSpell.ignorePaths": [
-    "*.pbxproj",
-    "ios/**/*.pbxproj",
+    "**/*.pbxproj",
     "node_modules",
-    "ios/Pods"
+    "ios/Pods/**",
+    "ios/build/**",
+    "android/build/**",
+    "android/app/build/**",
+    "vendor/**",
+    "**/*.p8",
+    "**/*.plist",
+    "**/*.xcworkspacedata",
+    "**/*.xcscheme"
   ]
 }
