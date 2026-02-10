@@ -1008,9 +1008,9 @@ function LandingPage() {
           {/* Hero Section */}
           <View style={themedStyles.heroSection}>
             <View style={themedStyles.logoContainer}>
-              <Text style={themedStyles.logoEmoji}>�</Text>
+              <Text style={themedStyles.logoEmoji}>📅</Text>
               <Text style={themedStyles.logoEmoji}>🤝</Text>
-              <Text style={themedStyles.logoEmoji}>🎉</Text>
+              <Text style={themedStyles.logoEmoji}>✨</Text>
             </View>
             <Text style={themedStyles.appName}>BetterPlay</Text>
             <Text style={themedStyles.tagline}>
@@ -1093,7 +1093,7 @@ function LandingPage() {
             <Text style={themedStyles.footerText}>
               {t('landing.footerText')}
             </Text>
-            <Text style={themedStyles.footerEmojis}>🎯 🏆 🤝</Text>
+            <Text style={themedStyles.footerEmojis}>📅 🌟 🤝</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
