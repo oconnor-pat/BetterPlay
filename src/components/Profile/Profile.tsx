@@ -15,6 +15,7 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
@@ -26,7 +27,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
-import {useEventContext} from '../../Context/EventContext';
+import {useEventContext, Event} from '../../Context/EventContext';
+
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarCheck,
@@ -41,7 +43,10 @@ import {
   faUsers,
   faUserPlus,
   faUserClock,
-  faBell,
+  faClock,
+  faLocationDot,
+  faFire,
+  faUserGroup,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 
@@ -85,6 +90,8 @@ const Profile: React.FC = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [favoriteSports, setFavoriteSports] = useState<string[]>([]);
   const [showInterestsPicker, setShowInterestsPicker] = useState(false);
+  const [friendsCount, setFriendsCount] = useState<number>(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState<number>(0);
 
   const route = useRoute<ProfileScreenRouteProp>();
   const navigation = useNavigation<any>();
@@ -93,6 +100,7 @@ const Profile: React.FC = () => {
   const {userData, setUserData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
   const {events} = useEventContext();
+
   const {t} = useTranslation();
 
   // Load favorite sports from backend on mount
@@ -125,6 +133,43 @@ const Profile: React.FC = () => {
     loadFavoriteSports();
   }, [_id]);
 
+  // Fetch friends count and pending requests count
+  useEffect(() => {
+    const loadSocialCounts = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        // Fetch friends
+        const friendsRes = await fetch(`${API_BASE_URL}/users/me/friends`, {
+          headers: {Authorization: `Bearer ${token}`},
+        });
+        if (friendsRes.ok) {
+          const friendsData = await friendsRes.json();
+          const list = Array.isArray(friendsData)
+            ? friendsData
+            : friendsData.friends || [];
+          setFriendsCount(list.length);
+        }
+        // Fetch pending incoming requests
+        const reqRes = await fetch(
+          `${API_BASE_URL}/users/me/friend-requests/incoming`,
+          {
+            headers: {Authorization: `Bearer ${token}`},
+          },
+        );
+        if (reqRes.ok) {
+          const reqData = await reqRes.json();
+          const reqList = Array.isArray(reqData)
+            ? reqData
+            : reqData.requests || [];
+          setPendingRequestsCount(reqList.length);
+        }
+      } catch (error) {
+        console.error('Error loading social counts:', error);
+      }
+    };
+    loadSocialCounts();
+  }, []);
+
   // Save favorite sports to backend when they change
   const saveFavoriteSports = useCallback(
     async (sports: string[]) => {
@@ -151,13 +196,78 @@ const Profile: React.FC = () => {
   // Calculate user stats
   const userStats = useMemo(() => {
     const eventsCreated = events.filter(e => e.createdBy === _id).length;
-    // Events joined: events where user is in roster (including their own events)
     const eventsJoined = events.filter(e => {
       const roster = (e as any).roster || (e as any).participants || [];
       return roster.some((r: any) => r.userId === _id || r._id === _id);
     }).length;
     return {eventsCreated, eventsJoined};
   }, [events, _id]);
+
+  // Find next upcoming event for this user
+  const nextUpcomingEvent = useMemo(() => {
+    const now = new Date();
+    const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const userEvents = events
+      .filter(e => {
+        const isCreator = e.createdBy === _id;
+        const roster = (e as any).roster || (e as any).participants || [];
+        const isInRoster = roster.some(
+          (r: any) => r.userId === _id || r._id === _id,
+        );
+        return isCreator || isInRoster;
+      })
+      .filter(e => {
+        try {
+          const eventDate = new Date(`${e.date}T${e.time || '00:00'}`);
+          return eventDate > now && eventDate <= oneWeekFromNow;
+        } catch {
+          return false;
+        }
+      })
+      .sort((a, b) => {
+        const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
+        const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
+        return dateA.getTime() - dateB.getTime();
+      });
+    return userEvents[0] || null;
+  }, [events, _id]);
+
+  // Format upcoming event date nicely
+  const formatEventDate = (event: Event) => {
+    try {
+      const date = new Date(`${event.date}T${event.time || '00:00'}`);
+      const now = new Date();
+      const diffMs = date.getTime() - now.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) {
+        return t('profile.today') || 'Today';
+      }
+      if (diffDays === 1) {
+        return t('profile.tomorrow') || 'Tomorrow';
+      }
+      if (diffDays < 7) {
+        return date.toLocaleDateString(undefined, {weekday: 'long'});
+      }
+      return date.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return event.date;
+    }
+  };
+
+  const formatEventTime = (event: Event) => {
+    try {
+      const date = new Date(`${event.date}T${event.time || '00:00'}`);
+      return date.toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    } catch {
+      return event.time;
+    }
+  };
 
   // Get member since year from user data
   const memberSinceYear = useMemo(() => {
@@ -204,27 +314,28 @@ const Profile: React.FC = () => {
           top: 8,
           zIndex: -1,
         },
-        // Profile Header Section
+        // ── Profile Header (compact) ──
         profileSection: {
           alignItems: 'center',
-          paddingVertical: 24,
+          paddingTop: 16,
+          paddingBottom: 20,
           paddingHorizontal: 16,
         },
         avatarContainer: {
           position: 'relative',
-          marginBottom: 16,
+          marginBottom: 12,
         },
         avatar: {
-          width: 110,
-          height: 110,
-          borderRadius: 55,
+          width: 100,
+          height: 100,
+          borderRadius: 50,
           borderWidth: 3,
           borderColor: colors.primary,
         },
         avatarPlaceholder: {
-          width: 110,
-          height: 110,
-          borderRadius: 55,
+          width: 100,
+          height: 100,
+          borderRadius: 50,
           backgroundColor: colors.primary + '20',
           alignItems: 'center',
           justifyContent: 'center',
@@ -232,80 +343,301 @@ const Profile: React.FC = () => {
           borderColor: colors.primary,
         },
         avatarInitials: {
-          fontSize: 38,
+          fontSize: 34,
           fontWeight: '700',
           color: colors.primary,
         },
+        avatarEditBadge: {
+          position: 'absolute',
+          bottom: 0,
+          right: -4,
+          backgroundColor: colors.primary,
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 2,
+          borderColor: colors.background,
+        },
         userName: {
-          fontSize: 26,
+          fontSize: 24,
           fontWeight: '700',
           color: colors.text,
-          marginBottom: 4,
+          marginBottom: 2,
         },
         emailText: {
-          fontSize: 15,
+          fontSize: 14,
           color: colors.placeholder,
-          marginBottom: 16,
+          marginBottom: 10,
         },
         photoButtonsRow: {
           flexDirection: 'row',
-          gap: 12,
+          gap: 10,
         },
         photoButton: {
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: colors.card,
-          paddingVertical: 10,
-          paddingHorizontal: 18,
-          borderRadius: 20,
+          paddingVertical: 8,
+          paddingHorizontal: 14,
+          borderRadius: 16,
           borderWidth: 1,
           borderColor: colors.border,
         },
         photoButtonText: {
           color: colors.primary,
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: '600',
-          marginLeft: 8,
+          marginLeft: 6,
         },
-        // Stats Row - Compact inline
-        statsRow: {
-          flexDirection: 'row',
-          justifyContent: 'center',
-          alignItems: 'center',
-          paddingVertical: 16,
-          paddingHorizontal: 16,
-          marginHorizontal: 16,
+        // ── Widget Card (base) ──
+        widgetCard: {
           backgroundColor: colors.card,
-          borderRadius: 12,
-          marginBottom: 16,
+          marginHorizontal: 16,
+          marginBottom: 14,
+          borderRadius: 16,
+          overflow: 'hidden',
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: {width: 0, height: 2},
+              shadowOpacity: 0.08,
+              shadowRadius: 8,
+            },
+            android: {
+              elevation: 3,
+            },
+          }),
         },
-        statItem: {
+        widgetCardInner: {
+          padding: 16,
+        },
+        widgetHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 14,
+        },
+        widgetHeaderLeft: {
           flexDirection: 'row',
           alignItems: 'center',
         },
-        statValue: {
-          fontSize: 18,
+        widgetIcon: {
+          width: 32,
+          height: 32,
+          borderRadius: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 10,
+        },
+        widgetTitle: {
+          fontSize: 15,
           fontWeight: '700',
           color: colors.text,
-          marginRight: 4,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
         },
-        statLabel: {
+        widgetSeeAll: {
+          fontSize: 13,
+          color: colors.primary,
+          fontWeight: '600',
+        },
+        // ── Quick Stats Widget (2x2 grid) ──
+        statsGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 10,
+        },
+        statCell: {
+          flex: 1,
+          minWidth: '45%',
+          backgroundColor: colors.background,
+          paddingVertical: 14,
+          paddingHorizontal: 14,
+          borderRadius: 12,
+          alignItems: 'center',
+        },
+        statCellIcon: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 8,
+        },
+        statCellValue: {
+          fontSize: 22,
+          fontWeight: '800',
+          color: colors.text,
+        },
+        statCellLabel: {
+          fontSize: 12,
+          color: colors.placeholder,
+          fontWeight: '500',
+          marginTop: 2,
+        },
+        // ── Upcoming Event Widget ──
+        upcomingEventCard: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.background,
+          borderRadius: 12,
+          padding: 14,
+        },
+        upcomingDateBadge: {
+          backgroundColor: colors.primary,
+          borderRadius: 12,
+          paddingVertical: 10,
+          paddingHorizontal: 14,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 14,
+          minWidth: 56,
+        },
+        upcomingDateDay: {
           fontSize: 14,
+          fontWeight: '700',
+          color: '#fff',
+        },
+        upcomingDateTime: {
+          fontSize: 11,
+          color: '#fff',
+          opacity: 0.85,
+          marginTop: 2,
+        },
+        upcomingEventInfo: {
+          flex: 1,
+        },
+        upcomingEventName: {
+          fontSize: 16,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 4,
+        },
+        upcomingEventMeta: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+        },
+        upcomingEventMetaText: {
+          fontSize: 13,
           color: colors.placeholder,
         },
-        statDivider: {
-          width: 1,
-          height: 20,
-          backgroundColor: colors.border,
-          marginHorizontal: 24,
+        upcomingEmptyText: {
+          fontSize: 14,
+          color: colors.placeholder,
+          textAlign: 'center',
+          paddingVertical: 12,
         },
-        // Section Card
+        upcomingEmptyCta: {
+          fontSize: 14,
+          color: colors.primary,
+          fontWeight: '600',
+          textAlign: 'center',
+          marginTop: 6,
+        },
+        // ── Social Hub Widget ──
+        socialQuickActions: {
+          flexDirection: 'row',
+          gap: 10,
+          marginTop: 12,
+        },
+        socialActionBtn: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.background,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          borderRadius: 10,
+          gap: 6,
+        },
+        socialActionText: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        socialActionBadge: {
+          backgroundColor: colors.error,
+          minWidth: 18,
+          height: 18,
+          borderRadius: 9,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 4,
+          marginLeft: 4,
+        },
+        socialActionBadgeText: {
+          fontSize: 10,
+          fontWeight: '700',
+          color: '#fff',
+        },
+        // ── Interests Widget ──
+        sportsContainer: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 10,
+        },
+        sportTag: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary + '18',
+          paddingVertical: 8,
+          paddingHorizontal: 14,
+          borderRadius: 20,
+          borderWidth: 1.5,
+          borderColor: colors.primary + '35',
+        },
+        sportEmoji: {
+          fontSize: 17,
+        },
+        sportTagText: {
+          fontSize: 14,
+          marginLeft: 6,
+          color: colors.text,
+          fontWeight: '500',
+        },
+        addSportButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.background,
+          paddingVertical: 8,
+          paddingHorizontal: 14,
+          borderRadius: 20,
+          borderWidth: 1.5,
+          borderColor: colors.border,
+          borderStyle: 'dashed',
+        },
+        addSportText: {
+          fontSize: 14,
+          marginLeft: 6,
+          color: colors.placeholder,
+          fontWeight: '500',
+        },
+        interestsEmoji: {
+          fontSize: 20,
+          marginRight: 8,
+        },
+        // ── Account / Footer ──
         sectionCard: {
           backgroundColor: colors.card,
           marginHorizontal: 16,
-          marginBottom: 16,
-          borderRadius: 12,
+          marginBottom: 14,
+          borderRadius: 16,
           overflow: 'hidden',
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: {width: 0, height: 2},
+              shadowOpacity: 0.08,
+              shadowRadius: 8,
+            },
+            android: {
+              elevation: 3,
+            },
+          }),
         },
         sectionHeader: {
           fontSize: 13,
@@ -317,7 +649,6 @@ const Profile: React.FC = () => {
           paddingTop: 16,
           paddingBottom: 8,
         },
-        // Menu Row
         menuRow: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -358,51 +689,10 @@ const Profile: React.FC = () => {
           color: colors.placeholder,
           marginRight: 8,
         },
-        // Favorite Sports
-        sportsContainer: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          paddingHorizontal: 16,
-          paddingBottom: 16,
-          gap: 10,
+        signOutText: {
+          color: '#DC3545',
         },
-        sportTag: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: colors.primary + '20',
-          paddingVertical: 8,
-          paddingHorizontal: 14,
-          borderRadius: 20,
-          borderWidth: 1,
-          borderColor: colors.primary + '40',
-        },
-        sportEmoji: {
-          fontSize: 18,
-        },
-        sportTagText: {
-          fontSize: 14,
-          marginLeft: 6,
-          color: colors.text,
-          fontWeight: '500',
-        },
-        addSportButton: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: colors.background,
-          paddingVertical: 8,
-          paddingHorizontal: 14,
-          borderRadius: 20,
-          borderWidth: 1,
-          borderColor: colors.border,
-          borderStyle: 'dashed',
-        },
-        addSportText: {
-          fontSize: 14,
-          marginLeft: 6,
-          color: colors.placeholder,
-          fontWeight: '500',
-        },
-        // Sports Picker Modal
+        // ── Sports Picker Modal ──
         sportsPickerOverlay: {
           position: 'absolute',
           top: 0,
@@ -467,9 +757,6 @@ const Profile: React.FC = () => {
           color: '#fff',
           fontSize: 16,
           fontWeight: '600',
-        },
-        signOutText: {
-          color: '#DC3545',
         },
       }),
     [colors],
@@ -708,7 +995,7 @@ const Profile: React.FC = () => {
             tintColor={colors.primary}
           />
         }>
-        {/* Profile Header */}
+        {/* ── Profile Header (compact) ── */}
         <View style={themedStyles.profileSection}>
           <View style={themedStyles.avatarContainer}>
             {selectedImage ? (
@@ -740,7 +1027,7 @@ const Profile: React.FC = () => {
                 onPress={handleChoosePhoto}>
                 <FontAwesomeIcon
                   icon={faImage}
-                  size={14}
+                  size={13}
                   color={colors.primary}
                 />
                 <Text style={themedStyles.photoButtonText}>
@@ -752,7 +1039,7 @@ const Profile: React.FC = () => {
                 onPress={handleTakePhoto}>
                 <FontAwesomeIcon
                   icon={faCamera}
-                  size={14}
+                  size={13}
                   color={colors.primary}
                 />
                 <Text style={themedStyles.photoButtonText}>
@@ -763,265 +1050,301 @@ const Profile: React.FC = () => {
           )}
         </View>
 
-        {/* Stats Row */}
-        <View style={themedStyles.statsRow}>
-          <View style={themedStyles.statItem}>
-            <Text style={themedStyles.statValue}>
-              {userStats.eventsCreated}
-            </Text>
-            <Text style={themedStyles.statLabel}>
-              {t('profile.created') || 'Created'}
-            </Text>
-          </View>
-          <View style={themedStyles.statDivider} />
-          <View style={themedStyles.statItem}>
-            <Text style={themedStyles.statValue}>{userStats.eventsJoined}</Text>
-            <Text style={themedStyles.statLabel}>
-              {t('profile.joined') || 'Joined'}
-            </Text>
-          </View>
-        </View>
-
-        {/* My Events Section */}
-        <View style={themedStyles.sectionCard}>
-          <Text style={themedStyles.sectionHeader}>
-            {t('profile.myEvents') || 'My Events'}
-          </Text>
-
-          <TouchableOpacity
-            style={themedStyles.menuRow}
-            onPress={() =>
-              navigation.navigate('EventList', {
-                profileFilter: 'created',
-                userId: _id,
-              })
-            }>
-            <View
-              style={[
-                themedStyles.menuIcon,
-                {backgroundColor: colors.primary + '20'},
-              ]}>
-              <FontAwesomeIcon
-                icon={faCalendarPlus}
-                size={16}
-                color={colors.primary}
-              />
-            </View>
-            <View style={themedStyles.menuContent}>
-              <Text style={themedStyles.menuTitle}>
-                {t('profile.eventsCreated') || 'Events Created'}
-              </Text>
-              <Text style={themedStyles.menuSubtitle}>
-                {userStats.eventsCreated}{' '}
-                {userStats.eventsCreated === 1 ? 'event' : 'events'}
-              </Text>
-            </View>
-            <FontAwesomeIcon
-              icon={faChevronRight}
-              size={14}
-              color={colors.placeholder}
-              style={themedStyles.menuChevron}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[themedStyles.menuRow, themedStyles.menuRowLast]}
-            onPress={() =>
-              navigation.navigate('EventList', {
-                profileFilter: 'joined',
-                userId: _id,
-              })
-            }>
-            <View
-              style={[
-                themedStyles.menuIcon,
-                {backgroundColor: '#4CAF50' + '20'},
-              ]}>
-              <FontAwesomeIcon
-                icon={faCalendarCheck}
-                size={16}
-                color="#4CAF50"
-              />
-            </View>
-            <View style={themedStyles.menuContent}>
-              <Text style={themedStyles.menuTitle}>
-                {t('profile.eventsJoined') || 'Events Joined'}
-              </Text>
-              <Text style={themedStyles.menuSubtitle}>
-                {userStats.eventsJoined}{' '}
-                {userStats.eventsJoined === 1 ? 'event' : 'events'}
-              </Text>
-            </View>
-            <FontAwesomeIcon
-              icon={faChevronRight}
-              size={14}
-              color={colors.placeholder}
-              style={themedStyles.menuChevron}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Notifications Section */}
-        <View style={themedStyles.sectionCard}>
-          <Text style={themedStyles.sectionHeader}>
-            {t('profile.notifications') || 'Notifications'}
-          </Text>
-
-          <TouchableOpacity
-            style={[themedStyles.menuRow, themedStyles.menuRowLast]}
-            onPress={() => navigation.navigate('Notifications')}>
-            <View
-              style={[
-                themedStyles.menuIcon,
-                {backgroundColor: '#FF5722' + '20'},
-              ]}>
-              <FontAwesomeIcon icon={faBell} size={16} color="#FF5722" />
-            </View>
-            <View style={themedStyles.menuContent}>
-              <Text style={themedStyles.menuTitle}>
-                {t('profile.allNotifications') || 'All Notifications'}
-              </Text>
-              <Text style={themedStyles.menuSubtitle}>
-                {t('profile.viewAllNotifications') ||
-                  'View all your notifications'}
-              </Text>
-            </View>
-            <FontAwesomeIcon
-              icon={faChevronRight}
-              size={14}
-              color={colors.placeholder}
-              style={themedStyles.menuChevron}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Friends Section */}
-        <View style={themedStyles.sectionCard}>
-          <Text style={themedStyles.sectionHeader}>Friends</Text>
-
-          <TouchableOpacity
-            style={themedStyles.menuRow}
-            onPress={() => navigation.navigate('FriendsList')}>
-            <View
-              style={[
-                themedStyles.menuIcon,
-                {backgroundColor: '#2196F3' + '20'},
-              ]}>
-              <FontAwesomeIcon icon={faUsers} size={16} color="#2196F3" />
-            </View>
-            <View style={themedStyles.menuContent}>
-              <Text style={themedStyles.menuTitle}>My Friends</Text>
-              <Text style={themedStyles.menuSubtitle}>
-                View and manage your friends
-              </Text>
-            </View>
-            <FontAwesomeIcon
-              icon={faChevronRight}
-              size={14}
-              color={colors.placeholder}
-              style={themedStyles.menuChevron}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={themedStyles.menuRow}
-            onPress={() => navigation.navigate('FriendRequests')}>
-            <View
-              style={[
-                themedStyles.menuIcon,
-                {backgroundColor: '#FF9800' + '20'},
-              ]}>
-              <FontAwesomeIcon icon={faUserClock} size={16} color="#FF9800" />
-            </View>
-            <View style={themedStyles.menuContent}>
-              <Text style={themedStyles.menuTitle}>Friend Requests</Text>
-              <Text style={themedStyles.menuSubtitle}>Pending requests</Text>
-            </View>
-            <FontAwesomeIcon
-              icon={faChevronRight}
-              size={14}
-              color={colors.placeholder}
-              style={themedStyles.menuChevron}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[themedStyles.menuRow, themedStyles.menuRowLast]}
-            onPress={() => navigation.navigate('UserSearch')}>
-            <View
-              style={[
-                themedStyles.menuIcon,
-                {backgroundColor: '#9C27B0' + '20'},
-              ]}>
-              <FontAwesomeIcon icon={faUserPlus} size={16} color="#9C27B0" />
-            </View>
-            <View style={themedStyles.menuContent}>
-              <Text style={themedStyles.menuTitle}>Find People</Text>
-              <Text style={themedStyles.menuSubtitle}>
-                Search for new friends
-              </Text>
-            </View>
-            <FontAwesomeIcon
-              icon={faChevronRight}
-              size={14}
-              color={colors.placeholder}
-              style={themedStyles.menuChevron}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Interests Section */}
-        <View style={themedStyles.sectionCard}>
-          <Text style={themedStyles.sectionHeader}>
-            {t('profile.interests') || 'Interests'}
-          </Text>
-          <View style={themedStyles.sportsContainer}>
-            {getFavoriteSportsDisplay().map(sport => (
-              <View key={sport.id} style={themedStyles.sportTag}>
-                <Text style={themedStyles.sportEmoji}>{sport.emoji}</Text>
-                <Text style={themedStyles.sportTagText}>{sport.label}</Text>
+        {/* ── Quick Stats Widget (2x2 grid) ── */}
+        <View style={themedStyles.widgetCard}>
+          <View style={themedStyles.widgetCardInner}>
+            <View style={themedStyles.widgetHeader}>
+              <View style={themedStyles.widgetHeaderLeft}>
+                <View
+                  style={[
+                    themedStyles.widgetIcon,
+                    {backgroundColor: colors.primary + '20'},
+                  ]}>
+                  <FontAwesomeIcon
+                    icon={faFire}
+                    size={15}
+                    color={colors.primary}
+                  />
+                </View>
+                <Text style={themedStyles.widgetTitle}>
+                  {t('profile.yourActivity') || 'Your Activity'}
+                </Text>
               </View>
-            ))}
-            <TouchableOpacity
-              style={themedStyles.addSportButton}
-              onPress={() => setShowInterestsPicker(true)}>
-              <FontAwesomeIcon
-                icon={faPlus}
-                size={12}
-                color={colors.placeholder}
-              />
-              <Text style={themedStyles.addSportText}>
-                {t('profile.edit') || 'Edit'}
-              </Text>
-            </TouchableOpacity>
+            </View>
+            <View style={themedStyles.statsGrid}>
+              <TouchableOpacity
+                style={themedStyles.statCell}
+                onPress={() =>
+                  navigation.navigate('EventList', {
+                    profileFilter: 'created',
+                    userId: _id,
+                  })
+                }>
+                <View
+                  style={[
+                    themedStyles.statCellIcon,
+                    {backgroundColor: colors.primary + '20'},
+                  ]}>
+                  <FontAwesomeIcon
+                    icon={faCalendarPlus}
+                    size={16}
+                    color={colors.primary}
+                  />
+                </View>
+                <Text style={themedStyles.statCellValue}>
+                  {userStats.eventsCreated}
+                </Text>
+                <Text style={themedStyles.statCellLabel}>
+                  {t('profile.created') || 'Created'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={themedStyles.statCell}
+                onPress={() =>
+                  navigation.navigate('EventList', {
+                    profileFilter: 'joined',
+                    userId: _id,
+                  })
+                }>
+                <View
+                  style={[
+                    themedStyles.statCellIcon,
+                    {backgroundColor: '#4CAF50' + '20'},
+                  ]}>
+                  <FontAwesomeIcon
+                    icon={faCalendarCheck}
+                    size={16}
+                    color="#4CAF50"
+                  />
+                </View>
+                <Text style={themedStyles.statCellValue}>
+                  {userStats.eventsJoined}
+                </Text>
+                <Text style={themedStyles.statCellLabel}>
+                  {t('profile.joined') || 'Joined'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={themedStyles.statCell}
+                onPress={() => navigation.navigate('FriendsList')}>
+                <View
+                  style={[
+                    themedStyles.statCellIcon,
+                    {backgroundColor: '#2196F3' + '20'},
+                  ]}>
+                  <FontAwesomeIcon
+                    icon={faUserGroup}
+                    size={16}
+                    color="#2196F3"
+                  />
+                </View>
+                <Text style={themedStyles.statCellValue}>{friendsCount}</Text>
+                <Text style={themedStyles.statCellLabel}>
+                  {t('profile.friends') || 'Friends'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={themedStyles.statCell}>
+                <View
+                  style={[
+                    themedStyles.statCellIcon,
+                    {backgroundColor: '#9C27B0' + '20'},
+                  ]}>
+                  <FontAwesomeIcon
+                    icon={faCalendarDays}
+                    size={16}
+                    color="#9C27B0"
+                  />
+                </View>
+                <Text style={themedStyles.statCellValue}>
+                  {memberSinceYear}
+                </Text>
+                <Text style={themedStyles.statCellLabel}>
+                  {t('profile.memberSince') || 'Member since'}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
-        {/* Account Section */}
+        {/* ── Upcoming Event Widget ── */}
+        <View style={themedStyles.widgetCard}>
+          <View style={themedStyles.widgetCardInner}>
+            <View style={themedStyles.widgetHeader}>
+              <View style={themedStyles.widgetHeaderLeft}>
+                <View
+                  style={[
+                    themedStyles.widgetIcon,
+                    {backgroundColor: '#FF9800' + '20'},
+                  ]}>
+                  <FontAwesomeIcon icon={faClock} size={15} color="#FF9800" />
+                </View>
+                <Text style={themedStyles.widgetTitle}>
+                  {t('profile.upNext') || 'Up Next'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('EventList', {
+                    profileFilter: 'joined',
+                    userId: _id,
+                  })
+                }>
+                <Text style={themedStyles.widgetSeeAll}>
+                  {t('profile.seeAll') || 'See All'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {nextUpcomingEvent ? (
+              <TouchableOpacity
+                style={themedStyles.upcomingEventCard}
+                onPress={() =>
+                  navigation.navigate('EventComments', {
+                    eventId: nextUpcomingEvent._id,
+                  })
+                }>
+                <View style={themedStyles.upcomingDateBadge}>
+                  <Text style={themedStyles.upcomingDateDay}>
+                    {formatEventDate(nextUpcomingEvent)}
+                  </Text>
+                  <Text style={themedStyles.upcomingDateTime}>
+                    {formatEventTime(nextUpcomingEvent)}
+                  </Text>
+                </View>
+                <View style={themedStyles.upcomingEventInfo}>
+                  <Text
+                    style={themedStyles.upcomingEventName}
+                    numberOfLines={1}>
+                    {nextUpcomingEvent.name}
+                  </Text>
+                  <View style={themedStyles.upcomingEventMeta}>
+                    <FontAwesomeIcon
+                      icon={faLocationDot}
+                      size={11}
+                      color={colors.placeholder}
+                    />
+                    <Text
+                      style={themedStyles.upcomingEventMetaText}
+                      numberOfLines={1}>
+                      {nextUpcomingEvent.location}
+                    </Text>
+                  </View>
+                </View>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.placeholder}
+                />
+              </TouchableOpacity>
+            ) : (
+              <View>
+                <Text style={themedStyles.upcomingEmptyText}>
+                  {t('profile.noUpcoming') || 'No upcoming events'}
+                </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Events')}>
+                  <Text style={themedStyles.upcomingEmptyCta}>
+                    {t('profile.browseEvents') || 'Browse Events'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* ── Social Hub Widget ── */}
+        <View style={themedStyles.widgetCard}>
+          <View style={themedStyles.widgetCardInner}>
+            <View style={themedStyles.widgetHeader}>
+              <View style={themedStyles.widgetHeaderLeft}>
+                <View
+                  style={[
+                    themedStyles.widgetIcon,
+                    {backgroundColor: '#2196F3' + '20'},
+                  ]}>
+                  <FontAwesomeIcon icon={faUsers} size={15} color="#2196F3" />
+                </View>
+                <Text style={themedStyles.widgetTitle}>
+                  {t('profile.social') || 'Social'}
+                </Text>
+              </View>
+            </View>
+            <View style={themedStyles.socialQuickActions}>
+              <TouchableOpacity
+                style={themedStyles.socialActionBtn}
+                onPress={() => navigation.navigate('FriendRequests')}>
+                <FontAwesomeIcon icon={faUserClock} size={13} color="#FF9800" />
+                <Text style={themedStyles.socialActionText}>
+                  {t('profile.requests') || 'Requests'}
+                </Text>
+                {pendingRequestsCount > 0 && (
+                  <View style={themedStyles.socialActionBadge}>
+                    <Text style={themedStyles.socialActionBadgeText}>
+                      {pendingRequestsCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={themedStyles.socialActionBtn}
+                onPress={() => navigation.navigate('UserSearch')}>
+                <FontAwesomeIcon icon={faUserPlus} size={13} color="#9C27B0" />
+                <Text style={themedStyles.socialActionText}>
+                  {t('profile.findPeople') || 'Find'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Interests Widget ── */}
+        <View style={themedStyles.widgetCard}>
+          <View style={themedStyles.widgetCardInner}>
+            <View style={themedStyles.widgetHeader}>
+              <View style={themedStyles.widgetHeaderLeft}>
+                <Text style={themedStyles.interestsEmoji}>✨</Text>
+                <Text style={themedStyles.widgetTitle}>
+                  {t('profile.interests') || 'Interests'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowInterestsPicker(true)}>
+                <Text style={themedStyles.widgetSeeAll}>
+                  {t('common.edit') || 'Edit'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={themedStyles.sportsContainer}>
+              {getFavoriteSportsDisplay().map(sport => (
+                <View key={sport.id} style={themedStyles.sportTag}>
+                  <Text style={themedStyles.sportEmoji}>{sport.emoji}</Text>
+                  <Text style={themedStyles.sportTagText}>{sport.label}</Text>
+                </View>
+              ))}
+              {getFavoriteSportsDisplay().length === 0 && (
+                <TouchableOpacity
+                  style={themedStyles.addSportButton}
+                  onPress={() => setShowInterestsPicker(true)}>
+                  <FontAwesomeIcon
+                    icon={faPlus}
+                    size={12}
+                    color={colors.placeholder}
+                  />
+                  <Text style={themedStyles.addSportText}>
+                    {t('profile.addInterests') || 'Add interests'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* ── Account Section ── */}
         <View style={themedStyles.sectionCard}>
           <Text style={themedStyles.sectionHeader}>
             {t('profile.account') || 'Account'}
           </Text>
-
-          <View style={themedStyles.menuRow}>
-            <View
-              style={[
-                themedStyles.menuIcon,
-                {backgroundColor: '#9C27B0' + '20'},
-              ]}>
-              <FontAwesomeIcon
-                icon={faCalendarDays}
-                size={16}
-                color="#9C27B0"
-              />
-            </View>
-            <View style={themedStyles.menuContent}>
-              <Text style={themedStyles.menuTitle}>
-                {t('profile.memberSince') || 'Member since'}
-              </Text>
-            </View>
-            <Text style={themedStyles.menuValue}>{memberSinceYear}</Text>
-          </View>
 
           <TouchableOpacity
             style={themedStyles.menuRow}

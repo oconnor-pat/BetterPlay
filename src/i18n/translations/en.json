@@ -195,7 +195,21 @@
     "clearFilter": "Clear",
     "notifications": "Notifications",
     "allNotifications": "All Notifications",
-    "viewAllNotifications": "View all your notifications"
+    "viewAllNotifications": "View all your notifications",
+    "upNext": "Up Next",
+    "seeAll": "See All",
+    "noUpcoming": "No upcoming events",
+    "browseEvents": "Browse Events",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "friends": "Friends",
+    "pendingRequests": "Requests",
+    "social": "Social",
+    "viewFriends": "View Friends",
+    "myFriends": "My Friends",
+    "requests": "Requests",
+    "findPeople": "Find",
+    "addInterests": "Add interests"
   },
   "notifications": {
     "title": "Notifications",

@@ -231,6 +231,48 @@ const jerseyColorOptions: {label: string; color: string}[] = [
 const isTeamSport = (eventType: string) =>
   teamSports.some(sport => sport.toLowerCase() === eventType.toLowerCase());
 
+// Helper to format event time for display, respecting user's locale
+const formatDisplayTime = (timeStr?: string): string => {
+  if (!timeStr) {
+    return '';
+  }
+  try {
+    let hours: number;
+    let minutes: number;
+
+    // Parse 24h format like "18:30"
+    const match24 = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+    // Parse 12h format like "6:30 PM" or "06:30 AM"
+    const match12 = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+
+    if (match24) {
+      hours = parseInt(match24[1], 10);
+      minutes = parseInt(match24[2], 10);
+    } else if (match12) {
+      hours = parseInt(match12[1], 10);
+      const period = match12[3].toUpperCase();
+      if (period === 'PM' && hours !== 12) {
+        hours += 12;
+      }
+      if (period === 'AM' && hours === 12) {
+        hours = 0;
+      }
+      minutes = parseInt(match12[2], 10);
+    } else {
+      return timeStr;
+    }
+
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date.toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return timeStr;
+  }
+};
+
 // Helper to format relative timestamp
 const formatRelativeTime = (dateString?: string): string => {
   if (!dateString) {
@@ -261,7 +303,7 @@ const formatRelativeTime = (dateString?: string): string => {
   if (diffDays < 7) {
     return `${diffDays}d ago`;
   }
-  if (diffWeeks < 4) {
+  if (diffDays < 30) {
     return `${diffWeeks}w ago`;
   }
   if (diffMonths < 12) {
@@ -2034,7 +2076,7 @@ const EventList: React.FC = () => {
     const shareMessage =
       `${emoji} Join me for ${event.name}!\n\n` +
       `🏷️ ${event.eventType}\n` +
-      `📅 ${event.date} @ ${event.time}\n` +
+      `📅 ${event.date} @ ${formatDisplayTime(event.time)}\n` +
       `📍 ${event.location}\n` +
       `👥 ${spotsAvailable} spot${
         spotsAvailable !== 1 ? 's' : ''
@@ -2349,7 +2391,7 @@ const EventList: React.FC = () => {
           <View style={themedStyles.cardRow}>
             <Text style={themedStyles.cardEmoji}>🗓️</Text>
             <Text style={themedStyles.cardText}>
-              {item.date} @ {item.time}
+              {item.date} @ {formatDisplayTime(item.time)}
             </Text>
           </View>
           {/* Roster */}
@@ -2840,7 +2882,7 @@ const EventList: React.FC = () => {
                       color: newEvent.time ? colors.text : colors.placeholder,
                     }}>
                     {newEvent.time
-                      ? newEvent.time
+                      ? formatDisplayTime(newEvent.time)
                       : t('events.selectEventTime')}
                   </Text>
                 </TouchableOpacity>
@@ -3263,6 +3305,8 @@ const EventList: React.FC = () => {
       </Modal>
       <Modal
         visible={showFilterModal}
+        transparent={true}
+        animationType="slide"
         onRequestClose={() => setShowFilterModal(false)}>
         <TouchableOpacity
           style={themedStyles.filterModalOverlay}

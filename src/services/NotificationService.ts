@@ -262,11 +262,11 @@ class NotificationService {
         console.log('Device token registered with backend successfully');
         return true;
       } else {
-        console.error('Failed to register device token with backend');
+        console.warn('Failed to register device token with backend');
         return false;
       }
     } catch (error) {
-      console.error('Error registering token with backend:', error);
+      console.warn('Error registering token with backend:', error);
       return false;
     }
   }

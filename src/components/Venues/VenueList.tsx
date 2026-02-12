@@ -245,6 +245,7 @@ const VenueList: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showSearch, setShowSearch] = useState<boolean>(false);
   const [selectedVenueType, setSelectedVenueType] = useState<string>('all');
+  const [showFilterDropdown, setShowFilterDropdown] = useState<boolean>(false);
 
   // Admin-only state
   const [modalVisible, setModalVisible] = useState<boolean>(false);
@@ -421,28 +422,103 @@ const VenueList: React.FC = () => {
           color: colors.text,
           fontSize: 16,
         },
+        // Filter dropdown
+        filterWrapper: {
+          zIndex: 100,
+          marginHorizontal: 16,
+          marginBottom: 12,
+        },
         filterButton: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: 14,
-          paddingVertical: 10,
-          backgroundColor: colors.card,
-          borderRadius: 20,
-          marginRight: 10,
-          borderWidth: 1,
-          borderColor: colors.border,
-        },
-        filterText: {
-          color: colors.text,
-          marginLeft: 6,
-          fontSize: 13,
-        },
-        activeFilter: {
+          justifyContent: 'space-between',
           backgroundColor: colors.primary,
-          borderColor: colors.primary,
+          borderRadius: 12,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
         },
-        activeFilterText: {
-          color: '#FFFFFF',
+        filterButtonOpen: {
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+        },
+        filterButtonLeft: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+        },
+        filterButtonEmoji: {
+          fontSize: 18,
+        },
+        filterButtonText: {
+          fontSize: 15,
+          fontWeight: '700',
+          color: '#fff',
+        },
+        filterList: {
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          backgroundColor: colors.card,
+          borderBottomLeftRadius: 12,
+          borderBottomRightRadius: 12,
+          maxHeight: 360,
+          borderWidth: 1,
+          borderTopWidth: 0,
+          borderColor: colors.primary + '40',
+          ...Platform.select({
+            ios: {
+              shadowColor: colors.primary,
+              shadowOffset: {width: 0, height: 6},
+              shadowOpacity: 0.25,
+              shadowRadius: 12,
+            },
+            android: {
+              elevation: 12,
+            },
+          }),
+        },
+        filterItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 13,
+          paddingHorizontal: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        filterItemLast: {
+          borderBottomWidth: 0,
+        },
+        filterItemActive: {
+          backgroundColor: colors.primary + '18',
+        },
+        filterItemEmoji: {
+          fontSize: 18,
+          width: 30,
+          textAlign: 'center',
+        },
+        filterItemText: {
+          fontSize: 15,
+          color: colors.text,
+          marginLeft: 10,
+          flex: 1,
+        },
+        filterItemTextActive: {
+          color: colors.primary,
+          fontWeight: '700',
+        },
+        filterCheck: {
+          fontSize: 14,
+          color: colors.primary,
+          fontWeight: '700',
+        },
+        filterOverlay: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99,
         },
         emptyContainer: {
           flex: 1,
@@ -934,48 +1010,94 @@ const VenueList: React.FC = () => {
     );
   };
 
-  // Render filter chips
-  const renderFilterChips = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={{marginBottom: 16, maxHeight: 44}}
-      contentContainerStyle={{alignItems: 'center'}}>
+  // Selected filter display info
+  const selectedFilterInfo = useMemo(() => {
+    if (selectedVenueType === 'all') {
+      return {emoji: '🏟️', label: 'All Venues'};
+    }
+    const option = venueTypeOptions.find(o => o.label === selectedVenueType);
+    return option
+      ? {emoji: option.emoji, label: option.label}
+      : {emoji: '🏟️', label: 'All Venues'};
+  }, [selectedVenueType]);
+
+  // All filter options
+  const allFilterOptions = useMemo(() => {
+    return [
+      {emoji: '🏟️', label: 'All Venues', value: 'all'},
+      ...venueTypeOptions.map(o => ({
+        emoji: o.emoji,
+        label: o.label,
+        value: o.label,
+      })),
+    ];
+  }, []);
+
+  // Render filter dropdown
+  const renderFilterDropdown = () => (
+    <View style={themedStyles.filterWrapper}>
       <TouchableOpacity
         style={[
           themedStyles.filterButton,
-          selectedVenueType === 'all' && themedStyles.activeFilter,
+          showFilterDropdown && themedStyles.filterButtonOpen,
         ]}
-        onPress={() => setSelectedVenueType('all')}>
-        <Text
-          style={[
-            themedStyles.filterText,
-            {marginLeft: 0},
-            selectedVenueType === 'all' && themedStyles.activeFilterText,
-          ]}>
-          All Venues
-        </Text>
-      </TouchableOpacity>
-      {venueTypeOptions.map(option => (
-        <TouchableOpacity
-          key={option.label}
-          style={[
-            themedStyles.filterButton,
-            selectedVenueType === option.label && themedStyles.activeFilter,
-          ]}
-          onPress={() => setSelectedVenueType(option.label)}>
-          <Text style={{fontSize: 14}}>{option.emoji}</Text>
-          <Text
-            style={[
-              themedStyles.filterText,
-              selectedVenueType === option.label &&
-                themedStyles.activeFilterText,
-            ]}>
-            {option.label}
+        onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+        activeOpacity={0.8}>
+        <View style={themedStyles.filterButtonLeft}>
+          <Text style={themedStyles.filterButtonEmoji}>
+            {selectedFilterInfo.emoji}
           </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
+          <Text style={themedStyles.filterButtonText}>
+            {selectedFilterInfo.label}
+          </Text>
+        </View>
+        <FontAwesomeIcon
+          icon={faChevronDown}
+          size={14}
+          color="#fff"
+          style={{
+            transform: [{rotate: showFilterDropdown ? '180deg' : '0deg'}],
+          }}
+        />
+      </TouchableOpacity>
+
+      {showFilterDropdown && (
+        <ScrollView
+          style={themedStyles.filterList}
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          {allFilterOptions.map((option, index) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                themedStyles.filterItem,
+                selectedVenueType === option.value &&
+                  themedStyles.filterItemActive,
+                index === allFilterOptions.length - 1 &&
+                  themedStyles.filterItemLast,
+              ]}
+              onPress={() => {
+                setSelectedVenueType(option.value);
+                setShowFilterDropdown(false);
+              }}>
+              <Text style={themedStyles.filterItemEmoji}>{option.emoji}</Text>
+              <Text
+                style={[
+                  themedStyles.filterItemText,
+                  selectedVenueType === option.value &&
+                    themedStyles.filterItemTextActive,
+                ]}>
+                {option.label}
+              </Text>
+              {selectedVenueType === option.value && (
+                <Text style={themedStyles.filterCheck}>✓</Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+    </View>
   );
 
   if (loading) {
@@ -1033,8 +1155,17 @@ const VenueList: React.FC = () => {
         </View>
       )}
 
-      {/* Filter Chips */}
-      {renderFilterChips()}
+      {/* Dismiss overlay when dropdown is open */}
+      {showFilterDropdown && (
+        <TouchableOpacity
+          style={themedStyles.filterOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFilterDropdown(false)}
+        />
+      )}
+
+      {/* Filter Dropdown */}
+      {renderFilterDropdown()}
 
       {/* Venue List */}
       <FlatList

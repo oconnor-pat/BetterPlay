@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Image,
   Alert,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -17,10 +18,14 @@ import {
   faArrowLeft,
   faUserMinus,
   faUser,
+  faChevronRight,
+  faUserPlus,
+  faSearch,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
+import {useTranslation} from 'react-i18next';
 
 interface Friend {
   _id: string;
@@ -33,6 +38,7 @@ interface Friend {
 const FriendsList: React.FC = () => {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
+  const {t} = useTranslation();
 
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,164 +134,253 @@ const FriendsList: React.FC = () => {
       .slice(0, 2);
   };
 
-  const styles = StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    backButton: {
-      padding: 8,
-      marginRight: 12,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: colors.text,
-      flex: 1,
-    },
-    headerCount: {
-      fontSize: 14,
-      color: colors.placeholder,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    listContent: {
-      padding: 16,
-    },
-    listContentEmpty: {
-      padding: 16,
-      flex: 1,
-    },
-    emptyContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 32,
-    },
-    emptyIcon: {
-      marginBottom: 16,
-      opacity: 0.5,
-    },
-    emptyText: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 8,
-      textAlign: 'center',
-    },
-    emptySubtext: {
-      fontSize: 14,
-      color: colors.placeholder,
-      textAlign: 'center',
-    },
-    friendCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    avatarContainer: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      backgroundColor: colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 12,
-      overflow: 'hidden',
-    },
-    avatarImage: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-    },
-    avatarText: {
-      color: '#FFFFFF',
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    friendInfo: {
-      flex: 1,
-    },
-    friendName: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    friendUsername: {
-      fontSize: 13,
-      color: colors.placeholder,
-      marginTop: 2,
-    },
-    removeButton: {
-      padding: 10,
-    },
-  });
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        safeArea: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        header: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
+        backButton: {
+          padding: 8,
+          marginRight: 12,
+        },
+        headerTitle: {
+          fontSize: 22,
+          fontWeight: '700',
+          color: colors.text,
+          flex: 1,
+        },
+        headerCount: {
+          fontSize: 15,
+          fontWeight: '600',
+          color: colors.placeholder,
+          backgroundColor: colors.card,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 12,
+          overflow: 'hidden',
+        },
+        loadingContainer: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        listContent: {
+          padding: 16,
+          gap: 12,
+        },
+        listContentEmpty: {
+          padding: 16,
+          flex: 1,
+        },
+        // Empty state
+        emptyContainer: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 40,
+        },
+        emptyIconContainer: {
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: colors.primary + '15',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 20,
+        },
+        emptyText: {
+          fontSize: 20,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 8,
+          textAlign: 'center',
+        },
+        emptySubtext: {
+          fontSize: 15,
+          color: colors.placeholder,
+          textAlign: 'center',
+          lineHeight: 22,
+          marginBottom: 24,
+        },
+        emptyButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary,
+          paddingHorizontal: 24,
+          paddingVertical: 12,
+          borderRadius: 24,
+          gap: 8,
+        },
+        emptyButtonText: {
+          fontSize: 15,
+          fontWeight: '600',
+          color: '#fff',
+        },
+        // Friend card
+        friendCard: {
+          backgroundColor: colors.card,
+          borderRadius: 16,
+          overflow: 'hidden',
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: {width: 0, height: 2},
+              shadowOpacity: 0.08,
+              shadowRadius: 8,
+            },
+            android: {
+              elevation: 3,
+            },
+          }),
+        },
+        friendCardContent: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: 14,
+        },
+        avatarContainer: {
+          width: 52,
+          height: 52,
+          borderRadius: 26,
+          backgroundColor: colors.primary + '20',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginRight: 14,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: colors.primary + '40',
+        },
+        avatarImage: {
+          width: 52,
+          height: 52,
+          borderRadius: 26,
+        },
+        avatarText: {
+          color: colors.primary,
+          fontSize: 18,
+          fontWeight: '700',
+        },
+        friendInfo: {
+          flex: 1,
+        },
+        friendName: {
+          fontSize: 16,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 2,
+        },
+        friendUsername: {
+          fontSize: 13,
+          color: colors.placeholder,
+        },
+        friendActions: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        },
+        viewProfileButton: {
+          padding: 8,
+        },
+        removeButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.error + '15',
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 10,
+          gap: 6,
+        },
+        removeButtonText: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.error,
+        },
+      }),
+    [colors],
+  );
 
   const renderFriend = ({item}: {item: Friend}) => (
-    <TouchableOpacity
-      style={styles.friendCard}
-      onPress={() => navigateToProfile(item)}
-      activeOpacity={0.7}>
-      <View style={styles.avatarContainer}>
-        {item.profilePicUrl ? (
-          <Image
-            source={{uri: item.profilePicUrl}}
-            style={styles.avatarImage}
-          />
-        ) : (
-          <Text style={styles.avatarText}>{getInitials(item.username)}</Text>
-        )}
-      </View>
+    <View style={styles.friendCard}>
+      <View style={styles.friendCardContent}>
+        <TouchableOpacity
+          onPress={() => navigateToProfile(item)}
+          activeOpacity={0.7}
+          style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
+          <View style={styles.avatarContainer}>
+            {item.profilePicUrl ? (
+              <Image
+                source={{uri: item.profilePicUrl}}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {getInitials(item.username)}
+              </Text>
+            )}
+          </View>
 
-      <View style={styles.friendInfo}>
-        <Text style={styles.friendName}>{item.name || item.username}</Text>
-        {item.name && (
-          <Text style={styles.friendUsername}>@{item.username}</Text>
-        )}
-      </View>
+          <View style={styles.friendInfo}>
+            <Text style={styles.friendName} numberOfLines={1}>
+              {item.name || item.username}
+            </Text>
+            <Text style={styles.friendUsername} numberOfLines={1}>
+              @{item.username}
+            </Text>
+          </View>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.removeButton}
-        onPress={() =>
-          handleRemoveFriend(item._id, item.name || item.username)
-        }>
-        <FontAwesomeIcon
-          icon={faUserMinus}
-          size={18}
-          color={colors.error || '#FF6B6B'}
-        />
-      </TouchableOpacity>
-    </TouchableOpacity>
+        <View style={styles.friendActions}>
+          <TouchableOpacity
+            style={styles.removeButton}
+            onPress={() =>
+              handleRemoveFriend(item._id, item.name || item.username)
+            }>
+            <FontAwesomeIcon
+              icon={faUserMinus}
+              size={13}
+              color={colors.error}
+            />
+            <Text style={styles.removeButtonText}>Unfriend</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.viewProfileButton}
+            onPress={() => navigateToProfile(item)}>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={13}
+              color={colors.placeholder}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
   );
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <FontAwesomeIcon
-        icon={faUser}
-        size={48}
-        color={colors.text}
-        style={styles.emptyIcon}
-      />
+      <View style={styles.emptyIconContainer}>
+        <FontAwesomeIcon icon={faUser} size={32} color={colors.primary} />
+      </View>
       <Text style={styles.emptyText}>No Friends Yet</Text>
       <Text style={styles.emptySubtext}>
-        Find players through search or at events and add them as friends!
+        Find people through search or at events and add them as friends!
       </Text>
+      <TouchableOpacity
+        style={styles.emptyButton}
+        onPress={() => navigation.navigate('UserSearch')}>
+        <FontAwesomeIcon icon={faSearch} size={14} color="#fff" />
+        <Text style={styles.emptyButtonText}>Find People</Text>
+      </TouchableOpacity>
     </View>
   );
 
