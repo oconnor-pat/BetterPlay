@@ -6,9 +6,9 @@
 DEVICE_ID="00008150-00015590027A401C"
 BUNDLE_ID="com.oconnorpat.betterplay"
 WORKSPACE="/Users/patty/Documents/Projects/BetterPlay/ios/BetterPlay.xcworkspace"
-APP_PATH="/Users/patty/Library/Developer/Xcode/DerivedData/BetterPlay-cirdbgrfixtloihdxubzmtpoletd/Build/Products/Debug-iphoneos/BetterPlay.app"
 PROJECT_DIR="/Users/patty/Documents/Projects/BetterPlay"
 METRO_PID_FILE="/tmp/betterplay-metro.pid"
+DERIVED_DATA_DIR="$HOME/Library/Developer/Xcode/DerivedData"
 
 # Function to check if Metro is already running
 is_metro_running() {
@@ -53,6 +53,17 @@ if [ $? -ne 0 ]; then
     echo "❌ Build failed"
     exit 1
 fi
+
+# Find the built app dynamically
+echo "📍 Locating built app..."
+APP_PATH=$(find "$DERIVED_DATA_DIR" -path "*BetterPlay*/Build/Products/Debug-iphoneos/BetterPlay.app" -type d 2>/dev/null | head -1)
+
+if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+    echo "❌ Could not find built app in DerivedData"
+    exit 1
+fi
+
+echo "   Found: $APP_PATH"
 
 echo "📲 Installing on iPhone..."
 xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH"

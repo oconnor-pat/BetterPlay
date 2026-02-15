@@ -13,5 +13,6 @@
     "**/*.plist",
     "**/*.xcworkspacedata",
     "**/*.xcscheme"
-  ]
+  ],
+  "cSpell.words": ["getifaddr", "notif", "Notifs", "selectbox"]
 }

@@ -249,6 +249,7 @@ const VenueList: React.FC = () => {
 
   // Admin-only state
   const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [placesApiFailed, setPlacesApiFailed] = useState(false);
   const [showVenueTypePicker, setShowVenueTypePicker] =
     useState<boolean>(false);
   const [showOpenTimePicker, setShowOpenTimePicker] = useState<boolean>(false);
@@ -347,16 +348,11 @@ const VenueList: React.FC = () => {
         },
         card: {
           backgroundColor: colors.card,
-          borderRadius: 12,
+          borderRadius: 16,
           padding: 18,
-          marginBottom: 18,
-          borderWidth: 1,
+          marginBottom: 12,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          shadowColor: colors.text,
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 6,
-          elevation: 3,
         },
         cardHeader: {
           flexDirection: 'row',
@@ -409,11 +405,11 @@ const VenueList: React.FC = () => {
         searchContainer: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.card,
-          borderRadius: 8,
-          paddingHorizontal: 12,
+          backgroundColor: colors.inputBackground,
+          borderRadius: 20,
+          paddingHorizontal: 14,
           marginBottom: 16,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         searchInput: {
@@ -552,11 +548,11 @@ const VenueList: React.FC = () => {
           borderRadius: 28,
           justifyContent: 'center',
           alignItems: 'center',
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.25,
-          shadowRadius: 4,
-          elevation: 5,
+          shadowColor: colors.primary,
+          shadowOffset: {width: 0, height: 4},
+          shadowOpacity: 0.35,
+          shadowRadius: 8,
+          elevation: 8,
         },
         modalOverlay: {
           flex: 1,
@@ -1197,7 +1193,10 @@ const VenueList: React.FC = () => {
       {isAdmin && (
         <TouchableOpacity
           style={themedStyles.addButton}
-          onPress={() => setModalVisible(true)}>
+          onPress={() => {
+            setPlacesApiFailed(false);
+            setModalVisible(true);
+          }}>
           <FontAwesomeIcon icon={faPlus} size={24} color="#FFFFFF" />
         </TouchableOpacity>
       )}
@@ -1224,7 +1223,7 @@ const VenueList: React.FC = () => {
 
                   <Text style={themedStyles.inputLabel}>Venue/Facility *</Text>
                   <View style={{zIndex: 1000, marginBottom: 16}}>
-                    {isApiKeyConfigured ? (
+                    {isApiKeyConfigured && !placesApiFailed ? (
                       <GooglePlacesAutocomplete
                         placeholder="Search for venue..."
                         onPress={(data, details = null) => {
@@ -1297,6 +1296,7 @@ const VenueList: React.FC = () => {
                             'GooglePlacesAutocomplete error:',
                             error,
                           );
+                          setPlacesApiFailed(true);
                         }}
                         enablePoweredByContainer={false}
                         debounce={200}
@@ -1304,7 +1304,11 @@ const VenueList: React.FC = () => {
                     ) : (
                       <TextInput
                         style={themedStyles.input}
-                        placeholder="Enter venue name"
+                        placeholder={
+                          placesApiFailed
+                            ? 'Enter venue name manually'
+                            : 'Enter venue name'
+                        }
                         placeholderTextColor={colors.secondaryText}
                         value={newVenue.name}
                         onChangeText={text =>
@@ -1314,8 +1318,24 @@ const VenueList: React.FC = () => {
                     )}
                   </View>
 
+                  {/* Manual address input when Places API is unavailable */}
+                  {placesApiFailed && (
+                    <>
+                      <Text style={themedStyles.inputLabel}>Address *</Text>
+                      <TextInput
+                        style={themedStyles.input}
+                        placeholder="Enter full address"
+                        placeholderTextColor={colors.secondaryText}
+                        value={newVenue.address}
+                        onChangeText={text =>
+                          setNewVenue(prev => ({...prev, address: text}))
+                        }
+                      />
+                    </>
+                  )}
+
                   {/* Show selected address */}
-                  {newVenue.address ? (
+                  {newVenue.address && !placesApiFailed ? (
                     <View
                       style={{
                         marginBottom: 16,

@@ -7,7 +7,7 @@ const PRODUCTION_API_URL = 'https://omhl-be-9801a7de15ab.herokuapp.com';
 // - Use your Mac's IP address for physical iPhone (find it via: ipconfig getifaddr en0)
 // - Example: 'http://192.168.1.100:8001'
 const LOCAL_API_URL_SIMULATOR = 'http://localhost:8001';
-const LOCAL_API_URL_DEVICE = 'http://192.168.1.253:8001';
+const LOCAL_API_URL_DEVICE = 'http://192.168.1.13:8001';
 
 // Toggle this to switch between production and local development
 const USE_LOCAL_API = false;

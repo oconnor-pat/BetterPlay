@@ -15,7 +15,6 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
@@ -398,17 +397,8 @@ const Profile: React.FC = () => {
           marginBottom: 14,
           borderRadius: 16,
           overflow: 'hidden',
-          ...Platform.select({
-            ios: {
-              shadowColor: '#000',
-              shadowOffset: {width: 0, height: 2},
-              shadowOpacity: 0.08,
-              shadowRadius: 8,
-            },
-            android: {
-              elevation: 3,
-            },
-          }),
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         widgetCardInner: {
           padding: 16,
@@ -627,17 +617,8 @@ const Profile: React.FC = () => {
           marginBottom: 14,
           borderRadius: 16,
           overflow: 'hidden',
-          ...Platform.select({
-            ios: {
-              shadowColor: '#000',
-              shadowOffset: {width: 0, height: 2},
-              shadowOpacity: 0.08,
-              shadowRadius: 8,
-            },
-            android: {
-              elevation: 3,
-            },
-          }),
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         sectionHeader: {
           fontSize: 13,

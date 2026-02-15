@@ -561,16 +561,12 @@ const EventList: React.FC = () => {
         },
         card: {
           backgroundColor: colors.card,
-          borderRadius: 12,
+          borderRadius: 16,
           padding: 18,
-          marginBottom: 18,
-          borderWidth: 1,
+          marginBottom: 12,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          shadowColor: colors.text,
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 6,
-          elevation: 3,
+          overflow: 'hidden',
         },
         pastEventCard: {
           opacity: 0.6,
@@ -735,6 +731,23 @@ const EventList: React.FC = () => {
           borderRadius: 10,
           alignItems: 'center',
           justifyContent: 'center',
+        },
+        fab: {
+          position: 'absolute',
+          bottom: 24,
+          right: 20,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: colors.primary,
+          shadowOffset: {width: 0, height: 4},
+          shadowOpacity: 0.35,
+          shadowRadius: 8,
+          elevation: 8,
+          zIndex: 100,
         },
         headerRight: {
           justifyContent: 'flex-end',
@@ -904,10 +917,10 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: colors.inputBackground || colors.card,
-          borderRadius: 12,
-          paddingHorizontal: 12,
+          borderRadius: 20,
+          paddingHorizontal: 14,
           marginBottom: 16,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         searchInput: {
@@ -1050,23 +1063,23 @@ const EventList: React.FC = () => {
         filterChipsContainer: {
           flexDirection: 'row',
           flexWrap: 'wrap',
-          gap: 8,
+          marginHorizontal: -4,
         },
         filterChip: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 8,
-          paddingHorizontal: 14,
-          borderRadius: 20,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          borderRadius: 10,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.background,
-          marginRight: 8,
-          marginBottom: 8,
+          margin: 4,
         },
         filterChipSelected: {
-          backgroundColor: colors.primary,
+          backgroundColor: colors.primary + '20',
           borderColor: colors.primary,
+          borderWidth: 1.5,
         },
         filterChipText: {
           fontSize: 14,
@@ -1074,13 +1087,14 @@ const EventList: React.FC = () => {
           marginLeft: 6,
         },
         filterChipTextSelected: {
-          color: colors.buttonText || '#fff',
+          color: colors.primary,
+          fontWeight: '600',
         },
         filterChipEmoji: {
           fontSize: 16,
         },
         dateFilterOption: {
-          paddingVertical: 12,
+          paddingVertical: 14,
           paddingHorizontal: 16,
           borderRadius: 10,
           borderWidth: 1,
@@ -1104,7 +1118,7 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          paddingVertical: 12,
+          paddingVertical: 14,
           paddingHorizontal: 16,
           borderRadius: 10,
           borderWidth: 1,
@@ -1112,15 +1126,16 @@ const EventList: React.FC = () => {
           backgroundColor: colors.background,
         },
         toggleOptionSelected: {
-          backgroundColor: colors.primary,
+          backgroundColor: colors.primary + '20',
           borderColor: colors.primary,
+          borderWidth: 1.5,
         },
         toggleOptionText: {
           fontSize: 15,
           color: colors.text,
         },
         toggleOptionTextSelected: {
-          color: colors.buttonText || '#fff',
+          color: colors.primary,
           fontWeight: '600',
         },
         filterButtonsRow: {
@@ -1241,10 +1256,60 @@ const EventList: React.FC = () => {
           fontWeight: '500',
           marginRight: 6,
         },
+        // Horizontal filter chip bar (compact pills)
+        chipBarContainer: {
+          marginBottom: 12,
+          minHeight: 50,
+          zIndex: 100,
+          backgroundColor: colors.background,
+          elevation: 10,
+          flexShrink: 0,
+          overflow: 'visible',
+        },
+        chipBarContent: {
+          paddingHorizontal: 4,
+          paddingVertical: 8,
+          gap: 10,
+          alignItems: 'center',
+        },
+        chip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 6,
+          paddingHorizontal: 12,
+          borderRadius: 18,
+          backgroundColor: colors.card,
+          borderWidth: 1,
+          borderColor: colors.border,
+          height: 36,
+        },
+        chipActive: {
+          backgroundColor: colors.primary + '18',
+          borderColor: colors.primary,
+          borderWidth: 1.5,
+        },
+        chipEmoji: {
+          fontSize: 15,
+          marginRight: 5,
+        },
+        chipText: {
+          fontSize: 13,
+          fontWeight: '500',
+          color: colors.secondaryText,
+        },
+        chipTextActive: {
+          color: colors.primary,
+          fontWeight: '600',
+        },
         searchFilterRow: {
           flexDirection: 'row',
           alignItems: 'center',
           marginBottom: 12,
+          backgroundColor: colors.background,
+          zIndex: 100,
+          elevation: 10,
+          flexShrink: 0,
         },
         searchContainerInRow: {
           flex: 1,
@@ -1550,6 +1615,9 @@ const EventList: React.FC = () => {
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [newEvent, setNewEvent] = useState(() => createEmptyEvent());
+
+  // Falls back to manual text input if Google Places API fails (e.g. billing not enabled)
+  const [placesApiFailed, setPlacesApiFailed] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -2052,6 +2120,7 @@ const EventList: React.FC = () => {
       privacy: event.privacy || 'public',
       invitedUsers: event.invitedUsers || [],
     });
+    setPlacesApiFailed(false);
     setModalVisible(true);
     setTempRosterSize(event.totalSpots.toString());
     setTempEventType(event.eventType);
@@ -2570,22 +2639,6 @@ const EventList: React.FC = () => {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity
-            style={themedStyles.addButton}
-            onPress={() => {
-              setModalVisible(true);
-              setIsEditing(false);
-              setEditingEventId(null);
-              setNewEvent(createEmptyEvent());
-              setTempRosterSize('');
-              setTempEventType('');
-            }}>
-            <FontAwesomeIcon
-              icon={faPlus}
-              size={18}
-              color={colors.buttonText || '#fff'}
-            />
-          </TouchableOpacity>
         </View>
       </View>
       {/* Search Bar with Filter Button */}
@@ -2639,132 +2692,208 @@ const EventList: React.FC = () => {
           )}
         </TouchableOpacity>
       </View>
-      {/* Profile Filter Banner */}
-      {profileFilter && (
-        <View style={themedStyles.profileFilterBanner}>
-          <Text style={themedStyles.profileFilterText}>
-            {profileFilter === 'created'
-              ? t('profile.showingEventsCreated') ||
-                'Showing events you created'
-              : t('profile.showingEventsJoined') || 'Showing events you joined'}
-          </Text>
-          <TouchableOpacity
-            style={themedStyles.profileFilterClear}
-            onPress={clearFilters}>
-            <Text style={themedStyles.profileFilterClearText}>
-              {t('profile.clearFilter') || 'Clear'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      {/* Active Filters Display */}
-      {activeFilterCount > 0 && (
-        <View style={themedStyles.activeFiltersContainer}>
-          {selectedEventTypes.map(type => (
-            <TouchableOpacity
-              key={type}
-              style={themedStyles.activeFilterTag}
-              onPress={() => toggleEventType(type)}>
-              <Text style={themedStyles.activeFilterTagText}>
-                {getEventTypeEmoji(type)} {type}
-              </Text>
-              <FontAwesomeIcon
-                icon={faTimes}
-                size={12}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-          ))}
-          {selectedDateFilter !== 'all' && (
-            <TouchableOpacity
-              style={themedStyles.activeFilterTag}
-              onPress={() => setSelectedDateFilter('all')}>
-              <Text style={themedStyles.activeFilterTagText}>
-                📅{' '}
-                {
-                  dateFilterOptions.find(d => d.value === selectedDateFilter)
-                    ?.label
-                }
-              </Text>
-              <FontAwesomeIcon
-                icon={faTimes}
-                size={12}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-          )}
-          {showAvailableOnly && (
-            <TouchableOpacity
-              style={themedStyles.activeFilterTag}
-              onPress={() => setShowAvailableOnly(false)}>
-              <Text style={themedStyles.activeFilterTagText}>
-                ✅ {t('events.availableOnly') || 'Available spots'}
-              </Text>
-              <FontAwesomeIcon
-                icon={faTimes}
-                size={12}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-      {loading ? (
-        <EventListSkeleton count={4} />
-      ) : filteredEvents.length === 0 ? (
-        <View style={themedStyles.noResultsContainer}>
-          <FontAwesomeIcon
-            icon={faPlus}
-            size={48}
-            color={colors.border}
-            style={themedStyles.noResultsIcon}
-          />
-          <Text style={themedStyles.noResultsText}>
-            {searchQuery ? t('common.noResults') : t('events.noEvents')}
-          </Text>
-          {searchQuery ? (
-            <Text style={themedStyles.noResultsSubtext}>
-              {t('events.tryDifferentSearch') || 'Try a different search term'}
-            </Text>
-          ) : showFirstTimeHint ? (
-            <>
-              <Text style={themedStyles.noResultsSubtext}>
-                {t('events.noEventsSubtext') ||
-                  'Create your first event and invite others to play!'}
-              </Text>
+      {/* Content wrapper: pills + filters + event list in their own flex context */}
+      <View style={{flex: 1}}>
+        {/* Horizontal Activity Filter Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={themedStyles.chipBarContainer}
+          contentContainerStyle={themedStyles.chipBarContent}>
+          {activityOptions.map(option => {
+            const isActive = selectedEventTypes.includes(option.label);
+            return (
               <TouchableOpacity
-                style={themedStyles.ctaButton}
-                onPress={() => {
-                  dismissFirstTimeHint();
-                  setModalVisible(true);
-                }}>
-                <FontAwesomeIcon icon={faPlus} size={16} color="#fff" />
-                <Text style={themedStyles.ctaButtonText}>
-                  {t('events.createFirstEvent') || 'Create Your First Event'}
+                key={option.label}
+                style={[themedStyles.chip, isActive && themedStyles.chipActive]}
+                onPress={() => toggleEventType(option.label)}
+                activeOpacity={0.7}>
+                <Text style={themedStyles.chipEmoji}>{option.emoji}</Text>
+                <Text
+                  style={[
+                    themedStyles.chipText,
+                    isActive && themedStyles.chipTextActive,
+                  ]}>
+                  {option.label}
                 </Text>
               </TouchableOpacity>
-            </>
-          ) : null}
-        </View>
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={filteredEvents}
-          renderItem={renderEventCard}
-          keyExtractor={item => item._id}
-          refreshing={loading}
-          onRefresh={fetchEvents}
-          onScrollToIndexFailed={info => {
-            // Handle scroll failure gracefully
-            setTimeout(() => {
-              flatListRef.current?.scrollToIndex({
-                index: info.index,
-                animated: true,
-              });
-            }, 100);
-          }}
+            );
+          })}
+        </ScrollView>
+        {/* Profile Filter Banner */}
+        {profileFilter && (
+          <View style={themedStyles.profileFilterBanner}>
+            <Text style={themedStyles.profileFilterText}>
+              {profileFilter === 'created'
+                ? t('profile.showingEventsCreated') ||
+                  'Showing events you created'
+                : t('profile.showingEventsJoined') ||
+                  'Showing events you joined'}
+            </Text>
+            <TouchableOpacity
+              style={themedStyles.profileFilterClear}
+              onPress={clearFilters}>
+              <Text style={themedStyles.profileFilterClearText}>
+                {t('profile.clearFilter') || 'Clear'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {/* Active Filters Display */}
+        {activeFilterCount > 0 && (
+          <View style={themedStyles.activeFiltersContainer}>
+            {selectedEventTypes.map(type => (
+              <TouchableOpacity
+                key={type}
+                style={themedStyles.activeFilterTag}
+                onPress={() => toggleEventType(type)}>
+                <Text style={themedStyles.activeFilterTagText}>
+                  {getEventTypeEmoji(type)} {type}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={12}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            ))}
+            {selectedDateFilter !== 'all' && (
+              <TouchableOpacity
+                style={themedStyles.activeFilterTag}
+                onPress={() => setSelectedDateFilter('all')}>
+                <Text style={themedStyles.activeFilterTagText}>
+                  📅{' '}
+                  {
+                    dateFilterOptions.find(d => d.value === selectedDateFilter)
+                      ?.label
+                  }
+                </Text>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={12}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            )}
+            {showAvailableOnly && (
+              <TouchableOpacity
+                style={themedStyles.activeFilterTag}
+                onPress={() => setShowAvailableOnly(false)}>
+                <Text style={themedStyles.activeFilterTagText}>
+                  ✅ {t('events.availableOnly') || 'Available spots'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={12}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {loading ? (
+          <EventListSkeleton count={4} />
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={filteredEvents}
+            renderItem={renderEventCard}
+            keyExtractor={item => item._id}
+            refreshing={loading}
+            onRefresh={fetchEvents}
+            onScrollToIndexFailed={info => {
+              // Handle scroll failure gracefully
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                });
+              }, 100);
+            }}
+            ListEmptyComponent={
+              <View
+                style={[
+                  themedStyles.noResultsContainer,
+                  {flex: 0, paddingVertical: 60},
+                ]}>
+                <FontAwesomeIcon
+                  icon={faPlus}
+                  size={48}
+                  color={colors.border}
+                  style={themedStyles.noResultsIcon}
+                />
+                <Text style={themedStyles.noResultsText}>
+                  {searchQuery
+                    ? t('common.noResults')
+                    : activeFilterCount > 0
+                    ? t('events.noMatchingEvents') || 'No matching events'
+                    : t('events.noEvents')}
+                </Text>
+                {searchQuery ? (
+                  <Text style={themedStyles.noResultsSubtext}>
+                    {t('events.tryDifferentSearch') ||
+                      'Try a different search term'}
+                  </Text>
+                ) : activeFilterCount > 0 ? (
+                  <>
+                    <Text style={themedStyles.noResultsSubtext}>
+                      {t('events.tryDifferentFilter') ||
+                        'Try a different filter or clear your current filters'}
+                    </Text>
+                    <TouchableOpacity
+                      style={themedStyles.ctaButton}
+                      onPress={clearFilters}>
+                      <FontAwesomeIcon icon={faTimes} size={16} color="#fff" />
+                      <Text style={themedStyles.ctaButtonText}>
+                        {t('events.clearFilters') || 'Clear Filters'}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : showFirstTimeHint ? (
+                  <>
+                    <Text style={themedStyles.noResultsSubtext}>
+                      {t('events.noEventsSubtext') ||
+                        'Create your first event and invite others to join!'}
+                    </Text>
+                    <TouchableOpacity
+                      style={themedStyles.ctaButton}
+                      onPress={() => {
+                        dismissFirstTimeHint();
+                        setPlacesApiFailed(false);
+                        setModalVisible(true);
+                      }}>
+                      <FontAwesomeIcon icon={faPlus} size={16} color="#fff" />
+                      <Text style={themedStyles.ctaButtonText}>
+                        {t('events.createFirstEvent') ||
+                          'Create Your First Event'}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
+              </View>
+            }
+          />
+        )}
+      </View>
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={themedStyles.fab}
+        activeOpacity={0.85}
+        onPress={() => {
+          setPlacesApiFailed(false);
+          setModalVisible(true);
+          setIsEditing(false);
+          setEditingEventId(null);
+          setNewEvent(createEmptyEvent());
+          setTempRosterSize('');
+          setTempEventType('');
+        }}>
+        <FontAwesomeIcon
+          icon={faPlus}
+          size={24}
+          color={colors.buttonText || '#fff'}
         />
-      )}
+      </TouchableOpacity>
       <Modal animationType="fade" transparent={true} visible={modalVisible}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -2790,7 +2919,7 @@ const EventList: React.FC = () => {
                 />
                 {/* Location Input with Autocomplete */}
                 <View style={themedStyles.autocompleteContainer}>
-                  {isApiKeyConfigured ? (
+                  {isApiKeyConfigured && !placesApiFailed ? (
                     <GooglePlacesAutocomplete
                       placeholder="Location/Facility"
                       onPress={(data, details = null) => {
@@ -2819,6 +2948,9 @@ const EventList: React.FC = () => {
                       styles={autocompleteStyles}
                       onFail={error => {
                         console.warn('GooglePlacesAutocomplete error:', error);
+                        // Fall back to plain text input when API fails
+                        // (e.g. billing not enabled, quota exceeded, invalid key)
+                        setPlacesApiFailed(true);
                       }}
                       textInputProps={{
                         placeholderTextColor: colors.placeholder || '#888',
@@ -2829,7 +2961,11 @@ const EventList: React.FC = () => {
                   ) : (
                     <TextInput
                       style={themedStyles.modalInput}
-                      placeholder={t('events.eventLocation')}
+                      placeholder={
+                        placesApiFailed
+                          ? 'Enter location manually'
+                          : t('events.eventLocation')
+                      }
                       placeholderTextColor={colors.placeholder || '#888'}
                       value={newEvent.location}
                       onChangeText={text =>

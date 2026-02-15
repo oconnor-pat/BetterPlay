@@ -458,7 +458,7 @@ const Notifications: React.FC = () => {
           alignItems: 'center',
           paddingHorizontal: 16,
           paddingVertical: 12,
-          borderBottomWidth: 1,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         notificationRowUnread: {

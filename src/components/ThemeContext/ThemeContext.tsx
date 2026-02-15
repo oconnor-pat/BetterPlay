@@ -32,31 +32,31 @@ interface ThemeContextType {
 }
 
 const lightColors: ThemeColors = {
-  background: '#f5f5f7',
+  background: '#F6F8FA',
   card: '#ffffff',
-  text: '#1d1d1f',
-  secondaryText: '#86868b',
+  text: '#1B1F23',
+  secondaryText: '#6A737D',
   primary: '#2ECC71',
-  border: '#d2d2d7',
-  error: '#b11313',
-  success: '#4CAF50',
+  border: '#E1E4E8',
+  error: '#D73A49',
+  success: '#28A745',
   buttonText: '#fff',
-  inputBackground: '#e8e8ed',
-  placeholder: '#8e8e93',
+  inputBackground: '#F0F2F5',
+  placeholder: '#8B949E',
 };
 
 const darkColors: ThemeColors = {
-  background: '#181818',
-  card: '#222',
-  text: '#fff',
-  secondaryText: '#aaa',
+  background: '#121212',
+  card: '#1E1E1E',
+  text: '#E8E8E8',
+  secondaryText: '#A0A0A0',
   primary: '#2ECC71',
-  border: '#333',
-  error: '#ff4d4f',
-  success: '#4CAF50',
+  border: '#333333',
+  error: '#F4212E',
+  success: '#00BA7C',
   buttonText: '#fff',
-  inputBackground: '#333',
-  placeholder: '#aaa',
+  inputBackground: '#252525',
+  placeholder: '#808080',
 };
 
 const THEME_STORAGE_KEY = '@app_theme_mode';

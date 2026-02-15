@@ -86,7 +86,10 @@ class NotificationService {
         status === AuthorizationStatus.AUTHORIZED ||
         status === AuthorizationStatus.PROVISIONAL
       ) {
-        await this.getAndRegisterToken();
+        // Fire token registration in the background so it doesn't block init
+        this.getAndRegisterToken().catch(err =>
+          console.log('Background token registration deferred:', err),
+        );
       }
 
       this.isInitialized = true;
@@ -144,17 +147,39 @@ class NotificationService {
   }
 
   /**
+   * Wait for the APNs token with retry logic.
+   * On a physical device the token is not available immediately at launch.
+   */
+  private async waitForAPNsToken(
+    maxRetries = 5,
+    delayMs = 1500,
+  ): Promise<string | null> {
+    for (let i = 0; i < maxRetries; i++) {
+      const apnsToken = await messaging().getAPNSToken();
+      if (apnsToken) {
+        return apnsToken;
+      }
+      console.log(
+        `APNs token not yet available, retrying (${i + 1}/${maxRetries})...`,
+      );
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    return null;
+  }
+
+  /**
    * Get the FCM/APNs device token
    */
   async getDeviceToken(): Promise<string | null> {
     try {
-      // For iOS, check if we have APNs token (auto-registered by Firebase)
+      // For iOS, wait for the APNs token before requesting FCM token
       if (Platform.OS === 'ios') {
-        // Get APNs token - Firebase auto-registers for remote messages
-        const apnsToken = await messaging().getAPNSToken();
+        const apnsToken = await this.waitForAPNsToken();
         if (!apnsToken) {
-          console.warn('APNs token not yet available');
-          // Token might not be ready yet, continue to try FCM token
+          console.warn(
+            'APNs token unavailable after retries — push notifications may not work',
+          );
+          return null;
         }
       }
 
@@ -262,7 +287,18 @@ class NotificationService {
         console.log('Device token registered with backend successfully');
         return true;
       } else {
-        console.warn('Failed to register device token with backend');
+        const status = response.status;
+        // 401 is expected if the user token is stale or from a different backend
+        // (e.g. production token used against local dev server) — don't warn
+        if (status === 401) {
+          console.log(
+            'Device token registration skipped: user not authenticated (token may be stale)',
+          );
+        } else {
+          console.log(
+            `Device token registration failed with status ${status}`,
+          );
+        }
         return false;
       }
     } catch (error) {

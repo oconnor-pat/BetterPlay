@@ -319,6 +319,7 @@ function LandingPage() {
         },
         modalSuccessButton: {
           marginTop: 24,
+          paddingHorizontal: 48,
         },
         failedAttemptsWarning: {
           backgroundColor: colors.error + '15',
