@@ -51,6 +51,7 @@ import {
   faLock,
   faEnvelope,
   faBell,
+  faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 import {
   useNavigation,
@@ -419,21 +420,19 @@ const openMapsForEvent = async (
 
   const lat = coords.latitude;
   const lng = coords.longitude;
-  const hasCoords = true; // We always have coordinates now
+  const hasCoords = !!(lat && lng);
 
-  const encodedQuery = encodeURIComponent(
-    hasCoords ? `${lat},${lng}` : address || name,
-  );
-  const encodedLabel = encodeURIComponent(name);
+  // Use the human-readable address for destination labels
+  const encodedAddress = encodeURIComponent(address || name);
 
   try {
     if (Platform.OS === 'ios') {
       // 1) Google Maps if installed
       const googleScheme = 'comgooglemaps://';
       if (await Linking.canOpenURL(googleScheme)) {
-        const url = hasCoords
-          ? `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`
-          : `comgooglemaps://?q=${encodedQuery}`;
+        const url = address
+          ? `comgooglemaps://?daddr=${encodedAddress}&directionsmode=driving`
+          : `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
         await Linking.openURL(url);
         return;
       }
@@ -442,22 +441,22 @@ const openMapsForEvent = async (
       if (await Linking.canOpenURL(wazeScheme)) {
         const url = hasCoords
           ? `waze://?ll=${lat},${lng}&navigate=yes`
-          : `waze://?q=${encodedQuery}&navigate=yes`;
+          : `waze://?q=${encodedAddress}&navigate=yes`;
         await Linking.openURL(url);
         return;
       }
-      // 3) Apple Maps fallback
-      const appleUrl = hasCoords
-        ? `http://maps.apple.com/?daddr=${lat},${lng}&q=${encodedLabel}`
-        : `http://maps.apple.com/?q=${encodedQuery}`;
+      // 3) Apple Maps fallback — use address so the destination shows a name
+      const appleUrl = address
+        ? `http://maps.apple.com/?daddr=${encodedAddress}`
+        : `http://maps.apple.com/?daddr=${lat},${lng}`;
       await Linking.openURL(appleUrl);
       return;
     } else {
       // Android
       // 1) Google navigation (if available)
-      const googleNavUrl = hasCoords
-        ? `google.navigation:q=${lat},${lng}`
-        : `google.navigation:q=${encodedQuery}`;
+      const googleNavUrl = address
+        ? `google.navigation:q=${encodedAddress}`
+        : `google.navigation:q=${lat},${lng}`;
       if (await Linking.canOpenURL(googleNavUrl)) {
         await Linking.openURL(googleNavUrl);
         return;
@@ -467,14 +466,14 @@ const openMapsForEvent = async (
       if (await Linking.canOpenURL(wazeScheme)) {
         const wazeUrl = hasCoords
           ? `waze://?ll=${lat},${lng}&navigate=yes`
-          : `waze://?q=${encodedQuery}&navigate=yes`;
+          : `waze://?q=${encodedAddress}&navigate=yes`;
         await Linking.openURL(wazeUrl);
         return;
       }
-      // 3) Generic geo: fallback
+      // 3) Generic geo: fallback — use address as label
       const geoUrl = hasCoords
-        ? `geo:${lat},${lng}?q=${lat},${lng}(${encodedLabel})`
-        : `geo:0,0?q=${encodedQuery}`;
+        ? `geo:${lat},${lng}?q=${lat},${lng}(${encodedAddress})`
+        : `geo:0,0?q=${encodedAddress}`;
       await Linking.openURL(geoUrl);
     }
   } catch (e) {
@@ -1479,87 +1478,105 @@ const EventList: React.FC = () => {
         // Likes modal styles
         likesModalOverlay: {
           flex: 1,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.55)',
+          justifyContent: 'flex-end',
         },
         likesModalContent: {
           backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 20,
-          width: '80%',
-          maxWidth: 300,
-          maxHeight: '50%',
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          paddingHorizontal: 20,
+          paddingBottom: Platform.OS === 'ios' ? 36 : 20,
+          maxHeight: '55%',
+        },
+        likesModalHandle: {
+          alignSelf: 'center',
+          width: 40,
+          height: 5,
+          borderRadius: 3,
+          backgroundColor: colors.border,
+          marginTop: 10,
+          marginBottom: 16,
+        },
+        likesModalHeaderRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 16,
+          gap: 8,
         },
         likesModalTitle: {
-          fontSize: 16,
+          fontSize: 18,
           fontWeight: '700',
           color: colors.text,
-          textAlign: 'center',
-          marginBottom: 14,
         },
         likesModalScroll: {
-          maxHeight: 220,
+          maxHeight: 320,
         },
         likesModalUserRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 8,
-          borderBottomWidth: 1,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         likesModalAvatar: {
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          marginRight: 10,
+          width: 42,
+          height: 42,
+          borderRadius: 21,
+          marginRight: 14,
         },
         likesModalAvatarPlaceholder: {
-          width: 32,
-          height: 32,
-          borderRadius: 16,
+          width: 42,
+          height: 42,
+          borderRadius: 21,
           backgroundColor: colors.primary,
           justifyContent: 'center',
           alignItems: 'center',
-          marginRight: 10,
+          marginRight: 14,
         },
         likesModalAvatarText: {
           color: '#fff',
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 15,
+          fontWeight: '700',
         },
         likesModalUsername: {
-          fontSize: 14,
+          fontSize: 15,
           color: colors.text,
           flex: 1,
+          fontWeight: '500',
         },
         likesModalUsernameClickable: {
           color: colors.primary,
+        },
+        likesModalChevron: {
+          marginLeft: 8,
+          opacity: 0.4,
         },
         likesModalAnonymous: {
           fontSize: 13,
           color: colors.secondaryText,
           fontStyle: 'italic',
-          paddingVertical: 8,
+          paddingVertical: 12,
           textAlign: 'center',
         },
         likesModalEmpty: {
           textAlign: 'center',
           color: colors.placeholder || '#888',
-          fontSize: 13,
-          paddingVertical: 16,
+          fontSize: 14,
+          paddingVertical: 24,
         },
         likesModalClose: {
-          marginTop: 14,
-          paddingVertical: 10,
+          marginTop: 16,
+          paddingVertical: 12,
           backgroundColor: colors.primary,
-          borderRadius: 8,
+          borderRadius: 12,
           alignItems: 'center',
         },
         likesModalCloseText: {
           color: '#fff',
-          fontWeight: '600',
-          fontSize: 14,
+          fontWeight: '700',
+          fontSize: 15,
         },
       }),
     [colors],
@@ -1665,6 +1682,15 @@ const EventList: React.FC = () => {
   const [invitedUserDetails, setInvitedUserDetails] = useState<LikedByUser[]>(
     [],
   );
+
+  // Close all pickers except the one being opened (accordion behavior)
+  const closeAllPickers = (except?: string) => {
+    if (except !== 'date') setShowDatePicker(false);
+    if (except !== 'time') setShowTimePicker(false);
+    if (except !== 'rosterSize') setShowRosterSizePicker(false);
+    if (except !== 'eventType') setShowEventTypePicker(false);
+    if (except !== 'jerseyColor') setShowJerseyColorPicker(false);
+  };
 
   // Expanded comments state - tracks which event's comments are shown inline
   const [expandedCommentsEventId, setExpandedCommentsEventId] = useState<
@@ -2978,7 +3004,10 @@ const EventList: React.FC = () => {
                 {/* Event Date selector */}
                 <TouchableOpacity
                   style={themedStyles.modalInput}
-                  onPress={() => setShowDatePicker(true)}>
+                  onPress={() => {
+                    closeAllPickers('date');
+                    setShowDatePicker(true);
+                  }}>
                   <Text
                     style={{
                       color: newEvent.date ? colors.text : colors.placeholder,
@@ -2999,7 +3028,10 @@ const EventList: React.FC = () => {
                     />
                     <TouchableOpacity
                       onPress={() => {
-                        setNewEvent({...newEvent, date: date?.toDateString()});
+                        setNewEvent({
+                          ...newEvent,
+                          date: date ? date.toDateString() : '',
+                        });
                         setShowDatePicker(false);
                       }}>
                       <Text style={themedStyles.confirmButton}>
@@ -3012,7 +3044,10 @@ const EventList: React.FC = () => {
                 {/* Event Time selector */}
                 <TouchableOpacity
                   style={themedStyles.modalInput}
-                  onPress={() => setShowTimePicker(true)}>
+                  onPress={() => {
+                    closeAllPickers('time');
+                    setShowTimePicker(true);
+                  }}>
                   <Text
                     style={{
                       color: newEvent.time ? colors.text : colors.placeholder,
@@ -3036,10 +3071,12 @@ const EventList: React.FC = () => {
                       onPress={() => {
                         setNewEvent({
                           ...newEvent,
-                          time: time?.toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }),
+                          time: time
+                            ? time.toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              }) ?? ''
+                            : '',
                         });
                         setShowTimePicker(false);
                       }}>
@@ -3054,6 +3091,7 @@ const EventList: React.FC = () => {
                 <TouchableOpacity
                   style={themedStyles.modalInput}
                   onPress={() => {
+                    closeAllPickers('rosterSize');
                     setShowRosterSizePicker(true);
                     setTempRosterSize(newEvent.totalSpots || '');
                   }}>
@@ -3104,6 +3142,7 @@ const EventList: React.FC = () => {
                 <TouchableOpacity
                   style={themedStyles.modalInput}
                   onPress={() => {
+                    closeAllPickers('eventType');
                     setShowEventTypePicker(true);
                     setTempEventType(newEvent.eventType || '');
                   }}>
@@ -3158,7 +3197,10 @@ const EventList: React.FC = () => {
                   <>
                     <TouchableOpacity
                       style={themedStyles.modalInput}
-                      onPress={() => setShowJerseyColorPicker(true)}>
+                      onPress={() => {
+                        closeAllPickers('jerseyColor');
+                        setShowJerseyColorPicker(true);
+                      }}>
                       <Text
                         style={{
                           color:
@@ -3595,17 +3637,29 @@ const EventList: React.FC = () => {
       <Modal
         visible={likesModalVisible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setLikesModalVisible(false)}>
         <TouchableOpacity
           style={themedStyles.likesModalOverlay}
           activeOpacity={1}
           onPress={() => setLikesModalVisible(false)}>
-          <View style={themedStyles.likesModalContent}>
-            <Text style={themedStyles.likesModalTitle}>
-              {likesModalData.title}
-            </Text>
-            <ScrollView style={themedStyles.likesModalScroll}>
+          <View
+            style={themedStyles.likesModalContent}
+            onStartShouldSetResponder={() => true}>
+            <View style={themedStyles.likesModalHandle} />
+            <View style={themedStyles.likesModalHeaderRow}>
+              <FontAwesomeIcon
+                icon={faHeart}
+                size={18}
+                color={colors.primary}
+              />
+              <Text style={themedStyles.likesModalTitle}>
+                {likesModalData.title}
+              </Text>
+            </View>
+            <ScrollView
+              style={themedStyles.likesModalScroll}
+              showsVerticalScrollIndicator={false}>
               {likesModalData.users.length > 0 ? (
                 <>
                   {likesModalData.users.map((user, index) => (
@@ -3644,6 +3698,14 @@ const EventList: React.FC = () => {
                         ]}>
                         {user.username}
                       </Text>
+                      {!!user._id && (
+                        <FontAwesomeIcon
+                          icon={faChevronRight}
+                          size={12}
+                          color={colors.secondaryText}
+                          style={themedStyles.likesModalChevron}
+                        />
+                      )}
                     </TouchableOpacity>
                   ))}
                   {likesModalData.anonymousCount > 0 && (

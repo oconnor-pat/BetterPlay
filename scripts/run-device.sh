@@ -47,7 +47,7 @@ else
 fi
 
 echo "🔨 Building BetterPlay..."
-xcodebuild -workspace "$WORKSPACE" -scheme BetterPlay -configuration Debug -destination "id=$DEVICE_ID" -allowProvisioningUpdates -quiet
+xcodebuild build -workspace "$WORKSPACE" -scheme BetterPlay -configuration Debug -destination "generic/platform=iOS" -allowProvisioningUpdates -quiet
 
 if [ $? -ne 0 ]; then
     echo "❌ Build failed"
