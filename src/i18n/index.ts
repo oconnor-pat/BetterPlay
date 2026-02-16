@@ -34,7 +34,7 @@ const resources = {
 };
 
 // Language detector that loads from AsyncStorage
-const languageDetector = {
+const _languageDetector = {
   type: 'languageDetector' as const,
   async: true,
   detect: async (callback: (lang: string) => void) => {

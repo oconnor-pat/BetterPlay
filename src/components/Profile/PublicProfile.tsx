@@ -30,9 +30,7 @@ import {
   faUserPlus,
   faUserCheck,
   faUserClock,
-  faUserMinus,
   faFire,
-  faUserGroup,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 import {TouchableOpacity} from 'react-native';
@@ -94,7 +92,7 @@ const PublicProfile: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [userData, setUserData] = useState<PublicUserData | null>(null);
   const [friendStatus, setFriendStatus] = useState<FriendStatus>('none');
-  const [mutualFriendsCount, setMutualFriendsCount] = useState<number>(0);
+  const [_mutualFriendsCount, _setMutualFriendsCount] = useState<number>(0);
   const [favoriteSports, setFavoriteSports] = useState<string[]>([]);
 
   // Fetch friend status

@@ -37,7 +37,6 @@ import {
   faRepeat,
   faGear,
   faChevronDown,
-  faFilter,
   faStar,
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
@@ -118,8 +117,12 @@ const parseTimeToHour = (timeStr: string, roundUp: boolean = false): number => {
   const isPM = match[3].toUpperCase() === 'PM';
 
   // Convert to 24-hour format
-  if (isPM && hour !== 12) hour += 12;
-  if (!isPM && hour === 12) hour = 0;
+  if (isPM && hour !== 12) {
+    hour += 12;
+  }
+  if (!isPM && hour === 12) {
+    hour = 0;
+  }
 
   // Round up for start times (so 5:30 AM becomes 6 AM - first full hour available)
   // Round down for end times (so 10:30 PM becomes 10 PM - last full hour slot)
@@ -154,7 +157,9 @@ const generateDefaultTimeSlots = (
       startHour = parseTimeToHour(parts[0].trim(), true);
       endHour = parseTimeToHour(parts[1].trim(), false);
       // Handle midnight (12:00 AM) as end of day
-      if (endHour === 0) endHour = 24;
+      if (endHour === 0) {
+        endHour = 24;
+      }
     }
   }
 
@@ -274,12 +279,16 @@ const SpaceDetail: React.FC = () => {
   // Helper function to safely compare user IDs (handles ObjectId vs string comparison)
   const isCurrentUserBooking = useCallback(
     (slot: TimeSlot): boolean => {
-      if (!slot.isBooked) return false;
+      if (!slot.isBooked) {
+        return false;
+      }
 
       const currentUserId = userData?._id;
       const currentUsername = userData?.username;
 
-      if (!currentUserId && !currentUsername) return false;
+      if (!currentUserId && !currentUsername) {
+        return false;
+      }
 
       // Check bookedBy - handle both string and object formats
       const bookedById =
@@ -1657,7 +1666,9 @@ const SpaceDetail: React.FC = () => {
 
   // Save edited slot
   const saveEditedSlot = async () => {
-    if (!editingSlot) return;
+    if (!editingSlot) {
+      return;
+    }
 
     if (newSlotStartTime >= newSlotEndTime) {
       Alert.alert(
@@ -1669,7 +1680,9 @@ const SpaceDetail: React.FC = () => {
 
     // Check for overlapping slots (excluding the current slot being edited)
     const hasOverlap = timeSlots.some(slot => {
-      if (slot._id === editingSlot._id) return false;
+      if (slot._id === editingSlot._id) {
+        return false;
+      }
       return (
         (newSlotStartTime >= slot.startTime &&
           newSlotStartTime < slot.endTime) ||
@@ -1759,22 +1772,34 @@ const SpaceDetail: React.FC = () => {
 
     // Determine card style based on booking status
     const getCardStyle = () => {
-      if (!item.isBooked) return themedStyles.slotCardAvailable;
-      if (isMyBooking) return themedStyles.slotCardMyBooking;
+      if (!item.isBooked) {
+        return themedStyles.slotCardAvailable;
+      }
+      if (isMyBooking) {
+        return themedStyles.slotCardMyBooking;
+      }
       return themedStyles.slotCardOtherBooking;
     };
 
     // Get status color
     const getStatusColor = () => {
-      if (!item.isBooked) return COLORS.available;
-      if (isMyBooking) return COLORS.myBooking;
+      if (!item.isBooked) {
+        return COLORS.available;
+      }
+      if (isMyBooking) {
+        return COLORS.myBooking;
+      }
       return COLORS.otherBooking;
     };
 
     // Get status text
     const getStatusText = () => {
-      if (!item.isBooked) return t('venues.available');
-      if (isMyBooking) return t('venues.yourBooking');
+      if (!item.isBooked) {
+        return t('venues.available');
+      }
+      if (isMyBooking) {
+        return t('venues.yourBooking');
+      }
       return t('venues.booked');
     };
 
@@ -1974,7 +1999,9 @@ const SpaceDetail: React.FC = () => {
 
     // Calculate the end date for recurring bookings
     const getRecurringEndDate = () => {
-      if (!selectedSlot) return '';
+      if (!selectedSlot) {
+        return '';
+      }
       const startDate = parseDateString(selectedSlot.date);
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + (recurringWeeks - 1) * 7);
@@ -2724,9 +2751,15 @@ const SpaceDetail: React.FC = () => {
 
                   // Determine cell style
                   const getCellStyle = () => {
-                    if (isPast) return themedStyles.weekSlotPast;
-                    if (!isBooked) return themedStyles.weekSlotAvailable;
-                    if (isMyBooking) return themedStyles.weekSlotMyBooking;
+                    if (isPast) {
+                      return themedStyles.weekSlotPast;
+                    }
+                    if (!isBooked) {
+                      return themedStyles.weekSlotAvailable;
+                    }
+                    if (isMyBooking) {
+                      return themedStyles.weekSlotMyBooking;
+                    }
                     return themedStyles.weekSlotBooked;
                   };
 

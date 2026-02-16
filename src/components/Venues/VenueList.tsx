@@ -31,12 +31,11 @@ import {
   faClock,
   faPlus,
   faChevronDown,
-  faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
-import UserContext, {UserContextType} from '../UserContext';
+import UserContext from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
 import Config from 'react-native-config';
@@ -158,7 +157,9 @@ const formatAddress = (address: Address): string => {
 
 // Helper to get today's operating hours
 const getTodayHours = (hours?: OperatingHours): string | null => {
-  if (!hours) return null;
+  if (!hours) {
+    return null;
+  }
   const days = [
     'sunday',
     'monday',
@@ -170,7 +171,9 @@ const getTodayHours = (hours?: OperatingHours): string | null => {
   ];
   const today = days[new Date().getDay()] as keyof OperatingHours;
   const todayHours = hours[today];
-  if (!todayHours) return 'Closed';
+  if (!todayHours) {
+    return 'Closed';
+  }
   return `${todayHours.open} - ${todayHours.close}`;
 };
 
@@ -185,7 +188,9 @@ const getSpaceLabel = (venueType: string) => {
   const found = venueTypeOptions.find(
     opt => opt.label.toLowerCase() === venueType.toLowerCase(),
   );
-  if (!found) return 'Spaces';
+  if (!found) {
+    return 'Spaces';
+  }
 
   switch (found.type) {
     case 'rink':
@@ -806,7 +811,7 @@ const VenueList: React.FC = () => {
       const token = await AsyncStorage.getItem('userToken');
 
       // Build operating hours string from open/close times
-      const operatingHoursStr =
+      const _operatingHoursStr =
         newVenue.openTime && newVenue.closeTime
           ? `${newVenue.openTime} - ${newVenue.closeTime}`
           : '';
@@ -834,7 +839,9 @@ const VenueList: React.FC = () => {
         } else {
           state = stateZipPart;
         }
-        if (addressParts[4]) country = addressParts[4];
+        if (addressParts[4]) {
+          country = addressParts[4];
+        }
       } else if (addressParts.length === 3) {
         // Format: "Venue, City, State"
         city = addressParts[1] || '';
@@ -913,7 +920,7 @@ const VenueList: React.FC = () => {
   };
 
   // Admin: Delete venue
-  const handleDeleteVenue = async (venueId: string) => {
+  const _handleDeleteVenue = async (venueId: string) => {
     Alert.alert(t('venues.deleteVenue'), t('venues.deleteConfirm'), [
       {text: t('common.cancel'), style: 'cancel'},
       {

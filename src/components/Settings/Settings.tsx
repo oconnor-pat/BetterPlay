@@ -147,7 +147,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleNotificationsToggle = async () => {
+  const _handleNotificationsToggle = async () => {
     const newValue = !notificationsEnabled;
     setNotificationsEnabled(newValue);
 

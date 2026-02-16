@@ -27,7 +27,6 @@ import {
   NotificationProvider,
   useNotifications,
 } from './src/Context/NotificationContext';
-import notificationService from './src/services/NotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from './src/config/api';
 
