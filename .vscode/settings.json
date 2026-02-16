@@ -1,11 +1,4 @@
 {
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "search.exclude": {
-    "**/node_modules": true
-  },
-  "files.watcherExclude": {
-    "**/node_modules/**": true
-  },
   "postman.settings.dotenv-detection-notification-visibility": false,
   "codium.codeCompletion.enable": true,
   "cSpell.ignorePaths": [
@@ -21,17 +14,5 @@
     "**/*.xcworkspacedata",
     "**/*.xcscheme"
   ],
-  "cSpell.words": [
-    "comgooglemaps",
-    "daddr",
-    "datetimepicker",
-    "directionsmode",
-    "getifaddr",
-    "notif",
-    "Notifs",
-    "pbxproj",
-    "selectbox",
-    "xcscheme",
-    "xcworkspacedata"
-  ]
+  "cSpell.words": ["getifaddr", "notif", "Notifs", "selectbox"]
 }

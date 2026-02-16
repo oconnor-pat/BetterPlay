@@ -2,9 +2,6 @@
 #
 .DS_Store
 
-# Corrupted Pods backup (pending deletion)
-ios/Pods_corrupted_backup/
-
 # Environment variables
 .env
 .env.local

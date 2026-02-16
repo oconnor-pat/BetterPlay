@@ -19,12 +19,13 @@ import {
   faUserMinus,
   faUser,
   faChevronRight,
+  faUserPlus,
   faSearch,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
-
+import {useTranslation} from 'react-i18next';
 
 interface Friend {
   _id: string;
@@ -37,6 +38,7 @@ interface Friend {
 const FriendsList: React.FC = () => {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
+  const {t} = useTranslation();
 
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);

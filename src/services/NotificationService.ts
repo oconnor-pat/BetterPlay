@@ -295,7 +295,9 @@ class NotificationService {
             'Device token registration skipped: user not authenticated (token may be stale)',
           );
         } else {
-          console.log(`Device token registration failed with status ${status}`);
+          console.log(
+            `Device token registration failed with status ${status}`,
+          );
         }
         return false;
       }
@@ -543,7 +545,7 @@ class NotificationService {
       venueId,
       spaceId,
       // Backend-specific fields
-      senderId: _senderId,
+      senderId,
       accepterId,
       postId,
     } = data;

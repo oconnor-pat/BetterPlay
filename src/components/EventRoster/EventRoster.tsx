@@ -1,5 +1,6 @@
 import React, {
   useState,
+  useEffect,
   useMemo,
   useContext,
   useCallback,
@@ -299,13 +300,9 @@ const EventRoster: React.FC = () => {
   // Check if user can join this event
   const canJoinEvent = useMemo(() => {
     // Public events: anyone can join
-    if (eventPrivacy === 'public') {
-      return true;
-    }
+    if (eventPrivacy === 'public') return true;
     // Private events: anyone can join (they just can't see it in the list)
-    if (eventPrivacy === 'private') {
-      return true;
-    }
+    if (eventPrivacy === 'private') return true;
     // Invite-only: only invited users or the creator can join
     if (eventPrivacy === 'invite-only') {
       return isEventCreator || isUserInvited;
@@ -1235,7 +1232,7 @@ const EventRoster: React.FC = () => {
         },
       ]);
     },
-    [userData?.username, t, eventId, updateRosterSpots, persistRoster],
+    [userData?.username, t, eventId, updateRosterSpots],
   );
 
   // Open edit modal for current user
@@ -1272,9 +1269,9 @@ const EventRoster: React.FC = () => {
       return updatedRoster;
     });
     setEditModalVisible(false);
-  }, [editPaidStatus, editJerseyColor, editPosition, userData?.username, t, eventType, persistRoster]);
+  }, [editPaidStatus, editJerseyColor, editPosition, userData?.username, t]);
 
-  const renderPlayerCard = ({item, index: _index}: {item: Player; index: number}) => {
+  const renderPlayerCard = ({item, index}: {item: Player; index: number}) => {
     const isSelf = item.username === userData?.username;
     const jerseyColorHex = jerseyColors[item.jerseyColor] || jerseyColors.Other;
     const isLight = isLightColor(item.jerseyColor);
