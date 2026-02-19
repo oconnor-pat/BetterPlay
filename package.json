@@ -1,5 +1,5 @@
 {
-  "version": "1.6.3",
+  "version": "1.8.3",
   "private": true,
   "scripts": {
     "android": "npm run emulator:pixel9 && npx react-native run-android",
@@ -8,6 +8,7 @@
     "ios": "react-native run-ios --simulator='iPhone 17 Pro (26.1)'",
     "lint": "eslint .",
     "start": "react-native start --port 8082",
+    "kill": "pkill -f xcodebuild; pkill -f 'react-native.*bundle'; pkill -f hermesc; pkill -f 'react-native start'; rm -f /tmp/betterplay-metro.pid; echo 'All processes killed'",
     "test": "jest",
     "postinstall": "sed -i '' 's|boostorg.jfrog.io/artifactory/main|archives.boost.io|g' node_modules/react-native/third-party-podspecs/boost.podspec 2>/dev/null || true"
   },

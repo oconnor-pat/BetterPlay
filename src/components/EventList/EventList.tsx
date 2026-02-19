@@ -44,7 +44,6 @@ import {
   faFilter,
   faShareAlt,
   faLocationArrow,
-  faArrowRightToBracket,
   faComments,
   faHeart,
   faGlobe,
@@ -56,7 +55,6 @@ import {
 import {
   useNavigation,
   NavigationProp,
-  CommonActions,
   useRoute,
   RouteProp,
 } from '@react-navigation/native';
@@ -1177,6 +1175,13 @@ const EventList: React.FC = () => {
         keyboardAvoidingView: {
           flex: 1,
         },
+        contentWrapper: {
+          flex: 1,
+        },
+        noResultsContainerCompact: {
+          flex: 0,
+          paddingVertical: 60,
+        },
         // Jersey color picker styles
         jerseyColorPickerContainer: {
           backgroundColor: colors.inputBackground || colors.background,
@@ -1685,11 +1690,21 @@ const EventList: React.FC = () => {
 
   // Close all pickers except the one being opened (accordion behavior)
   const closeAllPickers = (except?: string) => {
-    if (except !== 'date') setShowDatePicker(false);
-    if (except !== 'time') setShowTimePicker(false);
-    if (except !== 'rosterSize') setShowRosterSizePicker(false);
-    if (except !== 'eventType') setShowEventTypePicker(false);
-    if (except !== 'jerseyColor') setShowJerseyColorPicker(false);
+    if (except !== 'date') {
+      setShowDatePicker(false);
+    }
+    if (except !== 'time') {
+      setShowTimePicker(false);
+    }
+    if (except !== 'rosterSize') {
+      setShowRosterSizePicker(false);
+    }
+    if (except !== 'eventType') {
+      setShowEventTypePicker(false);
+    }
+    if (except !== 'jerseyColor') {
+      setShowJerseyColorPicker(false);
+    }
   };
 
   // Expanded comments state - tracks which event's comments are shown inline
@@ -2719,7 +2734,7 @@ const EventList: React.FC = () => {
         </TouchableOpacity>
       </View>
       {/* Content wrapper: pills + filters + event list in their own flex context */}
-      <View style={{flex: 1}}>
+      <View style={themedStyles.contentWrapper}>
         {/* Horizontal Activity Filter Chips */}
         <ScrollView
           horizontal
@@ -2840,7 +2855,7 @@ const EventList: React.FC = () => {
               <View
                 style={[
                   themedStyles.noResultsContainer,
-                  {flex: 0, paddingVertical: 60},
+                  themedStyles.noResultsContainerCompact,
                 ]}>
                 <FontAwesomeIcon
                   icon={faPlus}
