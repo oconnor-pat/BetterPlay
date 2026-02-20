@@ -915,10 +915,21 @@ const Profile: React.FC = () => {
           text: t('auth.signOut'),
           style: 'destructive',
           onPress: async () => {
+            // Unregister device from push notifications
+            try {
+              const notifService = require('../../services/NotificationService').default;
+              await notifService.unregisterDevice();
+            } catch {}
             await AsyncStorage.multiRemove([
               'userToken',
+              'cachedUserData',
+              'cachedEvents',
               '@profilePicUrl',
               '@app_language',
+              'locationEnabled',
+              'proximityVisibility',
+              'cachedUserLocation',
+              'cachedUserLocationTimestamp',
             ]);
             setUserData(null);
             navigation.reset({

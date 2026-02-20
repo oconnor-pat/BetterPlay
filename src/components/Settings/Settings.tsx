@@ -30,12 +30,16 @@ import {
   faXmark,
   faTrash,
   faExclamationTriangle,
+  faEye,
+  faUserGroup,
+  faLock,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
 import {useTranslation} from 'react-i18next';
 import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
+import locationService from '../../services/LocationService';
 import UserContext, {UserContextType} from '../UserContext';
 import {version as appVersion} from '../../../package.json';
 import NotificationSettings from './NotificationSettings';
@@ -63,12 +67,42 @@ const LANGUAGES: Language[] = [
 
 const LANGUAGE_STORAGE_KEY = '@app_language';
 
+type ProximityVisibility = 'public' | 'friends' | 'private';
+
+const VISIBILITY_OPTIONS: {
+  value: ProximityVisibility;
+  icon: typeof faEye;
+  labelKey: string;
+  descKey: string;
+}[] = [
+  {
+    value: 'public',
+    icon: faEye,
+    labelKey: 'settings.visibilityPublic',
+    descKey: 'settings.visibilityPublicDesc',
+  },
+  {
+    value: 'friends',
+    icon: faUserGroup,
+    labelKey: 'settings.visibilityFriends',
+    descKey: 'settings.visibilityFriendsDesc',
+  },
+  {
+    value: 'private',
+    icon: faLock,
+    labelKey: 'settings.visibilityPrivate',
+    descKey: 'settings.visibilityPrivateDesc',
+  },
+];
+
 const Settings: React.FC = () => {
   const {t, i18n} = useTranslation();
   const {darkMode, themeMode, setThemeMode, colors} = useTheme();
   const {setUserData} = useContext(UserContext) as UserContextType;
   const navigation = useNavigation();
   const [locationEnabled, setLocationEnabled] = useState(false);
+  const [proximityVisibility, setProximityVisibility] =
+    useState<ProximityVisibility>('private');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(
@@ -97,8 +131,13 @@ const Settings: React.FC = () => {
       );
       const savedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
 
+      const savedVisibility = await AsyncStorage.getItem('proximityVisibility');
+
       if (savedLocationPref !== null) {
         setLocationEnabled(JSON.parse(savedLocationPref));
+      }
+      if (savedVisibility !== null) {
+        setProximityVisibility(savedVisibility as ProximityVisibility);
       }
       if (savedNotificationsPref !== null) {
         setNotificationsEnabled(JSON.parse(savedNotificationsPref));
@@ -124,26 +163,68 @@ const Settings: React.FC = () => {
       await AsyncStorage.setItem('locationEnabled', JSON.stringify(newValue));
 
       if (newValue) {
-        // Request location permission
-        Geolocation.requestAuthorization(
-          () => {
-            Alert.alert(t('common.success'), t('settings.locationEnabled'));
-          },
-          error => {
-            console.error('Location permission denied:', error);
-            Alert.alert(
-              t('settings.permissionDenied'),
-              t('settings.enableLocationSettings'),
-            );
-            setLocationEnabled(false);
-            AsyncStorage.setItem('locationEnabled', JSON.stringify(false));
-          },
-        );
+        const granted = await locationService.requestPermission();
+        if (granted) {
+          Alert.alert(t('common.success'), t('settings.locationEnabled'));
+          // Send location to backend in the background
+          locationService.getCurrentPosition().then(async coords => {
+            try {
+              const token = await AsyncStorage.getItem('userToken');
+              if (token && coords) {
+                await axios.put(
+                  `${API_BASE_URL}/users/me/location`,
+                  {latitude: coords.latitude, longitude: coords.longitude},
+                  {headers: {Authorization: `Bearer ${token}`}},
+                );
+              }
+            } catch (err) {
+              console.log('Failed to sync location to backend:', err);
+            }
+          });
+        } else {
+          Alert.alert(
+            t('settings.permissionDenied'),
+            t('settings.enableLocationSettings'),
+          );
+          setLocationEnabled(false);
+          await AsyncStorage.setItem('locationEnabled', JSON.stringify(false));
+        }
       } else {
         Alert.alert(t('settings.locationDisabled'));
+        // Clear cached location and tell backend to remove it
+        locationService.clearLocation();
+        try {
+          const token = await AsyncStorage.getItem('userToken');
+          if (token) {
+            await axios.put(
+              `${API_BASE_URL}/users/me/location`,
+              {latitude: null, longitude: null},
+              {headers: {Authorization: `Bearer ${token}`}},
+            );
+          }
+        } catch (err) {
+          console.log('Failed to clear location on backend:', err);
+        }
       }
     } catch (error) {
       console.error('Error saving location preference:', error);
+    }
+  };
+
+  const handleVisibilityChange = async (value: ProximityVisibility) => {
+    setProximityVisibility(value);
+    try {
+      await AsyncStorage.setItem('proximityVisibility', value);
+      const token = await AsyncStorage.getItem('userToken');
+      if (token) {
+        await axios.put(
+          `${API_BASE_URL}/users/me/proximity-visibility`,
+          {proximityVisibility: value},
+          {headers: {Authorization: `Bearer ${token}`}},
+        );
+      }
+    } catch (error) {
+      console.log('Failed to save proximity visibility:', error);
     }
   };
 
@@ -311,6 +392,34 @@ const Settings: React.FC = () => {
         },
         settingAction: {
           marginLeft: 8,
+        },
+        visibilityOptions: {
+          flexDirection: 'row',
+          gap: 8,
+          marginTop: 10,
+        },
+        visibilityOption: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 20,
+          backgroundColor: colors.background,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        visibilityOptionActive: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        visibilityOptionText: {
+          fontSize: 13,
+          fontWeight: '500',
+          color: colors.text,
+        },
+        visibilityOptionTextActive: {
+          color: '#FFFFFF',
         },
         chevronContainer: {
           padding: 4,
@@ -747,6 +856,63 @@ const Settings: React.FC = () => {
                   />
                 </View>
               </TouchableOpacity>
+
+              {locationEnabled && (
+                <View style={themedStyles.settingRow}>
+                  <View style={themedStyles.iconContainer}>
+                    <FontAwesomeIcon
+                      icon={
+                        proximityVisibility === 'public'
+                          ? faEye
+                          : proximityVisibility === 'friends'
+                          ? faUserGroup
+                          : faLock
+                      }
+                      size={18}
+                      color={colors.primary}
+                    />
+                  </View>
+                  <View style={{flex: 1}}>
+                    <Text style={themedStyles.settingTitle}>
+                      {t('settings.proximityVisibility')}
+                    </Text>
+                    <Text style={themedStyles.settingDescription}>
+                      {t('settings.proximityVisibilityDesc')}
+                    </Text>
+                    <View style={themedStyles.visibilityOptions}>
+                      {VISIBILITY_OPTIONS.map(option => (
+                        <TouchableOpacity
+                          key={option.value}
+                          style={[
+                            themedStyles.visibilityOption,
+                            proximityVisibility === option.value &&
+                              themedStyles.visibilityOptionActive,
+                          ]}
+                          onPress={() => handleVisibilityChange(option.value)}
+                          activeOpacity={0.7}>
+                          <FontAwesomeIcon
+                            icon={option.icon}
+                            size={14}
+                            color={
+                              proximityVisibility === option.value
+                                ? '#FFFFFF'
+                                : colors.text
+                            }
+                          />
+                          <Text
+                            style={[
+                              themedStyles.visibilityOptionText,
+                              proximityVisibility === option.value &&
+                                themedStyles.visibilityOptionTextActive,
+                            ]}>
+                            {t(option.labelKey)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={[themedStyles.settingRow, themedStyles.settingRowLast]}

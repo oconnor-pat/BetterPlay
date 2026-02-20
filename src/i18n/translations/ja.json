@@ -110,7 +110,14 @@
     "happeningNow": "開催中",
     "startsIn": "開始まで",
     "day": "日",
-    "days": "日"
+    "days": "日",
+    "nearby": "近く",
+    "locationRequired": "位置情報が必要です",
+    "enableLocationFirst": "距離でフィルターするには、設定で位置情報サービスを有効にしてください。",
+    "locationUnavailable": "位置情報を利用できません",
+    "locationUnavailableMessage": "位置を特定できませんでした。もう一度お試しください。",
+    "showEventsWithin": "{{distance}} マイル以内のイベントを表示",
+    "withinDistance": "{{distance}} マイル以内"
   },
   "profile": {
     "title": "プロフィール",
@@ -142,7 +149,10 @@
     "favoriteSports": "興味",
     "selectFavoriteSports": "興味を選択",
     "interests": "興味",
-    "selectInterests": "興味を選択"
+    "selectInterests": "興味を選択",
+    "addInterests": "興味を追加",
+    "nearbyPlayers": "近く",
+    "playersFoundWithin": "{{distance}} マイル以内に{{count}}人のプレイヤーが見つかりました"
   },
   "communityNotes": {
     "title": "コミュニティノート",
@@ -186,7 +196,18 @@
     "locationEnabled": "位置情報サービスが有効",
     "locationDisabled": "位置情報サービスが無効",
     "permissionDenied": "権限が拒否されました",
-    "enableLocationSettings": "デバイスの設定で位置情報サービスを有効にしてください。"
+    "enableLocationSettings": "デバイスの設定で位置情報サービスを有効にしてください。",
+    "totalComments": "コメント総数",
+    "locationSyncSuccess": "位置情報が正常に更新されました",
+    "locationSyncFailed": "サーバーで位置情報を更新できませんでした",
+    "proximityVisibility": "近さの公開範囲",
+    "proximityVisibilityDesc": "あなたの距離を誰が見られるかを設定します",
+    "visibilityPublic": "公開",
+    "visibilityPublicDesc": "全員が距離を確認できます",
+    "visibilityFriends": "友達のみ",
+    "visibilityFriendsDesc": "友達だけが距離を確認できます",
+    "visibilityPrivate": "非公開",
+    "visibilityPrivateDesc": "誰も距離を確認できません"
   },
   "menu": {
     "settings": "設定",

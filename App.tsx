@@ -28,6 +28,7 @@ import {
   useNotifications,
 } from './src/Context/NotificationContext';
 import notificationService from './src/services/NotificationService';
+import locationService from './src/services/LocationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from './src/config/api';
 
@@ -135,6 +136,15 @@ const AppContent = () => {
     }
   };
 
+  // Reset admin state on logout, re-check on login
+  useEffect(() => {
+    if (userData === null) {
+      setIsAdmin(false);
+    } else {
+      checkAdminStatus();
+    }
+  }, [userData?._id]);
+
   // Check for existing session on app startup - FAST PATH
   useEffect(() => {
     const restoreSession = async () => {
@@ -224,6 +234,8 @@ const AppContent = () => {
           }
           // Also check admin status in background
           checkAdminStatusInBackground(token);
+          // Sync location to backend if user has location enabled
+          syncLocationInBackground(token);
         } else {
           // Token invalid
           await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
@@ -233,6 +245,31 @@ const AppContent = () => {
       } catch (error) {
         // Network error - keep using cached data (offline support)
         console.log('Background validation failed, using cached data');
+      }
+    };
+
+    const syncLocationInBackground = async (token: string) => {
+      try {
+        const locEnabled = await AsyncStorage.getItem('locationEnabled');
+        if (locEnabled !== 'true') {
+          return;
+        }
+        const coords = await locationService.getLocation();
+        if (coords) {
+          await fetch(`${API_BASE_URL}/users/me/location`, {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+            }),
+          });
+        }
+      } catch {
+        // Non-critical, silently fail
       }
     };
 

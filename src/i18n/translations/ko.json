@@ -110,7 +110,14 @@
     "happeningNow": "진행 중",
     "startsIn": "시작까지",
     "day": "일",
-    "days": "일"
+    "days": "일",
+    "nearby": "주변",
+    "locationRequired": "위치 필요",
+    "enableLocationFirst": "거리로 필터링하려면 설정에서 위치 서비스를 활성화하세요.",
+    "locationUnavailable": "위치를 사용할 수 없음",
+    "locationUnavailableMessage": "위치를 확인할 수 없습니다. 다시 시도해 주세요.",
+    "showEventsWithin": "{{distance}} 마일 이내 이벤트 표시",
+    "withinDistance": "{{distance}} 마일 이내"
   },
   "profile": {
     "title": "프로필",
@@ -142,7 +149,10 @@
     "favoriteSports": "관심사",
     "selectFavoriteSports": "관심사를 선택하세요",
     "interests": "관심사",
-    "selectInterests": "관심사를 선택하세요"
+    "selectInterests": "관심사를 선택하세요",
+    "addInterests": "관심사 추가",
+    "nearbyPlayers": "주변",
+    "playersFoundWithin": "{{distance}} 마일 이내 {{count}}명의 플레이어 발견"
   },
   "communityNotes": {
     "title": "커뮤니티 노트",
@@ -186,7 +196,18 @@
     "locationEnabled": "위치 서비스 활성화됨",
     "locationDisabled": "위치 서비스 비활성화됨",
     "permissionDenied": "권한 거부됨",
-    "enableLocationSettings": "기기 설정에서 위치 서비스를 활성화해 주세요."
+    "enableLocationSettings": "기기 설정에서 위치 서비스를 활성화해 주세요.",
+    "totalComments": "총 댓글 수",
+    "locationSyncSuccess": "위치가 성공적으로 업데이트되었습니다",
+    "locationSyncFailed": "서버에서 위치를 업데이트할 수 없습니다",
+    "proximityVisibility": "내 근접 정보 공개 범위",
+    "proximityVisibilityDesc": "누가 내 거리를 볼 수 있는지 제어합니다",
+    "visibilityPublic": "공개",
+    "visibilityPublicDesc": "모든 사람이 거리를 볼 수 있습니다",
+    "visibilityFriends": "친구만",
+    "visibilityFriendsDesc": "친구만 거리를 볼 수 있습니다",
+    "visibilityPrivate": "비공개",
+    "visibilityPrivateDesc": "아무도 거리를 볼 수 없습니다"
   },
   "menu": {
     "settings": "설정",

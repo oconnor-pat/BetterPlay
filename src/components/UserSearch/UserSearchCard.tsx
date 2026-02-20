@@ -14,6 +14,7 @@ import {
   faUserClock,
   faCalendarCheck,
   faCalendarPlus,
+  faLocationArrow,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTheme} from '../ThemeContext/ThemeContext';
 
@@ -30,37 +31,48 @@ interface UserSearchCardProps {
     username: string;
     name?: string;
     profilePicUrl?: string;
-    favoriteSports?: string[];
+    favoriteActivities?: string[];
     eventsCreated?: number;
     eventsJoined?: number;
   };
   onPress: () => void;
   friendStatus?: FriendStatus;
   onFriendAction?: () => void;
+  distance?: number; // miles, shown when proximity filter is active
 }
 
-// Interest emoji mapping
+// Interest emoji mapping (all 30 activities)
 const interestEmojis: Record<string, string> = {
   basketball: '🏀',
   hockey: '🏒',
   soccer: '⚽',
-  football: '🏈',
-  baseball: '⚾',
+  'figure-skating': '⛸️',
   tennis: '🎾',
   golf: '⛳',
+  football: '🏈',
+  rugby: '🏉',
+  baseball: '⚾',
+  softball: '🥎',
+  lacrosse: '🥍',
   volleyball: '🏐',
   trivia: '🧠',
   'game-nights': '🎲',
   karaoke: '🎤',
+  'open-mic': '🎙️',
+  'watch-party': '📺',
   'live-music': '🎵',
   hiking: '🥾',
   cycling: '🚴',
   running: '🏃',
   yoga: '🧘',
+  fishing: '🎣',
+  camping: '🏕️',
   'book-club': '📚',
-  volunteering: '💚',
-  cooking: '🍲',
   workshops: '🛠️',
+  meetup: '🤝',
+  cooking: '🍲',
+  volunteering: '💚',
+  other: '🎯',
 };
 
 const UserSearchCard: React.FC<UserSearchCardProps> = ({
@@ -68,6 +80,7 @@ const UserSearchCard: React.FC<UserSearchCardProps> = ({
   onPress,
   friendStatus = 'none',
   onFriendAction,
+  distance,
 }) => {
   const {colors} = useTheme();
 
@@ -191,6 +204,22 @@ const UserSearchCard: React.FC<UserSearchCardProps> = ({
       fontWeight: '600',
       marginLeft: 4,
     },
+    distanceBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary + '15',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 10,
+      alignSelf: 'flex-start',
+      marginBottom: 4,
+    },
+    distanceText: {
+      fontSize: 11,
+      color: colors.primary,
+      fontWeight: '600',
+      marginLeft: 4,
+    },
   });
 
   return (
@@ -209,11 +238,24 @@ const UserSearchCard: React.FC<UserSearchCardProps> = ({
       <View style={styles.infoContainer}>
         <Text style={styles.username}>{user.username}</Text>
 
-        {user.favoriteSports && user.favoriteSports.length > 0 && (
+        {distance != null && (
+          <View style={styles.distanceBadge}>
+            <FontAwesomeIcon
+              icon={faLocationArrow}
+              size={10}
+              color={colors.primary}
+            />
+            <Text style={styles.distanceText}>
+              {distance < 1 ? '< 1 mi' : `${Math.round(distance)} mi`}
+            </Text>
+          </View>
+        )}
+
+        {user.favoriteActivities && user.favoriteActivities.length > 0 && (
           <View style={styles.sportsRow}>
-            {user.favoriteSports.slice(0, 4).map((sport, index) => (
+            {user.favoriteActivities.slice(0, 4).map((activity, index) => (
               <Text key={index} style={styles.sportEmoji}>
-                {interestEmojis[sport.toLowerCase()] || '🎯'}
+                {interestEmojis[activity.toLowerCase()] || '🎯'}
               </Text>
             ))}
           </View>

@@ -18,10 +18,12 @@ import {
   faTimes,
   faArrowLeft,
   faFilter,
+  faLocationArrow,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
+import locationService, {Coordinates} from '../../services/LocationService';
 import UserSearchCard, {FriendStatus} from './UserSearchCard';
 import UserContext, {UserContextType} from '../UserContext';
 
@@ -45,28 +47,58 @@ interface User {
   username: string;
   name?: string;
   profilePicUrl?: string;
-  favoriteSports?: string[];
+  favoriteActivities?: string[];
   eventsCreated?: number;
   eventsJoined?: number;
+  distance?: number; // miles, returned by backend when proximity query is active
 }
 
-// Available interests for filtering
+const PROXIMITY_PRESETS = [
+  {label: '5 mi', value: 5},
+  {label: '10 mi', value: 10},
+  {label: '25 mi', value: 25},
+  {label: '50 mi', value: 50},
+  {label: '100 mi', value: 100},
+];
+
+// All activities for filtering (matches EventList activityOptions)
 const INTEREST_FILTERS = [
-  {id: 'all', label: 'All Interests', emoji: '🎯'},
+  {id: 'all', label: 'All', emoji: '🎯'},
+  // Sports
   {id: 'basketball', label: 'Basketball', emoji: '🏀'},
   {id: 'hockey', label: 'Hockey', emoji: '🏒'},
   {id: 'soccer', label: 'Soccer', emoji: '⚽'},
-  {id: 'football', label: 'Football', emoji: '🏈'},
-  {id: 'baseball', label: 'Baseball', emoji: '⚾'},
+  {id: 'figure-skating', label: 'Figure Skating', emoji: '⛸️'},
   {id: 'tennis', label: 'Tennis', emoji: '🎾'},
   {id: 'golf', label: 'Golf', emoji: '⛳'},
+  {id: 'football', label: 'Football', emoji: '🏈'},
+  {id: 'rugby', label: 'Rugby', emoji: '🏉'},
+  {id: 'baseball', label: 'Baseball', emoji: '⚾'},
+  {id: 'softball', label: 'Softball', emoji: '🥎'},
+  {id: 'lacrosse', label: 'Lacrosse', emoji: '🥍'},
   {id: 'volleyball', label: 'Volleyball', emoji: '🏐'},
-  {id: 'trivia', label: 'Trivia', emoji: '🧠'},
-  {id: 'game-nights', label: 'Game Nights', emoji: '🎲'},
-  {id: 'hiking', label: 'Hiking', emoji: '🥾'},
-  {id: 'yoga', label: 'Yoga', emoji: '🧘'},
+  // Social & Entertainment
+  {id: 'trivia', label: 'Trivia Night', emoji: '🧠'},
+  {id: 'game-nights', label: 'Game Night', emoji: '🎲'},
+  {id: 'karaoke', label: 'Karaoke', emoji: '🎤'},
+  {id: 'open-mic', label: 'Open Mic', emoji: '🎙️'},
+  {id: 'watch-party', label: 'Watch Party', emoji: '📺'},
   {id: 'live-music', label: 'Live Music', emoji: '🎵'},
+  // Outdoor & Fitness
+  {id: 'hiking', label: 'Hiking', emoji: '🥾'},
+  {id: 'cycling', label: 'Cycling', emoji: '🚴'},
+  {id: 'running', label: 'Running', emoji: '🏃'},
+  {id: 'yoga', label: 'Yoga', emoji: '🧘'},
+  {id: 'fishing', label: 'Fishing', emoji: '🎣'},
+  {id: 'camping', label: 'Camping', emoji: '🏕️'},
+  // Community & Learning
   {id: 'book-club', label: 'Book Club', emoji: '📚'},
+  {id: 'workshops', label: 'Workshop', emoji: '🛠️'},
+  {id: 'meetup', label: 'Meetup', emoji: '🤝'},
+  {id: 'cooking', label: 'Potluck', emoji: '🍲'},
+  {id: 'volunteering', label: 'Volunteer', emoji: '💚'},
+  // Other
+  {id: 'other', label: 'Other', emoji: '🎯'},
 ];
 
 const UserSearch: React.FC = () => {
@@ -81,6 +113,12 @@ const UserSearch: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedInterest, setSelectedInterest] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Proximity filter state
+  const [proximityEnabled, setProximityEnabled] = useState(false);
+  const [proximityRadius, setProximityRadius] = useState(25); // miles
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   // Friend status tracking
   const [friendStatuses, setFriendStatuses] = useState<
@@ -162,7 +200,18 @@ const UserSearch: React.FC = () => {
   const fetchUsers = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch(`${API_BASE_URL}/users`, {
+
+      let url = `${API_BASE_URL}/users`;
+      if (proximityEnabled && userLocation) {
+        const params = new URLSearchParams({
+          lat: userLocation.latitude.toString(),
+          lng: userLocation.longitude.toString(),
+          maxDistance: proximityRadius.toString(),
+        });
+        url += `?${params.toString()}`;
+      }
+
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -179,7 +228,6 @@ const UserSearch: React.FC = () => {
           setUsers(otherUsers);
           setFilteredUsers(otherUsers);
         } else if (data.users && Array.isArray(data.users)) {
-          // Handle case where API returns { users: [...] }
           const otherUsers = data.users.filter(
             (user: User) => user._id !== userData?._id,
           );
@@ -203,38 +251,118 @@ const UserSearch: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userData?._id]);
+  }, [userData?._id, proximityEnabled, userLocation, proximityRadius]);
 
   useEffect(() => {
     fetchUsers();
     fetchFriendData();
   }, [fetchUsers, fetchFriendData]);
 
+  // Check if the search query matches an activity name
+  const matchedActivity = searchQuery.trim()
+    ? INTEREST_FILTERS.find(
+        f =>
+          f.id !== 'all' &&
+          f.label.toLowerCase().includes(searchQuery.toLowerCase().trim()),
+      )
+    : null;
+
   // Filter users based on search query and selected interest
   useEffect(() => {
     let results = users;
 
-    // Filter by search query (username or name)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      results = results.filter(
-        user =>
-          user.username.toLowerCase().includes(query) ||
-          (user.name && user.name.toLowerCase().includes(query)),
+
+      // Check if the query matches an activity/interest name
+      const activityMatch = INTEREST_FILTERS.find(
+        f =>
+          f.id !== 'all' &&
+          (f.label.toLowerCase() === query ||
+            f.id.toLowerCase() === query),
       );
+
+      if (activityMatch) {
+        // Exact activity match: filter by that interest
+        results = results.filter(user =>
+          user.favoriteActivities?.some(
+            a => a.toLowerCase() === activityMatch.id.toLowerCase(),
+          ),
+        );
+      } else {
+        // Search by username, name, OR activity
+        results = results.filter(
+          user =>
+            user.username.toLowerCase().includes(query) ||
+            (user.name && user.name.toLowerCase().includes(query)) ||
+            user.favoriteActivities?.some(a =>
+              a.toLowerCase().includes(query),
+            ),
+        );
+      }
     }
 
-    // Filter by selected interest
+    // Filter by selected interest chip
     if (selectedInterest !== 'all') {
       results = results.filter(user =>
-        user.favoriteSports?.some(
-          sport => sport.toLowerCase() === selectedInterest.toLowerCase(),
+        user.favoriteActivities?.some(
+          activity =>
+            activity.toLowerCase() === selectedInterest.toLowerCase(),
         ),
       );
     }
 
     setFilteredUsers(results);
   }, [searchQuery, selectedInterest, users]);
+
+  // Toggle proximity filter
+  const handleProximityToggle = useCallback(async () => {
+    if (proximityEnabled) {
+      setProximityEnabled(false);
+      return;
+    }
+
+    const locEnabled = await AsyncStorage.getItem('locationEnabled');
+    if (locEnabled !== 'true') {
+      Alert.alert(
+        'Location Required',
+        'Enable Location Services in Settings to find nearby players.',
+      );
+      return;
+    }
+
+    setLocationLoading(true);
+    try {
+      const coords = await locationService.getLocation();
+      if (coords) {
+        setUserLocation(coords);
+        setProximityEnabled(true);
+      } else {
+        Alert.alert(
+          'Location Unavailable',
+          'Could not determine your location. Please try again.',
+        );
+      }
+    } catch {
+      Alert.alert(
+        'Location Error',
+        'Could not determine your location. Please try again.',
+      );
+    } finally {
+      setLocationLoading(false);
+    }
+  }, [proximityEnabled]);
+
+  // Re-fetch users when proximity settings change
+  useEffect(() => {
+    if (proximityEnabled && userLocation) {
+      setLoading(true);
+      fetchUsers();
+    } else if (!proximityEnabled) {
+      setLoading(true);
+      fetchUsers();
+    }
+  }, [proximityEnabled, proximityRadius, userLocation, fetchUsers]);
 
   // Handle friend action (send request, cancel, accept, etc.)
   const handleFriendAction = useCallback(
@@ -476,6 +604,104 @@ const UserSearch: React.FC = () => {
       paddingHorizontal: 16,
       paddingBottom: 8,
     },
+    activitySuggestion: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 16,
+      marginBottom: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      backgroundColor: colors.primary + '15',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.primary + '30',
+    },
+    activitySuggestionEmoji: {
+      fontSize: 16,
+      marginRight: 8,
+    },
+    activitySuggestionText: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.primary,
+    },
+    activeInterestTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      marginHorizontal: 16,
+      marginBottom: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      backgroundColor: colors.primary + '20',
+      borderRadius: 16,
+    },
+    activeInterestTagText: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: colors.primary,
+      marginRight: 8,
+    },
+    proximityContainer: {
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+    },
+    proximityToggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    proximityToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1,
+    },
+    proximityToggleActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    proximityToggleInactive: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+    },
+    proximityToggleText: {
+      fontSize: 13,
+      fontWeight: '600',
+      marginLeft: 6,
+    },
+    proximityPresetsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    proximityPreset: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      borderWidth: 1,
+    },
+    proximityPresetActive: {
+      backgroundColor: colors.primary + '20',
+      borderColor: colors.primary,
+    },
+    proximityPresetInactive: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+    },
+    proximityPresetText: {
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    proximityPresetTextActive: {
+      color: colors.primary,
+    },
+    proximityPresetTextInactive: {
+      color: colors.text,
+    },
   });
 
   const renderUser = ({item}: {item: User}) => (
@@ -486,6 +712,7 @@ const UserSearch: React.FC = () => {
       onFriendAction={() =>
         handleFriendAction(item._id, friendStatuses[item._id] || 'none')
       }
+      distance={proximityEnabled ? item.distance : undefined}
     />
   );
 
@@ -549,7 +776,7 @@ const UserSearch: React.FC = () => {
         />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by name or username..."
+          placeholder="Search by name, username, or interest..."
           placeholderTextColor={addOpacity(colors.text, 0.5)}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -562,6 +789,24 @@ const UserSearch: React.FC = () => {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Activity suggestion when search matches an interest */}
+      {matchedActivity && selectedInterest === 'all' && (
+        <TouchableOpacity
+          style={styles.activitySuggestion}
+          onPress={() => {
+            setSelectedInterest(matchedActivity.id);
+            setSearchQuery('');
+          }}>
+          <Text style={styles.activitySuggestionEmoji}>
+            {matchedActivity.emoji}
+          </Text>
+          <Text style={styles.activitySuggestionText}>
+            Filter by {matchedActivity.label}
+          </Text>
+          <FontAwesomeIcon icon={faFilter} size={12} color={colors.primary} />
+        </TouchableOpacity>
+      )}
 
       {/* Interest Filters */}
       {showFilters && (
@@ -597,10 +842,81 @@ const UserSearch: React.FC = () => {
         </View>
       )}
 
+      {/* Proximity Filter */}
+      <View style={styles.proximityContainer}>
+        <View style={styles.proximityToggleRow}>
+          <TouchableOpacity
+            style={[
+              styles.proximityToggle,
+              proximityEnabled
+                ? styles.proximityToggleActive
+                : styles.proximityToggleInactive,
+            ]}
+            onPress={handleProximityToggle}
+            disabled={locationLoading}>
+            {locationLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <FontAwesomeIcon
+                icon={faLocationArrow}
+                size={14}
+                color={proximityEnabled ? '#FFFFFF' : colors.text}
+              />
+            )}
+            <Text
+              style={[
+                styles.proximityToggleText,
+                {color: proximityEnabled ? '#FFFFFF' : colors.text},
+              ]}>
+              Nearby
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {proximityEnabled && (
+          <View style={styles.proximityPresetsRow}>
+            {PROXIMITY_PRESETS.map(preset => (
+              <TouchableOpacity
+                key={preset.value}
+                style={[
+                  styles.proximityPreset,
+                  proximityRadius === preset.value
+                    ? styles.proximityPresetActive
+                    : styles.proximityPresetInactive,
+                ]}
+                onPress={() => setProximityRadius(preset.value)}>
+                <Text
+                  style={[
+                    styles.proximityPresetText,
+                    proximityRadius === preset.value
+                      ? styles.proximityPresetTextActive
+                      : styles.proximityPresetTextInactive,
+                  ]}>
+                  {preset.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Active interest filter tag */}
+      {selectedInterest !== 'all' && (
+        <TouchableOpacity
+          style={styles.activeInterestTag}
+          onPress={() => setSelectedInterest('all')}>
+          <Text style={styles.activeInterestTagText}>
+            {INTEREST_FILTERS.find(f => f.id === selectedInterest)?.emoji}{' '}
+            {INTEREST_FILTERS.find(f => f.id === selectedInterest)?.label}
+          </Text>
+          <FontAwesomeIcon icon={faTimes} size={12} color={colors.primary} />
+        </TouchableOpacity>
+      )}
+
       {/* Results Count */}
       <Text style={styles.resultsCount}>
         {filteredUsers.length} player{filteredUsers.length !== 1 ? 's' : ''}{' '}
         found
+        {proximityEnabled ? ` within ${proximityRadius} mi` : ''}
       </Text>
 
       {/* User List */}

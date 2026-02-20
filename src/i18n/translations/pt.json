@@ -110,7 +110,14 @@
     "happeningNow": "Acontecendo Agora",
     "startsIn": "Começa em",
     "day": "dia",
-    "days": "dias"
+    "days": "dias",
+    "nearby": "Perto",
+    "locationRequired": "Localização Necessária",
+    "enableLocationFirst": "Ative os Serviços de Localização nas Configurações para filtrar por distância.",
+    "locationUnavailable": "Localização Indisponível",
+    "locationUnavailableMessage": "Não foi possível determinar sua localização. Por favor, tente novamente.",
+    "showEventsWithin": "Mostrar eventos dentro de {{distance}} mi",
+    "withinDistance": "Dentro de {{distance}} mi"
   },
   "profile": {
     "title": "Perfil",
@@ -142,7 +149,10 @@
     "favoriteSports": "Interesses",
     "selectFavoriteSports": "Selecione Seus Interesses",
     "interests": "Interesses",
-    "selectInterests": "Selecione Seus Interesses"
+    "selectInterests": "Selecione Seus Interesses",
+    "addInterests": "Adicionar interesses",
+    "nearbyPlayers": "Perto",
+    "playersFoundWithin": "{{count}} jogador(es) encontrado(s) dentro de {{distance}} mi"
   },
   "communityNotes": {
     "title": "Notas da Comunidade",
@@ -186,7 +196,18 @@
     "locationEnabled": "Serviços de localização ativados",
     "locationDisabled": "Serviços de localização desativados",
     "permissionDenied": "Permissão Negada",
-    "enableLocationSettings": "Por favor, ative os serviços de localização nas configurações do seu dispositivo."
+    "enableLocationSettings": "Por favor, ative os serviços de localização nas configurações do seu dispositivo.",
+    "totalComments": "Total de Comentários",
+    "locationSyncSuccess": "Localização atualizada com sucesso",
+    "locationSyncFailed": "Não foi possível atualizar sua localização no servidor",
+    "proximityVisibility": "Quem pode ver sua proximidade",
+    "proximityVisibilityDesc": "Controle quem pode ver o quão perto você está",
+    "visibilityPublic": "Público",
+    "visibilityPublicDesc": "Todos podem ver sua distância",
+    "visibilityFriends": "Amigos",
+    "visibilityFriendsDesc": "Apenas amigos podem ver sua distância",
+    "visibilityPrivate": "Privado",
+    "visibilityPrivateDesc": "Ninguém pode ver sua distância"
   },
   "menu": {
     "settings": "Configurações",

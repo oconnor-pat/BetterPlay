@@ -110,7 +110,14 @@
     "happeningNow": "अभी चल रहा है",
     "startsIn": "शुरू होने में",
     "day": "दिन",
-    "days": "दिन"
+    "days": "दिन",
+    "nearby": "पास में",
+    "locationRequired": "स्थान आवश्यक",
+    "enableLocationFirst": "दूरी से फ़िल्टर करने के लिए सेटिंग्स में स्थान सेवाएं सक्षम करें।",
+    "locationUnavailable": "स्थान अनुपलब्ध",
+    "locationUnavailableMessage": "आपका स्थान निर्धारित नहीं कर सका। कृपया पुनः प्रयास करें।",
+    "showEventsWithin": "{{distance}} मील के भीतर इवेंट दिखाएं",
+    "withinDistance": "{{distance}} मील के भीतर"
   },
   "profile": {
     "title": "प्रोफ़ाइल",
@@ -186,7 +193,15 @@
     "locationEnabled": "स्थान सेवाएं सक्षम",
     "locationDisabled": "स्थान सेवाएं अक्षम",
     "permissionDenied": "अनुमति अस्वीकृत",
-    "enableLocationSettings": "कृपया अपने डिवाइस सेटिंग्स में स्थान सेवाएं सक्षम करें।"
+    "enableLocationSettings": "कृपया अपने डिवाइस सेटिंग्स में स्थान सेवाएं सक्षम करें।",
+    "proximityVisibility": "आपकी निकटता कौन देख सकता है",
+    "proximityVisibilityDesc": "नियंत्रित करें कि आप कितने करीब हैं यह कौन देख सकता है",
+    "visibilityPublic": "सार्वजनिक",
+    "visibilityPublicDesc": "सभी आपकी दूरी देख सकते हैं",
+    "visibilityFriends": "मित्र",
+    "visibilityFriendsDesc": "केवल मित्र आपकी दूरी देख सकते हैं",
+    "visibilityPrivate": "निजी",
+    "visibilityPrivateDesc": "कोई भी आपकी दूरी नहीं देख सकता"
   },
   "menu": {
     "settings": "सेटिंग्स",

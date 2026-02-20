@@ -110,7 +110,14 @@
     "happeningNow": "Сейчас идёт",
     "startsIn": "Начало через",
     "day": "день",
-    "days": "дней"
+    "days": "дней",
+    "nearby": "Рядом",
+    "locationRequired": "Требуется местоположение",
+    "enableLocationFirst": "Включите службы геолокации в настройках, чтобы фильтровать по расстоянию.",
+    "locationUnavailable": "Местоположение недоступно",
+    "locationUnavailableMessage": "Не удалось определить ваше местоположение. Попробуйте ещё раз.",
+    "showEventsWithin": "Показать события в радиусе {{distance}} миль",
+    "withinDistance": "В радиусе {{distance}} миль"
   },
   "profile": {
     "title": "Профиль",
@@ -142,7 +149,10 @@
     "favoriteSports": "Интересы",
     "selectFavoriteSports": "Выберите свои интересы",
     "interests": "Интересы",
-    "selectInterests": "Выберите свои интересы"
+    "selectInterests": "Выберите свои интересы",
+    "addInterests": "Добавить интересы",
+    "nearbyPlayers": "Рядом",
+    "playersFoundWithin": "{{count}} игрок(ов) найдено в радиусе {{distance}} миль"
   },
   "communityNotes": {
     "title": "Заметки сообщества",
@@ -186,7 +196,18 @@
     "locationEnabled": "Службы геолокации включены",
     "locationDisabled": "Службы геолокации отключены",
     "permissionDenied": "Разрешение отклонено",
-    "enableLocationSettings": "Пожалуйста, включите службы геолокации в настройках устройства."
+    "enableLocationSettings": "Пожалуйста, включите службы геолокации в настройках устройства.",
+    "totalComments": "Всего комментариев",
+    "locationSyncSuccess": "Местоположение успешно обновлено",
+    "locationSyncFailed": "Не удалось обновить ваше местоположение на сервере",
+    "proximityVisibility": "Кто может видеть вашу близость",
+    "proximityVisibilityDesc": "Управляйте тем, кто может видеть расстояние до вас",
+    "visibilityPublic": "Все",
+    "visibilityPublicDesc": "Все могут видеть расстояние",
+    "visibilityFriends": "Друзья",
+    "visibilityFriendsDesc": "Только друзья могут видеть расстояние",
+    "visibilityPrivate": "Скрыто",
+    "visibilityPrivateDesc": "Никто не может видеть расстояние"
   },
   "menu": {
     "settings": "Настройки",

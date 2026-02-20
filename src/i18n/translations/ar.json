@@ -110,7 +110,14 @@
     "happeningNow": "يحدث الآن",
     "startsIn": "يبدأ خلال",
     "day": "يوم",
-    "days": "أيام"
+    "days": "أيام",
+    "nearby": "بالقرب",
+    "locationRequired": "الموقع مطلوب",
+    "enableLocationFirst": "فعّل خدمات الموقع في الإعدادات للتصفية حسب المسافة.",
+    "locationUnavailable": "الموقع غير متاح",
+    "locationUnavailableMessage": "تعذّر تحديد موقعك. يرجى المحاولة مرة أخرى.",
+    "showEventsWithin": "عرض الفعاليات ضمن {{distance}} ميل",
+    "withinDistance": "ضمن {{distance}} ميل"
   },
   "profile": {
     "title": "الملف الشخصي",
@@ -142,7 +149,10 @@
     "favoriteSports": "الاهتمامات",
     "selectFavoriteSports": "اختر اهتماماتك",
     "interests": "الاهتمامات",
-    "selectInterests": "اختر اهتماماتك"
+    "selectInterests": "اختر اهتماماتك",
+    "addInterests": "إضافة اهتمامات",
+    "nearbyPlayers": "بالقرب",
+    "playersFoundWithin": "{{count}} لاعب(ون) وجدوا ضمن {{distance}} ميل"
   },
   "communityNotes": {
     "title": "ملاحظات المجتمع",
@@ -186,7 +196,18 @@
     "locationEnabled": "تم تفعيل خدمات الموقع",
     "locationDisabled": "تم تعطيل خدمات الموقع",
     "permissionDenied": "تم رفض الإذن",
-    "enableLocationSettings": "يرجى تفعيل خدمات الموقع في إعدادات جهازك."
+    "enableLocationSettings": "يرجى تفعيل خدمات الموقع في إعدادات جهازك.",
+    "totalComments": "إجمالي التعليقات",
+    "locationSyncSuccess": "تم تحديث الموقع بنجاح",
+    "locationSyncFailed": "تعذّر تحديث موقعك على الخادم",
+    "proximityVisibility": "من يمكنه رؤية قربك",
+    "proximityVisibilityDesc": "تحكم في من يمكنه رؤية مدى قربك",
+    "visibilityPublic": "عام",
+    "visibilityPublicDesc": "يمكن للجميع رؤية المسافة",
+    "visibilityFriends": "الأصدقاء",
+    "visibilityFriendsDesc": "الأصدقاء فقط يمكنهم رؤية المسافة",
+    "visibilityPrivate": "خاص",
+    "visibilityPrivateDesc": "لا يمكن لأحد رؤية المسافة"
   },
   "menu": {
     "settings": "الإعدادات",

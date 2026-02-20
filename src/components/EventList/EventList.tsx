@@ -69,6 +69,7 @@ import EventComments from './EventComments';
 import CountdownTimer from './CountdownTimer';
 import {useNotifications} from '../../Context/NotificationContext';
 import notificationService from '../../services/NotificationService';
+import locationService, {Coordinates} from '../../services/LocationService';
 
 export type RootStackParamList = {
   EventList:
@@ -1674,6 +1675,13 @@ const EventList: React.FC = () => {
     null,
   );
 
+  // Proximity filter state
+  const [proximityEnabled, setProximityEnabled] = useState(false);
+  const [proximityRadius, setProximityRadius] = useState(25); // miles
+  const [eventUserLocation, setEventUserLocation] =
+    useState<Coordinates | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+
   // Location autocomplete state - removed manual toggle, now seamless
 
   // Edit mode state
@@ -1933,6 +1941,21 @@ const EventList: React.FC = () => {
       }
     }
 
+    // Proximity filter (client-side Haversine)
+    if (proximityEnabled && eventUserLocation) {
+      filtered = filtered.filter(event => {
+        if (event.latitude == null || event.longitude == null) {
+          return false;
+        }
+        const dist = locationService.haversineDistance(
+          eventUserLocation,
+          {latitude: event.latitude, longitude: event.longitude},
+          'mi',
+        );
+        return dist <= proximityRadius;
+      });
+    }
+
     // Sort by date (soonest first) so new events appear in chronological order
     filtered = [...filtered].sort((a, b) => {
       const dateA = new Date(`${a.date} ${a.time}`);
@@ -1950,6 +1973,9 @@ const EventList: React.FC = () => {
     hidePastEvents,
     profileFilter,
     profileFilterUserId,
+    proximityEnabled,
+    proximityRadius,
+    eventUserLocation,
   ]);
 
   // Scroll so the comment input is visible when the keyboard opens
@@ -2016,8 +2042,11 @@ const EventList: React.FC = () => {
     if (showAvailableOnly) {
       count++;
     }
+    if (proximityEnabled) {
+      count++;
+    }
     return count;
-  }, [selectedEventTypes, selectedDateFilter, showAvailableOnly]);
+  }, [selectedEventTypes, selectedDateFilter, showAvailableOnly, proximityEnabled]);
 
   // Toggle event type selection
   const toggleEventType = (type: string) => {
@@ -2028,6 +2057,44 @@ const EventList: React.FC = () => {
     );
   };
 
+  // Toggle proximity filter for events
+  const handleEventProximityToggle = async () => {
+    if (proximityEnabled) {
+      setProximityEnabled(false);
+      return;
+    }
+
+    const locEnabled = await AsyncStorage.getItem('locationEnabled');
+    if (locEnabled !== 'true') {
+      Alert.alert(
+        'Location Required',
+        'Enable Location Services in Settings to filter by distance.',
+      );
+      return;
+    }
+
+    setLocationLoading(true);
+    try {
+      const coords = await locationService.getLocation();
+      if (coords) {
+        setEventUserLocation(coords);
+        setProximityEnabled(true);
+      } else {
+        Alert.alert(
+          'Location Unavailable',
+          'Could not determine your location. Please try again.',
+        );
+      }
+    } catch {
+      Alert.alert(
+        'Location Error',
+        'Could not determine your location. Please try again.',
+      );
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   // Clear all filters
   const clearFilters = () => {
     setSelectedEventTypes([]);
@@ -2036,6 +2103,7 @@ const EventList: React.FC = () => {
     setHidePastEvents(true);
     setProfileFilter(null);
     setProfileFilterUserId(null);
+    setProximityEnabled(false);
   };
 
   const handleSaveNewEvent = async () => {
@@ -2896,6 +2964,20 @@ const EventList: React.FC = () => {
                 />
               </TouchableOpacity>
             )}
+            {proximityEnabled && (
+              <TouchableOpacity
+                style={themedStyles.activeFilterTag}
+                onPress={() => setProximityEnabled(false)}>
+                <Text style={themedStyles.activeFilterTagText}>
+                  📍 Within {proximityRadius} mi
+                </Text>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={12}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            )}
           </View>
         )}
         {loading ? (
@@ -3697,6 +3779,93 @@ const EventList: React.FC = () => {
                     <Text style={{color: colors.buttonText || '#fff'}}>✓</Text>
                   )}
                 </TouchableOpacity>
+              </View>
+
+              {/* Proximity Filter */}
+              <View style={themedStyles.filterSection}>
+                <Text style={themedStyles.filterSectionTitle}>
+                  Nearby
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    themedStyles.toggleOption,
+                    proximityEnabled && themedStyles.toggleOptionSelected,
+                  ]}
+                  onPress={handleEventProximityToggle}
+                  disabled={locationLoading}>
+                  <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
+                    {locationLoading ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.primary}
+                        style={{marginRight: 8}}
+                      />
+                    ) : (
+                      <FontAwesomeIcon
+                        icon={faLocationArrow}
+                        size={14}
+                        color={
+                          proximityEnabled
+                            ? colors.buttonText || '#fff'
+                            : colors.text
+                        }
+                        style={{marginRight: 8}}
+                      />
+                    )}
+                    <Text
+                      style={[
+                        themedStyles.toggleOptionText,
+                        proximityEnabled &&
+                          themedStyles.toggleOptionTextSelected,
+                      ]}>
+                      Show events within {proximityRadius} mi
+                    </Text>
+                  </View>
+                  {proximityEnabled && (
+                    <Text style={{color: colors.buttonText || '#fff'}}>✓</Text>
+                  )}
+                </TouchableOpacity>
+                {proximityEnabled && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: 8,
+                      marginTop: 10,
+                    }}>
+                    {[5, 10, 25, 50, 100].map(dist => (
+                      <TouchableOpacity
+                        key={dist}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 7,
+                          borderRadius: 16,
+                          borderWidth: 1,
+                          backgroundColor:
+                            proximityRadius === dist
+                              ? colors.primary + '20'
+                              : colors.card,
+                          borderColor:
+                            proximityRadius === dist
+                              ? colors.primary
+                              : colors.border,
+                        }}
+                        onPress={() => setProximityRadius(dist)}>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color:
+                              proximityRadius === dist
+                                ? colors.primary
+                                : colors.text,
+                          }}>
+                          {dist} mi
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
             </ScrollView>
 

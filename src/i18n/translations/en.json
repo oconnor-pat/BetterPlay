@@ -153,7 +153,14 @@
     "happeningNow": "Happening Now",
     "startsIn": "Starts in",
     "day": "day",
-    "days": "days"
+    "days": "days",
+    "nearby": "Nearby",
+    "locationRequired": "Location Required",
+    "enableLocationFirst": "Enable Location Services in Settings to filter by distance.",
+    "locationUnavailable": "Location Unavailable",
+    "locationUnavailableMessage": "Could not determine your location. Please try again.",
+    "showEventsWithin": "Show events within {{distance}} mi",
+    "withinDistance": "Within {{distance}} mi"
   },
   "profile": {
     "title": "Profile",
@@ -213,7 +220,9 @@
     "myFriends": "My Friends",
     "requests": "Requests",
     "findPeople": "Find",
-    "addInterests": "Add interests"
+    "addInterests": "Add interests",
+    "nearbyPlayers": "Nearby",
+    "playersFoundWithin": "{{count}} player(s) found within {{distance}} mi"
   },
   "notifications": {
     "title": "Notifications",
@@ -331,7 +340,17 @@
     "exportError": "Failed to export data",
     "dataFooter": "To request deletion of your data, use the 'Delete Account' option in Settings. For questions, contact support@betterplay.app",
     "statistics": "Statistics",
-    "totalComments": "Total Comments"
+    "totalComments": "Total Comments",
+    "locationSyncSuccess": "Location updated successfully",
+    "locationSyncFailed": "Could not update your location on the server",
+    "proximityVisibility": "Who Can See Your Proximity",
+    "proximityVisibilityDesc": "Control who can see how close you are",
+    "visibilityPublic": "Public",
+    "visibilityPublicDesc": "Everyone can see your distance",
+    "visibilityFriends": "Friends",
+    "visibilityFriendsDesc": "Only friends can see your distance",
+    "visibilityPrivate": "Private",
+    "visibilityPrivateDesc": "No one can see your distance"
   },
   "menu": {
     "settings": "Settings",

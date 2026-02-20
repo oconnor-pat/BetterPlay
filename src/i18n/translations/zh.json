@@ -110,7 +110,14 @@
     "happeningNow": "正在进行",
     "startsIn": "开始倒计时",
     "day": "天",
-    "days": "天"
+    "days": "天",
+    "nearby": "附近",
+    "locationRequired": "需要位置",
+    "enableLocationFirst": "请在设置中启用位置服务以按距离筛选。",
+    "locationUnavailable": "位置不可用",
+    "locationUnavailableMessage": "无法确定您的位置。请重试。",
+    "showEventsWithin": "显示 {{distance}} 英里内的活动",
+    "withinDistance": "{{distance}} 英里内"
   },
   "profile": {
     "title": "个人资料",
@@ -142,7 +149,10 @@
     "favoriteSports": "兴趣爱好",
     "selectFavoriteSports": "选择您的兴趣爱好",
     "interests": "兴趣爱好",
-    "selectInterests": "选择您的兴趣爱好"
+    "selectInterests": "选择您的兴趣爱好",
+    "addInterests": "添加兴趣爱好",
+    "nearbyPlayers": "附近",
+    "playersFoundWithin": "在 {{distance}} 英里内找到 {{count}} 位玩家"
   },
   "communityNotes": {
     "title": "社区笔记",
@@ -186,7 +196,18 @@
     "locationEnabled": "位置服务已启用",
     "locationDisabled": "位置服务已禁用",
     "permissionDenied": "权限被拒绝",
-    "enableLocationSettings": "请在设备设置中启用位置服务。"
+    "enableLocationSettings": "请在设备设置中启用位置服务。",
+    "totalComments": "评论总数",
+    "locationSyncSuccess": "位置更新成功",
+    "locationSyncFailed": "无法在服务器上更新您的位置",
+    "proximityVisibility": "谁可以看到您的距离",
+    "proximityVisibilityDesc": "控制谁可以看到您的距离信息",
+    "visibilityPublic": "公开",
+    "visibilityPublicDesc": "所有人都可以看到您的距离",
+    "visibilityFriends": "仅好友",
+    "visibilityFriendsDesc": "仅好友可以看到您的距离",
+    "visibilityPrivate": "私密",
+    "visibilityPrivateDesc": "没有人可以看到您的距离"
   },
   "menu": {
     "settings": "设置",

@@ -119,7 +119,14 @@
     "happeningNow": "Gerade Live",
     "startsIn": "Beginnt in",
     "day": "Tag",
-    "days": "Tage"
+    "days": "Tage",
+    "nearby": "In der Nähe",
+    "locationRequired": "Standort erforderlich",
+    "enableLocationFirst": "Aktivieren Sie die Standortdienste in den Einstellungen, um nach Entfernung zu filtern.",
+    "locationUnavailable": "Standort nicht verfügbar",
+    "locationUnavailableMessage": "Ihr Standort konnte nicht ermittelt werden. Bitte versuchen Sie es erneut.",
+    "showEventsWithin": "Veranstaltungen innerhalb von {{distance}} mi anzeigen",
+    "withinDistance": "Innerhalb von {{distance}} mi"
   },
   "profile": {
     "title": "Profil",
@@ -151,7 +158,10 @@
     "favoriteSports": "Interessen",
     "selectFavoriteSports": "Wählen Sie Ihre Interessen",
     "interests": "Interessen",
-    "selectInterests": "Wählen Sie Ihre Interessen"
+    "selectInterests": "Wählen Sie Ihre Interessen",
+    "addInterests": "Interessen hinzufügen",
+    "nearbyPlayers": "In der Nähe",
+    "playersFoundWithin": "{{count}} Spieler gefunden innerhalb von {{distance}} mi"
   },
   "communityNotes": {
     "title": "Community-Notizen",
@@ -195,7 +205,18 @@
     "locationEnabled": "Standortdienste aktiviert",
     "locationDisabled": "Standortdienste deaktiviert",
     "permissionDenied": "Berechtigung verweigert",
-    "enableLocationSettings": "Bitte aktivieren Sie die Standortdienste in Ihren Geräteeinstellungen."
+    "enableLocationSettings": "Bitte aktivieren Sie die Standortdienste in Ihren Geräteeinstellungen.",
+    "totalComments": "Gesamt Kommentare",
+    "locationSyncSuccess": "Standort erfolgreich aktualisiert",
+    "locationSyncFailed": "Ihr Standort konnte auf dem Server nicht aktualisiert werden",
+    "proximityVisibility": "Wer kann Ihre Nähe sehen",
+    "proximityVisibilityDesc": "Steuern Sie, wer sehen kann, wie nah Sie sind",
+    "visibilityPublic": "Öffentlich",
+    "visibilityPublicDesc": "Jeder kann Ihre Entfernung sehen",
+    "visibilityFriends": "Freunde",
+    "visibilityFriendsDesc": "Nur Freunde können Ihre Entfernung sehen",
+    "visibilityPrivate": "Privat",
+    "visibilityPrivateDesc": "Niemand kann Ihre Entfernung sehen"
   },
   "menu": {
     "settings": "Einstellungen",

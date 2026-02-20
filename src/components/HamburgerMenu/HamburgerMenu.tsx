@@ -25,8 +25,18 @@ const HamburgerMenu: React.FC = () => {
     if (option === 'Sign Out') {
       // Unregister device from push notifications before clearing tokens
       await notificationService.unregisterDevice();
-      // Clear the stored token and cached data to fully log out
-      await AsyncStorage.multiRemove(['userToken', 'cachedUserData']);
+      // Clear all account-specific cached data
+      await AsyncStorage.multiRemove([
+        'userToken',
+        'cachedUserData',
+        'cachedEvents',
+        '@profilePicUrl',
+        '@app_language',
+        'locationEnabled',
+        'proximityVisibility',
+        'cachedUserLocation',
+        'cachedUserLocationTimestamp',
+      ]);
       setUserData(null);
       navigation.reset({
         index: 0,
