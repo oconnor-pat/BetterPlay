@@ -48,6 +48,7 @@ import {
   faPlus,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import notificationService from '../../services/NotificationService';
 
 export interface Player {
   userId?: string;
@@ -166,6 +167,48 @@ const jerseyColors: Record<string, string> = {
 };
 
 // Light colors need dark text and a border for visibility
+const positionRatios: Record<string, Record<string, number>> = {
+  Basketball: {Guard: 2, Forward: 2, Center: 1},
+  Hockey: {Forward: 3, Defense: 2, Goalie: 1},
+  Soccer: {Forward: 3, Midfielder: 4, Defender: 4, Goalkeeper: 1},
+  Football: {Quarterback: 1, 'Running Back': 2, 'Wide Receiver': 3, Lineman: 5, Defense: 5},
+  Rugby: {Forward: 8, Back: 7},
+  Lacrosse: {Attack: 3, Midfield: 3, Defense: 3, Goalie: 1},
+  Volleyball: {Setter: 1, 'Outside Hitter': 2, 'Middle Blocker': 2, Libero: 1},
+  Baseball: {Pitcher: 1, Catcher: 1, Infield: 4, Outfield: 3},
+  Softball: {Pitcher: 1, Catcher: 1, Infield: 4, Outfield: 3},
+};
+
+const getScaledPositionCounts = (
+  sport: string,
+  rosterSize: number,
+  teamCount: number,
+): Record<string, number> | null => {
+  const ratios = positionRatios[sport];
+  if (!ratios) {
+    return null;
+  }
+
+  const ratioTotal = Object.values(ratios).reduce((sum, v) => sum + v, 0);
+  const effectiveSize = teamCount > 1 ? Math.round(rosterSize / teamCount) : rosterSize;
+
+  const scaled: Record<string, number> = {};
+  let assigned = 0;
+  const entries = Object.entries(ratios);
+
+  entries.forEach(([pos, ratio], i) => {
+    if (i === entries.length - 1) {
+      scaled[pos] = Math.max(effectiveSize - assigned, 1);
+    } else {
+      const count = Math.max(Math.round((ratio / ratioTotal) * effectiveSize), 1);
+      scaled[pos] = count;
+      assigned += count;
+    }
+  });
+
+  return scaled;
+};
+
 const lightJerseyColors = ['White', 'Yellow'];
 
 const isLightColor = (colorName: string) =>
@@ -264,6 +307,9 @@ const EventRoster: React.FC = () => {
   const [savingRoster, setSavingRoster] = useState(false);
   const [addPlayerExpanded, setAddPlayerExpanded] = useState(false);
 
+  const [activeTeamTab, setActiveTeamTab] = useState<string>('all');
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
+
   // Edit mode state
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editPaidStatus, setEditPaidStatus] = useState('');
@@ -331,6 +377,62 @@ const EventRoster: React.FC = () => {
 
     return {paidCount, unpaidCount, positionCounts, teamCounts};
   }, [roster]);
+
+  const teamColors = useMemo(() => {
+    if (!isTeamSport(eventType)) {
+      return [];
+    }
+    return Object.keys(rosterStats.teamCounts).filter(c => c !== 'N/A');
+  }, [rosterStats.teamCounts, eventType]);
+
+  const filteredRoster = useMemo(() => {
+    let players = roster;
+
+    if (isTeamSport(eventType) && activeTeamTab !== 'all' && teamColors.length > 1) {
+      players = players.filter(p => p.jerseyColor === activeTeamTab);
+    }
+
+    if (paymentFilter === 'paid') {
+      players = players.filter(p => p.paidStatus === 'Paid');
+    } else if (paymentFilter === 'unpaid') {
+      players = players.filter(p => p.paidStatus === 'Unpaid');
+    }
+
+    return players;
+  }, [roster, activeTeamTab, paymentFilter, eventType, teamColors]);
+
+  const scaledPositions = useMemo(() => {
+    const numTeams = teamColors.length > 1 ? teamColors.length : 1;
+    return getScaledPositionCounts(eventType, totalSpots, numTeams);
+  }, [eventType, totalSpots, teamColors]);
+
+  const positionSummary = useMemo(() => {
+    const positions = positionOptions[eventType] || positionOptions.Default;
+    const currentPlayers = isTeamSport(eventType) && activeTeamTab !== 'all' && teamColors.length > 1
+      ? roster.filter(p => p.jerseyColor === activeTeamTab)
+      : roster;
+
+    return positions.map(pos => {
+      const filled = currentPlayers.filter(p => p.position === pos).length;
+      const expected = scaledPositions ? scaledPositions[pos] || 0 : 0;
+      return {position: pos, filled, expected};
+    });
+  }, [eventType, roster, activeTeamTab, teamColors]);
+
+  const playersGroupedByPosition = useMemo(() => {
+    const groups: Record<string, Player[]> = {};
+    const positions = positionOptions[eventType] || positionOptions.Default;
+    positions.forEach(pos => {
+      groups[pos] = [];
+    });
+    filteredRoster.forEach(player => {
+      if (!groups[player.position]) {
+        groups[player.position] = [];
+      }
+      groups[player.position].push(player);
+    });
+    return groups;
+  }, [filteredRoster, eventType]);
 
   const themedStyles = useMemo(
     () =>
@@ -727,6 +829,167 @@ const EventRoster: React.FC = () => {
           color: colors.text,
           marginLeft: 8,
         },
+        // Team Tabs
+        teamTabsContainer: {
+          flexDirection: 'row',
+          marginBottom: 14,
+          borderRadius: 12,
+          backgroundColor: colors.inputBackground || colors.background,
+          padding: 4,
+        },
+        teamTab: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 10,
+          paddingHorizontal: 8,
+          borderRadius: 10,
+          gap: 6,
+        },
+        teamTabActive: {
+          backgroundColor: colors.card,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 1},
+          shadowOpacity: 0.1,
+          shadowRadius: 2,
+          elevation: 2,
+        },
+        teamTabDot: {
+          width: 12,
+          height: 12,
+          borderRadius: 6,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        teamTabText: {
+          fontSize: 13,
+          fontWeight: '500',
+          color: colors.secondaryText,
+        },
+        teamTabTextActive: {
+          color: colors.text,
+          fontWeight: '700',
+        },
+        teamTabCount: {
+          fontSize: 11,
+          fontWeight: '600',
+          color: colors.secondaryText,
+          backgroundColor: colors.inputBackground || colors.background,
+          paddingHorizontal: 6,
+          paddingVertical: 1,
+          borderRadius: 8,
+          overflow: 'hidden',
+        },
+        teamTabCountActive: {
+          backgroundColor: colors.primary + '20',
+          color: colors.primary,
+        },
+        // Payment Filter Tabs
+        paymentFilterContainer: {
+          flexDirection: 'row',
+          marginBottom: 14,
+          gap: 8,
+        },
+        paymentFilterTab: {
+          paddingVertical: 7,
+          paddingHorizontal: 14,
+          borderRadius: 20,
+          backgroundColor: colors.inputBackground || colors.background,
+          borderWidth: 1,
+          borderColor: 'transparent',
+        },
+        paymentFilterTabActive: {
+          borderColor: colors.primary,
+          backgroundColor: colors.primary + '12',
+        },
+        paymentFilterText: {
+          fontSize: 13,
+          fontWeight: '500',
+          color: colors.secondaryText,
+        },
+        paymentFilterTextActive: {
+          color: colors.primary,
+          fontWeight: '700',
+        },
+        // Position Summary
+        positionSummaryContainer: {
+          backgroundColor: colors.card,
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 14,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        positionSummaryTitle: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 10,
+        },
+        positionRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 8,
+        },
+        positionLabel: {
+          fontSize: 13,
+          color: colors.text,
+          width: 110,
+          fontWeight: '500',
+        },
+        positionBarBg: {
+          flex: 1,
+          height: 8,
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 4,
+          marginHorizontal: 10,
+          overflow: 'hidden',
+        },
+        positionBarFill: {
+          height: '100%',
+          backgroundColor: colors.primary,
+          borderRadius: 4,
+        },
+        positionBarOverfill: {
+          backgroundColor: '#FFA726',
+        },
+        positionCount: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
+          width: 42,
+          textAlign: 'right',
+        },
+        // Position Group Headers
+        positionGroupHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginTop: 10,
+          marginBottom: 6,
+          paddingBottom: 6,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        positionGroupTitle: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.5,
+        },
+        positionGroupCount: {
+          fontSize: 12,
+          color: colors.placeholder,
+          marginLeft: 8,
+        },
+        emptyPositionText: {
+          fontSize: 13,
+          color: colors.placeholder,
+          fontStyle: 'italic',
+          paddingVertical: 8,
+          paddingLeft: 4,
+        },
         // Player Card
         playerCard: {
           backgroundColor: colors.card,
@@ -1104,6 +1367,17 @@ const EventRoster: React.FC = () => {
     await persistRoster(updatedRoster);
     updateRosterSpots(eventId, updatedRoster.length);
 
+    if (date && time) {
+      notificationService
+        .scheduleEventNotifications({
+          _id: eventId,
+          name: eventName,
+          date,
+          time,
+        })
+        .catch(() => {});
+    }
+
     setPaidStatus('');
     setJerseyColor('');
     setPosition('');
@@ -1218,16 +1492,15 @@ const EventRoster: React.FC = () => {
           text: t('common.leave'),
           style: 'destructive',
           onPress: async () => {
-            // Use functional update to get latest roster state
             setRoster(currentRoster => {
               const updatedRoster = currentRoster.filter(
                 p => p.username !== playerUsername,
               );
-              // Persist in background
               persistRoster(updatedRoster);
               updateRosterSpots(eventId, updatedRoster.length);
               return updatedRoster;
             });
+            notificationService.cancelEventNotifications(eventId).catch(() => {});
           },
         },
       ]);
@@ -1311,6 +1584,7 @@ const EventRoster: React.FC = () => {
 
     return (
       <View
+        key={item.userId || item.username}
         style={[
           themedStyles.playerCard,
           isSelf && themedStyles.playerCardSelf,
@@ -1870,12 +2144,183 @@ const EventRoster: React.FC = () => {
                 {t('roster.noPlayersYet')}
               </Text>
             ) : (
-              <FlatList
-                data={roster}
-                renderItem={renderPlayerCard}
-                keyExtractor={(_, idx) => idx.toString()}
-                scrollEnabled={false}
-              />
+              <>
+                {/* Team Tabs - only for team sports with 2+ jersey colors */}
+                {isTeamSport(eventType) && teamColors.length > 1 && (
+                  <View style={themedStyles.teamTabsContainer}>
+                    <TouchableOpacity
+                      style={[
+                        themedStyles.teamTab,
+                        activeTeamTab === 'all' && themedStyles.teamTabActive,
+                      ]}
+                      onPress={() => setActiveTeamTab('all')}
+                      activeOpacity={0.7}>
+                      <Text
+                        style={[
+                          themedStyles.teamTabText,
+                          activeTeamTab === 'all' && themedStyles.teamTabTextActive,
+                        ]}>
+                        All
+                      </Text>
+                      <Text
+                        style={[
+                          themedStyles.teamTabCount,
+                          activeTeamTab === 'all' && themedStyles.teamTabCountActive,
+                        ]}>
+                        {roster.length}
+                      </Text>
+                    </TouchableOpacity>
+                    {teamColors.map(color => (
+                      <TouchableOpacity
+                        key={color}
+                        style={[
+                          themedStyles.teamTab,
+                          activeTeamTab === color && themedStyles.teamTabActive,
+                        ]}
+                        onPress={() => setActiveTeamTab(color)}
+                        activeOpacity={0.7}>
+                        <View
+                          style={[
+                            themedStyles.teamTabDot,
+                            {backgroundColor: jerseyColors[color] || jerseyColors.Other},
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            themedStyles.teamTabText,
+                            activeTeamTab === color && themedStyles.teamTabTextActive,
+                          ]}
+                          numberOfLines={1}>
+                          {color}
+                        </Text>
+                        <Text
+                          style={[
+                            themedStyles.teamTabCount,
+                            activeTeamTab === color && themedStyles.teamTabCountActive,
+                          ]}>
+                          {rosterStats.teamCounts[color] || 0}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Position Fill Summary */}
+                {isTeamSport(eventType) &&
+                  scaledPositions && (
+                    <View style={themedStyles.positionSummaryContainer}>
+                      <Text style={themedStyles.positionSummaryTitle}>
+                        Positions
+                      </Text>
+                      {positionSummary.map(({position: pos, filled, expected}) => {
+                        const pct = expected > 0
+                          ? Math.min((filled / expected) * 100, 100)
+                          : filled > 0
+                            ? 100
+                            : 0;
+                        const isOver = expected > 0 && filled > expected;
+                        return (
+                          <View key={pos} style={themedStyles.positionRow}>
+                            <Text style={themedStyles.positionLabel}>{pos}</Text>
+                            <View style={themedStyles.positionBarBg}>
+                              <View
+                                style={[
+                                  themedStyles.positionBarFill,
+                                  {width: `${pct}%`},
+                                  isOver && themedStyles.positionBarOverfill,
+                                ]}
+                              />
+                            </View>
+                            <Text style={themedStyles.positionCount}>
+                              {filled}{expected > 0 ? ` / ${expected}` : ''}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                {/* Payment Filter Tabs */}
+                {isTeamSport(eventType) && roster.length > 0 && (
+                  <View style={themedStyles.paymentFilterContainer}>
+                    {(['all', 'paid', 'unpaid'] as const).map(filter => {
+                      const count =
+                        filter === 'all'
+                          ? (activeTeamTab !== 'all' && teamColors.length > 1
+                              ? roster.filter(p => p.jerseyColor === activeTeamTab).length
+                              : roster.length)
+                          : filter === 'paid'
+                            ? (activeTeamTab !== 'all' && teamColors.length > 1
+                                ? roster.filter(p => p.jerseyColor === activeTeamTab && p.paidStatus === 'Paid').length
+                                : rosterStats.paidCount)
+                            : (activeTeamTab !== 'all' && teamColors.length > 1
+                                ? roster.filter(p => p.jerseyColor === activeTeamTab && p.paidStatus === 'Unpaid').length
+                                : rosterStats.unpaidCount);
+                      const label =
+                        filter === 'all'
+                          ? 'All'
+                          : filter === 'paid'
+                            ? `Paid`
+                            : `Unpaid`;
+                      return (
+                        <TouchableOpacity
+                          key={filter}
+                          style={[
+                            themedStyles.paymentFilterTab,
+                            paymentFilter === filter && themedStyles.paymentFilterTabActive,
+                          ]}
+                          onPress={() => setPaymentFilter(filter)}
+                          activeOpacity={0.7}>
+                          <Text
+                            style={[
+                              themedStyles.paymentFilterText,
+                              paymentFilter === filter && themedStyles.paymentFilterTextActive,
+                            ]}>
+                            {label} ({count})
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* Players grouped by position */}
+                {isTeamSport(eventType) ? (
+                  Object.entries(playersGroupedByPosition).map(
+                    ([pos, players]) => {
+                      if (players.length === 0 && paymentFilter !== 'all') {
+                        return null;
+                      }
+                      const expected = scaledPositions ? scaledPositions[pos] || 0 : 0;
+                      return (
+                        <View key={pos}>
+                          <View style={themedStyles.positionGroupHeader}>
+                            <Text style={themedStyles.positionGroupTitle}>
+                              {pos}
+                            </Text>
+                            <Text style={themedStyles.positionGroupCount}>
+                              {players.length}{expected > 0 ? ` / ${expected}` : ''}
+                            </Text>
+                          </View>
+                          {players.length > 0 ? (
+                            players.map((player, idx) =>
+                              renderPlayerCard({item: player, index: idx}),
+                            )
+                          ) : (
+                            <Text style={themedStyles.emptyPositionText}>
+                              No players yet
+                            </Text>
+                          )}
+                        </View>
+                      );
+                    },
+                  )
+                ) : (
+                  filteredRoster.map((player, idx) =>
+                    renderPlayerCard({item: player, index: idx}),
+                  )
+                )}
+              </>
             )}
           </View>
 

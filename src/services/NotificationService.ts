@@ -14,6 +14,8 @@ import notifee, {
   AuthorizationStatus,
   EventType,
   Event,
+  TriggerType,
+  TimestampTrigger,
 } from '@notifee/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Platform, Alert} from 'react-native';
@@ -295,9 +297,7 @@ class NotificationService {
             'Device token registration skipped: user not authenticated (token may be stale)',
           );
         } else {
-          console.log(
-            `Device token registration failed with status ${status}`,
-          );
+          console.log(`Device token registration failed with status ${status}`);
         }
         return false;
       }
@@ -545,7 +545,6 @@ class NotificationService {
       venueId,
       spaceId,
       // Backend-specific fields
-      senderId,
       accepterId,
       postId,
     } = data;
@@ -771,6 +770,204 @@ class NotificationService {
     } catch (error) {
       console.error('Error cancelling notifications:', error);
     }
+  }
+
+  /**
+   * Schedule a local notification at a specific timestamp.
+   * Returns the notification ID so it can be cancelled later.
+   */
+  async scheduleNotification(
+    payload: NotificationPayload,
+    fireDate: Date,
+  ): Promise<string | null> {
+    try {
+      if (fireDate.getTime() <= Date.now()) {
+        return null;
+      }
+
+      const trigger: TimestampTrigger = {
+        type: TriggerType.TIMESTAMP,
+        timestamp: fireDate.getTime(),
+      };
+
+      const id = await notifee.createTriggerNotification(
+        {
+          title: payload.title,
+          body: payload.body,
+          data: payload.data,
+          ios: {
+            foregroundPresentationOptions: {
+              alert: true,
+              badge: true,
+              sound: true,
+            },
+          },
+          android: {
+            channelId: ANDROID_CHANNEL_ID,
+            importance: AndroidImportance.HIGH,
+            pressAction: {
+              id: 'default',
+            },
+          },
+        },
+        trigger,
+      );
+
+      return id;
+    } catch (error) {
+      console.error('Error scheduling notification:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Schedule "upcoming event" and "event concluded" notifications for an event.
+   * Stores notification IDs in AsyncStorage keyed by event ID so they can be
+   * cancelled if the user leaves the event or the event is deleted.
+   */
+  async scheduleEventNotifications(event: {
+    _id: string;
+    name: string;
+    date: string;
+    time: string;
+  }): Promise<void> {
+    try {
+      const settings = await this.getNotificationSettings();
+      if (!settings.enabled || !settings.eventReminders) {
+        return;
+      }
+
+      await this.cancelEventNotifications(event._id);
+
+      const eventDateTime = this.parseEventDateTime(event.date, event.time);
+      if (!eventDateTime) {
+        return;
+      }
+
+      const now = Date.now();
+      const eventMs = eventDateTime.getTime();
+      const ids: string[] = [];
+
+      // 1 hour before
+      const oneHourBefore = eventMs - 60 * 60 * 1000;
+      if (oneHourBefore > now) {
+        const id = await this.scheduleNotification(
+          {
+            title: 'Event Starting Soon!',
+            body: `${event.name} starts in 1 hour`,
+            data: {type: 'event_reminder', eventId: event._id},
+          },
+          new Date(oneHourBefore),
+        );
+        if (id) {
+          ids.push(id);
+        }
+      }
+
+      // 15 minutes before
+      const fifteenMinBefore = eventMs - 15 * 60 * 1000;
+      if (fifteenMinBefore > now) {
+        const id = await this.scheduleNotification(
+          {
+            title: 'Almost Time!',
+            body: `${event.name} starts in 15 minutes`,
+            data: {type: 'event_reminder', eventId: event._id},
+          },
+          new Date(fifteenMinBefore),
+        );
+        if (id) {
+          ids.push(id);
+        }
+      }
+
+      // Event concluded (assumed 2 hours after start)
+      const concludedTime = eventMs + 2 * 60 * 60 * 1000;
+      if (concludedTime > now) {
+        const id = await this.scheduleNotification(
+          {
+            title: 'Event Concluded',
+            body: `${event.name} has wrapped up. Hope you had fun!`,
+            data: {type: 'event_update', eventId: event._id},
+          },
+          new Date(concludedTime),
+        );
+        if (id) {
+          ids.push(id);
+        }
+      }
+
+      if (ids.length > 0) {
+        await AsyncStorage.setItem(
+          `event_notif_${event._id}`,
+          JSON.stringify(ids),
+        );
+      }
+    } catch (error) {
+      console.error('Error scheduling event notifications:', error);
+    }
+  }
+
+  /**
+   * Cancel all scheduled notifications for a specific event.
+   */
+  async cancelEventNotifications(eventId: string): Promise<void> {
+    try {
+      const stored = await AsyncStorage.getItem(`event_notif_${eventId}`);
+      if (stored) {
+        const ids: string[] = JSON.parse(stored);
+        for (const id of ids) {
+          await notifee.cancelNotification(id);
+        }
+        await AsyncStorage.removeItem(`event_notif_${eventId}`);
+      }
+    } catch (error) {
+      console.error('Error cancelling event notifications:', error);
+    }
+  }
+
+  private parseEventDateTime(
+    eventDate: string,
+    eventTime: string,
+  ): Date | null {
+    let cleanDate = eventDate.replace(/^[A-Za-z]{3}\s+/, '');
+    let eventDateTime: Date | null = null;
+
+    const monthDayYearMatch = cleanDate.match(
+      /([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/,
+    );
+    if (monthDayYearMatch) {
+      const [, month, day, year] = monthDayYearMatch;
+      eventDateTime = new Date(`${month} ${day}, ${year}`);
+    }
+
+    if (!eventDateTime || isNaN(eventDateTime.getTime())) {
+      eventDateTime = new Date(cleanDate);
+    }
+
+    if (!eventDateTime || isNaN(eventDateTime.getTime())) {
+      eventDateTime = new Date(eventDate);
+    }
+
+    if (!eventDateTime || isNaN(eventDateTime.getTime())) {
+      return null;
+    }
+
+    let hours = 0;
+    let minutes = 0;
+    const timeMatch = eventTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (timeMatch) {
+      hours = parseInt(timeMatch[1], 10);
+      minutes = parseInt(timeMatch[2], 10);
+      const period = timeMatch[3]?.toUpperCase();
+      if (period === 'PM' && hours !== 12) {
+        hours += 12;
+      } else if (period === 'AM' && hours === 12) {
+        hours = 0;
+      }
+    }
+
+    eventDateTime.setHours(hours, minutes, 0, 0);
+    return eventDateTime;
   }
 
   /**

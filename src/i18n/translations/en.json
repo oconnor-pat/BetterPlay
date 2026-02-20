@@ -149,7 +149,11 @@
     "categorySports": "Sports",
     "categorySocial": "Social",
     "categoryOutdoor": "Outdoor",
-    "categoryCommunity": "Community"
+    "categoryCommunity": "Community",
+    "happeningNow": "Happening Now",
+    "startsIn": "Starts in",
+    "day": "day",
+    "days": "days"
   },
   "profile": {
     "title": "Profile",
@@ -389,7 +393,13 @@
     "invitedUsers": "Invited Users",
     "inviteHint": "Search for users by name to invite them to this event",
     "inviteError": "Failed to invite user",
-    "removeInviteError": "Failed to remove invite"
+    "removeInviteError": "Failed to remove invite",
+    "positions": "Positions",
+    "allTeams": "All",
+    "noPlayersInPosition": "No players yet",
+    "filterAll": "All",
+    "filterPaid": "Paid",
+    "filterUnpaid": "Unpaid"
   },
   "resetPassword": {
     "title": "Reset Password",

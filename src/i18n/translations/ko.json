@@ -106,7 +106,11 @@
     "categorySports": "스포츠",
     "categorySocial": "소셜",
     "categoryOutdoor": "아웃도어",
-    "categoryCommunity": "커뮤니티"
+    "categoryCommunity": "커뮤니티",
+    "happeningNow": "진행 중",
+    "startsIn": "시작까지",
+    "day": "일",
+    "days": "일"
   },
   "profile": {
     "title": "프로필",

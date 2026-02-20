@@ -106,7 +106,11 @@
     "categorySports": "スポーツ",
     "categorySocial": "ソーシャル",
     "categoryOutdoor": "アウトドア",
-    "categoryCommunity": "コミュニティ"
+    "categoryCommunity": "コミュニティ",
+    "happeningNow": "開催中",
+    "startsIn": "開始まで",
+    "day": "日",
+    "days": "日"
   },
   "profile": {
     "title": "プロフィール",

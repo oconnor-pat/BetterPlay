@@ -14,6 +14,7 @@ import {
   ScrollView,
   Share,
   KeyboardAvoidingView,
+  Keyboard,
   LayoutAnimation,
   UIManager,
   Image,
@@ -65,7 +66,9 @@ import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
 import EventComments from './EventComments';
+import CountdownTimer from './CountdownTimer';
 import {useNotifications} from '../../Context/NotificationContext';
+import notificationService from '../../services/NotificationService';
 
 export type RootStackParamList = {
   EventList:
@@ -559,8 +562,8 @@ const EventList: React.FC = () => {
         card: {
           backgroundColor: colors.card,
           borderRadius: 16,
-          padding: 18,
-          marginBottom: 12,
+          padding: 20,
+          marginBottom: 16,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           overflow: 'hidden',
@@ -586,27 +589,39 @@ const EventList: React.FC = () => {
           textTransform: 'uppercase' as const,
           letterSpacing: 0.5,
         },
+        cardHeaderSection: {
+          marginBottom: 14,
+        },
+        cardDetailsSection: {
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 12,
+          padding: 14,
+          marginBottom: 10,
+          gap: 10,
+        },
         cardRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 6,
         },
         cardEmoji: {
-          fontSize: 18,
-          marginRight: 8,
+          fontSize: 17,
+          marginRight: 10,
+          width: 24,
+          textAlign: 'center',
         },
         cardTitle: {
           color: colors.text,
           fontWeight: 'bold',
-          fontSize: 18,
-          marginBottom: 2,
+          fontSize: 19,
+          flex: 1,
         },
         cardText: {
           color: colors.text,
-          fontSize: 16,
+          fontSize: 15,
+          flex: 1,
         },
         cardSpacer: {
-          height: 8,
+          height: 6,
         },
         mapBox: {
           borderRadius: 8,
@@ -689,8 +704,8 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           justifyContent: 'center',
           alignItems: 'center',
-          marginTop: 16,
-          paddingTop: 14,
+          marginTop: 12,
+          paddingTop: 12,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           gap: 24,
@@ -892,7 +907,6 @@ const EventList: React.FC = () => {
           color: colors.primary,
           fontSize: 13,
           fontWeight: '600',
-          marginLeft: 4,
         },
         eventTimestamp: {
           color: colors.secondaryText,
@@ -903,7 +917,7 @@ const EventList: React.FC = () => {
         creatorRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 8,
+          marginTop: 4,
           paddingVertical: 4,
           paddingHorizontal: 8,
           backgroundColor: colors.inputBackground || 'rgba(0,0,0,0.05)',
@@ -1177,6 +1191,9 @@ const EventList: React.FC = () => {
         },
         contentWrapper: {
           flex: 1,
+        },
+        flatListContent: {
+          paddingBottom: 120,
         },
         noResultsContainerCompact: {
           flex: 0,
@@ -1935,6 +1952,30 @@ const EventList: React.FC = () => {
     profileFilterUserId,
   ]);
 
+  // Scroll so the comment input is visible when the keyboard opens
+  useEffect(() => {
+    if (!expandedCommentsEventId) {
+      return;
+    }
+    const kbEvent =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const sub = Keyboard.addListener(kbEvent, () => {
+      const idx = filteredEvents.findIndex(
+        e => e._id === expandedCommentsEventId,
+      );
+      if (idx >= 0 && flatListRef.current) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index: idx,
+            animated: true,
+            viewPosition: 1,
+          });
+        }, 100);
+      }
+    });
+    return () => sub.remove();
+  }, [expandedCommentsEventId, filteredEvents]);
+
   // Handle profile filter from navigation params
   useEffect(() => {
     if (route.params?.profileFilter && route.params?.userId) {
@@ -2049,6 +2090,9 @@ const EventList: React.FC = () => {
               event._id === editingEventId ? updatedEvent : event,
             ),
           );
+          notificationService
+            .scheduleEventNotifications(updatedEvent)
+            .catch(() => {});
         } catch (error) {
           Alert.alert(t('common.error'), t('events.updateError'));
           setSavingEvent(false);
@@ -2080,6 +2124,9 @@ const EventList: React.FC = () => {
             invitedUsers: response.data.invitedUsers || newEvent.invitedUsers,
           };
           setEventData(prevData => [createdEvent, ...prevData]);
+          notificationService
+            .scheduleEventNotifications(createdEvent)
+            .catch(() => {});
         } catch (error) {
           Alert.alert(t('common.error'), t('events.createError'));
           setSavingEvent(false);
@@ -2132,6 +2179,9 @@ const EventList: React.FC = () => {
             setDeletingEventId(event._id);
             try {
               await axios.delete(`${API_BASE_URL}/events/${event._id}`);
+              notificationService
+                .cancelEventNotifications(event._id)
+                .catch(() => {});
               setEventData(prevData =>
                 prevData.filter(e => e._id !== event._id),
               );
@@ -2424,6 +2474,13 @@ const EventList: React.FC = () => {
     setInviteSearchQuery('');
     setAvailableUsersToInvite([]);
     setInvitedUserDetails([]);
+    setShowDatePicker(false);
+    setShowTimePicker(false);
+    setShowRosterSizePicker(false);
+    setShowEventTypePicker(false);
+    setShowJerseyColorPicker(false);
+    setDate(new Date());
+    setTime(new Date());
   };
 
   const onDateChange = (evt: any, selectedDate?: Date) => {
@@ -2458,60 +2515,66 @@ const EventList: React.FC = () => {
               </Text>
             </View>
           )}
-          {/* Event Name */}
-          <View style={themedStyles.cardRow}>
-            <Text style={themedStyles.cardEmoji}>
-              {getEventTypeEmoji(item.eventType)}
-            </Text>
-            <Text style={themedStyles.cardTitle}>{item.name}</Text>
-            {/* Privacy Indicator */}
-            {item.privacy && item.privacy !== 'public' && (
-              <View style={themedStyles.privacyBadge}>
-                <FontAwesomeIcon
-                  icon={item.privacy === 'private' ? faLock : faEnvelope}
-                  size={12}
-                  color={colors.secondaryText}
-                />
-                <Text style={themedStyles.privacyBadgeText}>
-                  {item.privacy === 'private' ? 'Private' : 'Invite Only'}
+
+          {/* Header: Name + Creator */}
+          <View style={themedStyles.cardHeaderSection}>
+            <View style={themedStyles.cardRow}>
+              <Text style={themedStyles.cardEmoji}>
+                {getEventTypeEmoji(item.eventType)}
+              </Text>
+              <Text style={themedStyles.cardTitle}>{item.name}</Text>
+              {item.privacy && item.privacy !== 'public' && (
+                <View style={themedStyles.privacyBadge}>
+                  <FontAwesomeIcon
+                    icon={item.privacy === 'private' ? faLock : faEnvelope}
+                    size={12}
+                    color={colors.secondaryText}
+                  />
+                  <Text style={themedStyles.privacyBadgeText}>
+                    {item.privacy === 'private' ? 'Private' : 'Invite Only'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {item.createdByUsername && (
+              <View style={themedStyles.creatorRow}>
+                <Text style={themedStyles.eventUsername}>
+                  {t('events.createdBy')} {item.createdByUsername}
                 </Text>
+                {item.createdAt && (
+                  <Text style={themedStyles.eventTimestamp}>
+                    {formatRelativeTime(item.createdAt)}
+                  </Text>
+                )}
               </View>
             )}
           </View>
-          {/* Username of event creator */}
-          {item.createdByUsername && (
-            <View style={themedStyles.creatorRow}>
-              <Text style={themedStyles.cardEmoji}>👤</Text>
-              <Text style={themedStyles.eventUsername}>
-                {t('events.createdBy')} {item.createdByUsername}
-              </Text>
-              {item.createdAt && (
-                <Text style={themedStyles.eventTimestamp}>
-                  {formatRelativeTime(item.createdAt)}
-                </Text>
-              )}
+
+          {/* Details: Location, Date/Time, Roster */}
+          <View style={themedStyles.cardDetailsSection}>
+            <View style={themedStyles.cardRow}>
+              <Text style={themedStyles.cardEmoji}>📍</Text>
+              <Text style={themedStyles.cardText}>{item.location}</Text>
             </View>
+            <View style={themedStyles.cardRow}>
+              <Text style={themedStyles.cardEmoji}>🗓️</Text>
+              <Text style={themedStyles.cardText}>
+                {item.date} @ {formatDisplayTime(item.time)}
+              </Text>
+            </View>
+            <View style={themedStyles.cardRow}>
+              <Text style={themedStyles.cardEmoji}>👥</Text>
+              <Text style={themedStyles.cardText}>
+                {item.rosterSpotsFilled} / {item.totalSpots}{' '}
+                {t('events.playersJoined')}
+              </Text>
+            </View>
+          </View>
+
+          {/* Countdown Timer */}
+          {!isPast && (
+            <CountdownTimer eventDate={item.date} eventTime={item.time} />
           )}
-          {/* Location */}
-          <View style={themedStyles.cardRow}>
-            <Text style={themedStyles.cardEmoji}>📍</Text>
-            <Text style={themedStyles.cardText}>{item.location}</Text>
-          </View>
-          {/* Date and Time */}
-          <View style={themedStyles.cardRow}>
-            <Text style={themedStyles.cardEmoji}>🗓️</Text>
-            <Text style={themedStyles.cardText}>
-              {item.date} @ {formatDisplayTime(item.time)}
-            </Text>
-          </View>
-          {/* Roster */}
-          <View style={themedStyles.cardRow}>
-            <Text style={themedStyles.cardEmoji}>👥</Text>
-            <Text style={themedStyles.cardText}>
-              {item.rosterSpotsFilled} / {item.totalSpots}{' '}
-              {t('events.playersJoined')}
-            </Text>
-          </View>
         </TouchableOpacity>
 
         {/* Spacer */}
@@ -2733,8 +2796,11 @@ const EventList: React.FC = () => {
           )}
         </TouchableOpacity>
       </View>
-      {/* Content wrapper: pills + filters + event list in their own flex context */}
-      <View style={themedStyles.contentWrapper}>
+      {/* Content wrapper: pills + filters + event list */}
+      <KeyboardAvoidingView
+        style={themedStyles.contentWrapper}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
         {/* Horizontal Activity Filter Chips */}
         <ScrollView
           horizontal
@@ -2842,6 +2908,9 @@ const EventList: React.FC = () => {
             keyExtractor={item => item._id}
             refreshing={loading}
             onRefresh={fetchEvents}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            contentContainerStyle={themedStyles.flatListContent}
             onScrollToIndexFailed={info => {
               // Handle scroll failure gracefully
               setTimeout(() => {
@@ -2915,7 +2984,7 @@ const EventList: React.FC = () => {
             }
           />
         )}
-      </View>
+      </KeyboardAvoidingView>
       {/* Floating Action Button */}
       <TouchableOpacity
         style={themedStyles.fab}
@@ -2935,7 +3004,11 @@ const EventList: React.FC = () => {
           color={colors.buttonText || '#fff'}
         />
       </TouchableOpacity>
-      <Modal animationType="fade" transparent={true} visible={modalVisible}>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={handleCancelModal}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={themedStyles.keyboardAvoidingView}>

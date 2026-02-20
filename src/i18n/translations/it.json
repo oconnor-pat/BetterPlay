@@ -106,7 +106,11 @@
     "categorySports": "Sport",
     "categorySocial": "Sociale",
     "categoryOutdoor": "All'aperto",
-    "categoryCommunity": "Comunità"
+    "categoryCommunity": "Comunità",
+    "happeningNow": "In Corso",
+    "startsIn": "Inizia tra",
+    "day": "giorno",
+    "days": "giorni"
   },
   "profile": {
     "title": "Profilo",

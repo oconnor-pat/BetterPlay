@@ -115,7 +115,11 @@
     "categorySports": "Sport",
     "categorySocial": "Soziales",
     "categoryOutdoor": "Outdoor",
-    "categoryCommunity": "Gemeinschaft"
+    "categoryCommunity": "Gemeinschaft",
+    "happeningNow": "Gerade Live",
+    "startsIn": "Beginnt in",
+    "day": "Tag",
+    "days": "Tage"
   },
   "profile": {
     "title": "Profil",

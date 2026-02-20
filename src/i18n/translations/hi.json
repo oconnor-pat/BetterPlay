@@ -106,7 +106,11 @@
     "categorySports": "खेल",
     "categorySocial": "सामाजिक",
     "categoryOutdoor": "बाहरी",
-    "categoryCommunity": "सामुदायिक"
+    "categoryCommunity": "सामुदायिक",
+    "happeningNow": "अभी चल रहा है",
+    "startsIn": "शुरू होने में",
+    "day": "दिन",
+    "days": "दिन"
   },
   "profile": {
     "title": "प्रोफ़ाइल",
