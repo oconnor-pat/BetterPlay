@@ -1,5 +1,5 @@
 {
-  "version": "1.8.3",
+  "version": "1.9.3",
   "private": true,
   "scripts": {
     "android": "npm run emulator:pixel9 && npx react-native run-android",
