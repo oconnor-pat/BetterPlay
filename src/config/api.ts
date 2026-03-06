@@ -17,7 +17,7 @@ const USE_LOCAL_API = false;
 
 // Set to true if testing on a physical device with local backend
 // Only applies to iOS — Android emulator always uses 10.0.2.2
-const IS_PHYSICAL_DEVICE = f;
+const IS_PHYSICAL_DEVICE = false;
 
 // Automatically select the correct API URL
 const getLocalApiUrl = () => {

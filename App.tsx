@@ -4,6 +4,7 @@ import {
   DefaultTheme,
   DarkTheme,
   LinkingOptions,
+  useNavigation,
 } from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {LogBox} from 'react-native';
@@ -27,7 +28,6 @@ import {
   NotificationProvider,
   useNotifications,
 } from './src/Context/NotificationContext';
-import notificationService from './src/services/NotificationService';
 import locationService from './src/services/LocationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from './src/config/api';
@@ -80,11 +80,11 @@ const linking: LinkingOptions<RootStackParamList> = {
 const NotificationNavigationSetup: React.FC<{children: React.ReactNode}> = ({
   children,
 }) => {
-  const navigation = require('@react-navigation/native').useNavigation();
+  const navigation = useNavigation();
   const {setNavigationRef} = useNotifications();
 
   useEffect(() => {
-    setNavigationRef(navigation);
+    setNavigationRef(navigation as any);
     return () => setNavigationRef(null);
   }, [navigation, setNavigationRef]);
 
@@ -143,6 +143,7 @@ const AppContent = () => {
     } else {
       checkAdminStatus();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData?._id]);
 
   // Check for existing session on app startup - FAST PATH

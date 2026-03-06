@@ -16,14 +16,12 @@ import {useTranslation} from 'react-i18next';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {faEye, faEyeSlash} from '@fortawesome/free-solid-svg-icons';
 
-interface ResetPasswordProps {
-  route: {
-    params: {
-      token: string;
-    };
-  };
-  navigation: any;
-}
+import type {StackScreenProps} from '@react-navigation/stack';
+
+type ResetPasswordProps = StackScreenProps<
+  {ResetPassword: {token: string}},
+  'ResetPassword'
+>;
 
 const ResetPassword: React.FC<ResetPasswordProps> = ({route, navigation}) => {
   const token = route?.params?.token || '';
