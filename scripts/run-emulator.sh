@@ -65,6 +65,11 @@ else
     sleep 3
 fi
 
+# Reverse ports so emulator can reach host services
+echo "🔗 Setting up adb reverse for Metro and API..."
+adb reverse tcp:8081 tcp:8081
+adb reverse tcp:8001 tcp:8001
+
 # Set GPS location
 echo "📍 Setting GPS to Roxbury Township, NJ..."
 adb emu geo fix "$GPS_LON" "$GPS_LAT" > /dev/null 2>&1

@@ -16,15 +16,16 @@ const LOCAL_API_URL_DEVICE = 'http://192.168.1.253:8001';
 const USE_LOCAL_API = false;
 
 // Set to true if testing on a physical device with local backend
-const IS_PHYSICAL_DEVICE = false;
+// Only applies to iOS — Android emulator always uses 10.0.2.2
+const IS_PHYSICAL_DEVICE = f;
 
 // Automatically select the correct API URL
 const getLocalApiUrl = () => {
-  if (IS_PHYSICAL_DEVICE) {
-    return LOCAL_API_URL_DEVICE;
+  if (Platform.OS === 'android') {
+    return LOCAL_API_URL_ANDROID_EMULATOR;
   }
-  return Platform.OS === 'android'
-    ? LOCAL_API_URL_ANDROID_EMULATOR
+  return IS_PHYSICAL_DEVICE
+    ? LOCAL_API_URL_DEVICE
     : LOCAL_API_URL_IOS_SIMULATOR;
 };
 

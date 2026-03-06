@@ -33,6 +33,7 @@ import {
   faEye,
   faUserGroup,
   faLock,
+  faMapLocationDot,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
@@ -40,6 +41,11 @@ import {useTranslation} from 'react-i18next';
 import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
 import locationService from '../../services/LocationService';
+import {
+  getDefaultMapApp,
+  setDefaultMapApp,
+  MapAppName,
+} from '../../services/MapLauncher';
 import UserContext, {UserContextType} from '../UserContext';
 import {version as appVersion} from '../../../package.json';
 import NotificationSettings from './NotificationSettings';
@@ -117,6 +123,10 @@ const Settings: React.FC = () => {
   ] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [defaultMapApp, setDefaultMapAppState] = useState<MapAppName | null>(
+    null,
+  );
+  const [mapModalVisible, setMapModalVisible] = useState(false);
 
   // Load saved preferences on mount
   useEffect(() => {
@@ -148,6 +158,8 @@ const Settings: React.FC = () => {
           setSelectedLanguage(language);
         }
       }
+      const savedMapApp = await getDefaultMapApp();
+      setDefaultMapAppState(savedMapApp);
     } catch (error) {
       console.error('Error loading preferences:', error);
     } finally {
@@ -251,6 +263,21 @@ const Settings: React.FC = () => {
     } catch (error) {
       console.error('Error saving language preference:', error);
     }
+  };
+
+  const MAP_OPTIONS: {label: string; value: MapAppName | null}[] = [
+    {label: t('settings.alwaysAsk'), value: null},
+    ...(Platform.OS === 'ios'
+      ? [{label: 'Apple Maps', value: 'Apple Maps' as MapAppName}]
+      : []),
+    {label: 'Google Maps', value: 'Google Maps' as MapAppName},
+    {label: 'Waze', value: 'Waze' as MapAppName},
+  ];
+
+  const handleMapAppSelect = async (value: MapAppName | null) => {
+    setDefaultMapAppState(value);
+    setMapModalVisible(false);
+    await setDefaultMapApp(value);
   };
 
   const handleDeleteAccount = async () => {
@@ -977,6 +1004,34 @@ const Settings: React.FC = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
+                style={themedStyles.settingRow}
+                activeOpacity={0.7}
+                onPress={() => setMapModalVisible(true)}>
+                <View style={themedStyles.iconContainer}>
+                  <FontAwesomeIcon
+                    icon={faMapLocationDot}
+                    size={18}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={themedStyles.settingContent}>
+                  <Text style={themedStyles.settingTitle}>
+                    {t('settings.defaultMapApp')}
+                  </Text>
+                  <Text style={themedStyles.settingDescription}>
+                    {defaultMapApp || t('settings.alwaysAsk')}
+                  </Text>
+                </View>
+                <View style={themedStyles.chevronContainer}>
+                  <FontAwesomeIcon
+                    icon={faChevronRight}
+                    size={16}
+                    color={colors.placeholder}
+                  />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={[themedStyles.settingRow, themedStyles.settingRowLast]}
                 activeOpacity={0.7}
                 onPress={() =>
@@ -1107,6 +1162,61 @@ const Settings: React.FC = () => {
                     </Text>
                   </View>
                   {selectedLanguage.code === language.code && (
+                    <View style={themedStyles.languageCheck}>
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={18}
+                        color={colors.primary}
+                      />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Default Map App Modal */}
+      <Modal
+        visible={mapModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMapModalVisible(false)}>
+        <TouchableOpacity
+          style={themedStyles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setMapModalVisible(false)}>
+          <View
+            style={themedStyles.modalContent}
+            onStartShouldSetResponder={() => true}>
+            <View style={themedStyles.modalHeader}>
+              <Text style={themedStyles.modalTitle}>
+                {t('settings.defaultMapApp')}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.modalCloseButton}
+                onPress={() => setMapModalVisible(false)}>
+                <FontAwesomeIcon icon={faXmark} size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={themedStyles.languageList}>
+              {MAP_OPTIONS.map(option => (
+                <TouchableOpacity
+                  key={option.label}
+                  style={[
+                    themedStyles.languageOption,
+                    defaultMapApp === option.value &&
+                      themedStyles.languageOptionSelected,
+                  ]}
+                  onPress={() => handleMapAppSelect(option.value)}
+                  activeOpacity={0.7}>
+                  <View style={themedStyles.languageInfo}>
+                    <Text style={themedStyles.languageName}>
+                      {option.label}
+                    </Text>
+                  </View>
+                  {defaultMapApp === option.value && (
                     <View style={themedStyles.languageCheck}>
                       <FontAwesomeIcon
                         icon={faCheck}

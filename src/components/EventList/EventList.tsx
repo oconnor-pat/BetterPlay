@@ -77,6 +77,7 @@ import CountdownTimer from './CountdownTimer';
 import {useNotifications} from '../../Context/NotificationContext';
 import notificationService from '../../services/NotificationService';
 import locationService, {Coordinates} from '../../services/LocationService';
+import {openDirections} from '../../services/MapLauncher';
 
 export type RootStackParamList = {
   EventList:
@@ -413,7 +414,7 @@ const getEventTypeEmoji = (eventType: string) => {
   return found ? found.emoji : '🎯';
 };
 
-// Prefer Google Maps; fall back to Waze, then Apple (iOS) or geo (Android)
+// Open maps for an event — delegates to shared MapLauncher
 const openMapsForEvent = async (
   event: Partial<Event>,
   t: (key: string) => string,
@@ -421,74 +422,20 @@ const openMapsForEvent = async (
   const name = event?.name || 'Destination';
   const address = event?.location || '';
 
-  // Use exact coordinates if available, otherwise use location lookup
   const coords =
     event?.latitude && event?.longitude
       ? {latitude: event.latitude, longitude: event.longitude}
       : getCoordinatesFromLocation(address);
 
-  const lat = coords.latitude;
-  const lng = coords.longitude;
-  const hasCoords = !!(lat && lng);
-
-  // Use the human-readable address for destination labels
-  const encodedAddress = encodeURIComponent(address || name);
-
-  try {
-    if (Platform.OS === 'ios') {
-      // 1) Google Maps if installed
-      const googleScheme = 'comgooglemaps://';
-      if (await Linking.canOpenURL(googleScheme)) {
-        const url = address
-          ? `comgooglemaps://?daddr=${encodedAddress}&directionsmode=driving`
-          : `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
-        await Linking.openURL(url);
-        return;
-      }
-      // 2) Waze if installed
-      const wazeScheme = 'waze://';
-      if (await Linking.canOpenURL(wazeScheme)) {
-        const url = hasCoords
-          ? `waze://?ll=${lat},${lng}&navigate=yes`
-          : `waze://?q=${encodedAddress}&navigate=yes`;
-        await Linking.openURL(url);
-        return;
-      }
-      // 3) Apple Maps fallback — use address so the destination shows a name
-      const appleUrl = address
-        ? `http://maps.apple.com/?daddr=${encodedAddress}`
-        : `http://maps.apple.com/?daddr=${lat},${lng}`;
-      await Linking.openURL(appleUrl);
-      return;
-    } else {
-      // Android
-      // 1) Google navigation (if available)
-      const googleNavUrl = address
-        ? `google.navigation:q=${encodedAddress}`
-        : `google.navigation:q=${lat},${lng}`;
-      if (await Linking.canOpenURL(googleNavUrl)) {
-        await Linking.openURL(googleNavUrl);
-        return;
-      }
-      // 2) Waze if installed
-      const wazeScheme = 'waze://';
-      if (await Linking.canOpenURL(wazeScheme)) {
-        const wazeUrl = hasCoords
-          ? `waze://?ll=${lat},${lng}&navigate=yes`
-          : `waze://?q=${encodedAddress}&navigate=yes`;
-        await Linking.openURL(wazeUrl);
-        return;
-      }
-      // 3) Generic geo: fallback — use address as label
-      const geoUrl = hasCoords
-        ? `geo:${lat},${lng}?q=${lat},${lng}(${encodedAddress})`
-        : `geo:0,0?q=${encodedAddress}`;
-      await Linking.openURL(geoUrl);
-    }
-  } catch (e) {
-    console.error('Failed to open maps:', e);
-    Alert.alert(t('events.mapsError'), t('events.mapsErrorMessage'));
-  }
+  await openDirections(
+    {
+      name,
+      address: address || name,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+    },
+    t,
+  );
 };
 
 // Helper function to get approximate coordinates from common locations

@@ -9,3 +9,5 @@ export * from './NotificationService';
 
 export {default as locationService} from './LocationService';
 export * from './LocationService';
+
+export * from './MapLauncher';

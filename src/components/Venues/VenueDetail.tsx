@@ -49,6 +49,7 @@ import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
 import {VenueStackParamList} from './VenueList';
+import {openDirections as launchDirections} from '../../services/MapLauncher';
 
 type VenueDetailRouteProp = RouteProp<VenueStackParamList, 'VenueDetail'>;
 
@@ -533,24 +534,15 @@ const VenueDetail: React.FC = () => {
 
   // Open maps for directions
   const openDirections = async () => {
-    const encodedAddress = encodeURIComponent(venue?.address || address);
-    try {
-      if (Platform.OS === 'ios') {
-        const googleMapsUrl = `comgooglemaps://?daddr=${encodedAddress}&directionsmode=driving`;
-        const canOpenGoogle = await Linking.canOpenURL(googleMapsUrl);
-        if (canOpenGoogle) {
-          await Linking.openURL(googleMapsUrl);
-        } else {
-          await Linking.openURL(
-            `http://maps.apple.com/?daddr=${encodedAddress}`,
-          );
-        }
-      } else {
-        await Linking.openURL(`google.navigation:q=${encodedAddress}`);
-      }
-    } catch (error) {
-      Alert.alert(t('common.error'), t('venues.directionsError'));
-    }
+    await launchDirections(
+      {
+        name: venue?.name || venueName,
+        address: venue?.address || address,
+        latitude: venue?.latitude,
+        longitude: venue?.longitude,
+      },
+      t,
+    );
   };
 
   // Call venue
