@@ -51,8 +51,7 @@ try {
 import {useTranslation} from 'react-i18next';
 
 // Google Places API key from environment variable
-const GOOGLE_PLACES_API_KEY =
-  Config.GOOGLE_PLACES_API_KEY || 'AIzaSyDsfr1Zky-9sGj-p7FTaOJ8xcume8HiOwg';
+const GOOGLE_PLACES_API_KEY = Config.GOOGLE_PLACES_API_KEY || '';
 
 export type VenueStackParamList = {
   VenueList: undefined;

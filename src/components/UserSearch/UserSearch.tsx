@@ -50,7 +50,9 @@ interface User {
   favoriteActivities?: string[];
   eventsCreated?: number;
   eventsJoined?: number;
-  distance?: number; // miles, returned by backend when proximity query is active
+  latitude?: number;
+  longitude?: number;
+  distance?: number; // miles, computed client-side or returned by backend
 }
 
 const PROXIMITY_PRESETS = [
@@ -220,24 +222,50 @@ const UserSearch: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         // Ensure data is an array before filtering
+        let rawUsers: User[] = [];
         if (Array.isArray(data)) {
-          // Filter out the current user from results
-          const otherUsers = data.filter(
-            (user: User) => user._id !== userData?._id,
-          );
-          setUsers(otherUsers);
-          setFilteredUsers(otherUsers);
+          rawUsers = data;
         } else if (data.users && Array.isArray(data.users)) {
-          const otherUsers = data.users.filter(
-            (user: User) => user._id !== userData?._id,
-          );
-          setUsers(otherUsers);
-          setFilteredUsers(otherUsers);
+          rawUsers = data.users;
         } else {
           console.warn('Unexpected API response format:', data);
           setUsers([]);
           setFilteredUsers([]);
+          return;
         }
+
+        // Filter out the current user
+        let otherUsers = rawUsers.filter(
+          (user: User) => user._id !== userData?._id,
+        );
+
+        // Compute distance client-side if proximity is active
+        if (proximityEnabled && userLocation) {
+          otherUsers = otherUsers
+            .map(user => {
+              // Use backend distance if provided, otherwise calculate from coords
+              let dist = user.distance;
+              if (
+                dist == null &&
+                user.latitude != null &&
+                user.longitude != null
+              ) {
+                dist = locationService.haversineDistance(
+                  userLocation,
+                  {latitude: user.latitude, longitude: user.longitude},
+                  'mi',
+                );
+              }
+              return {...user, distance: dist};
+            })
+            .filter(
+              user => user.distance != null && user.distance <= proximityRadius,
+            )
+            .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+        }
+
+        setUsers(otherUsers);
+        setFilteredUsers(otherUsers);
       } else {
         console.warn('Failed to fetch users:', response.status);
         setUsers([]);
@@ -278,8 +306,7 @@ const UserSearch: React.FC = () => {
       const activityMatch = INTEREST_FILTERS.find(
         f =>
           f.id !== 'all' &&
-          (f.label.toLowerCase() === query ||
-            f.id.toLowerCase() === query),
+          (f.label.toLowerCase() === query || f.id.toLowerCase() === query),
       );
 
       if (activityMatch) {
@@ -295,9 +322,7 @@ const UserSearch: React.FC = () => {
           user =>
             user.username.toLowerCase().includes(query) ||
             (user.name && user.name.toLowerCase().includes(query)) ||
-            user.favoriteActivities?.some(a =>
-              a.toLowerCase().includes(query),
-            ),
+            user.favoriteActivities?.some(a => a.toLowerCase().includes(query)),
         );
       }
     }
@@ -306,8 +331,7 @@ const UserSearch: React.FC = () => {
     if (selectedInterest !== 'all') {
       results = results.filter(user =>
         user.favoriteActivities?.some(
-          activity =>
-            activity.toLowerCase() === selectedInterest.toLowerCase(),
+          activity => activity.toLowerCase() === selectedInterest.toLowerCase(),
         ),
       );
     }

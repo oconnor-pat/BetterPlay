@@ -156,8 +156,7 @@ interface Event {
 }
 
 // Google Places API configuration from environment variable
-const GOOGLE_PLACES_API_KEY =
-  Config.GOOGLE_PLACES_API_KEY || 'AIzaSyDsfr1Zky-9sGj-p7FTaOJ8xcume8HiOwg';
+const GOOGLE_PLACES_API_KEY = Config.GOOGLE_PLACES_API_KEY || '';
 
 // Check if API key is configured
 const isApiKeyConfigured = !!GOOGLE_PLACES_API_KEY;
@@ -2697,7 +2696,9 @@ const EventList: React.FC = () => {
 
             return (
               <MapView
-                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                provider={
+                  Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined
+                }
                 liteMode={Platform.OS === 'android'}
                 style={themedStyles.mapView}
                 initialRegion={{

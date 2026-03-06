@@ -2,15 +2,17 @@
   "version": "1.9.3",
   "private": true,
   "scripts": {
-    "android": "npm run emulator:pixel9pro && npx react-native run-android",
+    "android": "./scripts/run-emulator.sh",
     "device": "./scripts/run-device.sh",
     "emulator:pixel9pro": "emulator -avd Pixel_9_Pro || true",
     "ios": "react-native run-ios --simulator='iPhone 17 Pro (26.1)'",
     "lint": "eslint .",
     "start": "react-native start",
-    "kill": "pkill -f xcodebuild; pkill -f 'react-native.*bundle'; pkill -f hermesc; pkill -f 'react-native start'; rm -f /tmp/betterplay-metro.pid; echo 'All processes killed'",
+    "kill": "npm run kill:ios; npm run kill:android; pkill -f 'react-native start'; rm -f /tmp/betterplay-metro.pid; echo 'All processes killed'",
+    "kill:ios": "pkill -f xcodebuild; pkill -f 'react-native.*bundle'; pkill -f hermesc; echo 'iOS processes killed'",
+    "kill:android": "pkill -f 'qemu-system'; pkill -f GradleDaemon; adb emu kill 2>/dev/null; echo 'Android processes killed'",
     "test": "jest",
-    "postinstall": "echo 'postinstall complete'"
+    "postinstall": "npx patch-package"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^6.5.1",

@@ -43,7 +43,7 @@ class LocationService {
           resolve(coords);
         },
         error => reject(error),
-        {enableHighAccuracy: false, timeout: 15000, maximumAge: 60000},
+        {enableHighAccuracy: true, timeout: 20000, maximumAge: 60000},
       );
     });
   }
@@ -51,10 +51,7 @@ class LocationService {
   private async cacheLocation(coords: Coordinates): Promise<void> {
     try {
       await AsyncStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(coords));
-      await AsyncStorage.setItem(
-        LOCATION_TIMESTAMP_KEY,
-        Date.now().toString(),
-      );
+      await AsyncStorage.setItem(LOCATION_TIMESTAMP_KEY, Date.now().toString());
     } catch {}
   }
 
@@ -95,7 +92,10 @@ class LocationService {
 
   async clearLocation(): Promise<void> {
     this.lastKnownLocation = null;
-    await AsyncStorage.multiRemove([LOCATION_CACHE_KEY, LOCATION_TIMESTAMP_KEY]);
+    await AsyncStorage.multiRemove([
+      LOCATION_CACHE_KEY,
+      LOCATION_TIMESTAMP_KEY,
+    ]);
   }
 
   haversineDistance(
