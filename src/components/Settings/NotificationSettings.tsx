@@ -142,7 +142,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
               <TouchableOpacity
                 style={[styles.enableButton, styles.debugButton]}
                 onPress={() => notificationService.promptEnableNotifications()}>
-                <Text style={styles.enableButtonText}>Open iOS Settings</Text>
+                <Text style={styles.enableButtonText}>Open Device Settings</Text>
               </TouchableOpacity>
             )}
           </>

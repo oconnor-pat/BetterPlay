@@ -982,9 +982,7 @@ class NotificationService {
         {
           text: 'Open Settings',
           onPress: () => {
-            if (Platform.OS === 'ios') {
-              notifee.openNotificationSettings();
-            }
+            notifee.openNotificationSettings();
           },
         },
       ],

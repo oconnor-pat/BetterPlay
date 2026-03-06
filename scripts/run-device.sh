@@ -5,8 +5,8 @@
 
 DEVICE_ID="00008150-00015590027A401C"
 BUNDLE_ID="com.oconnorpat.betterplay"
-WORKSPACE="/Users/patty/Documents/Projects/BetterPlay/ios/BetterPlay.xcworkspace"
-PROJECT_DIR="/Users/patty/Documents/Projects/BetterPlay"
+WORKSPACE="/Users/patty/Projects/BetterPlay/ios/BetterPlay.xcworkspace"
+PROJECT_DIR="/Users/patty/Projects/BetterPlay"
 METRO_PID_FILE="/tmp/betterplay-metro.pid"
 DERIVED_DATA_DIR="$HOME/Library/Developer/Xcode/DerivedData"
 
@@ -24,8 +24,8 @@ is_metro_running() {
         rm -f "$METRO_PID_FILE"
     fi
     
-    # Also check if Metro is running on port 8082
-    if lsof -i :8082 -sTCP:LISTEN > /dev/null 2>&1; then
+    # Also check if Metro is running on port 8081
+    if lsof -i :8081 -sTCP:LISTEN > /dev/null 2>&1; then
         return 0
     fi
     

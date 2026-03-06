@@ -39,12 +39,20 @@ import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
-import Config from 'react-native-config';
 import {API_BASE_URL} from '../../config/api';
+
+// Safe import: react-native-config may not be linked on Android
+let Config: {GOOGLE_PLACES_API_KEY?: string} = {};
+try {
+  Config = require('react-native-config').default || {};
+} catch (e) {
+  Config = {};
+}
 import {useTranslation} from 'react-i18next';
 
 // Google Places API key from environment variable
-const GOOGLE_PLACES_API_KEY = Config.GOOGLE_PLACES_API_KEY || '';
+const GOOGLE_PLACES_API_KEY =
+  Config.GOOGLE_PLACES_API_KEY || 'AIzaSyDsfr1Zky-9sGj-p7FTaOJ8xcume8HiOwg';
 
 export type VenueStackParamList = {
   VenueList: undefined;

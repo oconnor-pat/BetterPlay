@@ -1,23 +1,33 @@
+import {Platform} from 'react-native';
+
 // API Configuration
 // Production API (Heroku)
 const PRODUCTION_API_URL = 'https://omhl-be-9801a7de15ab.herokuapp.com';
 
 // Local development URLs:
-// - Use 'localhost' for iOS Simulator
-// - Use your Mac's IP address for physical iPhone (find it via: ipconfig getifaddr en0)
-// - Example: 'http://192.168.1.100:8001'
-const LOCAL_API_URL_SIMULATOR = 'http://localhost:8001';
+// - iOS Simulator: 'localhost' maps to host machine
+// - Android Emulator: '10.0.2.2' maps to host machine
+// - Physical device: use your Mac's LAN IP (find via: ipconfig getifaddr en0)
+const LOCAL_API_URL_IOS_SIMULATOR = 'http://localhost:8001';
+const LOCAL_API_URL_ANDROID_EMULATOR = 'http://10.0.2.2:8001';
 const LOCAL_API_URL_DEVICE = 'http://192.168.1.253:8001';
 
 // Toggle this to switch between production and local development
 const USE_LOCAL_API = false;
 
-// Set to true if testing on physical device with local backend
+// Set to true if testing on a physical device with local backend
 const IS_PHYSICAL_DEVICE = false;
 
 // Automatically select the correct API URL
+const getLocalApiUrl = () => {
+  if (IS_PHYSICAL_DEVICE) {
+    return LOCAL_API_URL_DEVICE;
+  }
+  return Platform.OS === 'android'
+    ? LOCAL_API_URL_ANDROID_EMULATOR
+    : LOCAL_API_URL_IOS_SIMULATOR;
+};
+
 export const API_BASE_URL = USE_LOCAL_API
-  ? IS_PHYSICAL_DEVICE
-    ? LOCAL_API_URL_DEVICE
-    : LOCAL_API_URL_SIMULATOR
+  ? getLocalApiUrl()
   : PRODUCTION_API_URL;

@@ -412,7 +412,8 @@ function LandingPage() {
           JSON.stringify(responseData.user),
         );
 
-        // Register device for push notifications now that user is logged in
+        // Request notification permission for first-time users, then register token
+        await notificationService.requestPermission();
         await notificationService.ensureTokenRegistered();
 
         setSuccessMessage('Account created successfully!');
@@ -473,7 +474,8 @@ function LandingPage() {
           JSON.stringify(responseData.user),
         );
 
-        // Register device for push notifications now that user is logged in
+        // Request notification permission if not yet granted, then register token
+        await notificationService.requestPermission();
         await notificationService.ensureTokenRegistered();
 
         setSuccessMessage('Welcome back!');

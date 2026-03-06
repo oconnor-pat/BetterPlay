@@ -27,9 +27,16 @@ if (
 ) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import MapView, {Marker} from 'react-native-maps';
+
+// Safe import: react-native-config may not be linked on Android
+let Config: {GOOGLE_PLACES_API_KEY?: string} = {};
+try {
+  Config = require('react-native-config').default || {};
+} catch (e) {
+  Config = {};
+}
+import MapView, {Marker, PROVIDER_GOOGLE} from 'react-native-maps';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
@@ -149,7 +156,8 @@ interface Event {
 }
 
 // Google Places API configuration from environment variable
-const GOOGLE_PLACES_API_KEY = Config.GOOGLE_PLACES_API_KEY || '';
+const GOOGLE_PLACES_API_KEY =
+  Config.GOOGLE_PLACES_API_KEY || 'AIzaSyDsfr1Zky-9sGj-p7FTaOJ8xcume8HiOwg';
 
 // Check if API key is configured
 const isApiKeyConfigured = !!GOOGLE_PLACES_API_KEY;
@@ -630,7 +638,7 @@ const EventList: React.FC = () => {
           borderColor: colors.primary,
           backgroundColor: colors.inputBackground || '#eaeaea',
           marginVertical: 8,
-          overflow: 'hidden',
+          ...(Platform.OS === 'ios' ? {overflow: 'hidden' as const} : {}),
           shadowColor: colors.text,
           shadowOffset: {width: 0, height: 1},
           shadowOpacity: 0.1,
@@ -2046,7 +2054,12 @@ const EventList: React.FC = () => {
       count++;
     }
     return count;
-  }, [selectedEventTypes, selectedDateFilter, showAvailableOnly, proximityEnabled]);
+  }, [
+    selectedEventTypes,
+    selectedDateFilter,
+    showAvailableOnly,
+    proximityEnabled,
+  ]);
 
   // Toggle event type selection
   const toggleEventType = (type: string) => {
@@ -2552,13 +2565,35 @@ const EventList: React.FC = () => {
   };
 
   const onDateChange = (evt: any, selectedDate?: Date) => {
-    if (selectedDate) {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      if (evt.type === 'set' && selectedDate) {
+        setDate(selectedDate);
+        setNewEvent(prev => ({...prev, date: selectedDate.toDateString()}));
+      }
+    } else if (selectedDate) {
       setDate(selectedDate);
     }
   };
 
   const onTimeChange = (evt: any, selectedTime?: Date) => {
-    if (selectedTime) {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+      if (evt.type === 'set' && selectedTime) {
+        const roundedTime = new Date(
+          Math.ceil(selectedTime.getTime() / (15 * 1000)) * 15 * 1000,
+        );
+        setTime(roundedTime);
+        setNewEvent(prev => ({
+          ...prev,
+          time:
+            roundedTime.toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            }) ?? '',
+        }));
+      }
+    } else if (selectedTime) {
       const roundedTime = new Date(
         Math.ceil(selectedTime.getTime() / (15 * 1000)) * 15 * 1000,
       );
@@ -2662,6 +2697,8 @@ const EventList: React.FC = () => {
 
             return (
               <MapView
+                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                liteMode={Platform.OS === 'android'}
                 style={themedStyles.mapView}
                 initialRegion={{
                   latitude: coords.latitude,
@@ -3783,9 +3820,7 @@ const EventList: React.FC = () => {
 
               {/* Proximity Filter */}
               <View style={themedStyles.filterSection}>
-                <Text style={themedStyles.filterSectionTitle}>
-                  Nearby
-                </Text>
+                <Text style={themedStyles.filterSectionTitle}>Nearby</Text>
                 <TouchableOpacity
                   style={[
                     themedStyles.toggleOption,
@@ -3793,7 +3828,12 @@ const EventList: React.FC = () => {
                   ]}
                   onPress={handleEventProximityToggle}
                   disabled={locationLoading}>
-                  <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      flex: 1,
+                    }}>
                     {locationLoading ? (
                       <ActivityIndicator
                         size="small"
