@@ -4,7 +4,7 @@ import {
   DefaultTheme,
   DarkTheme,
   LinkingOptions,
-  useNavigation,
+  createNavigationContainerRef,
 } from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {LogBox} from 'react-native';
@@ -24,10 +24,8 @@ import {
   useTheme,
 } from './src/components/ThemeContext/ThemeContext';
 import {EventProvider} from './src/Context/EventContext';
-import {
-  NotificationProvider,
-  useNotifications,
-} from './src/Context/NotificationContext';
+import {NotificationProvider} from './src/Context/NotificationContext';
+import notificationService from './src/services/NotificationService';
 import locationService from './src/services/LocationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from './src/config/api';
@@ -76,20 +74,7 @@ const linking: LinkingOptions<RootStackParamList> = {
   },
 };
 
-// Component to set up navigation ref for notifications
-const NotificationNavigationSetup: React.FC<{children: React.ReactNode}> = ({
-  children,
-}) => {
-  const navigation = useNavigation();
-  const {setNavigationRef} = useNotifications();
-
-  useEffect(() => {
-    setNavigationRef(navigation as any);
-    return () => setNavigationRef(null);
-  }, [navigation, setNavigationRef]);
-
-  return <>{children}</>;
-};
+const navigationRef = createNavigationContainerRef<any>();
 
 const AppContent = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -369,8 +354,18 @@ const AppContent = () => {
         <NotificationProvider>
           <EventProvider>
             <NavigationContainer
+              ref={navigationRef}
               theme={darkMode ? DarkTheme : DefaultTheme}
               linking={linking}
+              onReady={() => {
+                notificationService.setNavigationCallback(
+                  (screen, params) => {
+                    if (navigationRef.isReady()) {
+                      navigationRef.navigate(screen as never, params as never);
+                    }
+                  },
+                );
+              }}
               fallback={
                 <View style={[styles.centeredView, backgroundStyle]}>
                   <ActivityIndicator
@@ -379,7 +374,6 @@ const AppContent = () => {
                   />
                 </View>
               }>
-              <NotificationNavigationSetup>
                 <Stack.Navigator
                   initialRouteName={
                     userData ? 'BottomNavigator' : 'LandingPage'
@@ -437,7 +431,6 @@ const AppContent = () => {
                     options={{headerShown: false}}
                   />
                 </Stack.Navigator>
-              </NotificationNavigationSetup>
             </NavigationContainer>
           </EventProvider>
         </NotificationProvider>

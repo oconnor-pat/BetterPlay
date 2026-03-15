@@ -40,6 +40,7 @@ export interface NotificationData {
   postId?: string;
   eventName?: string;
   commenterUsername?: string;
+  changedFields?: string;
   [key: string]: string | undefined;
 }
 
@@ -48,9 +49,16 @@ export type NotificationType =
   | 'friend_request'
   | 'friend_accepted'
   | 'event_update'
+  | 'event_watch_update'
+  | 'event_spot_opened'
+  | 'event_roster_change'
   | 'event_reminder'
   | 'event_invitation'
   | 'event_roster'
+  | 'event_like'
+  | 'event_comment'
+  | 'event_join'
+  | 'event_leave'
   | 'community_note'
   | 'venue_update'
   | 'space_update'
@@ -63,7 +71,12 @@ export interface NotificationPreferences {
   friendRequests: boolean;
   eventUpdates: boolean;
   eventReminders: boolean;
+  eventActivity?: boolean;
   communityNotes: boolean;
+  watchedEvents?: boolean;
+  watchedEventSpotsAvailable?: boolean;
+  watchedEventGeneralUpdates?: boolean;
+  watchedEventRosterChanges?: boolean;
   quietHoursEnabled?: boolean;
   quietHoursStart?: string; // e.g., "22:00"
   quietHoursEnd?: string; // e.g., "07:00"
@@ -96,7 +109,12 @@ export interface UpdatePreferencesRequest {
   friendRequests?: boolean;
   eventUpdates?: boolean;
   eventReminders?: boolean;
+  eventActivity?: boolean;
   communityNotes?: boolean;
+  watchedEvents?: boolean;
+  watchedEventSpotsAvailable?: boolean;
+  watchedEventGeneralUpdates?: boolean;
+  watchedEventRosterChanges?: boolean;
   quietHoursEnabled?: boolean;
   quietHoursStart?: string;
   quietHoursEnd?: string;

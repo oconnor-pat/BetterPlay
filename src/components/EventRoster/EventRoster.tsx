@@ -4,6 +4,7 @@ import React, {
   useMemo,
   useContext,
   useCallback,
+  useRef,
 } from 'react';
 import {
   View,
@@ -19,6 +20,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
@@ -71,6 +73,7 @@ type EventRosterRouteProp = RouteProp<
       totalSpots?: number;
       roster?: Player[];
       jerseyColors?: string[];
+      changedFields?: string;
     };
   },
   'EventRoster'
@@ -171,7 +174,13 @@ const positionRatios: Record<string, Record<string, number>> = {
   Basketball: {Guard: 2, Forward: 2, Center: 1},
   Hockey: {Forward: 3, Defense: 2, Goalie: 1},
   Soccer: {Forward: 3, Midfielder: 4, Defender: 4, Goalkeeper: 1},
-  Football: {Quarterback: 1, 'Running Back': 2, 'Wide Receiver': 3, Lineman: 5, Defense: 5},
+  Football: {
+    Quarterback: 1,
+    'Running Back': 2,
+    'Wide Receiver': 3,
+    Lineman: 5,
+    Defense: 5,
+  },
   Rugby: {Forward: 8, Back: 7},
   Lacrosse: {Attack: 3, Midfield: 3, Defense: 3, Goalie: 1},
   Volleyball: {Setter: 1, 'Outside Hitter': 2, 'Middle Blocker': 2, Libero: 1},
@@ -190,7 +199,8 @@ const getScaledPositionCounts = (
   }
 
   const ratioTotal = Object.values(ratios).reduce((sum, v) => sum + v, 0);
-  const effectiveSize = teamCount > 1 ? Math.round(rosterSize / teamCount) : rosterSize;
+  const effectiveSize =
+    teamCount > 1 ? Math.round(rosterSize / teamCount) : rosterSize;
 
   const scaled: Record<string, number> = {};
   let assigned = 0;
@@ -200,7 +210,10 @@ const getScaledPositionCounts = (
     if (i === entries.length - 1) {
       scaled[pos] = Math.max(effectiveSize - assigned, 1);
     } else {
-      const count = Math.max(Math.round((ratio / ratioTotal) * effectiveSize), 1);
+      const count = Math.max(
+        Math.round((ratio / ratioTotal) * effectiveSize),
+        1,
+      );
       scaled[pos] = count;
       assigned += count;
     }
@@ -258,11 +271,17 @@ const EventRoster: React.FC = () => {
     totalSpots: paramTotalSpots = 10,
     roster: initialRoster,
     jerseyColors: initialJerseyColors,
+    changedFields: changedFieldsParam,
   } = route.params;
   const {colors} = useTheme();
   const {updateRosterSpots} = useEventContext();
   const {userData} = useContext(UserContext) as UserContextType;
   const {t} = useTranslation();
+
+  const highlightAnim = useRef(new Animated.Value(0)).current;
+  const [highlightedFields, setHighlightedFields] = useState<Set<string>>(
+    new Set(),
+  );
 
   // State for event details (populated from params or fetched from API)
   const [eventName, setEventName] = useState(paramEventName || '');
@@ -308,7 +327,9 @@ const EventRoster: React.FC = () => {
   const [addPlayerExpanded, setAddPlayerExpanded] = useState(false);
 
   const [activeTeamTab, setActiveTeamTab] = useState<string>('all');
-  const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>(
+    'all',
+  );
 
   // Edit mode state
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -332,6 +353,34 @@ const EventRoster: React.FC = () => {
   const [invitedUserDetails, setInvitedUserDetails] = useState<
     {_id: string; username: string; profilePicUrl?: string}[]
   >([]);
+
+  useEffect(() => {
+    if (changedFieldsParam) {
+      const fields = changedFieldsParam.split(',').map(f => f.trim());
+      setHighlightedFields(new Set(fields));
+      highlightAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(highlightAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: false,
+        }),
+        Animated.delay(5000),
+        Animated.timing(highlightAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: false,
+        }),
+      ]).start(() => {
+        setHighlightedFields(new Set());
+      });
+    }
+  }, [changedFieldsParam, highlightAnim]);
+
+  const highlightBgColor = highlightAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['transparent', colors.primary + '40'],
+  });
 
   // Check if current user is the event creator
   const isEventCreator = useMemo(() => {
@@ -388,7 +437,11 @@ const EventRoster: React.FC = () => {
   const filteredRoster = useMemo(() => {
     let players = roster;
 
-    if (isTeamSport(eventType) && activeTeamTab !== 'all' && teamColors.length > 1) {
+    if (
+      isTeamSport(eventType) &&
+      activeTeamTab !== 'all' &&
+      teamColors.length > 1
+    ) {
       players = players.filter(p => p.jerseyColor === activeTeamTab);
     }
 
@@ -408,9 +461,10 @@ const EventRoster: React.FC = () => {
 
   const positionSummary = useMemo(() => {
     const positions = positionOptions[eventType] || positionOptions.Default;
-    const currentPlayers = isTeamSport(eventType) && activeTeamTab !== 'all' && teamColors.length > 1
-      ? roster.filter(p => p.jerseyColor === activeTeamTab)
-      : roster;
+    const currentPlayers =
+      isTeamSport(eventType) && activeTeamTab !== 'all' && teamColors.length > 1
+        ? roster.filter(p => p.jerseyColor === activeTeamTab)
+        : roster;
 
     return positions.map(pos => {
       const filled = currentPlayers.filter(p => p.position === pos).length;
@@ -1264,25 +1318,23 @@ const EventRoster: React.FC = () => {
         headers: token ? {Authorization: `Bearer ${token}`} : {},
       });
       setRoster(response.data.roster || []);
-      // Populate event details from API if not provided via route params
-      // API returns 'name' not 'eventName'
       if (response.data.name) {
-        setEventName(prev => prev || response.data.name);
+        setEventName(response.data.name);
       }
       if (response.data.eventType) {
-        setEventType(prev => prev || response.data.eventType);
+        setEventType(response.data.eventType);
       }
       if (response.data.date) {
-        setDate(prev => prev || response.data.date);
+        setDate(response.data.date);
       }
       if (response.data.time) {
-        setTime(prev => prev || response.data.time);
+        setTime(response.data.time);
       }
       if (response.data.location) {
-        setLocation(prev => prev || response.data.location);
+        setLocation(response.data.location);
       }
       if (response.data.totalSpots) {
-        setTotalSpots(prev => (prev === 10 ? response.data.totalSpots : prev));
+        setTotalSpots(response.data.totalSpots);
       }
       // Update jersey colors from backend if available
       if (
@@ -1342,7 +1394,7 @@ const EventRoster: React.FC = () => {
     }
   };
 
-  // Add player
+  // Add player via dedicated endpoint (triggers backend notifications)
   const handleSave = async () => {
     const isSport = isTeamSport(eventType);
     if (!username || !position || (isSport && (!paidStatus || !jerseyColor))) {
@@ -1362,9 +1414,26 @@ const EventRoster: React.FC = () => {
       position,
       profilePicUrl: userData?.profilePicUrl,
     };
+
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(
+        `${API_BASE_URL}/events/${eventId}/roster`,
+        {participant: newPlayer},
+        token ? {headers: {Authorization: `Bearer ${token}`}} : {},
+      );
+    } catch (error: any) {
+      if (error?.response?.status === 409) {
+        setErrorMessage('You are already on this roster.');
+      } else {
+        setErrorMessage('Failed to join event. Please try again.');
+      }
+      setSavingRoster(false);
+      return;
+    }
+
     const updatedRoster = [...roster, newPlayer];
     setRoster(updatedRoster);
-    await persistRoster(updatedRoster);
     updateRosterSpots(eventId, updatedRoster.length);
 
     if (date && time) {
@@ -1492,20 +1561,30 @@ const EventRoster: React.FC = () => {
           text: t('common.leave'),
           style: 'destructive',
           onPress: async () => {
-            setRoster(currentRoster => {
-              const updatedRoster = currentRoster.filter(
-                p => p.username !== playerUsername,
+            try {
+              const token = await AsyncStorage.getItem('userToken');
+              await axios.delete(
+                `${API_BASE_URL}/events/${eventId}/roster/${playerUsername}`,
+                token
+                  ? {headers: {Authorization: `Bearer ${token}`}}
+                  : undefined,
               );
-              persistRoster(updatedRoster);
-              updateRosterSpots(eventId, updatedRoster.length);
-              return updatedRoster;
-            });
-            notificationService.cancelEventNotifications(eventId).catch(() => {});
+            } catch (error) {
+              console.error('Error leaving event:', error);
+            }
+            const updatedRoster = roster.filter(
+              p => p.username !== playerUsername,
+            );
+            setRoster(updatedRoster);
+            updateRosterSpots(eventId, updatedRoster.length);
+            notificationService
+              .cancelEventNotifications(eventId)
+              .catch(() => {});
           },
         },
       ]);
     },
-    [userData?.username, t, eventId, updateRosterSpots],
+    [userData?.username, t, eventId, updateRosterSpots, roster],
   );
 
   // Open edit modal for current user
@@ -1526,23 +1605,27 @@ const EventRoster: React.FC = () => {
       Alert.alert(t('roster.missingFields'), t('roster.missingFieldsMessage'));
       return;
     }
-    setRoster(currentRoster => {
-      const updatedRoster = currentRoster.map(player =>
-        player.username === userData?.username
-          ? {
-              ...player,
-              paidStatus: editPaidStatus,
-              jerseyColor: editJerseyColor,
-              position: editPosition,
-            }
-          : player,
-      );
-      // Persist in background
-      persistRoster(updatedRoster);
-      return updatedRoster;
-    });
+    const updatedRoster = roster.map(player =>
+      player.username === userData?.username
+        ? {
+            ...player,
+            paidStatus: editPaidStatus,
+            jerseyColor: editJerseyColor,
+            position: editPosition,
+          }
+        : player,
+    );
+    setRoster(updatedRoster);
+    await persistRoster(updatedRoster);
     setEditModalVisible(false);
-  }, [editPaidStatus, editJerseyColor, editPosition, userData?.username, t]);
+  }, [
+    editPaidStatus,
+    editJerseyColor,
+    editPosition,
+    userData?.username,
+    t,
+    roster,
+  ]);
 
   const renderPlayerCard = ({item, index}: {item: Player; index: number}) => {
     const isSelf = item.username === userData?.username;
@@ -1691,12 +1774,21 @@ const EventRoster: React.FC = () => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
           {/* Event Header */}
-          <View style={themedStyles.eventHeader}>
+          <Animated.View
+            style={[
+              themedStyles.eventHeader,
+              highlightedFields.has('name') && {
+                backgroundColor: highlightBgColor,
+                borderRadius: 10,
+                marginHorizontal: -6,
+                paddingHorizontal: 6,
+              },
+            ]}>
             <Text style={themedStyles.eventEmoji}>{sportEmoji}</Text>
             <Text style={themedStyles.eventName} numberOfLines={2}>
               {eventName}
             </Text>
-          </View>
+          </Animated.View>
 
           {/* Event Details Card */}
           <View style={themedStyles.eventCard}>
@@ -1707,26 +1799,62 @@ const EventRoster: React.FC = () => {
             </View>
 
             {date && (
-              <View style={themedStyles.eventDetailRow}>
+              <Animated.View
+                style={[
+                  themedStyles.eventDetailRow,
+                  highlightedFields.has('date') && {
+                    backgroundColor: highlightBgColor,
+                    borderRadius: 8,
+                    marginHorizontal: -6,
+                    paddingHorizontal: 6,
+                  },
+                ]}>
                 <Text style={themedStyles.eventDetailIcon}>📅</Text>
                 <Text style={themedStyles.eventDetailText}>{date}</Text>
-              </View>
+              </Animated.View>
             )}
             {time && (
-              <View style={themedStyles.eventDetailRow}>
+              <Animated.View
+                style={[
+                  themedStyles.eventDetailRow,
+                  highlightedFields.has('time') && {
+                    backgroundColor: highlightBgColor,
+                    borderRadius: 8,
+                    marginHorizontal: -6,
+                    paddingHorizontal: 6,
+                  },
+                ]}>
                 <Text style={themedStyles.eventDetailIcon}>🕐</Text>
                 <Text style={themedStyles.eventDetailText}>{time}</Text>
-              </View>
+              </Animated.View>
             )}
             {location && (
-              <View style={themedStyles.eventDetailRow}>
+              <Animated.View
+                style={[
+                  themedStyles.eventDetailRow,
+                  highlightedFields.has('location') && {
+                    backgroundColor: highlightBgColor,
+                    borderRadius: 8,
+                    marginHorizontal: -6,
+                    paddingHorizontal: 6,
+                  },
+                ]}>
                 <Text style={themedStyles.eventDetailIcon}>📍</Text>
                 <Text style={themedStyles.eventDetailText}>{location}</Text>
-              </View>
+              </Animated.View>
             )}
 
             {/* Progress Bar */}
-            <View style={themedStyles.progressSection}>
+            <Animated.View
+              style={[
+                themedStyles.progressSection,
+                highlightedFields.has('totalSpots') && {
+                  backgroundColor: highlightBgColor,
+                  borderRadius: 8,
+                  marginHorizontal: -6,
+                  paddingHorizontal: 6,
+                },
+              ]}>
               <View style={themedStyles.progressHeader}>
                 <Text style={themedStyles.progressLabel}>
                   {t('roster.rosterSpots')}
@@ -1748,7 +1876,7 @@ const EventRoster: React.FC = () => {
                   ? t('roster.spotsRemaining', {count: spotsRemaining})
                   : t('roster.rosterFull')}
               </Text>
-            </View>
+            </Animated.View>
           </View>
 
           {/* Stats Section */}
@@ -2158,14 +2286,16 @@ const EventRoster: React.FC = () => {
                       <Text
                         style={[
                           themedStyles.teamTabText,
-                          activeTeamTab === 'all' && themedStyles.teamTabTextActive,
+                          activeTeamTab === 'all' &&
+                            themedStyles.teamTabTextActive,
                         ]}>
                         All
                       </Text>
                       <Text
                         style={[
                           themedStyles.teamTabCount,
-                          activeTeamTab === 'all' && themedStyles.teamTabCountActive,
+                          activeTeamTab === 'all' &&
+                            themedStyles.teamTabCountActive,
                         ]}>
                         {roster.length}
                       </Text>
@@ -2182,13 +2312,17 @@ const EventRoster: React.FC = () => {
                         <View
                           style={[
                             themedStyles.teamTabDot,
-                            {backgroundColor: jerseyColors[color] || jerseyColors.Other},
+                            {
+                              backgroundColor:
+                                jerseyColors[color] || jerseyColors.Other,
+                            },
                           ]}
                         />
                         <Text
                           style={[
                             themedStyles.teamTabText,
-                            activeTeamTab === color && themedStyles.teamTabTextActive,
+                            activeTeamTab === color &&
+                              themedStyles.teamTabTextActive,
                           ]}
                           numberOfLines={1}>
                           {color}
@@ -2196,7 +2330,8 @@ const EventRoster: React.FC = () => {
                         <Text
                           style={[
                             themedStyles.teamTabCount,
-                            activeTeamTab === color && themedStyles.teamTabCountActive,
+                            activeTeamTab === color &&
+                              themedStyles.teamTabCountActive,
                           ]}>
                           {rosterStats.teamCounts[color] || 0}
                         </Text>
@@ -2206,22 +2341,25 @@ const EventRoster: React.FC = () => {
                 )}
 
                 {/* Position Fill Summary */}
-                {isTeamSport(eventType) &&
-                  scaledPositions && (
-                    <View style={themedStyles.positionSummaryContainer}>
-                      <Text style={themedStyles.positionSummaryTitle}>
-                        Positions
-                      </Text>
-                      {positionSummary.map(({position: pos, filled, expected}) => {
-                        const pct = expected > 0
-                          ? Math.min((filled / expected) * 100, 100)
-                          : filled > 0
+                {isTeamSport(eventType) && scaledPositions && (
+                  <View style={themedStyles.positionSummaryContainer}>
+                    <Text style={themedStyles.positionSummaryTitle}>
+                      Positions
+                    </Text>
+                    {positionSummary.map(
+                      ({position: pos, filled, expected}) => {
+                        const pct =
+                          expected > 0
+                            ? Math.min((filled / expected) * 100, 100)
+                            : filled > 0
                             ? 100
                             : 0;
                         const isOver = expected > 0 && filled > expected;
                         return (
                           <View key={pos} style={themedStyles.positionRow}>
-                            <Text style={themedStyles.positionLabel}>{pos}</Text>
+                            <Text style={themedStyles.positionLabel}>
+                              {pos}
+                            </Text>
                             <View style={themedStyles.positionBarBg}>
                               <View
                                 style={[
@@ -2232,13 +2370,15 @@ const EventRoster: React.FC = () => {
                               />
                             </View>
                             <Text style={themedStyles.positionCount}>
-                              {filled}{expected > 0 ? ` / ${expected}` : ''}
+                              {filled}
+                              {expected > 0 ? ` / ${expected}` : ''}
                             </Text>
                           </View>
                         );
-                      })}
-                    </View>
-                  )}
+                      },
+                    )}
+                  </View>
+                )}
 
                 {/* Payment Filter Tabs */}
                 {isTeamSport(eventType) && roster.length > 0 && (
@@ -2246,35 +2386,47 @@ const EventRoster: React.FC = () => {
                     {(['all', 'paid', 'unpaid'] as const).map(filter => {
                       const count =
                         filter === 'all'
-                          ? (activeTeamTab !== 'all' && teamColors.length > 1
-                              ? roster.filter(p => p.jerseyColor === activeTeamTab).length
-                              : roster.length)
+                          ? activeTeamTab !== 'all' && teamColors.length > 1
+                            ? roster.filter(
+                                p => p.jerseyColor === activeTeamTab,
+                              ).length
+                            : roster.length
                           : filter === 'paid'
-                            ? (activeTeamTab !== 'all' && teamColors.length > 1
-                                ? roster.filter(p => p.jerseyColor === activeTeamTab && p.paidStatus === 'Paid').length
-                                : rosterStats.paidCount)
-                            : (activeTeamTab !== 'all' && teamColors.length > 1
-                                ? roster.filter(p => p.jerseyColor === activeTeamTab && p.paidStatus === 'Unpaid').length
-                                : rosterStats.unpaidCount);
+                          ? activeTeamTab !== 'all' && teamColors.length > 1
+                            ? roster.filter(
+                                p =>
+                                  p.jerseyColor === activeTeamTab &&
+                                  p.paidStatus === 'Paid',
+                              ).length
+                            : rosterStats.paidCount
+                          : activeTeamTab !== 'all' && teamColors.length > 1
+                          ? roster.filter(
+                              p =>
+                                p.jerseyColor === activeTeamTab &&
+                                p.paidStatus === 'Unpaid',
+                            ).length
+                          : rosterStats.unpaidCount;
                       const label =
                         filter === 'all'
                           ? 'All'
                           : filter === 'paid'
-                            ? `Paid`
-                            : `Unpaid`;
+                          ? `Paid`
+                          : `Unpaid`;
                       return (
                         <TouchableOpacity
                           key={filter}
                           style={[
                             themedStyles.paymentFilterTab,
-                            paymentFilter === filter && themedStyles.paymentFilterTabActive,
+                            paymentFilter === filter &&
+                              themedStyles.paymentFilterTabActive,
                           ]}
                           onPress={() => setPaymentFilter(filter)}
                           activeOpacity={0.7}>
                           <Text
                             style={[
                               themedStyles.paymentFilterText,
-                              paymentFilter === filter && themedStyles.paymentFilterTextActive,
+                              paymentFilter === filter &&
+                                themedStyles.paymentFilterTextActive,
                             ]}>
                             {label} ({count})
                           </Text>
@@ -2285,41 +2437,42 @@ const EventRoster: React.FC = () => {
                 )}
 
                 {/* Players grouped by position */}
-                {isTeamSport(eventType) ? (
-                  Object.entries(playersGroupedByPosition).map(
-                    ([pos, players]) => {
-                      if (players.length === 0 && paymentFilter !== 'all') {
-                        return null;
-                      }
-                      const expected = scaledPositions ? scaledPositions[pos] || 0 : 0;
-                      return (
-                        <View key={pos}>
-                          <View style={themedStyles.positionGroupHeader}>
-                            <Text style={themedStyles.positionGroupTitle}>
-                              {pos}
-                            </Text>
-                            <Text style={themedStyles.positionGroupCount}>
-                              {players.length}{expected > 0 ? ` / ${expected}` : ''}
-                            </Text>
+                {isTeamSport(eventType)
+                  ? Object.entries(playersGroupedByPosition).map(
+                      ([pos, players]) => {
+                        if (players.length === 0 && paymentFilter !== 'all') {
+                          return null;
+                        }
+                        const expected = scaledPositions
+                          ? scaledPositions[pos] || 0
+                          : 0;
+                        return (
+                          <View key={pos}>
+                            <View style={themedStyles.positionGroupHeader}>
+                              <Text style={themedStyles.positionGroupTitle}>
+                                {pos}
+                              </Text>
+                              <Text style={themedStyles.positionGroupCount}>
+                                {players.length}
+                                {expected > 0 ? ` / ${expected}` : ''}
+                              </Text>
+                            </View>
+                            {players.length > 0 ? (
+                              players.map((player, idx) =>
+                                renderPlayerCard({item: player, index: idx}),
+                              )
+                            ) : (
+                              <Text style={themedStyles.emptyPositionText}>
+                                No players yet
+                              </Text>
+                            )}
                           </View>
-                          {players.length > 0 ? (
-                            players.map((player, idx) =>
-                              renderPlayerCard({item: player, index: idx}),
-                            )
-                          ) : (
-                            <Text style={themedStyles.emptyPositionText}>
-                              No players yet
-                            </Text>
-                          )}
-                        </View>
-                      );
-                    },
-                  )
-                ) : (
-                  filteredRoster.map((player, idx) =>
-                    renderPlayerCard({item: player, index: idx}),
-                  )
-                )}
+                        );
+                      },
+                    )
+                  : filteredRoster.map((player, idx) =>
+                      renderPlayerCard({item: player, index: idx}),
+                    )}
               </>
             )}
           </View>

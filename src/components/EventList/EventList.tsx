@@ -10,7 +10,6 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
-  Linking,
   ScrollView,
   Share,
   KeyboardAvoidingView,
@@ -18,6 +17,7 @@ import {
   LayoutAnimation,
   UIManager,
   Image,
+  Switch,
 } from 'react-native';
 
 // Enable LayoutAnimation on Android
@@ -78,6 +78,9 @@ import {useNotifications} from '../../Context/NotificationContext';
 import notificationService from '../../services/NotificationService';
 import locationService, {Coordinates} from '../../services/LocationService';
 import {openDirections} from '../../services/MapLauncher';
+import eventWatchService, {
+  EventWatchPreferences,
+} from '../../services/EventWatchService';
 
 export type RootStackParamList = {
   EventList:
@@ -155,6 +158,13 @@ interface Event {
   // Invited users (for invite-only events)
   invitedUsers?: string[];
 }
+
+const getDefaultWatchPreferences = (): EventWatchPreferences => ({
+  spotsAvailable: true,
+  generalUpdates: true,
+  rosterChanges: false,
+  reminders: false,
+});
 
 // Google Places API configuration from environment variable
 const GOOGLE_PLACES_API_KEY = Config.GOOGLE_PLACES_API_KEY || '';
@@ -483,7 +493,8 @@ const EventList: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
   const {t} = useTranslation();
-  const {badgeCount} = useNotifications();
+  const {badgeCount, hasPermission, requestPermission, settings} =
+    useNotifications();
 
   const themedStyles = useMemo(
     () =>
@@ -654,6 +665,12 @@ const EventList: React.FC = () => {
         },
         joinButtonText: {
           color: colors.buttonText || '#fff',
+        },
+        watchButtonWatched: {
+          backgroundColor: colors.primary + '15',
+        },
+        watchButtonTextWatched: {
+          color: colors.primary,
         },
         iconContainer: {
           flexDirection: 'row',
@@ -1555,6 +1572,89 @@ const EventList: React.FC = () => {
           fontWeight: '700',
           fontSize: 15,
         },
+        watchModalCard: {
+          backgroundColor: colors.card,
+          borderRadius: 14,
+          padding: 16,
+        },
+        watchModalTitle: {
+          color: colors.text,
+          fontSize: 20,
+          fontWeight: '700',
+          marginBottom: 4,
+        },
+        watchModalSubtitle: {
+          color: colors.secondaryText,
+          fontSize: 13,
+          marginBottom: 14,
+        },
+        watchOptionRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: 10,
+        },
+        watchOptionInfo: {
+          flex: 1,
+          paddingRight: 10,
+        },
+        watchOptionTitle: {
+          color: colors.text,
+          fontSize: 15,
+          fontWeight: '600',
+        },
+        watchOptionDescription: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          marginTop: 2,
+        },
+        watchOptionDivider: {
+          height: 1,
+          backgroundColor: colors.border,
+        },
+        watchModalFooter: {
+          flexDirection: 'row',
+          marginTop: 14,
+          gap: 10,
+        },
+        watchSecondaryButton: {
+          flex: 1,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border,
+          paddingVertical: 12,
+          alignItems: 'center',
+        },
+        watchSecondaryButtonText: {
+          color: colors.text,
+          fontWeight: '600',
+          fontSize: 14,
+        },
+        watchDangerButton: {
+          borderColor: colors.error || '#e74c3c',
+          backgroundColor: (colors.error || '#e74c3c') + '14',
+        },
+        watchDangerButtonText: {
+          color: colors.error || '#e74c3c',
+        },
+        watchPrimaryButton: {
+          flex: 1,
+          borderRadius: 10,
+          backgroundColor: colors.primary,
+          paddingVertical: 12,
+          alignItems: 'center',
+        },
+        watchPrimaryButtonText: {
+          color: colors.buttonText || '#fff',
+          fontWeight: '700',
+          fontSize: 14,
+        },
+        watchGlobalMutedNote: {
+          marginTop: 12,
+          color: colors.secondaryText,
+          fontSize: 12,
+          lineHeight: 18,
+        },
       }),
     [colors],
   );
@@ -1706,6 +1806,16 @@ const EventList: React.FC = () => {
   const [savingEvent, setSavingEvent] = useState(false);
   const [_deletingEventId, setDeletingEventId] = useState<string | null>(null);
 
+  // Event watch state
+  const [watchModalVisible, setWatchModalVisible] = useState(false);
+  const [watchTargetEvent, setWatchTargetEvent] = useState<Event | null>(null);
+  const [watchPreferencesDraft, setWatchPreferencesDraft] =
+    useState<EventWatchPreferences>(getDefaultWatchPreferences());
+  const [watchedEventIds, setWatchedEventIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [savingWatch, setSavingWatch] = useState(false);
+
   // First-time user onboarding state
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
 
@@ -1757,6 +1867,16 @@ const EventList: React.FC = () => {
       setLikedEvents(new Set(userLikedEvents));
     }
   }, [eventData, userData]);
+
+  // Load watched events from persistent storage
+  useEffect(() => {
+    const loadWatches = async () => {
+      const ids = await eventWatchService.getWatchedEventIds();
+      setWatchedEventIds(new Set(ids));
+    };
+
+    loadWatches();
+  }, []);
 
   // Dismiss hint and save to storage
   const dismissFirstTimeHint = async () => {
@@ -2291,6 +2411,82 @@ const EventList: React.FC = () => {
     }
   };
 
+  const openWatchModal = async (event: Event) => {
+    const existing = await eventWatchService.getWatch(event._id);
+    setWatchTargetEvent(event);
+    setWatchPreferencesDraft(
+      existing?.preferences || eventWatchService.getDefaultPreferences(),
+    );
+    setWatchModalVisible(true);
+  };
+
+  const closeWatchModal = () => {
+    setWatchModalVisible(false);
+    setWatchTargetEvent(null);
+    setWatchPreferencesDraft(getDefaultWatchPreferences());
+  };
+
+  const saveWatchPreferences = async () => {
+    if (!watchTargetEvent) {
+      return;
+    }
+
+    if (!hasPermission) {
+      const granted = await requestPermission();
+      if (!granted) {
+        Alert.alert(
+          'Notifications Disabled',
+          'Enable system notifications to receive watched-event alerts.',
+        );
+        return;
+      }
+    }
+
+    setSavingWatch(true);
+    try {
+      await eventWatchService.watchEvent({
+        eventId: watchTargetEvent._id,
+        eventName: watchTargetEvent.name,
+        eventDate: watchTargetEvent.date,
+        eventTime: watchTargetEvent.time,
+        preferences: watchPreferencesDraft,
+      });
+
+      setWatchedEventIds(prev => {
+        const updated = new Set(prev);
+        updated.add(watchTargetEvent._id);
+        return updated;
+      });
+
+      closeWatchModal();
+    } catch (error) {
+      Alert.alert('Error', 'Unable to save watch preferences right now.');
+    } finally {
+      setSavingWatch(false);
+    }
+  };
+
+  const stopWatchingEvent = async () => {
+    if (!watchTargetEvent) {
+      return;
+    }
+
+    setSavingWatch(true);
+    try {
+      await eventWatchService.unwatchEvent(watchTargetEvent._id);
+      setWatchedEventIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(watchTargetEvent._id);
+        return updated;
+      });
+      closeWatchModal();
+    } catch {
+      Alert.alert('Error', 'Unable to remove watch right now.');
+    } finally {
+      setSavingWatch(false);
+    }
+  };
+
   // Toggle inline comments for an event
   const handleDiscussEvent = (event: Event) => {
     LayoutAnimation.configureNext(
@@ -2550,6 +2746,14 @@ const EventList: React.FC = () => {
   const renderEventCard = ({item}: {item: Event}) => {
     const isPast = isEventPast(item.date, item.time);
     const isCommentsExpanded = expandedCommentsEventId === item._id;
+    const isWatching = watchedEventIds.has(item._id);
+    const isEventFull = item.rosterSpotsFilled >= item.totalSpots;
+    let watchButtonLabel = 'Watch Event';
+    if (isWatching) {
+      watchButtonLabel = 'Watching';
+    } else if (isEventFull) {
+      watchButtonLabel = 'Watch for Spots';
+    }
 
     return (
       <View style={[themedStyles.card, isPast && themedStyles.pastEventCard]}>
@@ -2679,6 +2883,26 @@ const EventList: React.FC = () => {
 
         {/* Action Buttons */}
         <View style={themedStyles.actionRow}>
+          <TouchableOpacity
+            style={[
+              themedStyles.actionButton,
+              isWatching && themedStyles.watchButtonWatched,
+            ]}
+            onPress={() => openWatchModal(item)}>
+            <FontAwesomeIcon
+              icon={faBell}
+              size={16}
+              color={isWatching ? colors.primary : colors.primary}
+              style={themedStyles.actionButtonIcon}
+            />
+            <Text
+              style={[
+                themedStyles.actionButtonText,
+                isWatching && themedStyles.watchButtonTextWatched,
+              ]}>
+              {watchButtonLabel}
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[themedStyles.actionButton, themedStyles.joinButton]}
             onPress={() => openMapsForEvent(item, t)}>
@@ -3636,6 +3860,152 @@ const EventList: React.FC = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <Modal
+        visible={watchModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeWatchModal}>
+        <TouchableOpacity
+          style={themedStyles.modalOverlay}
+          activeOpacity={1}
+          onPress={closeWatchModal}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={e => e.stopPropagation()}
+            style={themedStyles.watchModalCard}>
+            <Text style={themedStyles.watchModalTitle}>
+              {watchedEventIds.has(watchTargetEvent?._id || '')
+                ? 'Update Watch Settings'
+                : 'Watch This Event'}
+            </Text>
+            <Text style={themedStyles.watchModalSubtitle}>
+              {watchTargetEvent?.name || ''}
+            </Text>
+
+            <View style={themedStyles.watchOptionRow}>
+              <View style={themedStyles.watchOptionInfo}>
+                <Text style={themedStyles.watchOptionTitle}>Spots Opened</Text>
+                <Text style={themedStyles.watchOptionDescription}>
+                  Alert me when a full event has a free spot.
+                </Text>
+              </View>
+              <Switch
+                value={watchPreferencesDraft.spotsAvailable}
+                onValueChange={value =>
+                  setWatchPreferencesDraft(prev => ({
+                    ...prev,
+                    spotsAvailable: value,
+                  }))
+                }
+                trackColor={{false: '#767577', true: colors.primary}}
+              />
+            </View>
+            <View style={themedStyles.watchOptionDivider} />
+
+            <View style={themedStyles.watchOptionRow}>
+              <View style={themedStyles.watchOptionInfo}>
+                <Text style={themedStyles.watchOptionTitle}>
+                  General Updates
+                </Text>
+                <Text style={themedStyles.watchOptionDescription}>
+                  Important changes to date, time, or location.
+                </Text>
+              </View>
+              <Switch
+                value={watchPreferencesDraft.generalUpdates}
+                onValueChange={value =>
+                  setWatchPreferencesDraft(prev => ({
+                    ...prev,
+                    generalUpdates: value,
+                  }))
+                }
+                trackColor={{false: '#767577', true: colors.primary}}
+              />
+            </View>
+            <View style={themedStyles.watchOptionDivider} />
+
+            <View style={themedStyles.watchOptionRow}>
+              <View style={themedStyles.watchOptionInfo}>
+                <Text style={themedStyles.watchOptionTitle}>
+                  Roster Changes
+                </Text>
+                <Text style={themedStyles.watchOptionDescription}>
+                  Notify me when roster activity changes this event.
+                </Text>
+              </View>
+              <Switch
+                value={watchPreferencesDraft.rosterChanges}
+                onValueChange={value =>
+                  setWatchPreferencesDraft(prev => ({
+                    ...prev,
+                    rosterChanges: value,
+                  }))
+                }
+                trackColor={{false: '#767577', true: colors.primary}}
+              />
+            </View>
+            <View style={themedStyles.watchOptionDivider} />
+
+            <View style={themedStyles.watchOptionRow}>
+              <View style={themedStyles.watchOptionInfo}>
+                <Text style={themedStyles.watchOptionTitle}>Reminders</Text>
+                <Text style={themedStyles.watchOptionDescription}>
+                  Day-of reminders for watched events.
+                </Text>
+              </View>
+              <Switch
+                value={watchPreferencesDraft.reminders}
+                onValueChange={value =>
+                  setWatchPreferencesDraft(prev => ({
+                    ...prev,
+                    reminders: value,
+                  }))
+                }
+                trackColor={{false: '#767577', true: colors.primary}}
+              />
+            </View>
+
+            {(!settings.enabled || !settings.watchedEvents) && (
+              <Text style={themedStyles.watchGlobalMutedNote}>
+                Global notification settings are currently muting watched-event
+                alerts. You can turn them on in Notification Settings.
+              </Text>
+            )}
+
+            <View style={themedStyles.watchModalFooter}>
+              {watchedEventIds.has(watchTargetEvent?._id || '') && (
+                <TouchableOpacity
+                  style={[
+                    themedStyles.watchSecondaryButton,
+                    themedStyles.watchDangerButton,
+                  ]}
+                  disabled={savingWatch}
+                  onPress={stopWatchingEvent}>
+                  <Text
+                    style={[
+                      themedStyles.watchSecondaryButtonText,
+                      themedStyles.watchDangerButtonText,
+                    ]}>
+                    Stop Watching
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={themedStyles.watchPrimaryButton}
+                disabled={savingWatch}
+                onPress={saveWatchPreferences}>
+                {savingWatch ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={themedStyles.watchPrimaryButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal
         visible={showFilterModal}
         transparent={true}

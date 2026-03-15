@@ -10,4 +10,7 @@ export * from './NotificationService';
 export {default as locationService} from './LocationService';
 export * from './LocationService';
 
+export {default as eventWatchService} from './EventWatchService';
+export * from './EventWatchService';
+
 export * from './MapLauncher';

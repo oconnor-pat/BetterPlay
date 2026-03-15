@@ -66,7 +66,12 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   friendRequests: true,
   eventUpdates: true,
   eventReminders: true,
+  eventActivity: true,
   communityNotes: true,
+  watchedEvents: true,
+  watchedEventSpotsAvailable: true,
+  watchedEventGeneralUpdates: true,
+  watchedEventRosterChanges: true,
 };
 
 /**
@@ -95,17 +100,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
    */
   const setNavigationRef = useCallback((ref: NavigationRef | null) => {
     navigationRef.current = ref;
-
-    // Set up navigation callback when ref is available
-    if (ref) {
-      notificationService.setNavigationCallback((screen, params) => {
-        try {
-          ref.navigate(screen, params);
-        } catch (error) {
-          console.error('Navigation error:', error);
-        }
-      });
-    }
   }, []);
 
   /**

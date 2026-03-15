@@ -267,6 +267,153 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
 
           <View style={[styles.separator, themedStyles.separator]} />
 
+          {/* Event Activity (likes, joins, leaves, comments on your events) */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, themedStyles.text]}>
+                Event Activity
+              </Text>
+              <Text
+                style={[styles.settingDescription, themedStyles.secondaryText]}>
+                Likes, joins, leaves, and comments on events you created
+              </Text>
+            </View>
+            <Switch
+              value={settings.eventActivity && settings.enabled}
+              onValueChange={value =>
+                handleToggleSetting('eventActivity', value)
+              }
+              disabled={!settings.enabled}
+              trackColor={{
+                false: '#767577',
+                true: colors?.primary || '#007AFF',
+              }}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          <View style={[styles.separator, themedStyles.separator]} />
+
+          {/* Watched Events (Master) */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, themedStyles.text]}>
+                Watched Events
+              </Text>
+              <Text
+                style={[styles.settingDescription, themedStyles.secondaryText]}>
+                Enable alerts for events you choose to watch
+              </Text>
+            </View>
+            <Switch
+              value={settings.watchedEvents && settings.enabled}
+              onValueChange={value =>
+                handleToggleSetting('watchedEvents', value)
+              }
+              disabled={!settings.enabled}
+              trackColor={{
+                false: '#767577',
+                true: colors?.primary || '#007AFF',
+              }}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          <View style={[styles.separator, themedStyles.separator]} />
+
+          {/* Watched Event Spot Alerts */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, themedStyles.text]}>
+                Spots Opened Alerts
+              </Text>
+              <Text
+                style={[styles.settingDescription, themedStyles.secondaryText]}>
+                Notify when a full watched event has an opening
+              </Text>
+            </View>
+            <Switch
+              value={
+                settings.watchedEventSpotsAvailable &&
+                settings.watchedEvents &&
+                settings.enabled
+              }
+              onValueChange={value =>
+                handleToggleSetting('watchedEventSpotsAvailable', value)
+              }
+              disabled={!settings.enabled || !settings.watchedEvents}
+              trackColor={{
+                false: '#767577',
+                true: colors?.primary || '#007AFF',
+              }}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          <View style={[styles.separator, themedStyles.separator]} />
+
+          {/* Watched Event General Updates */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, themedStyles.text]}>
+                Watched Event Updates
+              </Text>
+              <Text
+                style={[styles.settingDescription, themedStyles.secondaryText]}>
+                General updates on watched events
+              </Text>
+            </View>
+            <Switch
+              value={
+                settings.watchedEventGeneralUpdates &&
+                settings.watchedEvents &&
+                settings.enabled
+              }
+              onValueChange={value =>
+                handleToggleSetting('watchedEventGeneralUpdates', value)
+              }
+              disabled={!settings.enabled || !settings.watchedEvents}
+              trackColor={{
+                false: '#767577',
+                true: colors?.primary || '#007AFF',
+              }}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          <View style={[styles.separator, themedStyles.separator]} />
+
+          {/* Watched Event Roster Updates */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, themedStyles.text]}>
+                Watched Roster Changes
+              </Text>
+              <Text
+                style={[styles.settingDescription, themedStyles.secondaryText]}>
+                Changes to roster size for watched events
+              </Text>
+            </View>
+            <Switch
+              value={
+                settings.watchedEventRosterChanges &&
+                settings.watchedEvents &&
+                settings.enabled
+              }
+              onValueChange={value =>
+                handleToggleSetting('watchedEventRosterChanges', value)
+              }
+              disabled={!settings.enabled || !settings.watchedEvents}
+              trackColor={{
+                false: '#767577',
+                true: colors?.primary || '#007AFF',
+              }}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          <View style={[styles.separator, themedStyles.separator]} />
+
           {/* Community Notes */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
