@@ -66,9 +66,13 @@ else
 fi
 
 # Reverse ports so emulator can reach host services
+setup_adb_reverse() {
+    adb reverse tcp:8081 tcp:8081 2>/dev/null
+    adb reverse tcp:8001 tcp:8001 2>/dev/null
+}
+
 echo "🔗 Setting up adb reverse for Metro and API..."
-adb reverse tcp:8081 tcp:8081
-adb reverse tcp:8001 tcp:8001
+setup_adb_reverse
 
 # Set GPS location
 echo "📍 Setting GPS to Roxbury Township, NJ..."
@@ -84,4 +88,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Re-establish reverse ports after app launch (they can drop during install)
+setup_adb_reverse
+
 echo "✅ Done! BetterPlay is running on Android emulator."
+echo "💡 If Metro disconnects after a refresh, run: adb reverse tcp:8081 tcp:8081"
