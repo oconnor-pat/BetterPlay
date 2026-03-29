@@ -9,7 +9,6 @@ import {VenueList, VenueDetail, SpaceDetail} from '../Venues';
 import {UserSearch} from '../UserSearch';
 import {FriendsList, FriendRequests} from '../Friends';
 import {Notifications} from '../Notifications';
-import CommunityNotes from '../Communitynotes/CommunityNotes';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarAlt,
@@ -99,13 +98,6 @@ const LocalEventsStack = () => {
       <Stack.Screen
         name="Notifications"
         component={Notifications}
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="CommunityNotes"
-        component={CommunityNotes}
         options={{
           headerShown: false,
         }}

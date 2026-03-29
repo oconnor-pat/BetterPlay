@@ -10,17 +10,17 @@ const PRODUCTION_API_URL = 'https://omhl-be-9801a7de15ab.herokuapp.com';
 // - Physical device: use your Mac's LAN IP (find via: ipconfig getifaddr en0)
 const LOCAL_API_URL_IOS_SIMULATOR = 'http://localhost:8001';
 const LOCAL_API_URL_ANDROID_EMULATOR = 'http://10.0.2.2:8001';
-const LOCAL_API_URL_DEVICE = 'http://192.168.1.43:8001';
+const LOCAL_API_URL_DEVICE = 'http://192.168.1.15:8001';
 
 // Toggle this to switch between production and local development
-const USE_LOCAL_API = false;
+const USE_LOCAL_API = true;
 
 // Set to true if testing on a physical device with local backend
 // Only applies to iOS — Android emulator always uses 10.0.2.2
-const IS_PHYSICAL_DEVICE = false;
+const IS_PHYSICAL_DEVICE = true;
 
 // Automatically select the correct API URL
-const getLocalApiUrl = () => {
+const getLocalApiUrl = (): string => {
   if (Platform.OS === 'android') {
     return LOCAL_API_URL_ANDROID_EMULATOR;
   }

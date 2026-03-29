@@ -874,7 +874,7 @@ const Profile: React.FC = () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       await axios.put(
-        'https://omhl-be-9801a7de15ab.herokuapp.com/user/profile-pic',
+        `${API_BASE_URL}/user/profile-pic`,
         {
           userId: _id,
           profilePicUrl: imageUrl,

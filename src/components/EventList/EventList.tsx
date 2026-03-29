@@ -1,4 +1,11 @@
-import React, {useState, useContext, useMemo, useEffect, useRef} from 'react';
+import React, {
+  useState,
+  useContext,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+} from 'react';
 import {
   View,
   Text,
@@ -18,6 +25,9 @@ import {
   UIManager,
   Image,
   Switch,
+  Animated,
+  PanResponder,
+  AppState,
 } from 'react-native';
 
 // Enable LayoutAnimation on Android
@@ -59,6 +69,7 @@ import {
   faEnvelope,
   faBell,
   faChevronRight,
+  faRotate,
 } from '@fortawesome/free-solid-svg-icons';
 import {
   useNavigation,
@@ -75,6 +86,7 @@ import {useTranslation} from 'react-i18next';
 import EventComments from './EventComments';
 import CountdownTimer from './CountdownTimer';
 import {useNotifications} from '../../Context/NotificationContext';
+import {useSocket} from '../../Context/SocketContext';
 import notificationService from '../../services/NotificationService';
 import locationService, {Coordinates} from '../../services/LocationService';
 import {openDirections} from '../../services/MapLauncher';
@@ -86,6 +98,7 @@ export type RootStackParamList = {
   EventList:
     | {
         highlightEventId?: string;
+        expandComments?: boolean;
         profileFilter?: 'created' | 'joined';
         userId?: string;
       }
@@ -133,6 +146,8 @@ const privacyOptions: {
   },
 ];
 
+type RecurrenceFrequency = 'weekly' | 'biweekly' | 'monthly';
+
 interface Event {
   _id: string;
   name: string;
@@ -146,17 +161,16 @@ interface Event {
   createdByUsername?: string;
   createdAt?: string;
   likes?: string[];
-  // Support for coordinates (if available from backend)
   latitude?: number;
   longitude?: number;
-  // Jersey colors for team-based events (exactly 2 colors, sports only)
   jerseyColors?: string[];
-  // Description for the event
   description?: string;
-  // Privacy setting
   privacy?: EventPrivacy;
-  // Invited users (for invite-only events)
   invitedUsers?: string[];
+  commentCount?: number;
+  isRecurring?: boolean;
+  recurrenceGroupId?: string;
+  recurrenceFrequency?: RecurrenceFrequency;
 }
 
 const getDefaultWatchPreferences = (): EventWatchPreferences => ({
@@ -173,6 +187,18 @@ const GOOGLE_PLACES_API_KEY = Config.GOOGLE_PLACES_API_KEY || '';
 const isApiKeyConfigured = !!GOOGLE_PLACES_API_KEY;
 
 // Helper function to create empty event object
+const recurrenceOptions: {
+  value: RecurrenceFrequency;
+  label: string;
+  description: string;
+}[] = [
+  {value: 'weekly', label: 'Weekly', description: 'Same day every week'},
+  {value: 'biweekly', label: 'Biweekly', description: 'Every two weeks'},
+  {value: 'monthly', label: 'Monthly', description: 'Same day each month'},
+];
+
+const recurrenceCountOptions = [2, 3, 4, 5, 6, 8, 10, 12];
+
 const createEmptyEvent = () => ({
   name: '',
   location: '',
@@ -185,6 +211,9 @@ const createEmptyEvent = () => ({
   jerseyColors: [] as string[],
   privacy: 'public' as EventPrivacy,
   invitedUsers: [] as string[],
+  isRecurring: false,
+  recurrenceFrequency: 'weekly' as RecurrenceFrequency,
+  recurrenceCount: 4,
 });
 
 const rosterSizeOptions: string[] = Array.from({length: 30}, (_, i) =>
@@ -489,12 +518,194 @@ const getCoordinatesFromLocation = (
   return {latitude: 37.7749, longitude: -122.4194};
 };
 
+interface RecurringDeckProps {
+  groupId: string;
+  events: Event[];
+  activeIndex: number;
+  onIndexChange: (idx: number) => void;
+  onCollapse: () => void;
+  renderEventCard: (args: {item: Event}) => React.ReactElement;
+  colors: any;
+  themedStyles: any;
+}
+
+const SWIPE_THRESHOLD = 60;
+const STACK_OFFSET = 8;
+const STACK_SCALE_STEP = 0.035;
+
+const RecurringDeck: React.FC<RecurringDeckProps> = ({
+  groupId,
+  events,
+  activeIndex,
+  onIndexChange,
+  onCollapse,
+  renderEventCard,
+  colors,
+  themedStyles,
+}) => {
+  const pan = useRef(new Animated.ValueXY()).current;
+  const activeIndexRef = useRef(activeIndex);
+  const eventsLengthRef = useRef(events.length);
+
+  activeIndexRef.current = activeIndex;
+  eventsLengthRef.current = events.length;
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gs) =>
+          Math.abs(gs.dx) > 15 && Math.abs(gs.dy) < 40,
+        onPanResponderMove: Animated.event([null, {dx: pan.x}], {
+          useNativeDriver: false,
+        }),
+        onPanResponderRelease: (_, gs) => {
+          if (Math.abs(gs.dx) > SWIPE_THRESHOLD) {
+            const direction = gs.dx > 0 ? 1 : -1;
+            Animated.timing(pan.x, {
+              toValue: direction * 400,
+              duration: 200,
+              useNativeDriver: false,
+            }).start(() => {
+              pan.setValue({x: 0, y: 0});
+              const len = eventsLengthRef.current;
+              const cur = activeIndexRef.current;
+              const newIndex =
+                direction < 0 ? (cur + 1) % len : (cur - 1 + len) % len;
+              onIndexChange(newIndex);
+            });
+          } else {
+            Animated.spring(pan, {
+              toValue: {x: 0, y: 0},
+              useNativeDriver: false,
+              friction: 5,
+            }).start();
+          }
+        },
+      }),
+    [pan, onIndexChange],
+  );
+
+  const rotation = pan.x.interpolate({
+    inputRange: [-200, 0, 200],
+    outputRange: ['-8deg', '0deg', '8deg'],
+    extrapolate: 'clamp',
+  });
+
+  const visibleCount = Math.min(events.length, 3);
+
+  return (
+    <View key={groupId}>
+      <View style={themedStyles.recurringCarouselHeader}>
+        <View style={themedStyles.rowCenter}>
+          <FontAwesomeIcon icon={faRotate} size={13} color={colors.primary} />
+          <Text style={themedStyles.recurringCarouselTitle}>
+            {events[activeIndex]?.name || events[0].name}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onCollapse}>
+          <Text style={themedStyles.recurringCollapseText}>Collapse</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={themedStyles.carouselPageLabel}>
+        <Text style={themedStyles.carouselPageLabelText}>
+          {activeIndex + 1} of {events.length}
+        </Text>
+      </View>
+
+      <View
+        style={{
+          paddingBottom: (visibleCount - 1) * STACK_OFFSET + 12,
+        }}>
+        <View style={themedStyles.positionRelative}>
+          {Array.from({length: visibleCount})
+            .map((_, i) => i)
+            .reverse()
+            .map(i => {
+              const eventIdx = (activeIndex + i) % events.length;
+              const evt = events[eventIdx];
+
+              if (i === 0) {
+                return (
+                  <Animated.View
+                    key={'deck-top'}
+                    {...panResponder.panHandlers}
+                    style={{
+                      zIndex: visibleCount,
+                      transform: [{translateX: pan.x}, {rotate: rotation}],
+                    }}>
+                    {renderEventCard({item: evt})}
+                  </Animated.View>
+                );
+              }
+
+              const offset = i * STACK_OFFSET;
+              const scale = 1 - i * STACK_SCALE_STEP;
+              const horizontalInset = i * 6;
+              return (
+                <View
+                  key={`deck-bg-${i}`}
+                  style={[
+                    themedStyles.deckBgCardBase,
+                    {
+                      top: offset,
+                      left: horizontalInset,
+                      right: horizontalInset,
+                      opacity: 1 - i * 0.2,
+                      zIndex: visibleCount - i,
+                      transform: [{scaleY: scale}],
+                    },
+                  ]}>
+                  {renderEventCard({item: evt})}
+                </View>
+              );
+            })}
+        </View>
+      </View>
+
+      <View style={themedStyles.deckNavRow}>
+        <TouchableOpacity
+          onPress={() =>
+            onIndexChange((activeIndex - 1 + events.length) % events.length)
+          }
+          style={themedStyles.deckNavButton}>
+          <Text style={themedStyles.deckNavButtonText}>{'‹'} Prev</Text>
+        </TouchableOpacity>
+        <View style={themedStyles.deckDots}>
+          {events.length <= 12 ? (
+            events.map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  themedStyles.deckDot,
+                  i === activeIndex && themedStyles.deckDotActive,
+                ]}
+              />
+            ))
+          ) : (
+            <Text style={themedStyles.carouselPageLabelText}>
+              {activeIndex + 1} / {events.length}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          onPress={() => onIndexChange((activeIndex + 1) % events.length)}
+          style={themedStyles.deckNavButton}>
+          <Text style={themedStyles.deckNavButtonText}>Next {'›'}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 const EventList: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
   const {t} = useTranslation();
   const {badgeCount, hasPermission, requestPermission, settings} =
     useNotifications();
+  const {subscribe: socketSubscribe} = useSocket();
 
   const themedStyles = useMemo(
     () =>
@@ -529,10 +740,15 @@ const EventList: React.FC = () => {
           backgroundColor: colors.card,
           borderRadius: 16,
           padding: 20,
-          marginBottom: 16,
+          marginBottom: 20,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
+          borderColor: colors.border + '80',
           overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 3,
         },
         pastEventCard: {
           opacity: 0.6,
@@ -561,9 +777,9 @@ const EventList: React.FC = () => {
         cardDetailsSection: {
           backgroundColor: colors.inputBackground || colors.background,
           borderRadius: 12,
-          padding: 14,
-          marginBottom: 10,
-          gap: 10,
+          padding: 16,
+          marginBottom: 12,
+          gap: 12,
         },
         cardRow: {
           flexDirection: 'row',
@@ -590,16 +806,16 @@ const EventList: React.FC = () => {
           height: 6,
         },
         mapBox: {
-          borderRadius: 8,
+          borderRadius: 12,
           borderWidth: 1,
-          borderColor: colors.primary,
+          borderColor: colors.primary + '60',
           backgroundColor: colors.inputBackground || '#eaeaea',
-          marginVertical: 8,
+          marginVertical: 10,
           ...(Platform.OS === 'ios' ? {overflow: 'hidden' as const} : {}),
-          shadowColor: colors.text,
+          shadowColor: '#000',
           shadowOffset: {width: 0, height: 1},
-          shadowOpacity: 0.1,
-          shadowRadius: 2,
+          shadowOpacity: 0.06,
+          shadowRadius: 4,
           elevation: 2,
         },
         mapView: {
@@ -635,25 +851,24 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginTop: 10,
+          marginTop: 12,
+          gap: 10,
         },
         actionButton: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: colors.background,
-          borderRadius: 10,
-          paddingVertical: 12,
+          borderRadius: 12,
+          paddingVertical: 13,
           paddingHorizontal: 18,
           borderWidth: 1.5,
           borderColor: colors.primary,
           flex: 1,
-          marginRight: 10,
         },
         joinButton: {
           backgroundColor: colors.primary,
           borderColor: colors.primary,
-          marginRight: 0,
         },
         actionButtonIcon: {
           marginRight: 8,
@@ -676,11 +891,11 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           justifyContent: 'center',
           alignItems: 'center',
-          marginTop: 12,
-          paddingTop: 12,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          gap: 24,
+          marginTop: 14,
+          paddingTop: 14,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border + '60',
+          gap: 20,
         },
         iconButton: {
           padding: 10,
@@ -688,25 +903,30 @@ const EventList: React.FC = () => {
           backgroundColor: colors.inputBackground || colors.background,
         },
         likeButtonContainer: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          position: 'relative' as const,
           padding: 10,
           borderRadius: 20,
           backgroundColor: colors.inputBackground || colors.background,
-          gap: 6,
         },
-        eventLikeCountBadge: {
-          backgroundColor: colors.primary + '20',
-          paddingHorizontal: 8,
-          paddingVertical: 2,
-          borderRadius: 10,
-          minWidth: 24,
-          alignItems: 'center',
+        iconCountBadge: {
+          position: 'absolute' as const,
+          top: -5,
+          right: -8,
+          backgroundColor: '#FF3B30',
+          borderRadius: 9,
+          minWidth: 18,
+          height: 18,
+          paddingHorizontal: 4,
+          alignItems: 'center' as const,
+          justifyContent: 'center' as const,
         },
-        eventLikeCountText: {
-          fontSize: 12,
-          fontWeight: '600',
-          color: colors.primary,
+        iconCountBadgeText: {
+          color: '#fff',
+          fontSize: 10,
+          fontWeight: '700' as const,
+        },
+        commentButtonContainer: {
+          position: 'relative' as const,
         },
         addButton: {
           width: 38,
@@ -1655,6 +1875,262 @@ const EventList: React.FC = () => {
           fontSize: 12,
           lineHeight: 18,
         },
+        recurrenceSection: {
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 12,
+          padding: 14,
+          marginBottom: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        recurrenceToggleRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        },
+        recurrenceLabel: {
+          color: colors.text,
+          fontSize: 15,
+          fontWeight: '600',
+        },
+        recurrenceDescription: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          marginTop: 2,
+        },
+        recurrenceOptions: {
+          marginTop: 14,
+          paddingTop: 14,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        },
+        recurrenceSubLabel: {
+          color: colors.text,
+          fontSize: 13,
+          fontWeight: '600',
+          marginBottom: 8,
+        },
+        recurrenceFrequencyRow: {
+          flexDirection: 'row',
+          gap: 8,
+        },
+        recurrenceFrequencyOption: {
+          flex: 1,
+          alignItems: 'center',
+          paddingVertical: 10,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+        },
+        recurrenceFrequencySelected: {
+          borderColor: colors.primary,
+          borderWidth: 2,
+          backgroundColor: colors.primary + '10',
+        },
+        recurrenceFrequencyText: {
+          color: colors.text,
+          fontSize: 13,
+          fontWeight: '600',
+        },
+        recurrenceFrequencyTextSelected: {
+          color: colors.primary,
+        },
+        recurrenceCountScroll: {
+          flexGrow: 0,
+          marginBottom: 10,
+        },
+        recurrenceCountOption: {
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 8,
+        },
+        recurrenceCountSelected: {
+          borderColor: colors.primary,
+          borderWidth: 2,
+          backgroundColor: colors.primary + '10',
+        },
+        recurrenceCountText: {
+          color: colors.text,
+          fontSize: 15,
+          fontWeight: '600',
+        },
+        recurrenceCountTextSelected: {
+          color: colors.primary,
+        },
+        recurrenceSummary: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          fontStyle: 'italic',
+          marginTop: 4,
+        },
+        recurringBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary + '15',
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: 10,
+          marginLeft: 8,
+        },
+        recurringBadgeText: {
+          color: colors.primary,
+          fontSize: 11,
+          fontWeight: '600',
+          marginLeft: 4,
+        },
+        recurringStackIndicator: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 10,
+          paddingHorizontal: 16,
+          marginHorizontal: 16,
+          marginTop: -8,
+          marginBottom: 12,
+          backgroundColor: colors.primary + '10',
+          borderRadius: 10,
+          gap: 6,
+        },
+        recurringStackText: {
+          color: colors.primary,
+          fontSize: 13,
+          fontWeight: '600',
+          flex: 1,
+        },
+        recurringCarouselHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          gap: 8,
+        },
+        recurringCarouselTitle: {
+          color: colors.text,
+          fontSize: 16,
+          fontWeight: '700',
+          marginLeft: 8,
+        },
+        recurringCollapseText: {
+          color: colors.primary,
+          fontSize: 13,
+          fontWeight: '600',
+        },
+        carouselPageLabel: {
+          alignSelf: 'center',
+          backgroundColor: colors.primary + '20',
+          paddingHorizontal: 10,
+          paddingVertical: 3,
+          borderRadius: 10,
+          marginBottom: 6,
+        },
+        carouselPageLabelText: {
+          color: colors.primary,
+          fontSize: 12,
+          fontWeight: '700',
+        },
+        deckNavRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 20,
+          marginTop: -4,
+          marginBottom: 12,
+        },
+        deckNavButton: {
+          paddingVertical: 6,
+          paddingHorizontal: 14,
+          backgroundColor: colors.primary + '18',
+          borderRadius: 16,
+        },
+        deckNavButtonText: {
+          color: colors.primary,
+          fontSize: 13,
+          fontWeight: '700',
+        },
+        deckDots: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 5,
+        },
+        deckDot: {
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: colors.border || '#555',
+        },
+        deckDotActive: {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: colors.primary,
+        },
+        rowCenter: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        positionRelative: {
+          position: 'relative',
+        },
+        deckBgCardBase: {
+          position: 'absolute',
+          left: 0,
+          right: 0,
+        },
+        zIndexTop: {
+          zIndex: 10,
+        },
+        flexOne: {
+          flex: 1,
+        },
+        recurrenceCountSubLabel: {
+          marginTop: 12,
+        },
+        proximityToggleContent: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          flex: 1,
+        },
+        proximityIconMargin: {
+          marginRight: 8,
+        },
+        proximityDistanceRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginTop: 10,
+        },
+        proximityDistanceChip: {
+          paddingHorizontal: 14,
+          paddingVertical: 7,
+          borderRadius: 16,
+          borderWidth: 1,
+        },
+        proximityDistanceChipSelected: {
+          backgroundColor: colors.primary + '20',
+          borderColor: colors.primary,
+        },
+        proximityDistanceChipDefault: {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+        },
+        proximityDistanceText: {
+          fontSize: 13,
+          fontWeight: '600',
+        },
+        proximityDistanceTextSelected: {
+          color: colors.primary,
+        },
+        proximityDistanceTextDefault: {
+          color: colors.text,
+        },
       }),
     [colors],
   );
@@ -1794,6 +2270,11 @@ const EventList: React.FC = () => {
   // Liked events state
   const [likedEvents, setLikedEvents] = useState<Set<string>>(new Set());
 
+  // Local comment count overrides (updated when user adds/removes comments)
+  const [localCommentCounts, setLocalCommentCounts] = useState<{
+    [eventId: string]: number;
+  }>({});
+
   // Likes modal state
   const [likesModalVisible, setLikesModalVisible] = useState(false);
   const [likesModalData, setLikesModalData] = useState<{
@@ -1805,6 +2286,14 @@ const EventList: React.FC = () => {
   // Loading state for save operations
   const [savingEvent, setSavingEvent] = useState(false);
   const [_deletingEventId, setDeletingEventId] = useState<string | null>(null);
+
+  // Recurring group deck state
+  const [expandedRecurringGroup, setExpandedRecurringGroup] = useState<
+    string | null
+  >(null);
+  const [deckActiveIndex, setDeckActiveIndex] = useState<{
+    [groupId: string]: number;
+  }>({});
 
   // Event watch state
   const [watchModalVisible, setWatchModalVisible] = useState(false);
@@ -1820,7 +2309,7 @@ const EventList: React.FC = () => {
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
 
   // Ref for scrolling to specific events
-  const flatListRef = useRef<FlatList<Event> | null>(null);
+  const flatListRef = useRef<FlatList<any> | null>(null);
 
   const navigation = useNavigation<NavigationProp<any>>();
   const route = useRoute<RouteProp<RootStackParamList, 'EventList'>>();
@@ -1927,6 +2416,67 @@ const EventList: React.FC = () => {
 
     loadEvents();
   }, [fetchEvents]);
+
+  // Refresh event data via REST (used by socket triggers and foreground resume)
+  const fetchLatestEvents = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(`${API_BASE_URL}/events`, {
+        headers: token ? {Authorization: `Bearer ${token}`} : {},
+      });
+      if (Array.isArray(response.data)) {
+        setEventData(response.data);
+        AsyncStorage.setItem('cachedEvents', JSON.stringify(response.data));
+      }
+    } catch {
+      // Silent fail — will retry on next socket event or foreground resume
+    }
+  }, []);
+
+  // Listen for real-time event updates via WebSocket
+  useEffect(() => {
+    if (!initialLoadDone) {
+      return;
+    }
+
+    const unsubRefresh = socketSubscribe('events:refresh', () => {
+      fetchLatestEvents();
+    });
+
+    const unsubLiked = socketSubscribe(
+      'event:liked',
+      (data: {
+        eventId: string;
+        likes: string[];
+        likedByUsernames: string[];
+      }) => {
+        setEventData(prev =>
+          prev.map(ev =>
+            ev._id === data.eventId
+              ? {
+                  ...ev,
+                  likes: data.likes,
+                  likedByUsernames: data.likedByUsernames,
+                }
+              : ev,
+          ),
+        );
+      },
+    );
+
+    // Fallback: refresh when app returns to foreground
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        fetchLatestEvents();
+      }
+    });
+
+    return () => {
+      unsubRefresh();
+      unsubLiked();
+      subscription.remove();
+    };
+  }, [initialLoadDone, socketSubscribe, fetchLatestEvents]);
 
   // Filter events based on search query and filters
   const filteredEvents = useMemo(() => {
@@ -2052,6 +2602,35 @@ const EventList: React.FC = () => {
     eventUserLocation,
   ]);
 
+  type DisplayItem =
+    | {type: 'single'; event: Event}
+    | {type: 'recurring'; groupId: string; events: Event[]};
+
+  const displayItems: DisplayItem[] = useMemo(() => {
+    const items: DisplayItem[] = [];
+    const seenGroups = new Set<string>();
+
+    for (const event of filteredEvents) {
+      if (event.isRecurring && event.recurrenceGroupId) {
+        if (seenGroups.has(event.recurrenceGroupId)) {
+          continue;
+        }
+        seenGroups.add(event.recurrenceGroupId);
+        const groupEvents = filteredEvents.filter(
+          e => e.recurrenceGroupId === event.recurrenceGroupId,
+        );
+        items.push({
+          type: 'recurring',
+          groupId: event.recurrenceGroupId,
+          events: groupEvents,
+        });
+      } else {
+        items.push({type: 'single', event});
+      }
+    }
+    return items;
+  }, [filteredEvents]);
+
   // Scroll so the comment input is visible when the keyboard opens
   useEffect(() => {
     if (!expandedCommentsEventId) {
@@ -2060,8 +2639,10 @@ const EventList: React.FC = () => {
     const kbEvent =
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const sub = Keyboard.addListener(kbEvent, () => {
-      const idx = filteredEvents.findIndex(
-        e => e._id === expandedCommentsEventId,
+      const idx = displayItems.findIndex(di =>
+        di.type === 'single'
+          ? di.event._id === expandedCommentsEventId
+          : di.events.some(e => e._id === expandedCommentsEventId),
       );
       if (idx >= 0 && flatListRef.current) {
         setTimeout(() => {
@@ -2074,7 +2655,7 @@ const EventList: React.FC = () => {
       }
     });
     return () => sub.remove();
-  }, [expandedCommentsEventId, filteredEvents]);
+  }, [expandedCommentsEventId, filteredEvents, displayItems]);
 
   // Handle profile filter from navigation params
   useEffect(() => {
@@ -2086,13 +2667,22 @@ const EventList: React.FC = () => {
     }
   }, [route.params?.profileFilter, route.params?.userId]);
 
-  // Scroll to highlighted event when navigating from Community Notes
+  // Scroll to highlighted event and optionally expand comments (once per navigation)
+  const hasScrolledToHighlight = useRef<string | null>(null);
   useEffect(() => {
-    if (route.params?.highlightEventId && filteredEvents.length > 0) {
-      const eventIndex = filteredEvents.findIndex(
-        e => e._id === route.params?.highlightEventId,
+    const targetId = route.params?.highlightEventId;
+    if (
+      targetId &&
+      displayItems.length > 0 &&
+      hasScrolledToHighlight.current !== targetId
+    ) {
+      const eventIndex = displayItems.findIndex(di =>
+        di.type === 'single'
+          ? di.event._id === targetId
+          : di.events.some(e => e._id === targetId),
       );
       if (eventIndex !== -1) {
+        hasScrolledToHighlight.current = targetId;
         setTimeout(() => {
           flatListRef.current?.scrollToIndex({
             index: eventIndex,
@@ -2100,9 +2690,19 @@ const EventList: React.FC = () => {
             viewPosition: 0.3,
           });
         }, 300);
+
+        if (route.params?.expandComments) {
+          setTimeout(() => {
+            setExpandedCommentsEventId(targetId);
+          }, 600);
+        }
       }
     }
-  }, [route.params?.highlightEventId, filteredEvents]);
+  }, [
+    route.params?.highlightEventId,
+    route.params?.expandComments,
+    displayItems,
+  ]);
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -2247,7 +2847,7 @@ const EventList: React.FC = () => {
         }
       } else {
         try {
-          const response = await axios.post(`${API_BASE_URL}/events`, {
+          const eventPayload: Record<string, any> = {
             name: newEvent.name,
             location: newEvent.location,
             time: newEvent.time,
@@ -2263,17 +2863,34 @@ const EventList: React.FC = () => {
               : undefined,
             privacy: newEvent.privacy,
             invitedUsers: newEvent.invitedUsers,
-          });
-          // Merge the response with local privacy settings in case backend doesn't return them
-          const createdEvent = {
-            ...response.data,
-            privacy: response.data.privacy || newEvent.privacy,
-            invitedUsers: response.data.invitedUsers || newEvent.invitedUsers,
           };
-          setEventData(prevData => [createdEvent, ...prevData]);
-          notificationService
-            .scheduleEventNotifications(createdEvent)
-            .catch(() => {});
+
+          if (newEvent.isRecurring) {
+            eventPayload.isRecurring = true;
+            eventPayload.recurrenceFrequency = newEvent.recurrenceFrequency;
+            eventPayload.recurrenceCount = newEvent.recurrenceCount;
+          }
+
+          const response = await axios.post(
+            `${API_BASE_URL}/events`,
+            eventPayload,
+          );
+
+          const responseData = response.data;
+          const createdEvents: Event[] = Array.isArray(responseData)
+            ? responseData
+            : [responseData];
+
+          const mergedEvents = createdEvents.map(evt => ({
+            ...evt,
+            privacy: evt.privacy || newEvent.privacy,
+            invitedUsers: evt.invitedUsers || newEvent.invitedUsers,
+          }));
+
+          setEventData(prevData => [...mergedEvents, ...prevData]);
+          for (const evt of mergedEvents) {
+            notificationService.scheduleEventNotifications(evt).catch(() => {});
+          }
         } catch (error) {
           Alert.alert(t('common.error'), t('events.createError'));
           setSavingEvent(false);
@@ -2357,6 +2974,9 @@ const EventList: React.FC = () => {
       jerseyColors: event.jerseyColors || [],
       privacy: event.privacy || 'public',
       invitedUsers: event.invitedUsers || [],
+      isRecurring: event.isRecurring || false,
+      recurrenceFrequency: event.recurrenceFrequency || 'weekly',
+      recurrenceCount: 4,
     });
     setPlacesApiFailed(false);
     setModalVisible(true);
@@ -2709,37 +3329,40 @@ const EventList: React.FC = () => {
   const onDateChange = (evt: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
-      if (evt.type === 'set' && selectedDate) {
-        setDate(selectedDate);
+    }
+    if (selectedDate) {
+      setDate(selectedDate);
+      const isToday = selectedDate.toDateString() === new Date().toDateString();
+      if (isToday && time && time < new Date()) {
+        setTime(undefined);
+        setNewEvent(prev => ({
+          ...prev,
+          date: selectedDate.toDateString(),
+          time: '',
+        }));
+      } else {
         setNewEvent(prev => ({...prev, date: selectedDate.toDateString()}));
       }
-    } else if (selectedDate) {
-      setDate(selectedDate);
     }
   };
 
   const onTimeChange = (evt: any, selectedTime?: Date) => {
     if (Platform.OS === 'android') {
       setShowTimePicker(false);
-      if (evt.type === 'set' && selectedTime) {
-        const roundedTime = new Date(
-          Math.ceil(selectedTime.getTime() / (15 * 1000)) * 15 * 1000,
-        );
-        setTime(roundedTime);
-        setNewEvent(prev => ({
-          ...prev,
-          time:
-            roundedTime.toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            }) ?? '',
-        }));
-      }
-    } else if (selectedTime) {
+    }
+    if (selectedTime) {
       const roundedTime = new Date(
         Math.ceil(selectedTime.getTime() / (15 * 1000)) * 15 * 1000,
       );
       setTime(roundedTime);
+      setNewEvent(prev => ({
+        ...prev,
+        time:
+          roundedTime.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }) ?? '',
+      }));
     }
   };
 
@@ -2786,6 +3409,16 @@ const EventList: React.FC = () => {
                   <Text style={themedStyles.privacyBadgeText}>
                     {item.privacy === 'private' ? 'Private' : 'Invite Only'}
                   </Text>
+                </View>
+              )}
+              {item.isRecurring && (
+                <View style={themedStyles.recurringBadge}>
+                  <FontAwesomeIcon
+                    icon={faRotate}
+                    size={10}
+                    color={colors.primary}
+                  />
+                  <Text style={themedStyles.recurringBadgeText}>Recurring</Text>
                 </View>
               )}
             </View>
@@ -2924,27 +3557,28 @@ const EventList: React.FC = () => {
 
         {/* Share/Discuss/Like/Settings/Delete Icons */}
         <View style={themedStyles.iconContainer}>
-          {/* Like Button with Count */}
-          <View style={themedStyles.likeButtonContainer}>
-            <TouchableOpacity onPress={() => toggleEventLike(item)}>
-              <FontAwesomeIcon
-                icon={faHeart}
-                size={18}
-                color={
-                  likedEvents.has(item._id) ? '#e74c3c' : colors.secondaryText
-                }
-              />
-            </TouchableOpacity>
+          {/* Like Button with Count Badge */}
+          <TouchableOpacity
+            style={themedStyles.likeButtonContainer}
+            onPress={() => toggleEventLike(item)}
+            onLongPress={() =>
+              (item.likes?.length || 0) > 0 && showEventLikedBy(item)
+            }>
+            <FontAwesomeIcon
+              icon={faHeart}
+              size={18}
+              color={
+                likedEvents.has(item._id) ? '#e74c3c' : colors.secondaryText
+              }
+            />
             {(item.likes?.length || 0) > 0 && (
-              <TouchableOpacity
-                style={themedStyles.eventLikeCountBadge}
-                onPress={() => showEventLikedBy(item)}>
-                <Text style={themedStyles.eventLikeCountText}>
-                  {item.likes?.length || 0}
+              <View style={themedStyles.iconCountBadge}>
+                <Text style={themedStyles.iconCountBadgeText}>
+                  {item.likes!.length}
                 </Text>
-              </TouchableOpacity>
+              </View>
             )}
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity
             style={themedStyles.iconButton}
             onPress={() => handleShareEvent(item)}>
@@ -2954,18 +3588,28 @@ const EventList: React.FC = () => {
               color={colors.primary}
             />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              themedStyles.iconButton,
-              isCommentsExpanded && {backgroundColor: colors.primary + '20'},
-            ]}
-            onPress={() => handleDiscussEvent(item)}>
-            <FontAwesomeIcon
-              icon={faComments}
-              size={18}
-              color={isCommentsExpanded ? colors.primary : colors.primary}
-            />
-          </TouchableOpacity>
+          {/* Comment Button with Count Badge */}
+          <View style={themedStyles.commentButtonContainer}>
+            <TouchableOpacity
+              style={[
+                themedStyles.iconButton,
+                isCommentsExpanded && {backgroundColor: colors.primary + '20'},
+              ]}
+              onPress={() => handleDiscussEvent(item)}>
+              <FontAwesomeIcon
+                icon={faComments}
+                size={18}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+            {(localCommentCounts[item._id] ?? item.commentCount ?? 0) > 0 && (
+              <View style={themedStyles.iconCountBadge}>
+                <Text style={themedStyles.iconCountBadgeText}>
+                  {localCommentCounts[item._id] ?? item.commentCount ?? 0}
+                </Text>
+              </View>
+            )}
+          </View>
           {userData?._id === item.createdBy && (
             <TouchableOpacity
               style={themedStyles.iconButton}
@@ -2993,10 +3637,110 @@ const EventList: React.FC = () => {
             eventName={item.name}
             eventType={item.eventType}
             onClose={() => setExpandedCommentsEventId(null)}
+            onCommentCountChange={(eid, count) =>
+              setLocalCommentCounts(prev => ({...prev, [eid]: count}))
+            }
           />
         )}
       </View>
     );
+  };
+
+  const renderRecurringGroup = (groupId: string, events: Event[]) => {
+    const isExpanded = expandedRecurringGroup === groupId;
+    const activeIdx = deckActiveIndex[groupId] || 0;
+    const previewEvent = events[activeIdx] || events[0];
+
+    if (!isExpanded) {
+      const stackCards = Math.min(events.length, 3);
+      return (
+        <View key={groupId}>
+          <TouchableOpacity
+            activeOpacity={0.95}
+            onPress={() => {
+              LayoutAnimation.configureNext(
+                LayoutAnimation.Presets.easeInEaseOut,
+              );
+              setExpandedRecurringGroup(groupId);
+            }}
+            style={{marginBottom: (stackCards - 1) * 4 + 8}}>
+            <View style={themedStyles.positionRelative}>
+              {Array.from({length: stackCards})
+                .map((_, i) => i)
+                .reverse()
+                .map(i => {
+                  if (i === 0) {
+                    return null;
+                  }
+                  const offset = i * 6;
+                  const scale = 1 - i * 0.03;
+                  return (
+                    <View
+                      key={`shadow-${i}`}
+                      style={[
+                        themedStyles.deckBgCardBase,
+                        {
+                          top: offset,
+                          transform: [{scale}],
+                          opacity: 1 - i * 0.2,
+                          zIndex: -i,
+                        },
+                      ]}>
+                      {renderEventCard({item: events[i] || previewEvent})}
+                    </View>
+                  );
+                })}
+              <View style={themedStyles.zIndexTop}>
+                {renderEventCard({item: previewEvent})}
+              </View>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={themedStyles.recurringStackIndicator}
+            onPress={() => {
+              LayoutAnimation.configureNext(
+                LayoutAnimation.Presets.easeInEaseOut,
+              );
+              setExpandedRecurringGroup(groupId);
+            }}>
+            <FontAwesomeIcon icon={faRotate} size={12} color={colors.primary} />
+            <Text style={themedStyles.recurringStackText}>
+              {events.length} events in this series — tap to browse
+            </Text>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={10}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <RecurringDeck
+        groupId={groupId}
+        events={events}
+        activeIndex={activeIdx}
+        onIndexChange={idx =>
+          setDeckActiveIndex(prev => ({...prev, [groupId]: idx}))
+        }
+        onCollapse={() => {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setExpandedRecurringGroup(null);
+        }}
+        renderEventCard={renderEventCard}
+        colors={colors}
+        themedStyles={themedStyles}
+      />
+    );
+  };
+
+  const renderDisplayItem = ({item}: {item: DisplayItem}) => {
+    if (item.type === 'single') {
+      return renderEventCard({item: item.event});
+    }
+    return renderRecurringGroup(item.groupId, item.events);
   };
 
   return (
@@ -3194,22 +3938,26 @@ const EventList: React.FC = () => {
         ) : (
           <FlatList
             ref={flatListRef}
-            data={filteredEvents}
-            renderItem={renderEventCard}
-            keyExtractor={item => item._id}
+            data={displayItems}
+            renderItem={renderDisplayItem}
+            keyExtractor={item =>
+              item.type === 'single' ? item.event._id : item.groupId
+            }
             refreshing={loading}
             onRefresh={fetchEvents}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             contentContainerStyle={themedStyles.flatListContent}
             onScrollToIndexFailed={info => {
-              // Handle scroll failure gracefully
-              setTimeout(() => {
-                flatListRef.current?.scrollToIndex({
-                  index: info.index,
-                  animated: true,
-                });
-              }, 100);
+              const maxIndex = displayItems.length - 1;
+              if (maxIndex >= 0) {
+                setTimeout(() => {
+                  flatListRef.current?.scrollToIndex({
+                    index: Math.min(info.index, maxIndex),
+                    animated: true,
+                  });
+                }, 100);
+              }
             }}
             ListEmptyComponent={
               <View
@@ -3401,22 +4149,20 @@ const EventList: React.FC = () => {
                     <DateTimePicker
                       value={date || new Date()}
                       mode="date"
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      display={Platform.OS === 'ios' ? 'inline' : 'default'}
                       onChange={onDateChange}
-                      textColor={colors.text}
+                      minimumDate={new Date()}
+                      themeVariant="dark"
+                      accentColor={colors.primary}
                     />
-                    <TouchableOpacity
-                      onPress={() => {
-                        setNewEvent({
-                          ...newEvent,
-                          date: date ? date.toDateString() : '',
-                        });
-                        setShowDatePicker(false);
-                      }}>
-                      <Text style={themedStyles.confirmButton}>
-                        {t('events.confirmDate')}
-                      </Text>
-                    </TouchableOpacity>
+                    {Platform.OS === 'ios' && (
+                      <TouchableOpacity
+                        onPress={() => setShowDatePicker(false)}>
+                        <Text style={themedStyles.confirmButton}>
+                          {t('events.confirmDate')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
 
@@ -3445,24 +4191,125 @@ const EventList: React.FC = () => {
                       display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                       onChange={onTimeChange}
                       textColor={colors.text}
+                      minimumDate={
+                        date &&
+                        date.toDateString() === new Date().toDateString()
+                          ? new Date()
+                          : undefined
+                      }
                     />
-                    <TouchableOpacity
-                      onPress={() => {
-                        setNewEvent({
-                          ...newEvent,
-                          time: time
-                            ? time.toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              }) ?? ''
-                            : '',
-                        });
-                        setShowTimePicker(false);
-                      }}>
-                      <Text style={themedStyles.confirmButton}>
-                        {t('events.confirmTime')}
-                      </Text>
-                    </TouchableOpacity>
+                    {Platform.OS === 'ios' && (
+                      <TouchableOpacity
+                        onPress={() => setShowTimePicker(false)}>
+                        <Text style={themedStyles.confirmButton}>
+                          {t('events.confirmTime')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* Recurring Event toggle */}
+                {!isEditing && (
+                  <View style={themedStyles.recurrenceSection}>
+                    <View style={themedStyles.recurrenceToggleRow}>
+                      <View style={themedStyles.flexOne}>
+                        <Text style={themedStyles.recurrenceLabel}>
+                          Recurring Event
+                        </Text>
+                        <Text style={themedStyles.recurrenceDescription}>
+                          Automatically create multiple events on a schedule
+                        </Text>
+                      </View>
+                      <Switch
+                        value={newEvent.isRecurring}
+                        onValueChange={value =>
+                          setNewEvent({...newEvent, isRecurring: value})
+                        }
+                        trackColor={{
+                          false: '#767577',
+                          true: colors.primary,
+                        }}
+                      />
+                    </View>
+
+                    {newEvent.isRecurring && (
+                      <View style={themedStyles.recurrenceOptions}>
+                        <Text style={themedStyles.recurrenceSubLabel}>
+                          Frequency
+                        </Text>
+                        <View style={themedStyles.recurrenceFrequencyRow}>
+                          {recurrenceOptions.map(option => (
+                            <TouchableOpacity
+                              key={option.value}
+                              style={[
+                                themedStyles.recurrenceFrequencyOption,
+                                newEvent.recurrenceFrequency === option.value &&
+                                  themedStyles.recurrenceFrequencySelected,
+                              ]}
+                              onPress={() =>
+                                setNewEvent({
+                                  ...newEvent,
+                                  recurrenceFrequency: option.value,
+                                })
+                              }>
+                              <Text
+                                style={[
+                                  themedStyles.recurrenceFrequencyText,
+                                  newEvent.recurrenceFrequency ===
+                                    option.value &&
+                                    themedStyles.recurrenceFrequencyTextSelected,
+                                ]}>
+                                {option.label}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+
+                        <Text
+                          style={[
+                            themedStyles.recurrenceSubLabel,
+                            themedStyles.recurrenceCountSubLabel,
+                          ]}>
+                          Number of Events
+                        </Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          style={themedStyles.recurrenceCountScroll}>
+                          {recurrenceCountOptions.map(count => (
+                            <TouchableOpacity
+                              key={count}
+                              style={[
+                                themedStyles.recurrenceCountOption,
+                                newEvent.recurrenceCount === count &&
+                                  themedStyles.recurrenceCountSelected,
+                              ]}
+                              onPress={() =>
+                                setNewEvent({
+                                  ...newEvent,
+                                  recurrenceCount: count,
+                                })
+                              }>
+                              <Text
+                                style={[
+                                  themedStyles.recurrenceCountText,
+                                  newEvent.recurrenceCount === count &&
+                                    themedStyles.recurrenceCountTextSelected,
+                                ]}>
+                                {count}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+
+                        <Text style={themedStyles.recurrenceSummary}>
+                          {newEvent.date
+                            ? `${newEvent.recurrenceCount} events, ${newEvent.recurrenceFrequency}, starting ${newEvent.date}`
+                            : 'Select a date above to see the schedule'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 )}
 
@@ -4146,17 +4993,12 @@ const EventList: React.FC = () => {
                   ]}
                   onPress={handleEventProximityToggle}
                   disabled={locationLoading}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      flex: 1,
-                    }}>
+                  <View style={themedStyles.proximityToggleContent}>
                     {locationLoading ? (
                       <ActivityIndicator
                         size="small"
                         color={colors.primary}
-                        style={{marginRight: 8}}
+                        style={themedStyles.proximityIconMargin}
                       />
                     ) : (
                       <FontAwesomeIcon
@@ -4167,7 +5009,7 @@ const EventList: React.FC = () => {
                             ? colors.buttonText || '#fff'
                             : colors.text
                         }
-                        style={{marginRight: 8}}
+                        style={themedStyles.proximityIconMargin}
                       />
                     )}
                     <Text
@@ -4184,40 +5026,24 @@ const EventList: React.FC = () => {
                   )}
                 </TouchableOpacity>
                 {proximityEnabled && (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                      marginTop: 10,
-                    }}>
+                  <View style={themedStyles.proximityDistanceRow}>
                     {[5, 10, 25, 50, 100].map(dist => (
                       <TouchableOpacity
                         key={dist}
-                        style={{
-                          paddingHorizontal: 14,
-                          paddingVertical: 7,
-                          borderRadius: 16,
-                          borderWidth: 1,
-                          backgroundColor:
-                            proximityRadius === dist
-                              ? colors.primary + '20'
-                              : colors.card,
-                          borderColor:
-                            proximityRadius === dist
-                              ? colors.primary
-                              : colors.border,
-                        }}
+                        style={[
+                          themedStyles.proximityDistanceChip,
+                          proximityRadius === dist
+                            ? themedStyles.proximityDistanceChipSelected
+                            : themedStyles.proximityDistanceChipDefault,
+                        ]}
                         onPress={() => setProximityRadius(dist)}>
                         <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: '600',
-                            color:
-                              proximityRadius === dist
-                                ? colors.primary
-                                : colors.text,
-                          }}>
+                          style={[
+                            themedStyles.proximityDistanceText,
+                            proximityRadius === dist
+                              ? themedStyles.proximityDistanceTextSelected
+                              : themedStyles.proximityDistanceTextDefault,
+                          ]}>
                           {dist} mi
                         </Text>
                       </TouchableOpacity>

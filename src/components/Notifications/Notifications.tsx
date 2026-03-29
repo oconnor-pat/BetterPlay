@@ -23,11 +23,15 @@ import {
   faCalendarPlus,
   faEnvelope,
   faComment,
+  faComments,
+  faHeart,
+  faUsers,
   faCheck,
   faCheckDouble,
   faTrash,
   faEllipsisV,
   faClock,
+  faEye,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from '../../config/api';
@@ -44,6 +48,13 @@ export interface AppNotification {
     | 'event_reminder'
     | 'event_invitation'
     | 'event_roster'
+    | 'event_like'
+    | 'event_comment'
+    | 'event_join'
+    | 'event_leave'
+    | 'event_watch_update'
+    | 'event_spot_opened'
+    | 'event_roster_change'
     | 'community_note'
     | 'general';
   title: string;
@@ -64,7 +75,7 @@ const Notifications: React.FC = () => {
   const navigation = useNavigation<any>();
   const {colors} = useTheme();
   const {t} = useTranslation();
-  const {setBadgeCount} = useNotifications();
+  const {setBadgeCount, refreshBadgeCount} = useNotifications();
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,6 +119,14 @@ const Notifications: React.FC = () => {
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
+
+  // Refresh badge count when leaving the screen
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', () => {
+      refreshBadgeCount();
+    });
+    return () => unsubscribe();
+  }, [navigation, refreshBadgeCount]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -280,6 +299,11 @@ const Notifications: React.FC = () => {
       case 'event_reminder':
       case 'event_invitation':
       case 'event_roster':
+      case 'event_join':
+      case 'event_leave':
+      case 'event_watch_update':
+      case 'event_spot_opened':
+      case 'event_roster_change':
         if (notification.data?.eventId) {
           navigation.navigate('Events', {
             screen: 'EventRoster',
@@ -287,11 +311,26 @@ const Notifications: React.FC = () => {
           });
         }
         break;
-      case 'community_note':
-        navigation.navigate('Events', {
-          screen: 'CommunityNotes',
-        });
+      case 'event_like':
+      case 'event_comment':
+      case 'community_note': {
+        const targetId =
+          notification.data?.eventId || notification.data?.postEventId;
+        if (targetId) {
+          navigation.navigate('Events', {
+            screen: 'EventList',
+            params: {
+              highlightEventId: targetId,
+              expandComments: notification.type !== 'event_like',
+            },
+          });
+        } else {
+          navigation.navigate('Events', {
+            screen: 'EventList',
+          });
+        }
         break;
+      }
       default:
         break;
     }
@@ -305,15 +344,25 @@ const Notifications: React.FC = () => {
       case 'friend_accepted':
         return faUserCheck;
       case 'event_update':
+      case 'event_watch_update':
         return faCalendarCheck;
       case 'event_reminder':
         return faClock;
       case 'event_invitation':
         return faEnvelope;
       case 'event_roster':
+      case 'event_roster_change':
         return faCalendarPlus;
+      case 'event_like':
+        return faHeart;
+      case 'event_comment':
       case 'community_note':
-        return faComment;
+        return faComments;
+      case 'event_join':
+      case 'event_leave':
+        return faUsers;
+      case 'event_spot_opened':
+        return faEye;
       default:
         return faBell;
     }
@@ -327,15 +376,23 @@ const Notifications: React.FC = () => {
       case 'friend_accepted':
         return '#4CAF50';
       case 'event_update':
+      case 'event_watch_update':
         return '#2196F3';
       case 'event_reminder':
         return '#9C27B0';
       case 'event_invitation':
-        return colors.primary;
       case 'event_roster':
+      case 'event_roster_change':
+      case 'event_join':
+      case 'event_leave':
         return colors.primary;
+      case 'event_like':
+        return '#e74c3c';
+      case 'event_comment':
       case 'community_note':
         return '#00BCD4';
+      case 'event_spot_opened':
+        return '#FF9800';
       default:
         return colors.text;
     }

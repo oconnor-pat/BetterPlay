@@ -27,6 +27,7 @@ import {
   faCheck,
   faTimes,
   faHeart,
+  faComments,
   faPaperPlane,
   faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
@@ -36,6 +37,7 @@ import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
 import {useNavigation, CommonActions} from '@react-navigation/native';
+import {useSocket} from '../../Context/SocketContext';
 
 interface Reply {
   _id?: string;
@@ -86,6 +88,7 @@ interface EventCommentsProps {
   eventName: string;
   eventType: string;
   onClose: () => void;
+  onCommentCountChange?: (eventId: string, count: number) => void;
 }
 
 // Helper to get user initials for avatar
@@ -141,6 +144,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
   eventName,
   eventType,
   onClose,
+  onCommentCountChange,
 }) => {
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
@@ -176,6 +180,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
   const {colors} = useTheme();
   const {t} = useTranslation();
   const navigation = useNavigation();
+  const {subscribe: socketSubscribe, joinEvent, leaveEvent} = useSocket();
 
   const replyInputRefs = useRef<{[key: string]: TextInput | null}>({});
   const composerInputRef = useRef<TextInput | null>(null);
@@ -225,6 +230,47 @@ const EventComments: React.FC<EventCommentsProps> = ({
   useEffect(() => {
     fetchOrCreatePost();
   }, [fetchOrCreatePost]);
+
+  // Join event room and listen for real-time comment updates
+  useEffect(() => {
+    joinEvent(eventId);
+
+    const unsub = socketSubscribe(
+      'comments:updated',
+      (data: {
+        eventId: string;
+        comments: Comment[];
+        likes?: string[];
+        likedByUsernames?: string[];
+      }) => {
+        if (data.eventId === eventId) {
+          setPost(prev => {
+            if (!prev) return prev;
+            const updates: Partial<Post> = {comments: data.comments};
+            if (data.likes) updates.likes = data.likes;
+            if (data.likedByUsernames)
+              updates.likedByUsernames = data.likedByUsernames;
+            return {...prev, ...updates};
+          });
+        }
+      },
+    );
+
+    return () => {
+      leaveEvent(eventId);
+      unsub();
+    };
+  }, [eventId, joinEvent, leaveEvent, socketSubscribe]);
+
+  const onCommentCountChangeRef = useRef(onCommentCountChange);
+  onCommentCountChangeRef.current = onCommentCountChange;
+
+  useEffect(() => {
+    if (onCommentCountChangeRef.current) {
+      const count = post?.comments?.length || 0;
+      onCommentCountChangeRef.current(eventId, count);
+    }
+  }, [post, eventId]);
 
   // Navigate to user's public profile
   const navigateToProfile = useCallback(
@@ -905,57 +951,27 @@ const EventComments: React.FC<EventCommentsProps> = ({
         socialActionsRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingTop: 12,
-          paddingHorizontal: 2,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: colors.border,
-          gap: 8,
+          paddingTop: 10,
+          paddingBottom: 2,
+          gap: 6,
         },
-        socialAction: {
+        socialPill: {
           flexDirection: 'row',
           alignItems: 'center',
           paddingVertical: 6,
-          paddingHorizontal: 10,
+          paddingHorizontal: 12,
           borderRadius: 20,
-          backgroundColor: colors.primary,
+          borderWidth: 1,
+          borderColor: colors.border + '60',
+          gap: 6,
         },
-        socialActionFlex: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingVertical: 6,
-          paddingHorizontal: 10,
-          borderRadius: 20,
-          backgroundColor: colors.background,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
-        },
-        socialActionText: {
-          marginLeft: 6,
+        socialPillText: {
           fontSize: 13,
-          color: colors.buttonText,
+          color: colors.secondaryText,
           fontWeight: '600',
         },
-        likedText: {
+        socialPillTextActive: {
           color: '#e74c3c',
-        },
-        clickableLikeCount: {
-          backgroundColor: colors.primary + '20',
-          paddingHorizontal: 10,
-          paddingVertical: 4,
-          borderRadius: 12,
-          fontWeight: '600',
-          color: colors.primary,
-          overflow: 'hidden',
-        },
-        likeCountButton: {
-          minWidth: 32,
-          minHeight: 28,
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
-        likeIconButton: {
-          padding: 6,
-          marginRight: 2,
         },
         // Comment input
         commentInputRow: {
@@ -1070,40 +1086,28 @@ const EventComments: React.FC<EventCommentsProps> = ({
           fontSize: 12,
           fontWeight: '500',
         },
-        commentLikeButton: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          padding: 4,
-        },
         commentLikeRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginTop: 8,
-          gap: 12,
+          marginTop: 6,
         },
-        commentLikeText: {
-          marginLeft: 4,
+        commentLikePill: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 4,
+          paddingHorizontal: 8,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: colors.border + '40',
+          gap: 5,
+        },
+        commentLikePillText: {
           fontSize: 12,
           color: colors.secondaryText,
-          fontWeight: '500',
-        },
-        commentLikedText: {
-          color: '#e74c3c',
-        },
-        commentLikeCountButton: {
-          minWidth: 24,
-          minHeight: 24,
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
-        commentClickableLikeCount: {
-          backgroundColor: colors.primary + '20',
-          paddingHorizontal: 8,
-          paddingVertical: 3,
-          borderRadius: 10,
           fontWeight: '600',
-          color: colors.primary,
-          overflow: 'hidden',
+        },
+        commentLikePillTextActive: {
+          color: '#e74c3c',
         },
         // Reply input
         replyInputRow: {
@@ -1488,41 +1492,41 @@ const EventComments: React.FC<EventCommentsProps> = ({
 
         {/* Social Actions */}
         <View style={styles.socialActionsRow}>
-          <View style={styles.socialActionFlex}>
-            <TouchableOpacity
-              onPress={() => toggleLike(post._id)}
-              style={styles.likeIconButton}>
-              <FontAwesomeIcon
-                icon={faHeart}
-                size={16}
-                color={likedPosts.has(post._id) ? '#e74c3c' : colors.border}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.likeCountButton}
-              onPress={() =>
-                showLikedBy(
-                  t('communityNotes.likedBy') || 'Liked by',
-                  post.likedByUsers || [],
-                  post.likedByUsernames || [],
-                  post.likes?.length || 0,
-                )
-              }
-              disabled={(post.likes?.length || 0) === 0}>
-              <Text
-                style={[
-                  styles.socialActionText,
-                  likedPosts.has(post._id) && styles.likedText,
-                  (post.likes?.length || 0) > 0 && styles.clickableLikeCount,
-                ]}>
-                {post.likes?.length || 0}
-              </Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.socialPill}
+            onPress={() => toggleLike(post._id)}
+            onLongPress={() =>
+              (post.likes?.length || 0) > 0 &&
+              showLikedBy(
+                t('communityNotes.likedBy') || 'Liked by',
+                post.likedByUsers || [],
+                post.likedByUsernames || [],
+                post.likes?.length || 0,
+              )
+            }>
+            <FontAwesomeIcon
+              icon={faHeart}
+              size={14}
+              color={likedPosts.has(post._id) ? '#e74c3c' : colors.secondaryText}
+            />
+            <Text
+              style={[
+                styles.socialPillText,
+                likedPosts.has(post._id) && styles.socialPillTextActive,
+              ]}>
+              {post.likes?.length || 0}
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.socialPill}>
+            <FontAwesomeIcon
+              icon={faComments}
+              size={14}
+              color={colors.secondaryText}
+            />
+            <Text style={styles.socialPillText}>
+              {post.comments?.length || 0}
+            </Text>
           </View>
-          <Text style={styles.socialActionText}>
-            {post.comments?.length || 0}{' '}
-            {t('communityNotes.comments') || 'Comments'}
-          </Text>
         </View>
 
         {/* Add Comment */}
@@ -1674,9 +1678,18 @@ const EventComments: React.FC<EventCommentsProps> = ({
                         <Text style={styles.commentText}>{comment.text}</Text>
                         <View style={styles.commentLikeRow}>
                           <TouchableOpacity
-                            style={styles.commentLikeButton}
+                            style={styles.commentLikePill}
                             onPress={() =>
                               toggleCommentLike(post._id, comment._id!)
+                            }
+                            onLongPress={() =>
+                              (comment.likes?.length || 0) > 0 &&
+                              showLikedBy(
+                                t('communityNotes.likedBy') || 'Liked by',
+                                comment.likedByUsers || [],
+                                comment.likedByUsernames || [],
+                                comment.likes?.length || 0,
+                              )
                             }>
                             <FontAwesomeIcon
                               icon={faHeart}
@@ -1684,28 +1697,14 @@ const EventComments: React.FC<EventCommentsProps> = ({
                               color={
                                 likedComments.has(comment._id!)
                                   ? '#e74c3c'
-                                  : colors.border
+                                  : colors.secondaryText
                               }
                             />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.commentLikeCountButton}
-                            onPress={() =>
-                              showLikedBy(
-                                t('communityNotes.likedBy') || 'Liked by',
-                                comment.likedByUsers || [],
-                                comment.likedByUsernames || [],
-                                comment.likes?.length || 0,
-                              )
-                            }
-                            disabled={(comment.likes?.length || 0) === 0}>
                             <Text
                               style={[
-                                styles.commentLikeText,
+                                styles.commentLikePillText,
                                 likedComments.has(comment._id!) &&
-                                  styles.commentLikedText,
-                                (comment.likes?.length || 0) > 0 &&
-                                  styles.commentClickableLikeCount,
+                                  styles.commentLikePillTextActive,
                               ]}>
                               {comment.likes?.length || 0}
                             </Text>

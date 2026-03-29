@@ -21,6 +21,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  AppState,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
@@ -51,6 +52,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notificationService from '../../services/NotificationService';
+import {useSocket} from '../../Context/SocketContext';
 
 export interface Player {
   userId?: string;
@@ -277,6 +279,7 @@ const EventRoster: React.FC = () => {
   const {updateRosterSpots} = useEventContext();
   const {userData} = useContext(UserContext) as UserContextType;
   const {t} = useTranslation();
+  const {subscribe: socketSubscribe, joinEvent, leaveEvent} = useSocket();
 
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(
@@ -1382,6 +1385,53 @@ const EventRoster: React.FC = () => {
       loadData();
     }, [fetchEventData]),
   );
+
+  // Join the event's socket room and listen for real-time roster updates
+  useEffect(() => {
+    joinEvent(eventId);
+
+    const unsubRoster = socketSubscribe(
+      'roster:updated',
+      (data: {eventId: string; roster: any[]; rosterSpotsFilled: number}) => {
+        if (data.eventId === eventId) {
+          setRoster(data.roster);
+          setTotalSpots(prev => prev); // keep current
+          updateRosterSpots(eventId, data.rosterSpotsFilled);
+        }
+      },
+    );
+
+    const unsubEvent = socketSubscribe(
+      'event:updated',
+      (data: {event: any}) => {
+        if (data.event && data.event._id === eventId) {
+          const ev = data.event;
+          if (ev.name) {setEventName(ev.name);}
+          if (ev.eventType) {setEventType(ev.eventType);}
+          if (ev.date) {setDate(ev.date);}
+          if (ev.time) {setTime(ev.time);}
+          if (ev.location) {setLocation(ev.location);}
+          if (ev.totalSpots) {setTotalSpots(ev.totalSpots);}
+          if (ev.roster) {setRoster(ev.roster);}
+          if (ev.jerseyColors) {setEventJerseyColors(ev.jerseyColors);}
+        }
+      },
+    );
+
+    // Fallback: refresh when app returns to foreground
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        fetchEventData();
+      }
+    });
+
+    return () => {
+      leaveEvent(eventId);
+      unsubRoster();
+      unsubEvent();
+      subscription.remove();
+    };
+  }, [eventId, joinEvent, leaveEvent, socketSubscribe, fetchEventData, updateRosterSpots]);
 
   // Persist roster to backend
   const persistRoster = async (updatedRoster: Player[]) => {

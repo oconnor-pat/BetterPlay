@@ -1539,7 +1539,7 @@ const SpaceDetail: React.FC = () => {
             try {
               const token = await AsyncStorage.getItem('userToken');
               await axios.delete(
-                `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/timeslots/${slot._id}`,
+                `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/slots/${slot._id}`,
                 {headers: {Authorization: `Bearer ${token}`}},
               );
               // Remove from local state
@@ -1598,7 +1598,7 @@ const SpaceDetail: React.FC = () => {
       const dateStr = getLocalDateString(selectedDate);
 
       const response = await axios.post(
-        `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/timeslots`,
+        `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/slots`,
         {
           date: dateStr,
           startTime: newSlotStartTime,
@@ -1692,7 +1692,7 @@ const SpaceDetail: React.FC = () => {
       const token = await AsyncStorage.getItem('userToken');
 
       await axios.put(
-        `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/timeslots/${editingSlot._id}`,
+        `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/slots/${editingSlot._id}`,
         {
           startTime: newSlotStartTime,
           endTime: newSlotEndTime,

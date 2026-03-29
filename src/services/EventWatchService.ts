@@ -120,7 +120,7 @@ class EventWatchService {
         return;
       }
 
-      const endpoint = `${API_BASE_URL}/api/events/${watch.eventId}/watch`;
+      const endpoint = `${API_BASE_URL}/events/${watch.eventId}/watch`;
       const response = await fetch(endpoint, {
         method: watching ? 'PUT' : 'DELETE',
         headers: {

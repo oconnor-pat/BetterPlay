@@ -25,6 +25,7 @@ import {
 } from './src/components/ThemeContext/ThemeContext';
 import {EventProvider} from './src/Context/EventContext';
 import {NotificationProvider} from './src/Context/NotificationContext';
+import {SocketProvider} from './src/Context/SocketContext';
 import notificationService from './src/services/NotificationService';
 import locationService from './src/services/LocationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -351,6 +352,7 @@ const AppContent = () => {
       />
       <UserContext.Provider
         value={{userData, setUserData, isAdmin, checkAdminStatus}}>
+        <SocketProvider>
         <NotificationProvider>
           <EventProvider>
             <NavigationContainer
@@ -434,6 +436,7 @@ const AppContent = () => {
             </NavigationContainer>
           </EventProvider>
         </NotificationProvider>
+        </SocketProvider>
       </UserContext.Provider>
     </>
   );

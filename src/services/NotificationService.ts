@@ -525,7 +525,7 @@ class NotificationService {
    * Actual Navigator Structure:
    * - RootStack: LandingPage, BottomNavigator, Settings, ResetPassword, ...
    *   - Tab.Navigator (inside BottomNavigator): Events, Venues, Profile
-   *     - Events (LocalEventsStack): EventList, EventRoster, PublicProfile, UserSearch, Notifications, CommunityNotes
+   *     - Events (LocalEventsStack): EventList, EventRoster, PublicProfile, UserSearch, Notifications
    *     - Venues (VenueStack): VenueList, VenueDetail, SpaceDetail
    *     - Profile (ProfileStack): ProfileMain, UserSearch, PublicProfile, FriendsList, FriendRequests, Notifications
    */
@@ -583,7 +583,7 @@ class NotificationService {
         break;
       }
 
-      // Event-related notifications -> Events tab
+      // Event update/roster notifications -> EventRoster screen
       case 'event_update':
       case 'event_watch_update':
       case 'event_spot_opened':
@@ -591,8 +591,6 @@ class NotificationService {
       case 'event_reminder':
       case 'event_invitation':
       case 'event_roster':
-      case 'event_like':
-      case 'event_comment':
       case 'event_join':
       case 'event_leave': {
         const targetEventId = eventId || id;
@@ -608,14 +606,19 @@ class NotificationService {
         break;
       }
 
-      // Community note notifications -> Events tab (CommunityNotes is inside LocalEventsStack)
+      // Like/comment notifications -> EventList, scroll to card and expand comments
+      case 'event_like':
+      case 'event_comment':
       case 'community_note': {
-        const noteId = postId || id;
-        navigateToTab(
-          'Events',
-          'CommunityNotes',
-          noteId ? {noteId} : undefined,
-        );
+        const likeCommentEventId = eventId || id;
+        if (likeCommentEventId) {
+          navigateToTab('Events', 'EventList', {
+            highlightEventId: likeCommentEventId,
+            expandComments: type !== 'event_like',
+          });
+        } else {
+          navigateToTab('Events', 'EventList');
+        }
         break;
       }
 

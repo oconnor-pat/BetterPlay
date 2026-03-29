@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {API_BASE_URL} from '../config/api';
 
 export interface Event {
   _id: string;
@@ -21,6 +22,9 @@ export interface Event {
   createdByUsername?: string;
   latitude?: number;
   longitude?: number;
+  isRecurring?: boolean;
+  recurrenceGroupId?: string;
+  recurrenceFrequency?: string;
 }
 
 interface EventContextType {
@@ -31,8 +35,6 @@ interface EventContextType {
 }
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
-
-const API_BASE_URL = 'http://localhost:8001';
 
 export const EventProvider = ({children}: {children: ReactNode}) => {
   const [events, setEvents] = useState<Event[]>([]);

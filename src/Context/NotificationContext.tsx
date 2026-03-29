@@ -13,12 +13,14 @@ import React, {
   useRef,
   ReactNode,
 } from 'react';
+import {AppState} from 'react-native';
 import notificationService, {
   NotificationSettings,
 } from '../services/NotificationService';
 import {AuthorizationStatus} from '@notifee/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from '../config/api';
+import {useSocket} from './SocketContext';
 
 // Navigation reference type
 type NavigationRef = {
@@ -43,6 +45,7 @@ interface NotificationContextType {
   badgeCount: number;
   setBadgeCount: (count: number) => void;
   clearBadge: () => Promise<void>;
+  refreshBadgeCount: () => Promise<void>;
 
   // Initialization
   isInitialized: boolean;
@@ -207,10 +210,64 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     }
   }, []);
 
+  /**
+   * Fetch unread count from the backend
+   */
+  const refreshBadgeCount = useCallback(async (): Promise<void> => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        return;
+      }
+      const response = await fetch(
+        `${API_BASE_URL}/api/notifications/unread-count`,
+        {
+          headers: {Authorization: `Bearer ${token}`},
+        },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setBadgeCount(data.count || 0);
+      }
+    } catch {
+      // Silently fail — badge will update on next poll
+    }
+  }, []);
+
   // Initialize on mount
   useEffect(() => {
     initializeNotifications();
   }, [initializeNotifications]);
+
+  // Listen for real-time notification updates via WebSocket
+  const {subscribe} = useSocket();
+
+  useEffect(() => {
+    if (!isInitialized) {
+      return;
+    }
+
+    const unsubNew = subscribe('notification:new', () => {
+      refreshBadgeCount();
+    });
+
+    const unsubBadge = subscribe('notification:badge', (data: {count: number}) => {
+      setBadgeCount(data.count);
+    });
+
+    // Fallback: refresh badge when app returns to foreground
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        refreshBadgeCount();
+      }
+    });
+
+    return () => {
+      unsubNew();
+      unsubBadge();
+      subscription.remove();
+    };
+  }, [isInitialized, refreshBadgeCount, subscribe]);
 
   // Context value
   const contextValue: NotificationContextType = {
@@ -223,6 +280,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     badgeCount,
     setBadgeCount,
     clearBadge,
+    refreshBadgeCount,
     isInitialized,
     setNavigationRef,
   };
