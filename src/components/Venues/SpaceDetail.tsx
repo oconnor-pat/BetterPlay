@@ -61,6 +61,11 @@ interface TimeSlot {
   eventName?: string;
   price?: number;
   bookingId?: string;
+  name?: string;
+  description?: string;
+  category?: string;
+  ageRestriction?: string;
+  maxCapacity?: number;
 }
 
 // Helper function to format date
@@ -248,7 +253,15 @@ const SpaceDetail: React.FC = () => {
   const [newSlotStartTime, setNewSlotStartTime] = useState<string>('09:00');
   const [newSlotEndTime, setNewSlotEndTime] = useState<string>('10:00');
   const [newSlotPrice, setNewSlotPrice] = useState<string>('150');
+  const [newSlotName, setNewSlotName] = useState<string>('');
+  const [newSlotDescription, setNewSlotDescription] = useState<string>('');
+  const [newSlotCategory, setNewSlotCategory] = useState<string>('');
+  const [newSlotAgeRestriction, setNewSlotAgeRestriction] = useState<string>('');
+  const [newSlotMaxCapacity, setNewSlotMaxCapacity] = useState<string>('');
   const [savingSlot, setSavingSlot] = useState<boolean>(false);
+
+  // Category filter for normal users
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
 
   // Time picker state
   const [showStartTimePicker, setShowStartTimePicker] =
@@ -1091,9 +1104,14 @@ const SpaceDetail: React.FC = () => {
         startTime: slot.startTime,
         endTime: slot.endTime,
         date: slot.date,
-        isBooked: slot.available === false, // Only booked if explicitly set to false
+        isBooked: slot.available === false,
         bookedBy: slot.bookedBy,
         bookedByUsername: slot.bookedByUsername,
+        name: slot.name || undefined,
+        description: slot.description || undefined,
+        category: slot.category || undefined,
+        ageRestriction: slot.ageRestriction || undefined,
+        maxCapacity: slot.maxCapacity || undefined,
         eventName: slot.eventName,
         price: slot.price || 150,
         bookingId: slot.bookingId,
@@ -1159,12 +1177,17 @@ const SpaceDetail: React.FC = () => {
           startTime: slot.startTime,
           endTime: slot.endTime,
           date: slot.date,
-          isBooked: slot.available === false, // Only booked if explicitly set to false
+          isBooked: slot.available === false,
           bookedBy: slot.bookedBy,
           bookedByUsername: slot.bookedByUsername,
           eventName: slot.eventName,
           price: slot.price || 150,
           bookingId: slot.bookingId,
+          name: slot.name || undefined,
+          description: slot.description || undefined,
+          category: slot.category || undefined,
+          ageRestriction: slot.ageRestriction || undefined,
+          maxCapacity: slot.maxCapacity || undefined,
         };
         // Normalize the date - if the slot.date doesn't match any key in our map,
         // it might be off by a day due to timezone. Parse and re-format to local.
@@ -1510,6 +1533,11 @@ const SpaceDetail: React.FC = () => {
     setNewSlotStartTime('09:00');
     setNewSlotEndTime('10:00');
     setNewSlotPrice('150');
+    setNewSlotName('');
+    setNewSlotDescription('');
+    setNewSlotCategory('');
+    setNewSlotAgeRestriction('');
+    setNewSlotMaxCapacity('');
     setShowAddSlotModal(true);
   };
 
@@ -1519,6 +1547,11 @@ const SpaceDetail: React.FC = () => {
     setNewSlotStartTime(slot.startTime);
     setNewSlotEndTime(slot.endTime);
     setNewSlotPrice(slot.price?.toString() || '150');
+    setNewSlotName(slot.name || '');
+    setNewSlotDescription(slot.description || '');
+    setNewSlotCategory(slot.category || '');
+    setNewSlotAgeRestriction(slot.ageRestriction || '');
+    setNewSlotMaxCapacity(slot.maxCapacity?.toString() || '');
     setShowEditSlotModal(true);
   };
 
@@ -1604,6 +1637,11 @@ const SpaceDetail: React.FC = () => {
           startTime: newSlotStartTime,
           endTime: newSlotEndTime,
           price: parseFloat(newSlotPrice) || 150,
+          name: newSlotName || undefined,
+          description: newSlotDescription || undefined,
+          category: newSlotCategory || undefined,
+          ageRestriction: newSlotAgeRestriction || undefined,
+          maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
         },
         {headers: {Authorization: `Bearer ${token}`}},
       );
@@ -1616,6 +1654,11 @@ const SpaceDetail: React.FC = () => {
         date: dateStr,
         isBooked: false,
         price: parseFloat(newSlotPrice) || 150,
+        name: newSlotName || undefined,
+        description: newSlotDescription || undefined,
+        category: newSlotCategory || undefined,
+        ageRestriction: newSlotAgeRestriction || undefined,
+        maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
       };
 
       setTimeSlots(prev =>
@@ -1630,7 +1673,6 @@ const SpaceDetail: React.FC = () => {
       );
     } catch (error) {
       console.error('Error adding slot:', error);
-      // For development - still add to local state
       const dateStr = getLocalDateString(selectedDate);
       const newSlot: TimeSlot = {
         _id: `slot-${dateStr}-${newSlotStartTime}-${Date.now()}`,
@@ -1639,6 +1681,11 @@ const SpaceDetail: React.FC = () => {
         date: dateStr,
         isBooked: false,
         price: parseFloat(newSlotPrice) || 150,
+        name: newSlotName || undefined,
+        description: newSlotDescription || undefined,
+        category: newSlotCategory || undefined,
+        ageRestriction: newSlotAgeRestriction || undefined,
+        maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
       };
       setTimeSlots(prev =>
         [...prev, newSlot].sort((a, b) =>
@@ -1697,11 +1744,15 @@ const SpaceDetail: React.FC = () => {
           startTime: newSlotStartTime,
           endTime: newSlotEndTime,
           price: parseFloat(newSlotPrice) || 150,
+          name: newSlotName,
+          description: newSlotDescription,
+          category: newSlotCategory,
+          ageRestriction: newSlotAgeRestriction,
+          maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
         },
         {headers: {Authorization: `Bearer ${token}`}},
       );
 
-      // Update local state
       setTimeSlots(prev =>
         prev
           .map(slot =>
@@ -1711,6 +1762,11 @@ const SpaceDetail: React.FC = () => {
                   startTime: newSlotStartTime,
                   endTime: newSlotEndTime,
                   price: parseFloat(newSlotPrice) || 150,
+                  name: newSlotName || undefined,
+                  description: newSlotDescription || undefined,
+                  category: newSlotCategory || undefined,
+                  ageRestriction: newSlotAgeRestriction || undefined,
+                  maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
                 }
               : slot,
           )
@@ -1725,7 +1781,6 @@ const SpaceDetail: React.FC = () => {
       );
     } catch (error) {
       console.error('Error updating slot:', error);
-      // For development - still update local state
       setTimeSlots(prev =>
         prev
           .map(slot =>
@@ -1735,6 +1790,11 @@ const SpaceDetail: React.FC = () => {
                   startTime: newSlotStartTime,
                   endTime: newSlotEndTime,
                   price: parseFloat(newSlotPrice) || 150,
+                  name: newSlotName || undefined,
+                  description: newSlotDescription || undefined,
+                  category: newSlotCategory || undefined,
+                  ageRestriction: newSlotAgeRestriction || undefined,
+                  maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
                 }
               : slot,
           )
@@ -1805,6 +1865,11 @@ const SpaceDetail: React.FC = () => {
             </View>
 
             <View style={themedStyles.slotInfo}>
+              {item.name ? (
+                <Text style={{fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 2}} numberOfLines={1}>
+                  {item.name}
+                </Text>
+              ) : null}
               <View style={themedStyles.slotStatus}>
                 <View
                   style={[
@@ -1825,6 +1890,25 @@ const SpaceDetail: React.FC = () => {
                   {item.eventName}
                 </Text>
               )}
+              {(item.category || item.ageRestriction || item.maxCapacity) && (
+                <View style={{flexDirection: 'row', flexWrap: 'wrap', marginTop: 4, gap: 4}}>
+                  {item.category ? (
+                    <View style={{backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
+                      <Text style={{fontSize: 11, color: colors.primary, fontWeight: '600'}}>{item.category}</Text>
+                    </View>
+                  ) : null}
+                  {item.ageRestriction ? (
+                    <View style={{backgroundColor: '#FF9800' + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
+                      <Text style={{fontSize: 11, color: '#FF9800', fontWeight: '600'}}>{item.ageRestriction}</Text>
+                    </View>
+                  ) : null}
+                  {item.maxCapacity ? (
+                    <View style={{backgroundColor: '#2196F3' + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
+                      <Text style={{fontSize: 11, color: '#2196F3', fontWeight: '600'}}>Max {item.maxCapacity}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              )}
             </View>
 
             {/* Chevron indicator */}
@@ -1840,9 +1924,14 @@ const SpaceDetail: React.FC = () => {
             </View>
           </View>
 
-          {/* Expanded actions - only visible when tapped */}
+          {/* Expanded details and actions - only visible when tapped */}
           {isExpanded && (
             <View style={themedStyles.slotExpandedActions}>
+              {item.description ? (
+                <Text style={{fontSize: 13, color: colors.secondaryText, marginBottom: 10, lineHeight: 18}}>
+                  {item.description}
+                </Text>
+              ) : null}
               {!item.isBooked ? (
                 <>
                   <TouchableOpacity
@@ -2426,6 +2515,63 @@ const SpaceDetail: React.FC = () => {
               keyboardType="numeric"
             />
 
+            <Text style={themedStyles.inputLabel}>
+              {'Slot Name'}
+            </Text>
+            <TextInput
+              style={themedStyles.input}
+              placeholder="e.g. Adult Open Skate"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotName}
+              onChangeText={setNewSlotName}
+            />
+
+            <Text style={themedStyles.inputLabel}>
+              {'Category'}
+            </Text>
+            <TextInput
+              style={themedStyles.input}
+              placeholder="e.g. Hockey, Figure Skating, Open Skate"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotCategory}
+              onChangeText={setNewSlotCategory}
+            />
+
+            <Text style={themedStyles.inputLabel}>
+              {'Age Restriction'}
+            </Text>
+            <TextInput
+              style={themedStyles.input}
+              placeholder="e.g. 18+, Youth Only, All Ages"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotAgeRestriction}
+              onChangeText={setNewSlotAgeRestriction}
+            />
+
+            <Text style={themedStyles.inputLabel}>
+              {'Max Capacity'}
+            </Text>
+            <TextInput
+              style={themedStyles.input}
+              placeholder="e.g. 30"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotMaxCapacity}
+              onChangeText={setNewSlotMaxCapacity}
+              keyboardType="numeric"
+            />
+
+            <Text style={themedStyles.inputLabel}>
+              {'Description / Notes'}
+            </Text>
+            <TextInput
+              style={[themedStyles.input, {height: 80, textAlignVertical: 'top', paddingTop: 10}]}
+              placeholder="e.g. Helmets required, bring your own gear"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotDescription}
+              onChangeText={setNewSlotDescription}
+              multiline
+            />
+
             <TouchableOpacity
               style={themedStyles.submitButton}
               onPress={saveNewSlot}
@@ -2557,6 +2703,63 @@ const SpaceDetail: React.FC = () => {
               value={newSlotPrice}
               onChangeText={setNewSlotPrice}
               keyboardType="numeric"
+            />
+
+            <Text style={themedStyles.inputLabel}>
+              {'Slot Name'}
+            </Text>
+            <TextInput
+              style={themedStyles.input}
+              placeholder="e.g. Adult Open Skate"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotName}
+              onChangeText={setNewSlotName}
+            />
+
+            <Text style={themedStyles.inputLabel}>
+              {'Category'}
+            </Text>
+            <TextInput
+              style={themedStyles.input}
+              placeholder="e.g. Hockey, Figure Skating, Open Skate"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotCategory}
+              onChangeText={setNewSlotCategory}
+            />
+
+            <Text style={themedStyles.inputLabel}>
+              {'Age Restriction'}
+            </Text>
+            <TextInput
+              style={themedStyles.input}
+              placeholder="e.g. 18+, Youth Only, All Ages"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotAgeRestriction}
+              onChangeText={setNewSlotAgeRestriction}
+            />
+
+            <Text style={themedStyles.inputLabel}>
+              {'Max Capacity'}
+            </Text>
+            <TextInput
+              style={themedStyles.input}
+              placeholder="e.g. 30"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotMaxCapacity}
+              onChangeText={setNewSlotMaxCapacity}
+              keyboardType="numeric"
+            />
+
+            <Text style={themedStyles.inputLabel}>
+              {'Description / Notes'}
+            </Text>
+            <TextInput
+              style={[themedStyles.input, {height: 80, textAlignVertical: 'top', paddingTop: 10}]}
+              placeholder="e.g. Helmets required, bring your own gear"
+              placeholderTextColor={colors.secondaryText}
+              value={newSlotDescription}
+              onChangeText={setNewSlotDescription}
+              multiline
             />
 
             <TouchableOpacity
@@ -3001,15 +3204,66 @@ const SpaceDetail: React.FC = () => {
         </View>
       )}
 
+      {/* Category Filter Chips - Day View Only */}
+      {viewMode === 'day' && (() => {
+        const categories = Array.from(new Set(timeSlots.map(s => s.category).filter((c): c is string => !!c)));
+        if (categories.length === 0) return null;
+        return (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{paddingHorizontal: 16, paddingVertical: 8, maxHeight: 44}}
+            contentContainerStyle={{gap: 8, alignItems: 'center'}}>
+            <TouchableOpacity
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: !selectedCategoryFilter ? colors.primary : colors.border,
+                backgroundColor: !selectedCategoryFilter ? colors.primary + '20' : colors.background,
+              }}
+              onPress={() => setSelectedCategoryFilter('')}>
+              <Text style={{fontSize: 12, fontWeight: '600', color: !selectedCategoryFilter ? colors.primary : colors.secondaryText}}>
+                All
+              </Text>
+            </TouchableOpacity>
+            {categories.map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: selectedCategoryFilter === cat ? colors.primary : colors.border,
+                  backgroundColor: selectedCategoryFilter === cat ? colors.primary + '20' : colors.background,
+                }}
+                onPress={() => setSelectedCategoryFilter(selectedCategoryFilter === cat ? '' : cat)}>
+                <Text style={{fontSize: 12, fontWeight: '600', color: selectedCategoryFilter === cat ? colors.primary : colors.secondaryText}}>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        );
+      })()}
+
       {/* Content: Day View or Week View */}
       {viewMode === 'week' ? (
         renderWeekView()
       ) : (
         <FlatList
           data={
-            showMyBookingsOnly
-              ? timeSlots.filter(s => isCurrentUserBooking(s))
-              : timeSlots
+            (() => {
+              let filtered = showMyBookingsOnly
+                ? timeSlots.filter(s => isCurrentUserBooking(s))
+                : timeSlots;
+              if (selectedCategoryFilter) {
+                filtered = filtered.filter(s => s.category === selectedCategoryFilter);
+              }
+              return filtered;
+            })()
           }
           keyExtractor={item => item._id}
           renderItem={renderSlotCard}
