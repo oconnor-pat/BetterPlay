@@ -66,6 +66,7 @@ interface TimeSlot {
   category?: string;
   ageRestriction?: string;
   maxCapacity?: number;
+  isCustom?: boolean;
 }
 
 // Helper function to format date
@@ -197,6 +198,26 @@ const venueTypeEmojis: Record<string, string> = {
   'Multi-Purpose': '🏟️',
 };
 
+const CATEGORY_OPTIONS = [
+  'Hockey',
+  'Figure Skating',
+  'Open Skate',
+  'Freestyle',
+  'Learn to Skate',
+  'Broomball',
+  'Curling',
+  'Private Event',
+];
+
+const AGE_RESTRICTION_OPTIONS = [
+  'All Ages',
+  '18+',
+  '21+',
+  'Youth Only',
+  'Seniors (55+)',
+  'Adults Only',
+];
+
 const SpaceDetail: React.FC = () => {
   const route = useRoute<SpaceDetailRouteProp>();
   const navigation = useNavigation();
@@ -267,6 +288,10 @@ const SpaceDetail: React.FC = () => {
   const [showStartTimePicker, setShowStartTimePicker] =
     useState<boolean>(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState<boolean>(false);
+
+  // Category and age restriction picker state
+  const [showCategoryPicker, setShowCategoryPicker] = useState<boolean>(false);
+  const [showAgeRestrictionPicker, setShowAgeRestrictionPicker] = useState<boolean>(false);
 
   // Admin mode toggle (hides admin controls unless enabled)
   const [adminModeEnabled, setAdminModeEnabled] = useState<boolean>(false);
@@ -861,6 +886,59 @@ const SpaceDetail: React.FC = () => {
           fontSize: 16,
           fontWeight: '600',
         },
+        resetButton: {
+          borderRadius: 8,
+          padding: 14,
+          alignItems: 'center',
+          marginTop: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+        },
+        resetButtonText: {
+          color: colors.secondaryText,
+          fontSize: 14,
+          fontWeight: '600',
+        },
+        pickerButton: {
+          backgroundColor: colors.background,
+          borderRadius: 8,
+          padding: 14,
+          borderWidth: 1,
+          borderColor: colors.border,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        },
+        pickerButtonText: {
+          fontSize: 16,
+          color: colors.text,
+        },
+        pickerPlaceholder: {
+          fontSize: 16,
+          color: colors.secondaryText,
+        },
+        pickerOptionsContainer: {
+          backgroundColor: colors.background,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginTop: 4,
+          overflow: 'hidden',
+        },
+        pickerOption: {
+          padding: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
+        pickerOptionSelected: {
+          backgroundColor: colors.primary + '20',
+        },
+        pickerOptionText: {
+          fontSize: 16,
+          color: colors.text,
+          textAlign: 'center',
+        },
         // View mode toggle styles
         viewModeContainer: {
           flexDirection: 'row',
@@ -1115,6 +1193,7 @@ const SpaceDetail: React.FC = () => {
         eventName: slot.eventName,
         price: slot.price || 150,
         bookingId: slot.bookingId,
+        isCustom: slot.isCustom || false,
       }));
       setTimeSlots(transformedSlots);
     } catch (error) {
@@ -1188,6 +1267,7 @@ const SpaceDetail: React.FC = () => {
           category: slot.category || undefined,
           ageRestriction: slot.ageRestriction || undefined,
           maxCapacity: slot.maxCapacity || undefined,
+          isCustom: slot.isCustom || false,
         };
         // Normalize the date - if the slot.date doesn't match any key in our map,
         // it might be off by a day due to timezone. Parse and re-format to local.
@@ -1362,7 +1442,12 @@ const SpaceDetail: React.FC = () => {
       return;
     }
 
-    if (!bookingEventName.trim()) {
+    const effectiveEventName =
+      selectedSlot.isCustom && selectedSlot.name
+        ? selectedSlot.name
+        : bookingEventName.trim();
+
+    if (!effectiveEventName) {
       Alert.alert(
         t('common.error'),
         t('venues.eventNameRequired') || 'Event name is required',
@@ -1382,7 +1467,7 @@ const SpaceDetail: React.FC = () => {
         await axios.put(
           `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/bookings/${selectedSlot._id}`,
           {
-            eventName: bookingEventName.trim(),
+            eventName: effectiveEventName,
             notes: bookingNotes.trim(),
           },
           {headers: {Authorization: `Bearer ${token}`}},
@@ -1397,7 +1482,7 @@ const SpaceDetail: React.FC = () => {
         setTimeSlots(prev =>
           prev.map(s =>
             s._id === selectedSlot._id
-              ? {...s, eventName: bookingEventName.trim()}
+              ? {...s, eventName: effectiveEventName}
               : s,
           ),
         );
@@ -1418,7 +1503,7 @@ const SpaceDetail: React.FC = () => {
                 date: dateStr,
                 startTime: selectedSlot.startTime,
                 endTime: selectedSlot.endTime,
-                eventName: bookingEventName.trim(),
+                eventName: effectiveEventName,
                 notes: bookingNotes.trim(),
                 isRecurring: true,
                 recurringWeeks: recurringWeeks,
@@ -1456,7 +1541,7 @@ const SpaceDetail: React.FC = () => {
             date: selectedSlot.date,
             startTime: selectedSlot.startTime,
             endTime: selectedSlot.endTime,
-            eventName: bookingEventName.trim(),
+            eventName: effectiveEventName,
             notes: bookingNotes.trim(),
           },
           {headers: {Authorization: `Bearer ${token}`}},
@@ -1538,12 +1623,13 @@ const SpaceDetail: React.FC = () => {
     setNewSlotCategory('');
     setNewSlotAgeRestriction('');
     setNewSlotMaxCapacity('');
+    setShowCategoryPicker(false);
+    setShowAgeRestrictionPicker(false);
     setShowAddSlotModal(true);
   };
 
-  // Open edit slot modal
+  // Open edit slot modal for both custom and auto-generated slots
   const handleEditSlot = (slot: TimeSlot) => {
-    setEditingSlot(slot);
     setNewSlotStartTime(slot.startTime);
     setNewSlotEndTime(slot.endTime);
     setNewSlotPrice(slot.price?.toString() || '150');
@@ -1551,8 +1637,25 @@ const SpaceDetail: React.FC = () => {
     setNewSlotDescription(slot.description || '');
     setNewSlotCategory(slot.category || '');
     setNewSlotAgeRestriction(slot.ageRestriction || '');
-    setNewSlotMaxCapacity(slot.maxCapacity?.toString() || '');
+    setNewSlotMaxCapacity('');
+    setShowCategoryPicker(false);
+    setShowAgeRestrictionPicker(false);
+    setEditingSlot(slot);
     setShowEditSlotModal(true);
+  };
+
+  const handleResetSlotToDefault = () => {
+    if (!editingSlot) return;
+    setNewSlotStartTime(editingSlot.startTime);
+    setNewSlotEndTime(editingSlot.endTime);
+    setNewSlotPrice(editingSlot.price?.toString() || '150');
+    setNewSlotName('');
+    setNewSlotDescription('');
+    setNewSlotCategory('');
+    setNewSlotAgeRestriction('');
+    setNewSlotMaxCapacity('');
+    setShowCategoryPicker(false);
+    setShowAgeRestrictionPicker(false);
   };
 
   // Delete a slot
@@ -1641,14 +1744,13 @@ const SpaceDetail: React.FC = () => {
           description: newSlotDescription || undefined,
           category: newSlotCategory || undefined,
           ageRestriction: newSlotAgeRestriction || undefined,
-          maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
         },
         {headers: {Authorization: `Bearer ${token}`}},
       );
 
-      // Add to local state and sort by time
+      const slotData = response.data.slot || response.data;
       const newSlot: TimeSlot = {
-        _id: response.data._id || `slot-${dateStr}-${newSlotStartTime}`,
+        _id: slotData.id || slotData._id || `slot-${dateStr}-${newSlotStartTime}`,
         startTime: newSlotStartTime,
         endTime: newSlotEndTime,
         date: dateStr,
@@ -1658,7 +1760,7 @@ const SpaceDetail: React.FC = () => {
         description: newSlotDescription || undefined,
         category: newSlotCategory || undefined,
         ageRestriction: newSlotAgeRestriction || undefined,
-        maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
+        isCustom: true,
       };
 
       setTimeSlots(prev =>
@@ -1685,7 +1787,7 @@ const SpaceDetail: React.FC = () => {
         description: newSlotDescription || undefined,
         category: newSlotCategory || undefined,
         ageRestriction: newSlotAgeRestriction || undefined,
-        maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
+        isCustom: true,
       };
       setTimeSlots(prev =>
         [...prev, newSlot].sort((a, b) =>
@@ -1737,21 +1839,36 @@ const SpaceDetail: React.FC = () => {
     setSavingSlot(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
+      const dateStr = editingSlot.date || getLocalDateString(selectedDate);
+      const slotPayload = {
+        date: dateStr,
+        startTime: newSlotStartTime,
+        endTime: newSlotEndTime,
+        price: parseFloat(newSlotPrice) || 150,
+        name: newSlotName || undefined,
+        description: newSlotDescription || undefined,
+        category: newSlotCategory || undefined,
+        ageRestriction: newSlotAgeRestriction || undefined,
+        maxCapacity: undefined,
+      };
 
-      await axios.put(
-        `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/slots/${editingSlot._id}`,
-        {
-          startTime: newSlotStartTime,
-          endTime: newSlotEndTime,
-          price: parseFloat(newSlotPrice) || 150,
-          name: newSlotName,
-          description: newSlotDescription,
-          category: newSlotCategory,
-          ageRestriction: newSlotAgeRestriction,
-          maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
-        },
-        {headers: {Authorization: `Bearer ${token}`}},
-      );
+      let updatedSlotId = editingSlot._id;
+
+      if (editingSlot.isCustom) {
+        await axios.put(
+          `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/slots/${editingSlot._id}`,
+          slotPayload,
+          {headers: {Authorization: `Bearer ${token}`}},
+        );
+      } else {
+        const response = await axios.post(
+          `${API_BASE_URL}/api/venues/${venueId}/spaces/${spaceId}/slots`,
+          slotPayload,
+          {headers: {Authorization: `Bearer ${token}`}},
+        );
+        const slotData = response.data.slot || response.data;
+        updatedSlotId = slotData.id || slotData._id || editingSlot._id;
+      }
 
       setTimeSlots(prev =>
         prev
@@ -1759,6 +1876,7 @@ const SpaceDetail: React.FC = () => {
             slot._id === editingSlot._id
               ? {
                   ...slot,
+                  _id: updatedSlotId,
                   startTime: newSlotStartTime,
                   endTime: newSlotEndTime,
                   price: parseFloat(newSlotPrice) || 150,
@@ -1766,7 +1884,8 @@ const SpaceDetail: React.FC = () => {
                   description: newSlotDescription || undefined,
                   category: newSlotCategory || undefined,
                   ageRestriction: newSlotAgeRestriction || undefined,
-                  maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
+                  maxCapacity: undefined,
+                  isCustom: true,
                 }
               : slot,
           )
@@ -1779,33 +1898,13 @@ const SpaceDetail: React.FC = () => {
         t('common.success'),
         t('venues.slotUpdated') || 'Time slot updated',
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating slot:', error);
-      setTimeSlots(prev =>
-        prev
-          .map(slot =>
-            slot._id === editingSlot._id
-              ? {
-                  ...slot,
-                  startTime: newSlotStartTime,
-                  endTime: newSlotEndTime,
-                  price: parseFloat(newSlotPrice) || 150,
-                  name: newSlotName || undefined,
-                  description: newSlotDescription || undefined,
-                  category: newSlotCategory || undefined,
-                  ageRestriction: newSlotAgeRestriction || undefined,
-                  maxCapacity: newSlotMaxCapacity ? parseInt(newSlotMaxCapacity, 10) : undefined,
-                }
-              : slot,
-          )
-          .sort((a, b) => a.startTime.localeCompare(b.startTime)),
-      );
-      setShowEditSlotModal(false);
-      setEditingSlot(null);
-      Alert.alert(
-        t('common.success'),
-        t('venues.slotUpdated') || 'Time slot updated',
-      );
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to update time slot. Please try again.';
+      Alert.alert(t('common.error'), errorMsg);
     } finally {
       setSavingSlot(false);
     }
@@ -1890,7 +1989,7 @@ const SpaceDetail: React.FC = () => {
                   {item.eventName}
                 </Text>
               )}
-              {(item.category || item.ageRestriction || item.maxCapacity) && (
+              {(item.category || item.ageRestriction) && (
                 <View style={{flexDirection: 'row', flexWrap: 'wrap', marginTop: 4, gap: 4}}>
                   {item.category ? (
                     <View style={{backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
@@ -1900,11 +1999,6 @@ const SpaceDetail: React.FC = () => {
                   {item.ageRestriction ? (
                     <View style={{backgroundColor: '#FF9800' + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
                       <Text style={{fontSize: 11, color: '#FF9800', fontWeight: '600'}}>{item.ageRestriction}</Text>
-                    </View>
-                  ) : null}
-                  {item.maxCapacity ? (
-                    <View style={{backgroundColor: '#2196F3' + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
-                      <Text style={{fontSize: 11, color: '#2196F3', fontWeight: '600'}}>Max {item.maxCapacity}</Text>
                     </View>
                   ) : null}
                 </View>
@@ -1967,28 +2061,32 @@ const SpaceDetail: React.FC = () => {
                             themedStyles.slotActionButtonText,
                             themedStyles.slotActionButtonTextSecondary,
                           ]}>
-                          {t('venues.editSlot') || 'Edit Slot'}
+                          {item.isCustom
+                            ? (t('venues.editSlot') || 'Edit Slot')
+                            : 'Customize'}
                         </Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          themedStyles.slotActionButton,
-                          themedStyles.slotActionButtonDanger,
-                        ]}
-                        onPress={() => handleDeleteSlot(item)}>
-                        <FontAwesomeIcon
-                          icon={faTrash}
-                          size={12}
-                          color={colors.error || '#F44336'}
-                        />
-                        <Text
+                      {item.isCustom && (
+                        <TouchableOpacity
                           style={[
-                            themedStyles.slotActionButtonText,
-                            themedStyles.slotActionButtonTextDanger,
-                          ]}>
-                          {t('common.delete') || 'Delete'}
-                        </Text>
-                      </TouchableOpacity>
+                            themedStyles.slotActionButton,
+                            themedStyles.slotActionButtonDanger,
+                          ]}
+                          onPress={() => handleDeleteSlot(item)}>
+                          <FontAwesomeIcon
+                            icon={faTrash}
+                            size={12}
+                            color={colors.error || '#F44336'}
+                          />
+                          <Text
+                            style={[
+                              themedStyles.slotActionButtonText,
+                              themedStyles.slotActionButtonTextDanger,
+                            ]}>
+                            {t('common.delete') || 'Delete'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </>
                   )}
                 </>
@@ -2119,27 +2217,60 @@ const SpaceDetail: React.FC = () => {
                 </View>
               )}
 
-              <Text style={themedStyles.inputLabel}>
-                {t('venues.eventName')}
-              </Text>
-              <TextInput
-                style={themedStyles.input}
-                placeholder={t('venues.eventNamePlaceholder')}
-                placeholderTextColor={colors.secondaryText}
-                value={bookingEventName}
-                onChangeText={setBookingEventName}
-              />
+              {selectedSlot?.isCustom && selectedSlot?.name ? (
+                <View style={{marginBottom: 16}}>
+                  <Text style={[themedStyles.inputLabel, {marginBottom: 4}]}>
+                    {selectedSlot.name}
+                  </Text>
+                  {selectedSlot.description ? (
+                    <Text style={{color: colors.secondaryText, fontSize: 14, marginBottom: 8}}>
+                      {selectedSlot.description}
+                    </Text>
+                  ) : null}
+                  {(selectedSlot.category || selectedSlot.ageRestriction) ? (
+                    <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+                      {selectedSlot.category ? (
+                        <View style={{backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
+                          <Text style={{fontSize: 12, color: colors.primary, fontWeight: '600'}}>
+                            {selectedSlot.category}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {selectedSlot.ageRestriction ? (
+                        <View style={{backgroundColor: '#FF9800' + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
+                          <Text style={{fontSize: 12, color: '#FF9800', fontWeight: '600'}}>
+                            {selectedSlot.ageRestriction}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
+              ) : (
+                <>
+                  <Text style={themedStyles.inputLabel}>
+                    {t('venues.eventName')}
+                  </Text>
+                  <TextInput
+                    style={themedStyles.input}
+                    placeholder={t('venues.eventNamePlaceholder')}
+                    placeholderTextColor={colors.secondaryText}
+                    value={bookingEventName}
+                    onChangeText={setBookingEventName}
+                  />
 
-              <Text style={themedStyles.inputLabel}>{t('venues.notes')}</Text>
-              <TextInput
-                style={[themedStyles.input, themedStyles.textArea]}
-                placeholder={t('venues.notesPlaceholder')}
-                placeholderTextColor={colors.secondaryText}
-                multiline
-                numberOfLines={3}
-                value={bookingNotes}
-                onChangeText={setBookingNotes}
-              />
+                  <Text style={themedStyles.inputLabel}>{t('venues.notes')}</Text>
+                  <TextInput
+                    style={[themedStyles.input, themedStyles.textArea]}
+                    placeholder={t('venues.notesPlaceholder')}
+                    placeholderTextColor={colors.secondaryText}
+                    multiline
+                    numberOfLines={3}
+                    value={bookingNotes}
+                    onChangeText={setBookingNotes}
+                  />
+                </>
+              )}
 
               {/* Recurring Booking Option - only show for new bookings */}
               {!isEditing && (
@@ -2526,39 +2657,91 @@ const SpaceDetail: React.FC = () => {
               onChangeText={setNewSlotName}
             />
 
-            <Text style={themedStyles.inputLabel}>
-              {'Category'}
-            </Text>
-            <TextInput
-              style={themedStyles.input}
-              placeholder="e.g. Hockey, Figure Skating, Open Skate"
-              placeholderTextColor={colors.secondaryText}
-              value={newSlotCategory}
-              onChangeText={setNewSlotCategory}
-            />
+            <View style={themedStyles.timePickerContainer}>
+              <Text style={themedStyles.inputLabel}>
+                {'Category'}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.pickerButton}
+                onPress={() => {
+                  setShowCategoryPicker(!showCategoryPicker);
+                  setShowAgeRestrictionPicker(false);
+                }}>
+                <Text style={newSlotCategory ? themedStyles.pickerButtonText : themedStyles.pickerPlaceholder}>
+                  {newSlotCategory || 'Select a category'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+              {showCategoryPicker && (
+                <ScrollView
+                  style={themedStyles.pickerOptionsContainer}
+                  nestedScrollEnabled>
+                  {CATEGORY_OPTIONS.map(option => (
+                    <TouchableOpacity
+                      key={`add-cat-${option}`}
+                      style={[
+                        themedStyles.pickerOption,
+                        option === newSlotCategory && themedStyles.pickerOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setNewSlotCategory(option === newSlotCategory ? '' : option);
+                        setShowCategoryPicker(false);
+                      }}>
+                      <Text style={themedStyles.pickerOptionText}>
+                        {option}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
 
-            <Text style={themedStyles.inputLabel}>
-              {'Age Restriction'}
-            </Text>
-            <TextInput
-              style={themedStyles.input}
-              placeholder="e.g. 18+, Youth Only, All Ages"
-              placeholderTextColor={colors.secondaryText}
-              value={newSlotAgeRestriction}
-              onChangeText={setNewSlotAgeRestriction}
-            />
-
-            <Text style={themedStyles.inputLabel}>
-              {'Max Capacity'}
-            </Text>
-            <TextInput
-              style={themedStyles.input}
-              placeholder="e.g. 30"
-              placeholderTextColor={colors.secondaryText}
-              value={newSlotMaxCapacity}
-              onChangeText={setNewSlotMaxCapacity}
-              keyboardType="numeric"
-            />
+            <View style={themedStyles.timePickerContainer}>
+              <Text style={themedStyles.inputLabel}>
+                {'Age Restriction'}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.pickerButton}
+                onPress={() => {
+                  setShowAgeRestrictionPicker(!showAgeRestrictionPicker);
+                  setShowCategoryPicker(false);
+                }}>
+                <Text style={newSlotAgeRestriction ? themedStyles.pickerButtonText : themedStyles.pickerPlaceholder}>
+                  {newSlotAgeRestriction || 'Select age restriction'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+              {showAgeRestrictionPicker && (
+                <ScrollView
+                  style={themedStyles.pickerOptionsContainer}
+                  nestedScrollEnabled>
+                  {AGE_RESTRICTION_OPTIONS.map(option => (
+                    <TouchableOpacity
+                      key={`add-age-${option}`}
+                      style={[
+                        themedStyles.pickerOption,
+                        option === newSlotAgeRestriction && themedStyles.pickerOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setNewSlotAgeRestriction(option === newSlotAgeRestriction ? '' : option);
+                        setShowAgeRestrictionPicker(false);
+                      }}>
+                      <Text style={themedStyles.pickerOptionText}>
+                        {option}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
 
             <Text style={themedStyles.inputLabel}>
               {'Description / Notes'}
@@ -2716,39 +2899,91 @@ const SpaceDetail: React.FC = () => {
               onChangeText={setNewSlotName}
             />
 
-            <Text style={themedStyles.inputLabel}>
-              {'Category'}
-            </Text>
-            <TextInput
-              style={themedStyles.input}
-              placeholder="e.g. Hockey, Figure Skating, Open Skate"
-              placeholderTextColor={colors.secondaryText}
-              value={newSlotCategory}
-              onChangeText={setNewSlotCategory}
-            />
+            <View style={themedStyles.timePickerContainer}>
+              <Text style={themedStyles.inputLabel}>
+                {'Category'}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.pickerButton}
+                onPress={() => {
+                  setShowCategoryPicker(!showCategoryPicker);
+                  setShowAgeRestrictionPicker(false);
+                }}>
+                <Text style={newSlotCategory ? themedStyles.pickerButtonText : themedStyles.pickerPlaceholder}>
+                  {newSlotCategory || 'Select a category'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+              {showCategoryPicker && (
+                <ScrollView
+                  style={themedStyles.pickerOptionsContainer}
+                  nestedScrollEnabled>
+                  {CATEGORY_OPTIONS.map(option => (
+                    <TouchableOpacity
+                      key={`edit-cat-${option}`}
+                      style={[
+                        themedStyles.pickerOption,
+                        option === newSlotCategory && themedStyles.pickerOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setNewSlotCategory(option === newSlotCategory ? '' : option);
+                        setShowCategoryPicker(false);
+                      }}>
+                      <Text style={themedStyles.pickerOptionText}>
+                        {option}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
 
-            <Text style={themedStyles.inputLabel}>
-              {'Age Restriction'}
-            </Text>
-            <TextInput
-              style={themedStyles.input}
-              placeholder="e.g. 18+, Youth Only, All Ages"
-              placeholderTextColor={colors.secondaryText}
-              value={newSlotAgeRestriction}
-              onChangeText={setNewSlotAgeRestriction}
-            />
-
-            <Text style={themedStyles.inputLabel}>
-              {'Max Capacity'}
-            </Text>
-            <TextInput
-              style={themedStyles.input}
-              placeholder="e.g. 30"
-              placeholderTextColor={colors.secondaryText}
-              value={newSlotMaxCapacity}
-              onChangeText={setNewSlotMaxCapacity}
-              keyboardType="numeric"
-            />
+            <View style={themedStyles.timePickerContainer}>
+              <Text style={themedStyles.inputLabel}>
+                {'Age Restriction'}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.pickerButton}
+                onPress={() => {
+                  setShowAgeRestrictionPicker(!showAgeRestrictionPicker);
+                  setShowCategoryPicker(false);
+                }}>
+                <Text style={newSlotAgeRestriction ? themedStyles.pickerButtonText : themedStyles.pickerPlaceholder}>
+                  {newSlotAgeRestriction || 'Select age restriction'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+              {showAgeRestrictionPicker && (
+                <ScrollView
+                  style={themedStyles.pickerOptionsContainer}
+                  nestedScrollEnabled>
+                  {AGE_RESTRICTION_OPTIONS.map(option => (
+                    <TouchableOpacity
+                      key={`edit-age-${option}`}
+                      style={[
+                        themedStyles.pickerOption,
+                        option === newSlotAgeRestriction && themedStyles.pickerOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setNewSlotAgeRestriction(option === newSlotAgeRestriction ? '' : option);
+                        setShowAgeRestrictionPicker(false);
+                      }}>
+                      <Text style={themedStyles.pickerOptionText}>
+                        {option}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
 
             <Text style={themedStyles.inputLabel}>
               {'Description / Notes'}
@@ -2773,6 +3008,14 @@ const SpaceDetail: React.FC = () => {
                   {t('venues.saveChanges') || 'Save Changes'}
                 </Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={themedStyles.resetButton}
+              onPress={handleResetSlotToDefault}>
+              <Text style={themedStyles.resetButtonText}>
+                {'Reset to Default'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity

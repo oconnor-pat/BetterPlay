@@ -53,7 +53,7 @@ function LandingPage() {
   if (!userContext) {
     throw new Error('LandingPage must be used within a UserProvider');
   }
-  const {userData, setUserData} = userContext;
+  const {setUserData} = userContext;
 
   // Theme
   const {colors} = useTheme();
@@ -442,12 +442,6 @@ function LandingPage() {
       setErrorMessage('Failed to create account. Please try again.');
       setSuccessMessage(null);
     }
-    setUserData({
-      ...userData,
-      username: registrationData.username,
-      email: registrationData.email,
-      _id: '',
-    });
   };
 
   const handleLogin = async () => {
@@ -891,6 +885,9 @@ function LandingPage() {
             ref={registerEmailInputRef}
             autoCapitalize="none"
             keyboardType="email-address"
+            autoComplete="email"
+            textContentType="emailAddress"
+            secureTextEntry={false}
             onFocus={() => setFocusedField('registerEmail')}
             onBlur={() => setFocusedField(null)}
             returnKeyType="next"
