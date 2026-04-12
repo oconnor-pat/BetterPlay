@@ -13,11 +13,11 @@ const LOCAL_API_URL_ANDROID_EMULATOR = 'http://10.0.2.2:8001';
 const LOCAL_API_URL_DEVICE = 'http://192.168.1.37:8001';
 
 // Toggle this to switch between production and local development
-const USE_LOCAL_API = true;
+const USE_LOCAL_API = false;
 
 // Set to true if testing on a physical device with local backend
 // Only applies to iOS — Android emulator always uses 10.0.2.2
-const IS_PHYSICAL_DEVICE = true;
+const IS_PHYSICAL_DEVICE = false;
 
 // Automatically select the correct API URL
 const getLocalApiUrl = (): string => {
