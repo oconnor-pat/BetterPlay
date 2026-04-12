@@ -54,6 +54,8 @@ export interface AppNotification {
     | 'event_leave'
     | 'event_watch_update'
     | 'event_spot_opened'
+    | 'event_spot_available'
+    | 'event_waitlist_join'
     | 'event_roster_change'
     | 'community_note'
     | 'general';
@@ -303,6 +305,8 @@ const Notifications: React.FC = () => {
       case 'event_leave':
       case 'event_watch_update':
       case 'event_spot_opened':
+      case 'event_spot_available':
+      case 'event_waitlist_join':
       case 'event_roster_change':
         if (notification.data?.eventId) {
           navigation.navigate('Events', {
@@ -362,7 +366,10 @@ const Notifications: React.FC = () => {
       case 'event_leave':
         return faUsers;
       case 'event_spot_opened':
+      case 'event_spot_available':
         return faEye;
+      case 'event_waitlist_join':
+        return faUsers;
       default:
         return faBell;
     }
@@ -385,6 +392,7 @@ const Notifications: React.FC = () => {
       case 'event_roster_change':
       case 'event_join':
       case 'event_leave':
+      case 'event_waitlist_join':
         return colors.primary;
       case 'event_like':
         return '#e74c3c';
@@ -392,6 +400,7 @@ const Notifications: React.FC = () => {
       case 'community_note':
         return '#00BCD4';
       case 'event_spot_opened':
+      case 'event_spot_available':
         return '#FF9800';
       default:
         return colors.text;

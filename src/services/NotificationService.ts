@@ -587,6 +587,8 @@ class NotificationService {
       case 'event_update':
       case 'event_watch_update':
       case 'event_spot_opened':
+      case 'event_spot_available':
+      case 'event_waitlist_join':
       case 'event_roster_change':
       case 'event_reminder':
       case 'event_invitation':

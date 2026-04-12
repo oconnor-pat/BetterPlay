@@ -25,6 +25,7 @@ export interface Event {
   isRecurring?: boolean;
   recurrenceGroupId?: string;
   recurrenceFrequency?: string;
+  waitlist?: Array<{userId: string; username: string; profilePicUrl?: string; joinedAt: string}>;
 }
 
 interface EventContextType {

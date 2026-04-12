@@ -171,6 +171,7 @@ interface Event {
   isRecurring?: boolean;
   recurrenceGroupId?: string;
   recurrenceFrequency?: RecurrenceFrequency;
+  waitlist?: Array<{userId: string; username: string; profilePicUrl?: string; joinedAt: string}>;
 }
 
 const getDefaultWatchPreferences = (): EventWatchPreferences => ({
@@ -3371,12 +3372,7 @@ const EventList: React.FC = () => {
     const isCommentsExpanded = expandedCommentsEventId === item._id;
     const isWatching = watchedEventIds.has(item._id);
     const isEventFull = item.rosterSpotsFilled >= item.totalSpots;
-    let watchButtonLabel = 'Watch Event';
-    if (isWatching) {
-      watchButtonLabel = 'Watching';
-    } else if (isEventFull) {
-      watchButtonLabel = 'Watch for Spots';
-    }
+    const watchButtonLabel = isWatching ? 'Watching' : 'Watch Event';
 
     return (
       <View style={[themedStyles.card, isPast && themedStyles.pastEventCard]}>
@@ -3453,6 +3449,9 @@ const EventList: React.FC = () => {
               <Text style={themedStyles.cardText}>
                 {item.rosterSpotsFilled} / {item.totalSpots}{' '}
                 {t('events.playersJoined')}
+                {isEventFull && item.waitlist && item.waitlist.length > 0
+                  ? ` · ${item.waitlist.length} on waitlist`
+                  : ''}
               </Text>
             </View>
           </View>
@@ -4820,6 +4819,14 @@ const EventList: React.FC = () => {
             )}
 
             <View style={themedStyles.watchModalFooter}>
+              <TouchableOpacity
+                style={themedStyles.watchSecondaryButton}
+                onPress={closeWatchModal}>
+                <Text style={themedStyles.watchSecondaryButtonText}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
               {watchedEventIds.has(watchTargetEvent?._id || '') && (
                 <TouchableOpacity
                   style={[

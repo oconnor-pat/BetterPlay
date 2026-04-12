@@ -260,6 +260,41 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
+const ReservationCountdown: React.FC<{expiresAt: string; colors: any}> = ({
+  expiresAt,
+  colors,
+}) => {
+  const [remaining, setRemaining] = useState('');
+
+  useEffect(() => {
+    const update = () => {
+      const diff = new Date(expiresAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setRemaining('Expired');
+        return;
+      }
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setRemaining(`${mins}m ${secs.toString().padStart(2, '0')}s remaining`);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  return (
+    <Text
+      style={{
+        color: remaining === 'Expired' ? colors.error : colors.secondaryText,
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 6,
+      }}>
+      ⏱ {remaining}
+    </Text>
+  );
+};
+
 const EventRoster: React.FC = () => {
   const route = useRoute<EventRosterRouteProp>();
   const navigation = useNavigation<any>();
@@ -357,6 +392,20 @@ const EventRoster: React.FC = () => {
     {_id: string; username: string; profilePicUrl?: string}[]
   >([]);
 
+  // Waitlist state
+  const [waitlist, setWaitlist] = useState<
+    {userId: string; username: string; profilePicUrl?: string; joinedAt: string}[]
+  >([]);
+  const [joiningWaitlist, setJoiningWaitlist] = useState(false);
+
+  // Spot reservation state
+  const [spotReservation, setSpotReservation] = useState<{
+    userId: string;
+    username: string;
+    profilePicUrl?: string;
+    expiresAt: string;
+  } | null>(null);
+
   useEffect(() => {
     if (changedFieldsParam) {
       const fields = changedFieldsParam.split(',').map(f => f.trim());
@@ -412,6 +461,28 @@ const EventRoster: React.FC = () => {
   const isUserOnRoster = useMemo(() => {
     return roster.some(player => player.username === userData?.username);
   }, [roster, userData?.username]);
+
+  const isUserOnWaitlist = useMemo(() => {
+    return waitlist.some(w => w.userId === userData?._id);
+  }, [waitlist, userData?._id]);
+
+  const userWaitlistPosition = useMemo(() => {
+    const idx = waitlist.findIndex(w => w.userId === userData?._id);
+    return idx >= 0 ? idx + 1 : 0;
+  }, [waitlist, userData?._id]);
+
+  const isEventFull = useMemo(() => {
+    return roster.length >= totalSpots;
+  }, [roster.length, totalSpots]);
+
+  const hasActiveReservation = useMemo(() => {
+    if (!spotReservation) return false;
+    return new Date(spotReservation.expiresAt) > new Date();
+  }, [spotReservation]);
+
+  const isMyReservation = useMemo(() => {
+    return hasActiveReservation && spotReservation?.userId === userData?._id;
+  }, [hasActiveReservation, spotReservation, userData?._id]);
 
   // Calculate roster stats
   const rosterStats = useMemo(() => {
@@ -1350,6 +1421,8 @@ const EventRoster: React.FC = () => {
       setEventPrivacy(response.data.privacy || 'public');
       setEventCreatedBy(response.data.createdBy || '');
       setInvitedUsers(response.data.invitedUsers || []);
+      setWaitlist(response.data.waitlist || []);
+      setSpotReservation(response.data.spotReservation || null);
 
       // Fetch invited user details if invite-only
       if (
@@ -1392,11 +1465,26 @@ const EventRoster: React.FC = () => {
 
     const unsubRoster = socketSubscribe(
       'roster:updated',
-      (data: {eventId: string; roster: any[]; rosterSpotsFilled: number}) => {
+      (data: {eventId: string; roster: any[]; rosterSpotsFilled: number; waitlist?: any[]; spotReservation?: any}) => {
         if (data.eventId === eventId) {
           setRoster(data.roster);
-          setTotalSpots(prev => prev); // keep current
+          setTotalSpots(prev => prev);
           updateRosterSpots(eventId, data.rosterSpotsFilled);
+          if (data.waitlist !== undefined) {
+            setWaitlist(data.waitlist);
+          }
+          if (data.spotReservation !== undefined) {
+            setSpotReservation(data.spotReservation);
+          }
+        }
+      },
+    );
+
+    const unsubWaitlist = socketSubscribe(
+      'waitlist:updated',
+      (data: {eventId: string; waitlist: any[]}) => {
+        if (data.eventId === eventId) {
+          setWaitlist(data.waitlist);
         }
       },
     );
@@ -1428,6 +1516,7 @@ const EventRoster: React.FC = () => {
     return () => {
       leaveEvent(eventId);
       unsubRoster();
+      unsubWaitlist();
       unsubEvent();
       subscription.remove();
     };
@@ -1475,6 +1564,12 @@ const EventRoster: React.FC = () => {
     } catch (error: any) {
       if (error?.response?.status === 409) {
         setErrorMessage('You are already on this roster.');
+      } else if (error?.response?.data?.reserved) {
+        setErrorMessage('The last spot is temporarily reserved for another player.');
+        fetchEventData();
+      } else if (error?.response?.data?.full) {
+        setErrorMessage('This event is now full. You can join the waitlist instead.');
+        fetchEventData();
       } else {
         setErrorMessage('Failed to join event. Please try again.');
       }
@@ -1636,6 +1731,48 @@ const EventRoster: React.FC = () => {
     },
     [userData?.username, t, eventId, updateRosterSpots, roster],
   );
+
+  const handleJoinWaitlist = useCallback(async () => {
+    setJoiningWaitlist(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.post(
+        `${API_BASE_URL}/events/${eventId}/waitlist`,
+        {},
+        {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+      );
+      if (response.data.waitlist) {
+        setWaitlist(response.data.waitlist);
+      }
+      Alert.alert(
+        t('common.success') || 'Success',
+        `You're #${response.data.position} on the waitlist. We'll notify you when a spot opens!`,
+      );
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.message || 'Failed to join waitlist';
+      Alert.alert(t('common.error') || 'Error', msg);
+    } finally {
+      setJoiningWaitlist(false);
+    }
+  }, [eventId, t]);
+
+  const handleLeaveWaitlist = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.delete(
+        `${API_BASE_URL}/events/${eventId}/waitlist`,
+        {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+      );
+      if (response.data.waitlist) {
+        setWaitlist(response.data.waitlist);
+      }
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.message || 'Failed to leave waitlist';
+      Alert.alert(t('common.error') || 'Error', msg);
+    }
+  }, [eventId, t]);
 
   // Open edit modal for current user
   const handleEdit = useCallback(() => {
@@ -1925,6 +2062,9 @@ const EventRoster: React.FC = () => {
                 {spotsRemaining > 0
                   ? t('roster.spotsRemaining', {count: spotsRemaining})
                   : t('roster.rosterFull')}
+                {isEventFull && waitlist.length > 0
+                  ? ` · ${waitlist.length} on waitlist`
+                  : ''}
               </Text>
             </Animated.View>
           </View>
@@ -2137,11 +2277,12 @@ const EventRoster: React.FC = () => {
                       <TouchableOpacity
                         style={[
                           themedStyles.saveButton,
-                          (spotsRemaining === 0 || savingRoster) &&
+                          (spotsRemaining === 0 && !isMyReservation || savingRoster) &&
                             themedStyles.saveButtonDisabled,
+                          isMyReservation && {backgroundColor: colors.primary},
                         ]}
                         onPress={handleSave}
-                        disabled={spotsRemaining === 0 || savingRoster}>
+                        disabled={(spotsRemaining === 0 && !isMyReservation) || savingRoster}>
                         {savingRoster ? (
                           <ActivityIndicator
                             size="small"
@@ -2157,15 +2298,237 @@ const EventRoster: React.FC = () => {
                         <Text style={themedStyles.buttonText}>
                           {savingRoster
                             ? t('common.loading') || 'Joining...'
+                            : isMyReservation
+                            ? 'Claim Your Spot!'
                             : spotsRemaining === 0
                             ? t('roster.rosterFull')
                             : t('roster.joinEvent')}
                         </Text>
                       </TouchableOpacity>
+
+                      {isEventFull && !isUserOnRoster && !isMyReservation && (
+                        <TouchableOpacity
+                          style={[
+                            themedStyles.saveButton,
+                            {marginTop: 10},
+                            isUserOnWaitlist && {backgroundColor: colors.error},
+                          ]}
+                          onPress={
+                            isUserOnWaitlist
+                              ? handleLeaveWaitlist
+                              : handleJoinWaitlist
+                          }
+                          disabled={joiningWaitlist}>
+                          {joiningWaitlist ? (
+                            <ActivityIndicator
+                              size="small"
+                              color={colors.buttonText}
+                            />
+                          ) : null}
+                          <Text style={themedStyles.buttonText}>
+                            {joiningWaitlist
+                              ? 'Joining...'
+                              : isUserOnWaitlist
+                              ? `Leave Waitlist (#${userWaitlistPosition})`
+                              : 'Join Waitlist'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </>
                   )}
                 </View>
               )}
+            </View>
+          )}
+
+          {/* Spot Reservation Banner */}
+          {hasActiveReservation && spotReservation && (
+            <View
+              style={{
+                backgroundColor: isMyReservation
+                  ? colors.primary + '20'
+                  : '#FF9800' + '20',
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 16,
+                borderWidth: 1,
+                borderColor: isMyReservation
+                  ? colors.primary + '40'
+                  : '#FF9800' + '40',
+              }}>
+              {isMyReservation ? (
+                <>
+                  <Text
+                    style={{
+                      color: colors.primary,
+                      fontSize: 15,
+                      fontWeight: '700',
+                      marginBottom: 4,
+                    }}>
+                    A spot is reserved for you!
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.secondaryText,
+                      fontSize: 13,
+                    }}>
+                    Join the roster before your reservation expires. Use the
+                    "Join This Event" section above to claim your spot.
+                  </Text>
+                  <ReservationCountdown expiresAt={spotReservation.expiresAt} colors={colors} />
+                </>
+              ) : (
+                <>
+                  <Text
+                    style={{
+                      color: '#FF9800',
+                      fontSize: 14,
+                      fontWeight: '600',
+                    }}>
+                    A spot is being held for {spotReservation.username}
+                  </Text>
+                  <ReservationCountdown expiresAt={spotReservation.expiresAt} colors={colors} />
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Waitlist Section - visible when there are waitlisted users */}
+          {waitlist.length > 0 && (
+            <View style={[themedStyles.statsSection, {marginBottom: 16}]}>
+              <Text style={themedStyles.statsSectionTitle}>
+                ⏳ Waitlist ({waitlist.length})
+              </Text>
+              {waitlist.map((entry, index) => {
+                const isMe = entry.userId === userData?._id;
+                const displayPic = isMe
+                  ? userData?.profilePicUrl || entry.profilePicUrl
+                  : entry.profilePicUrl;
+
+                return (
+                  <TouchableOpacity
+                    key={entry.userId}
+                    activeOpacity={isMe ? 1.0 : 0.7}
+                    onPress={() => {
+                      if (!isMe && entry.userId) {
+                        navigation.navigate('PublicProfile', {
+                          userId: entry.userId,
+                          username: entry.username,
+                          profilePicUrl: displayPic,
+                        });
+                      }
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 10,
+                      paddingHorizontal: 16,
+                      borderBottomWidth: index < waitlist.length - 1 ? 1 : 0,
+                      borderBottomColor: colors.border,
+                    }}>
+                    {/* Position badge */}
+                    <View
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        backgroundColor: colors.primary + '15',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginRight: 8,
+                      }}>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: '700',
+                          color: colors.primary,
+                        }}>
+                        {index + 1}
+                      </Text>
+                    </View>
+
+                    {/* Avatar — smaller and dashed-border style */}
+                    {displayPic ? (
+                      <Image
+                        source={{uri: displayPic}}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          marginRight: 12,
+                          borderWidth: 2,
+                          borderColor: colors.primary + '50',
+                          opacity: 0.85,
+                        }}
+                      />
+                    ) : (
+                      <View
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: colors.primary + '15',
+                          borderWidth: 2,
+                          borderColor: colors.primary + '40',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginRight: 12,
+                          opacity: 0.85,
+                        }}>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: colors.primary,
+                          }}>
+                          {getInitials(entry.username)}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Username */}
+                    <Text
+                      style={{
+                        color: colors.text,
+                        fontSize: 14,
+                        fontWeight: '500',
+                        flex: 1,
+                        opacity: 0.85,
+                      }}>
+                      {entry.username}
+                    </Text>
+
+                    {/* "You" badge or "Waiting" label */}
+                    {isMe ? (
+                      <View
+                        style={{
+                          backgroundColor: colors.primary + '20',
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 10,
+                        }}>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: colors.primary,
+                            fontWeight: '600',
+                          }}>
+                          You
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: colors.secondaryText,
+                          fontStyle: 'italic',
+                        }}>
+                        Waiting
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
