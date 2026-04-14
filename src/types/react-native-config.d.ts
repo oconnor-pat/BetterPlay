@@ -1,6 +1,7 @@
 declare module 'react-native-config' {
   export interface NativeConfig {
     GOOGLE_PLACES_API_KEY?: string;
+    SENTRY_DSN?: string;
   }
 
   export const Config: NativeConfig;

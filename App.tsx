@@ -8,6 +8,8 @@ import {
 } from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {LogBox} from 'react-native';
+import * as Sentry from '@sentry/react-native';
+import Config from 'react-native-config';
 import LandingPage from './src/components/Landingpage/LandingPage';
 import BottomNavigator from './src/components/BottomNavigator/BottomNavigator';
 import Settings from './src/components/Settings/Settings';
@@ -30,6 +32,13 @@ import notificationService from './src/services/NotificationService';
 import locationService from './src/services/LocationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from './src/config/api';
+
+Sentry.init({
+  dsn: Config.SENTRY_DSN,
+  enableAutoSessionTracking: true,
+  tracesSampleRate: 0.2,
+  enabled: !__DEV__,
+});
 
 // Suppress harmless reanimated warning on logout
 LogBox.ignoreLogs(['Sending `onAnimatedValueUpdate` with no listeners']);
@@ -353,29 +362,29 @@ const AppContent = () => {
       <UserContext.Provider
         value={{userData, setUserData, isAdmin, checkAdminStatus}}>
         <SocketProvider>
-        <NotificationProvider>
-          <EventProvider>
-            <NavigationContainer
-              ref={navigationRef}
-              theme={darkMode ? DarkTheme : DefaultTheme}
-              linking={linking}
-              onReady={() => {
-                notificationService.setNavigationCallback(
-                  (screen, params) => {
-                    if (navigationRef.isReady()) {
-                      navigationRef.navigate(screen as never, params as never);
-                    }
-                  },
-                );
-              }}
-              fallback={
-                <View style={[styles.centeredView, backgroundStyle]}>
-                  <ActivityIndicator
-                    size="large"
-                    color={colors?.primary || '#007AFF'}
-                  />
-                </View>
-              }>
+          <NotificationProvider>
+            <EventProvider>
+              <NavigationContainer
+                ref={navigationRef}
+                theme={darkMode ? DarkTheme : DefaultTheme}
+                linking={linking}
+                onReady={() => {
+                  notificationService.setNavigationCallback(
+                    (screen, params) => {
+                      if (navigationRef.isReady()) {
+                        (navigationRef.navigate as Function)(screen, params);
+                      }
+                    },
+                  );
+                }}
+                fallback={
+                  <View style={[styles.centeredView, backgroundStyle]}>
+                    <ActivityIndicator
+                      size="large"
+                      color={colors?.primary || '#007AFF'}
+                    />
+                  </View>
+                }>
                 <Stack.Navigator
                   initialRouteName={
                     userData ? 'BottomNavigator' : 'LandingPage'
@@ -433,9 +442,9 @@ const AppContent = () => {
                     options={{headerShown: false}}
                   />
                 </Stack.Navigator>
-            </NavigationContainer>
-          </EventProvider>
-        </NotificationProvider>
+              </NavigationContainer>
+            </EventProvider>
+          </NotificationProvider>
         </SocketProvider>
       </UserContext.Provider>
     </>
@@ -456,10 +465,12 @@ const styles = StyleSheet.create({
   },
 });
 
-export default function App() {
+function App() {
   return (
     <ThemeProvider>
       <AppContent />
     </ThemeProvider>
   );
 }
+
+export default Sentry.wrap(App);

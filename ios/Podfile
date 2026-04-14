@@ -23,6 +23,10 @@ target 'BetterPlay' do
   pod 'FirebaseCoreInternal', :modular_headers => true
   pod 'GoogleUtilities', :modular_headers => true
 
+  # Sentry for crash reporting
+  pod 'Sentry', :modular_headers => true
+  pod 'SentryPrivate', :modular_headers => true
+
   use_react_native!(
     :path => config[:reactNativePath],
     :app_path => "#{Pod::Config.instance.installation_root}/.."

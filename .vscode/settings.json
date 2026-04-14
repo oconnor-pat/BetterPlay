@@ -1,18 +1,5 @@
 {
   "postman.settings.dotenv-detection-notification-visibility": false,
   "codium.codeCompletion.enable": true,
-  "cSpell.ignorePaths": [
-    "**/*.pbxproj",
-    "node_modules",
-    "ios/Pods/**",
-    "ios/build/**",
-    "android/build/**",
-    "android/app/build/**",
-    "vendor/**",
-    "**/*.p8",
-    "**/*.plist",
-    "**/*.xcworkspacedata",
-    "**/*.xcscheme"
-  ],
-  "cSpell.words": ["getifaddr", "notif", "Notifs", "selectbox"]
+  "cSpell.enabled": false
 }

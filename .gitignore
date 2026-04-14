@@ -76,3 +76,6 @@ android/app/google-services.json
 # testing
 /coverage
 .qodo
+
+# Cursor
+.cursor/
