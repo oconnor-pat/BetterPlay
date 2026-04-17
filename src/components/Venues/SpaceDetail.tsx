@@ -45,6 +45,7 @@ import UserContext, {UserContextType} from '../UserContext';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
+import analyticsService from '../../services/AnalyticsService';
 import {useTranslation} from 'react-i18next';
 import {VenueStackParamList} from './VenueList';
 
@@ -1548,6 +1549,7 @@ const SpaceDetail: React.FC = () => {
         );
 
         Alert.alert(t('common.success'), t('venues.bookingConfirmed'));
+        analyticsService.trackBookVenue(venueId, spaceId).catch(() => {});
       }
 
       // Refresh time slots to get updated data from server

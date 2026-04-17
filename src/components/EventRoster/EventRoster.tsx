@@ -11,7 +11,6 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   Alert,
   Modal,
@@ -35,6 +34,7 @@ import axios from 'axios';
 import {useEventContext} from '../../Context/EventContext';
 import UserContext, {UserContextType} from '../UserContext';
 import {API_BASE_URL} from '../../config/api';
+import analyticsService from '../../services/AnalyticsService';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {useTranslation} from 'react-i18next';
 import {RosterListSkeleton} from '../Skeleton';
@@ -394,7 +394,12 @@ const EventRoster: React.FC = () => {
 
   // Waitlist state
   const [waitlist, setWaitlist] = useState<
-    {userId: string; username: string; profilePicUrl?: string; joinedAt: string}[]
+    {
+      userId: string;
+      username: string;
+      profilePicUrl?: string;
+      joinedAt: string;
+    }[]
   >([]);
   const [joiningWaitlist, setJoiningWaitlist] = useState(false);
 
@@ -447,9 +452,13 @@ const EventRoster: React.FC = () => {
   // Check if user can join this event
   const canJoinEvent = useMemo(() => {
     // Public events: anyone can join
-    if (eventPrivacy === 'public') return true;
+    if (eventPrivacy === 'public') {
+      return true;
+    }
     // Private events: anyone can join (they just can't see it in the list)
-    if (eventPrivacy === 'private') return true;
+    if (eventPrivacy === 'private') {
+      return true;
+    }
     // Invite-only: only invited users or the creator can join
     if (eventPrivacy === 'invite-only') {
       return isEventCreator || isUserInvited;
@@ -476,7 +485,9 @@ const EventRoster: React.FC = () => {
   }, [roster.length, totalSpots]);
 
   const hasActiveReservation = useMemo(() => {
-    if (!spotReservation) return false;
+    if (!spotReservation) {
+      return false;
+    }
     return new Date(spotReservation.expiresAt) > new Date();
   }, [spotReservation]);
 
@@ -545,7 +556,7 @@ const EventRoster: React.FC = () => {
       const expected = scaledPositions ? scaledPositions[pos] || 0 : 0;
       return {position: pos, filled, expected};
     });
-  }, [eventType, roster, activeTeamTab, teamColors]);
+  }, [eventType, roster, activeTeamTab, teamColors, scaledPositions]);
 
   const playersGroupedByPosition = useMemo(() => {
     const groups: Record<string, Player[]> = {};
@@ -1465,7 +1476,13 @@ const EventRoster: React.FC = () => {
 
     const unsubRoster = socketSubscribe(
       'roster:updated',
-      (data: {eventId: string; roster: any[]; rosterSpotsFilled: number; waitlist?: any[]; spotReservation?: any}) => {
+      (data: {
+        eventId: string;
+        roster: any[];
+        rosterSpotsFilled: number;
+        waitlist?: any[];
+        spotReservation?: any;
+      }) => {
         if (data.eventId === eventId) {
           setRoster(data.roster);
           setTotalSpots(prev => prev);
@@ -1494,14 +1511,30 @@ const EventRoster: React.FC = () => {
       (data: {event: any}) => {
         if (data.event && data.event._id === eventId) {
           const ev = data.event;
-          if (ev.name) {setEventName(ev.name);}
-          if (ev.eventType) {setEventType(ev.eventType);}
-          if (ev.date) {setDate(ev.date);}
-          if (ev.time) {setTime(ev.time);}
-          if (ev.location) {setLocation(ev.location);}
-          if (ev.totalSpots) {setTotalSpots(ev.totalSpots);}
-          if (ev.roster) {setRoster(ev.roster);}
-          if (ev.jerseyColors) {setEventJerseyColors(ev.jerseyColors);}
+          if (ev.name) {
+            setEventName(ev.name);
+          }
+          if (ev.eventType) {
+            setEventType(ev.eventType);
+          }
+          if (ev.date) {
+            setDate(ev.date);
+          }
+          if (ev.time) {
+            setTime(ev.time);
+          }
+          if (ev.location) {
+            setLocation(ev.location);
+          }
+          if (ev.totalSpots) {
+            setTotalSpots(ev.totalSpots);
+          }
+          if (ev.roster) {
+            setRoster(ev.roster);
+          }
+          if (ev.jerseyColors) {
+            setEventJerseyColors(ev.jerseyColors);
+          }
         }
       },
     );
@@ -1520,18 +1553,28 @@ const EventRoster: React.FC = () => {
       unsubEvent();
       subscription.remove();
     };
-  }, [eventId, joinEvent, leaveEvent, socketSubscribe, fetchEventData, updateRosterSpots]);
+  }, [
+    eventId,
+    joinEvent,
+    leaveEvent,
+    socketSubscribe,
+    fetchEventData,
+    updateRosterSpots,
+  ]);
 
   // Persist roster to backend
-  const persistRoster = async (updatedRoster: Player[]) => {
-    try {
-      await axios.put(`${API_BASE_URL}/events/${eventId}/roster`, {
-        roster: updatedRoster,
-      });
-    } catch (error) {
-      console.error('Error persisting roster:', error);
-    }
-  };
+  const persistRoster = useCallback(
+    async (updatedRoster: Player[]) => {
+      try {
+        await axios.put(`${API_BASE_URL}/events/${eventId}/roster`, {
+          roster: updatedRoster,
+        });
+      } catch (error) {
+        console.error('Error persisting roster:', error);
+      }
+    },
+    [eventId],
+  );
 
   // Add player via dedicated endpoint (triggers backend notifications)
   const handleSave = async () => {
@@ -1565,10 +1608,14 @@ const EventRoster: React.FC = () => {
       if (error?.response?.status === 409) {
         setErrorMessage('You are already on this roster.');
       } else if (error?.response?.data?.reserved) {
-        setErrorMessage('The last spot is temporarily reserved for another player.');
+        setErrorMessage(
+          'The last spot is temporarily reserved for another player.',
+        );
         fetchEventData();
       } else if (error?.response?.data?.full) {
-        setErrorMessage('This event is now full. You can join the waitlist instead.');
+        setErrorMessage(
+          'This event is now full. You can join the waitlist instead.',
+        );
         fetchEventData();
       } else {
         setErrorMessage('Failed to join event. Please try again.');
@@ -1580,6 +1627,7 @@ const EventRoster: React.FC = () => {
     const updatedRoster = [...roster, newPlayer];
     setRoster(updatedRoster);
     updateRosterSpots(eventId, updatedRoster.length);
+    analyticsService.trackJoinEvent(eventId, eventName).catch(() => {});
 
     if (date && time) {
       notificationService
@@ -1749,8 +1797,7 @@ const EventRoster: React.FC = () => {
         `You're #${response.data.position} on the waitlist. We'll notify you when a spot opens!`,
       );
     } catch (error: any) {
-      const msg =
-        error?.response?.data?.message || 'Failed to join waitlist';
+      const msg = error?.response?.data?.message || 'Failed to join waitlist';
       Alert.alert(t('common.error') || 'Error', msg);
     } finally {
       setJoiningWaitlist(false);
@@ -1768,8 +1815,7 @@ const EventRoster: React.FC = () => {
         setWaitlist(response.data.waitlist);
       }
     } catch (error: any) {
-      const msg =
-        error?.response?.data?.message || 'Failed to leave waitlist';
+      const msg = error?.response?.data?.message || 'Failed to leave waitlist';
       Alert.alert(t('common.error') || 'Error', msg);
     }
   }, [eventId, t]);
@@ -1812,9 +1858,17 @@ const EventRoster: React.FC = () => {
     userData?.username,
     t,
     roster,
+    eventType,
+    persistRoster,
   ]);
 
-  const renderPlayerCard = ({item, index}: {item: Player; index: number}) => {
+  const renderPlayerCard = ({
+    item,
+    index: _index,
+  }: {
+    item: Player;
+    index: number;
+  }) => {
     const isSelf = item.username === userData?.username;
     const jerseyColorHex = jerseyColors[item.jerseyColor] || jerseyColors.Other;
     const isLight = isLightColor(item.jerseyColor);
@@ -2277,12 +2331,16 @@ const EventRoster: React.FC = () => {
                       <TouchableOpacity
                         style={[
                           themedStyles.saveButton,
-                          (spotsRemaining === 0 && !isMyReservation || savingRoster) &&
+                          ((spotsRemaining === 0 && !isMyReservation) ||
+                            savingRoster) &&
                             themedStyles.saveButtonDisabled,
                           isMyReservation && {backgroundColor: colors.primary},
                         ]}
                         onPress={handleSave}
-                        disabled={(spotsRemaining === 0 && !isMyReservation) || savingRoster}>
+                        disabled={
+                          (spotsRemaining === 0 && !isMyReservation) ||
+                          savingRoster
+                        }>
                         {savingRoster ? (
                           <ActivityIndicator
                             size="small"
@@ -2375,7 +2433,10 @@ const EventRoster: React.FC = () => {
                     Join the roster before your reservation expires. Use the
                     "Join This Event" section above to claim your spot.
                   </Text>
-                  <ReservationCountdown expiresAt={spotReservation.expiresAt} colors={colors} />
+                  <ReservationCountdown
+                    expiresAt={spotReservation.expiresAt}
+                    colors={colors}
+                  />
                 </>
               ) : (
                 <>
@@ -2387,7 +2448,10 @@ const EventRoster: React.FC = () => {
                     }}>
                     A spot is being held for {spotReservation.username}
                   </Text>
-                  <ReservationCountdown expiresAt={spotReservation.expiresAt} colors={colors} />
+                  <ReservationCountdown
+                    expiresAt={spotReservation.expiresAt}
+                    colors={colors}
+                  />
                 </>
               )}
             </View>
@@ -2823,8 +2887,8 @@ const EventRoster: React.FC = () => {
                         filter === 'all'
                           ? 'All'
                           : filter === 'paid'
-                          ? `Paid`
-                          : `Unpaid`;
+                          ? 'Paid'
+                          : 'Unpaid';
                       return (
                         <TouchableOpacity
                           key={filter}

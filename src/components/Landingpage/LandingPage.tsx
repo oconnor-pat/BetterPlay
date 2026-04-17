@@ -17,6 +17,7 @@ import UserContext from '../UserContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from '../../config/api';
 import notificationService from '../../services/NotificationService';
+import analyticsService from '../../services/AnalyticsService';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -419,6 +420,7 @@ function LandingPage() {
         setSuccessMessage('Account created successfully!');
         setErrorMessage(null);
         setUserData(responseData.user);
+        analyticsService.trackSignUp().catch(() => {});
         navigation.navigate('BottomNavigator', {
           screen: 'Profile',
           params: {
@@ -457,6 +459,7 @@ function LandingPage() {
       if (responseData.success) {
         setFailedAttempts(0); // Reset on successful login
         setUserData(responseData.user);
+        analyticsService.trackLogin().catch(() => {});
         if (!responseData.token) {
           console.error('No token in response', responseData);
           return;

@@ -26,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
+import analyticsService from '../../services/AnalyticsService';
 import {useEventContext, Event} from '../../Context/EventContext';
 
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -852,6 +853,7 @@ const Profile: React.FC = () => {
       const imageUrl = lambdaResponse.data.url;
       setSelectedImage(imageUrl);
       await updateUserProfilePic(imageUrl);
+      analyticsService.trackUpdateProfilePhoto().catch(() => {});
     } catch (error: any) {
       console.error('Error uploading image to Lambda:', error);
       if (error?.response?.status === 413) {

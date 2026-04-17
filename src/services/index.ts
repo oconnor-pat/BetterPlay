@@ -14,3 +14,5 @@ export {default as eventWatchService} from './EventWatchService';
 export * from './EventWatchService';
 
 export * from './MapLauncher';
+
+export {default as analyticsService} from './AnalyticsService';
