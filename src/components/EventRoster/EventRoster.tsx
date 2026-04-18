@@ -385,11 +385,11 @@ const EventRoster: React.FC = () => {
   const [inviteExpanded, setInviteExpanded] = useState(false);
   const [inviteSearchQuery, setInviteSearchQuery] = useState('');
   const [inviteSearchResults, setInviteSearchResults] = useState<
-    {_id: string; username: string; profilePicUrl?: string}[]
+    {_id: string; username: string; name?: string; profilePicUrl?: string}[]
   >([]);
   const [loadingInviteSearch, setLoadingInviteSearch] = useState(false);
   const [invitedUserDetails, setInvitedUserDetails] = useState<
-    {_id: string; username: string; profilePicUrl?: string}[]
+    {_id: string; username: string; name?: string; profilePicUrl?: string}[]
   >([]);
 
   // Waitlist state
@@ -585,114 +585,130 @@ const EventRoster: React.FC = () => {
           backgroundColor: colors.background,
         },
         scrollContent: {
-          padding: 16,
+          paddingBottom: 32,
+        },
+        // Section building blocks
+        section: {
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        sectionLabel: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.6,
+          marginBottom: 10,
         },
         // Event Header
         eventHeader: {
           flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 16,
+          alignItems: 'flex-start',
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 12,
+          gap: 10,
         },
         eventEmoji: {
-          fontSize: 32,
-          marginRight: 10,
+          fontSize: 28,
+          lineHeight: 32,
         },
         eventName: {
-          fontSize: 24,
-          fontWeight: 'bold',
+          fontSize: 22,
+          fontWeight: '700',
           color: colors.text,
           flex: 1,
           flexWrap: 'wrap',
+          letterSpacing: -0.3,
+          lineHeight: 28,
         },
-        // Event Card
+        // Event Card (now flat section)
         eventCard: {
-          backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 20,
-          marginBottom: 16,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          elevation: 3,
+          paddingHorizontal: 16,
+          paddingTop: 4,
+          paddingBottom: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         eventTypeRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 16,
+          marginBottom: 14,
         },
         eventTypeBadge: {
-          backgroundColor: colors.primary + '20',
-          paddingHorizontal: 12,
-          paddingVertical: 6,
-          borderRadius: 20,
+          backgroundColor: colors.primary + '15',
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 12,
         },
         eventTypeText: {
           color: colors.primary,
-          fontSize: 14,
-          fontWeight: '600',
+          fontSize: 12,
+          fontWeight: '700',
+          letterSpacing: 0.3,
         },
         eventDetailRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 8,
+          marginBottom: 6,
         },
         eventDetailIcon: {
-          fontSize: 16,
+          fontSize: 14,
           marginRight: 10,
-          width: 24,
+          width: 20,
+          textAlign: 'center' as const,
         },
         eventDetailText: {
           color: colors.text,
-          fontSize: 15,
+          fontSize: 14,
           flex: 1,
         },
-        // Progress Bar
+        // Progress Bar (lives inside its own flat section)
         progressSection: {
-          marginTop: 16,
-          paddingTop: 16,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
+          marginTop: 12,
         },
         progressHeader: {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 10,
+          marginBottom: 8,
         },
         progressLabel: {
-          fontSize: 14,
-          color: colors.text,
-          fontWeight: '500',
+          fontSize: 13,
+          color: colors.secondaryText,
+          fontWeight: '600',
         },
         progressCount: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.primary,
           fontWeight: '700',
         },
         progressBarBg: {
-          height: 10,
+          height: 6,
           backgroundColor: colors.border,
-          borderRadius: 5,
+          borderRadius: 3,
           overflow: 'hidden',
         },
         progressBarFill: {
           height: '100%',
           backgroundColor: colors.primary,
-          borderRadius: 5,
+          borderRadius: 3,
         },
-        // Stats Section
+        // Stats Section (flat)
         statsSection: {
-          backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 16,
-          marginBottom: 16,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         statsSectionTitle: {
-          fontSize: 16,
-          fontWeight: '600',
-          color: colors.text,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.6,
           marginBottom: 12,
         },
         statsRow: {
@@ -704,14 +720,14 @@ const EventRoster: React.FC = () => {
           flex: 1,
         },
         statValue: {
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: '700',
           color: colors.primary,
         },
         statLabel: {
           fontSize: 12,
-          color: colors.placeholder,
-          marginTop: 4,
+          color: colors.secondaryText,
+          marginTop: 2,
         },
         // Team Breakdown
         teamBreakdown: {
@@ -739,34 +755,33 @@ const EventRoster: React.FC = () => {
           marginLeft: 6,
           color: colors.text,
         },
-        // Add Player Section
+        // Add Player Section (flat, collapsible)
         addPlayerSection: {
-          backgroundColor: colors.card,
-          borderRadius: 16,
-          marginBottom: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
           overflow: 'hidden',
         },
         addPlayerHeader: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: 16,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
         },
         addPlayerHeaderLeft: {
           flexDirection: 'row',
           alignItems: 'center',
         },
         addPlayerTitle: {
-          fontSize: 16,
+          fontSize: 15,
           fontWeight: '600',
           color: colors.text,
           marginLeft: 10,
         },
         addPlayerContent: {
-          padding: 16,
-          paddingTop: 0,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
+          paddingHorizontal: 16,
+          paddingBottom: 16,
+          paddingTop: 4,
         },
         alreadyJoinedBadge: {
           flexDirection: 'row',
@@ -796,23 +811,23 @@ const EventRoster: React.FC = () => {
           fontSize: 16,
         },
         dropdown: {
-          backgroundColor: colors.inputBackground,
-          padding: 14,
-          marginBottom: 12,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: colors.border,
+          backgroundColor: 'transparent',
+          paddingHorizontal: 20,
+          paddingVertical: 16,
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         dropdownText: {
           color: colors.text,
-          fontSize: 16,
+          fontSize: 15,
+          fontWeight: '500',
         },
         placeholderText: {
           color: colors.placeholder,
-          fontSize: 16,
+          fontSize: 15,
         },
         saveButton: {
           backgroundColor: colors.primary,
@@ -845,18 +860,16 @@ const EventRoster: React.FC = () => {
           textAlign: 'center',
           fontSize: 14,
         },
-        // Invite Players Section
+        // Invite Players Section (flat, collapsible)
         inviteSection: {
-          backgroundColor: colors.card,
-          borderRadius: 16,
-          marginBottom: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
           overflow: 'hidden',
         },
         inviteContent: {
-          padding: 16,
-          paddingTop: 0,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
+          paddingHorizontal: 16,
+          paddingBottom: 16,
+          paddingTop: 4,
         },
         inviteSearchContainer: {
           flexDirection: 'row',
@@ -912,11 +925,19 @@ const EventRoster: React.FC = () => {
           fontSize: 14,
           fontWeight: '600',
         },
-        inviteUserName: {
+        inviteUserTextBlock: {
           flex: 1,
+          marginRight: 8,
+        },
+        inviteUserName: {
           fontSize: 14,
           color: colors.text,
-          fontWeight: '500',
+          fontWeight: '600',
+        },
+        inviteUserHandle: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          marginTop: 1,
         },
         invitedUsersList: {
           marginTop: 12,
@@ -955,23 +976,26 @@ const EventRoster: React.FC = () => {
         },
         // Roster Section
         rosterSection: {
-          marginBottom: 16,
+          paddingTop: 4,
         },
         sectionHeader: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 12,
+          paddingHorizontal: 16,
+          paddingTop: 14,
+          paddingBottom: 10,
         },
         sectionTitle: {
-          fontSize: 18,
-          fontWeight: '600',
+          fontSize: 15,
+          fontWeight: '700',
           color: colors.text,
           marginLeft: 8,
         },
         // Team Tabs
         teamTabsContainer: {
           flexDirection: 'row',
-          marginBottom: 14,
+          marginHorizontal: 16,
+          marginBottom: 12,
           borderRadius: 12,
           backgroundColor: colors.inputBackground || colors.background,
           padding: 4,
@@ -1027,7 +1051,8 @@ const EventRoster: React.FC = () => {
         // Payment Filter Tabs
         paymentFilterContainer: {
           flexDirection: 'row',
-          marginBottom: 14,
+          paddingHorizontal: 16,
+          marginBottom: 12,
           gap: 8,
         },
         paymentFilterTab: {
@@ -1051,14 +1076,11 @@ const EventRoster: React.FC = () => {
           color: colors.primary,
           fontWeight: '700',
         },
-        // Position Summary
+        // Position Summary (flat)
         positionSummaryContainer: {
-          backgroundColor: colors.card,
-          borderRadius: 14,
-          padding: 14,
-          marginBottom: 14,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
+          paddingHorizontal: 16,
+          paddingTop: 4,
+          paddingBottom: 14,
         },
         positionSummaryTitle: {
           fontSize: 14,
@@ -1104,21 +1126,20 @@ const EventRoster: React.FC = () => {
         positionGroupHeader: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginTop: 10,
-          marginBottom: 6,
+          paddingHorizontal: 16,
+          paddingTop: 10,
           paddingBottom: 6,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
         },
         positionGroupTitle: {
-          fontSize: 14,
-          fontWeight: '600',
+          fontSize: 12,
+          fontWeight: '700',
           color: colors.secondaryText,
           textTransform: 'uppercase' as const,
-          letterSpacing: 0.5,
+          letterSpacing: 0.6,
         },
         positionGroupCount: {
-          fontSize: 12,
+          fontSize: 11,
+          fontWeight: '600',
           color: colors.placeholder,
           marginLeft: 8,
         },
@@ -1126,40 +1147,34 @@ const EventRoster: React.FC = () => {
           fontSize: 13,
           color: colors.placeholder,
           fontStyle: 'italic',
+          paddingHorizontal: 16,
           paddingVertical: 8,
-          paddingLeft: 4,
         },
-        // Player Card
+        // Player Card (flat row)
         playerCard: {
-          backgroundColor: colors.card,
           flexDirection: 'row',
           alignItems: 'center',
-          padding: 14,
-          marginBottom: 10,
-          borderRadius: 14,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 1},
-          shadowOpacity: 0.06,
-          shadowRadius: 3,
-          elevation: 2,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         playerCardSelf: {
-          borderWidth: 2,
-          borderColor: colors.primary,
+          backgroundColor: colors.primary + '08',
         },
         avatar: {
-          width: 48,
-          height: 48,
-          borderRadius: 24,
+          width: 42,
+          height: 42,
+          borderRadius: 21,
           alignItems: 'center',
           justifyContent: 'center',
-          marginRight: 14,
+          marginRight: 12,
         },
         avatarImage: {
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          marginRight: 14,
+          width: 42,
+          height: 42,
+          borderRadius: 21,
+          marginRight: 12,
         },
         avatarLight: {
           borderWidth: 2,
@@ -1177,26 +1192,27 @@ const EventRoster: React.FC = () => {
           flex: 1,
         },
         playerName: {
-          fontSize: 16,
-          fontWeight: '600',
+          fontSize: 15,
+          fontWeight: '700',
           color: colors.text,
-          marginBottom: 4,
+          marginBottom: 3,
         },
         playerActions: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 8,
+          gap: 6,
         },
         editButton: {
-          backgroundColor: colors.primary + '15',
-          paddingVertical: 8,
-          paddingHorizontal: 12,
-          borderRadius: 8,
+          paddingVertical: 6,
+          paddingHorizontal: 10,
+          borderRadius: 14,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         editButtonText: {
-          color: colors.primary,
+          color: colors.text,
           fontWeight: '600',
-          fontSize: 13,
+          fontSize: 12,
         },
         playerDetails: {
           flexDirection: 'row',
@@ -1206,15 +1222,16 @@ const EventRoster: React.FC = () => {
         playerBadge: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.background,
-          paddingHorizontal: 8,
-          paddingVertical: 4,
-          borderRadius: 12,
+          backgroundColor: colors.inputBackground || colors.background,
+          paddingHorizontal: 7,
+          paddingVertical: 3,
+          borderRadius: 10,
         },
         playerBadgeText: {
-          fontSize: 12,
-          color: colors.text,
+          fontSize: 11,
+          color: colors.secondaryText,
           marginLeft: 4,
+          fontWeight: '600',
         },
         paidBadge: {
           backgroundColor: '#4CAF50' + '20',
@@ -1236,23 +1253,23 @@ const EventRoster: React.FC = () => {
           borderColor: colors.border,
         },
         deleteButton: {
-          backgroundColor: colors.error + '15',
-          paddingVertical: 8,
-          paddingHorizontal: 12,
-          borderRadius: 8,
-          marginLeft: 10,
+          paddingVertical: 6,
+          paddingHorizontal: 10,
+          borderRadius: 14,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.error + '60',
         },
         deleteButtonText: {
           color: colors.error,
           fontWeight: '600',
-          fontSize: 13,
+          fontSize: 12,
         },
         emptyState: {
           textAlign: 'center',
           color: colors.placeholder,
-          fontSize: 16,
-          marginTop: 30,
-          marginBottom: 30,
+          fontSize: 15,
+          paddingHorizontal: 16,
+          paddingVertical: 30,
         },
         // Modal
         modalOverlay: {
@@ -1263,98 +1280,115 @@ const EventRoster: React.FC = () => {
         },
         modalContent: {
           backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 20,
+          borderRadius: 18,
+          paddingTop: 18,
+          paddingBottom: 14,
           maxHeight: '70%',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         modalTitle: {
-          fontSize: 18,
-          fontWeight: '600',
+          fontSize: 17,
+          fontWeight: '700',
           color: colors.text,
           textAlign: 'center',
-          marginBottom: 16,
+          marginBottom: 14,
+          paddingHorizontal: 20,
+          paddingBottom: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         modalOption: {
-          padding: 14,
-          borderRadius: 10,
-          marginBottom: 8,
-          backgroundColor: colors.background,
+          paddingVertical: 14,
+          paddingHorizontal: 20,
           flexDirection: 'row',
           alignItems: 'center',
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         modalOptionSelected: {
-          backgroundColor: colors.primary + '20',
-          borderWidth: 1,
-          borderColor: colors.primary,
+          backgroundColor: colors.primary + '0D',
         },
         modalOptionText: {
           color: colors.text,
-          fontSize: 16,
+          fontSize: 15,
           flex: 1,
         },
         modalOptionTextSelected: {
           color: colors.primary,
-          fontWeight: '600',
+          fontWeight: '700',
         },
         modalOptionTextWithMargin: {
-          color: colors.text,
-          fontSize: 16,
-          flex: 1,
-          marginLeft: 12,
-        },
-        expandedOptions: {
-          backgroundColor: colors.background,
-          borderRadius: 10,
-          marginBottom: 12,
-          marginTop: -8,
-          paddingHorizontal: 8,
-          paddingVertical: 4,
-        },
-        inlineOption: {
-          padding: 12,
-          borderRadius: 8,
-          marginVertical: 2,
-          backgroundColor: colors.card,
-          flexDirection: 'row',
-          alignItems: 'center',
-        },
-        inlineOptionSelected: {
-          backgroundColor: colors.primary + '20',
-          borderWidth: 1,
-          borderColor: colors.primary,
-        },
-        inlineOptionText: {
           color: colors.text,
           fontSize: 15,
           flex: 1,
           marginLeft: 12,
         },
+        expandedOptions: {
+          backgroundColor: colors.inputBackground || colors.background,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        inlineOption: {
+          paddingVertical: 12,
+          paddingHorizontal: 24,
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        inlineOptionSelected: {
+          backgroundColor: colors.primary + '12',
+        },
+        inlineOptionText: {
+          color: colors.text,
+          fontSize: 14,
+          flex: 1,
+          marginLeft: 12,
+        },
         inlineOptionTextSelected: {
           color: colors.primary,
-          fontWeight: '600',
+          fontWeight: '700',
         },
         colorSwatch: {
-          width: 24,
-          height: 24,
-          borderRadius: 12,
+          width: 20,
+          height: 20,
+          borderRadius: 10,
           marginRight: 12,
-          borderWidth: 2,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         modalClose: {
-          marginTop: 8,
-          padding: 14,
-          backgroundColor: colors.primary,
-          borderRadius: 12,
+          marginTop: 10,
+          marginHorizontal: 20,
+          paddingVertical: 12,
+          backgroundColor: 'transparent',
+          borderRadius: 24,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
           alignItems: 'center',
         },
         modalCloseText: {
+          color: colors.text,
+          fontWeight: '600',
+          fontSize: 15,
+        },
+        modalSaveButton: {
+          marginHorizontal: 20,
+          marginTop: 16,
+          paddingVertical: 13,
+          backgroundColor: colors.primary,
+          borderRadius: 24,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        modalSaveButtonText: {
           color: colors.buttonText,
           fontWeight: '700',
-          fontSize: 16,
+          fontSize: 15,
+          marginLeft: 8,
         },
         modalScrollView: {
-          maxHeight: 300,
+          maxHeight: 320,
         },
         progressRemaining: {
           fontSize: 14,
@@ -1364,12 +1398,12 @@ const EventRoster: React.FC = () => {
           textAlign: 'center',
         },
         statValueGreen: {
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: '700',
           color: '#4CAF50',
         },
         statValueError: {
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: '700',
           color: colors.error,
         },
@@ -1449,6 +1483,7 @@ const EventRoster: React.FC = () => {
           .map((u: any) => ({
             _id: u._id,
             username: u.username,
+            name: u.name,
             profilePicUrl: u.profilePicUrl,
           }));
         setInvitedUserDetails(invitedDetails);
@@ -1661,10 +1696,12 @@ const EventRoster: React.FC = () => {
         headers: token ? {Authorization: `Bearer ${token}`} : {},
       });
       const allUsers = response.data?.users || response.data || [];
-      // Filter users by search query (exclude current user and already invited)
+      const normalizedQuery = query.toLowerCase();
+      // Filter users by username OR real name (exclude current user and already invited)
       const filteredUsers = allUsers.filter(
         (user: any) =>
-          user.username.toLowerCase().includes(query.toLowerCase()) &&
+          (user.username?.toLowerCase().includes(normalizedQuery) ||
+            (user.name && user.name.toLowerCase().includes(normalizedQuery))) &&
           user._id !== userData?._id &&
           !invitedUsers.includes(user._id),
       );
@@ -1672,6 +1709,7 @@ const EventRoster: React.FC = () => {
         filteredUsers.slice(0, 8).map((user: any) => ({
           _id: user._id,
           username: user.username,
+          name: user.name,
           profilePicUrl: user.profilePicUrl,
         })),
       );
@@ -1685,6 +1723,7 @@ const EventRoster: React.FC = () => {
   const inviteUserToEvent = async (user: {
     _id: string;
     username: string;
+    name?: string;
     profilePicUrl?: string;
   }) => {
     try {
@@ -2404,15 +2443,14 @@ const EventRoster: React.FC = () => {
             <View
               style={{
                 backgroundColor: isMyReservation
-                  ? colors.primary + '20'
-                  : '#FF9800' + '20',
-                borderRadius: 12,
-                padding: 14,
-                marginBottom: 16,
-                borderWidth: 1,
-                borderColor: isMyReservation
-                  ? colors.primary + '40'
-                  : '#FF9800' + '40',
+                  ? colors.primary + '12'
+                  : '#FF9800' + '12',
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                borderTopWidth: 2,
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderTopColor: isMyReservation ? colors.primary : '#FF9800',
+                borderBottomColor: colors.border,
               }}>
               {isMyReservation ? (
                 <>
@@ -2459,7 +2497,7 @@ const EventRoster: React.FC = () => {
 
           {/* Waitlist Section - visible when there are waitlisted users */}
           {waitlist.length > 0 && (
-            <View style={[themedStyles.statsSection, {marginBottom: 16}]}>
+            <View style={themedStyles.statsSection}>
               <Text style={themedStyles.statsSectionTitle}>
                 ⏳ Waitlist ({waitlist.length})
               </Text>
@@ -2486,8 +2524,10 @@ const EventRoster: React.FC = () => {
                       flexDirection: 'row',
                       alignItems: 'center',
                       paddingVertical: 10,
-                      paddingHorizontal: 16,
-                      borderBottomWidth: index < waitlist.length - 1 ? 1 : 0,
+                      borderBottomWidth:
+                        index < waitlist.length - 1
+                          ? StyleSheet.hairlineWidth
+                          : 0,
                       borderBottomColor: colors.border,
                     }}>
                     {/* Position badge */}
@@ -2665,13 +2705,24 @@ const EventRoster: React.FC = () => {
                             <View
                               style={themedStyles.inviteUserAvatarPlaceholder}>
                               <Text style={themedStyles.inviteUserAvatarText}>
-                                {getInitials(user.username)}
+                                {getInitials(user.name || user.username)}
                               </Text>
                             </View>
                           )}
-                          <Text style={themedStyles.inviteUserName}>
-                            {user.username}
-                          </Text>
+                          <View style={themedStyles.inviteUserTextBlock}>
+                            <Text
+                              style={themedStyles.inviteUserName}
+                              numberOfLines={1}>
+                              {user.name || user.username}
+                            </Text>
+                            {user.name ? (
+                              <Text
+                                style={themedStyles.inviteUserHandle}
+                                numberOfLines={1}>
+                                @{user.username}
+                              </Text>
+                            ) : null}
+                          </View>
                           <FontAwesomeIcon
                             icon={faPlus}
                             size={16}
@@ -2695,7 +2746,7 @@ const EventRoster: React.FC = () => {
                             key={user._id}
                             style={themedStyles.invitedUserChip}>
                             <Text style={themedStyles.invitedUserChipText}>
-                              {user.username}
+                              {user.name || user.username}
                             </Text>
                             <TouchableOpacity
                               onPress={() => removeInvite(user._id)}
@@ -3347,28 +3398,24 @@ const EventRoster: React.FC = () => {
 
                 {/* Save & Cancel Buttons */}
                 <TouchableOpacity
-                  style={[themedStyles.saveButton, {marginTop: 16}]}
+                  style={themedStyles.modalSaveButton}
                   onPress={handleSaveEdit}>
                   <FontAwesomeIcon
                     icon={faCheck}
-                    size={18}
+                    size={16}
                     color={colors.buttonText}
                   />
-                  <Text style={themedStyles.buttonText}>
+                  <Text style={themedStyles.modalSaveButtonText}>
                     {t('roster.saveChanges')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[
-                    themedStyles.modalClose,
-                    {backgroundColor: colors.border},
-                  ]}
+                  style={themedStyles.modalClose}
                   onPress={() => {
                     setEditModalVisible(false);
                     setExpandedSection(null);
                   }}>
-                  <Text
-                    style={[themedStyles.modalCloseText, {color: colors.text}]}>
+                  <Text style={themedStyles.modalCloseText}>
                     {t('common.cancel')}
                   </Text>
                 </TouchableOpacity>

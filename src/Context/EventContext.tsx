@@ -20,6 +20,7 @@ export interface Event {
   eventType: string;
   createdBy: string;
   createdByUsername?: string;
+  createdByProfilePicUrl?: string;
   latitude?: number;
   longitude?: number;
   isRecurring?: boolean;

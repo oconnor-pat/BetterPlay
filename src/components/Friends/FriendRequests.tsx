@@ -200,15 +200,15 @@ const FriendRequests: React.FC = () => {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingVertical: 12,
-      borderBottomWidth: 1,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
     },
     backButton: {
       padding: 8,
-      marginRight: 12,
+      marginRight: 4,
     },
     headerTitle: {
-      fontSize: 20,
+      fontSize: 16,
       fontWeight: '700',
       color: colors.text,
       flex: 1,
@@ -216,50 +216,53 @@ const FriendRequests: React.FC = () => {
     tabContainer: {
       flexDirection: 'row',
       paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
+      gap: 8,
     },
     tab: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 10,
-      borderRadius: 8,
-      marginHorizontal: 4,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: StyleSheet.hairlineWidth,
     },
     activeTab: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primary + '14',
+      borderColor: colors.primary,
     },
     inactiveTab: {
-      backgroundColor: colors.card,
+      backgroundColor: 'transparent',
+      borderColor: colors.border,
     },
     tabText: {
-      fontSize: 14,
-      fontWeight: '600',
+      fontSize: 13,
+      fontWeight: '700',
       marginLeft: 8,
     },
     activeTabText: {
-      color: '#FFFFFF',
+      color: colors.primary,
     },
     inactiveTabText: {
-      color: colors.text,
+      color: colors.secondaryText,
     },
     badge: {
-      backgroundColor: colors.error || '#FF6B6B',
+      backgroundColor: colors.primary,
       borderRadius: 10,
-      minWidth: 20,
-      height: 20,
+      minWidth: 18,
+      height: 18,
       justifyContent: 'center',
       alignItems: 'center',
-      marginLeft: 8,
+      marginLeft: 6,
     },
     badgeText: {
       color: '#FFFFFF',
-      fontSize: 12,
-      fontWeight: '600',
-      paddingHorizontal: 6,
+      fontSize: 11,
+      fontWeight: '700',
+      paddingHorizontal: 5,
     },
     loadingContainer: {
       flex: 1,
@@ -267,7 +270,8 @@ const FriendRequests: React.FC = () => {
       alignItems: 'center',
     },
     listContent: {
-      padding: 16,
+      paddingTop: 4,
+      paddingBottom: 16,
     },
     listContentEmpty: {
       padding: 16,
@@ -278,37 +282,38 @@ const FriendRequests: React.FC = () => {
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 32,
+      paddingVertical: 64,
     },
     emptyIcon: {
-      marginBottom: 16,
-      opacity: 0.5,
+      marginBottom: 14,
+      opacity: 0.4,
     },
     emptyText: {
-      fontSize: 18,
-      fontWeight: '600',
+      fontSize: 16,
+      fontWeight: '700',
       color: colors.text,
-      marginBottom: 8,
+      marginBottom: 6,
       textAlign: 'center',
     },
     emptySubtext: {
-      fontSize: 14,
-      color: colors.placeholder,
+      fontSize: 13,
+      color: colors.secondaryText,
       textAlign: 'center',
+      lineHeight: 19,
     },
     requestCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
+      backgroundColor: colors.background,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
     },
     avatarContainer: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
@@ -316,48 +321,53 @@ const FriendRequests: React.FC = () => {
       overflow: 'hidden',
     },
     avatarImage: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
     },
     avatarText: {
       color: '#FFFFFF',
-      fontSize: 18,
-      fontWeight: 'bold',
+      fontSize: 16,
+      fontWeight: '700',
     },
     requestInfo: {
       flex: 1,
     },
     requestName: {
-      fontSize: 16,
-      fontWeight: '600',
+      fontSize: 15,
+      fontWeight: '700',
       color: colors.text,
     },
     requestUsername: {
-      fontSize: 13,
-      color: colors.placeholder,
+      fontSize: 12,
+      color: colors.secondaryText,
       marginTop: 2,
     },
     actionButtons: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 6,
     },
     actionButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
       justifyContent: 'center',
       alignItems: 'center',
-      marginLeft: 8,
+      borderWidth: StyleSheet.hairlineWidth,
+      backgroundColor: 'transparent',
     },
     acceptButton: {
-      backgroundColor: '#4CAF50',
+      borderColor: '#4CAF50',
+      backgroundColor: '#4CAF5012',
     },
     declineButton: {
-      backgroundColor: colors.error || '#FF6B6B',
+      borderColor: colors.error,
+      backgroundColor: (colors.error || '#FF6B6B') + '12',
     },
     cancelButton: {
-      backgroundColor: colors.border,
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
     },
   });
 
@@ -388,12 +398,12 @@ const FriendRequests: React.FC = () => {
         <TouchableOpacity
           style={[styles.actionButton, styles.acceptButton]}
           onPress={() => handleAcceptRequest(item._id)}>
-          <FontAwesomeIcon icon={faCheck} size={18} color="#FFFFFF" />
+          <FontAwesomeIcon icon={faCheck} size={14} color="#4CAF50" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.declineButton]}
           onPress={() => handleDeclineRequest(item._id)}>
-          <FontAwesomeIcon icon={faTimes} size={18} color="#FFFFFF" />
+          <FontAwesomeIcon icon={faTimes} size={14} color={colors.error} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -425,7 +435,11 @@ const FriendRequests: React.FC = () => {
       <TouchableOpacity
         style={[styles.actionButton, styles.cancelButton]}
         onPress={() => handleCancelRequest(item._id)}>
-        <FontAwesomeIcon icon={faTimes} size={18} color={colors.text} />
+        <FontAwesomeIcon
+          icon={faTimes}
+          size={14}
+          color={colors.secondaryText}
+        />
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -434,8 +448,8 @@ const FriendRequests: React.FC = () => {
     <View style={styles.emptyContainer}>
       <FontAwesomeIcon
         icon={faInbox}
-        size={48}
-        color={colors.text}
+        size={36}
+        color={colors.secondaryText}
         style={styles.emptyIcon}
       />
       <Text style={styles.emptyText}>No Pending Requests</Text>
@@ -449,8 +463,8 @@ const FriendRequests: React.FC = () => {
     <View style={styles.emptyContainer}>
       <FontAwesomeIcon
         icon={faPaperPlane}
-        size={48}
-        color={colors.text}
+        size={36}
+        color={colors.secondaryText}
         style={styles.emptyIcon}
       />
       <Text style={styles.emptyText}>No Sent Requests</Text>
@@ -470,7 +484,7 @@ const FriendRequests: React.FC = () => {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}>
-            <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
+            <FontAwesomeIcon icon={faArrowLeft} size={18} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Friend Requests</Text>
         </View>
@@ -487,7 +501,7 @@ const FriendRequests: React.FC = () => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
-          <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
+          <FontAwesomeIcon icon={faArrowLeft} size={18} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Friend Requests</Text>
       </View>
@@ -502,8 +516,10 @@ const FriendRequests: React.FC = () => {
           onPress={() => setActiveTab('incoming')}>
           <FontAwesomeIcon
             icon={faInbox}
-            size={16}
-            color={activeTab === 'incoming' ? '#FFFFFF' : colors.text}
+            size={13}
+            color={
+              activeTab === 'incoming' ? colors.primary : colors.secondaryText
+            }
           />
           <Text
             style={[
@@ -529,8 +545,10 @@ const FriendRequests: React.FC = () => {
           onPress={() => setActiveTab('outgoing')}>
           <FontAwesomeIcon
             icon={faPaperPlane}
-            size={16}
-            color={activeTab === 'outgoing' ? '#FFFFFF' : colors.text}
+            size={13}
+            color={
+              activeTab === 'outgoing' ? colors.primary : colors.secondaryText
+            }
           />
           <Text
             style={[
@@ -542,7 +560,8 @@ const FriendRequests: React.FC = () => {
             Sent
           </Text>
           {outgoingRequests.length > 0 && (
-            <View style={[styles.badge, {backgroundColor: colors.placeholder}]}>
+            <View
+              style={[styles.badge, {backgroundColor: colors.secondaryText}]}>
               <Text style={styles.badgeText}>{outgoingRequests.length}</Text>
             </View>
           )}

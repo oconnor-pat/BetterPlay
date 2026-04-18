@@ -1,4 +1,5 @@
 import React, {useContext, useEffect, useRef} from 'react';
+import {Platform, StyleSheet, View} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
 import EventList from '../EventList/EventList';
@@ -21,33 +22,38 @@ import UserContext from '../UserContext';
 import {IconDefinition} from '@fortawesome/fontawesome-svg-core';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {useNotifications} from '../../Context/NotificationContext';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useTranslation} from 'react-i18next';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-const TabBarIcon = ({
+const TabBarIconPill = ({
   icon,
   color,
-  size,
+  focused,
+  pillColor,
 }: {
   icon: IconDefinition;
   color: string;
-  size: number;
+  focused: boolean;
+  pillColor: string;
 }) => {
-  return <FontAwesomeIcon icon={icon} size={size} color={color} />;
+  return (
+    <View
+      style={[styles.iconPill, focused && {backgroundColor: pillColor}]}>
+      <FontAwesomeIcon icon={icon} size={18} color={color} />
+    </View>
+  );
 };
 
-// Helper function to generate tabBarIcon renderer with theme colors
-function createTabBarIcon(colors: {primary: string; text: string}) {
-  // This function is stable and can be reused
+function createTabBarIcon(colors: {primary: string; secondaryText: string}) {
   return function tabBarIcon({
     route,
     focused,
-    size,
   }: {
     route: {name: string};
     focused: boolean;
-    size: number;
   }) {
     const iconMap: Record<string, IconDefinition> = {
       Events: faCalendarAlt,
@@ -55,10 +61,27 @@ function createTabBarIcon(colors: {primary: string; text: string}) {
       Profile: faUser,
     };
     const icon = iconMap[route.name] || faQuestion;
-    const iconColor = focused ? colors.primary : colors.text;
-    return <TabBarIcon icon={icon} color={iconColor} size={size} />;
+    const iconColor = focused ? colors.primary : colors.secondaryText;
+    return (
+      <TabBarIconPill
+        icon={icon}
+        color={iconColor}
+        focused={focused}
+        pillColor={colors.primary + '14'}
+      />
+    );
   };
 }
+
+const styles = StyleSheet.create({
+  iconPill: {
+    width: 56,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
 
 // Stack Navigator for Local Events screens
 const LocalEventsStack = () => {
@@ -182,6 +205,8 @@ const BottomNavigator: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
   const {hasPermission, isInitialized, requestPermission} = useNotifications();
+  const {t} = useTranslation();
+  const insets = useSafeAreaInsets();
   const hasPromptedRef = useRef(false);
 
   // Request notification permission after login (once per session)
@@ -208,31 +233,48 @@ const BottomNavigator: React.FC = () => {
 
   const userId = userData?._id;
 
-  // Create a stable tabBarIcon renderer with current theme colors
   const themedTabBarIcon = ({
     route,
     focused,
-    size,
   }: {
     route: {name: string};
     focused: boolean;
-    size: number;
-  }) => createTabBarIcon(colors)({route, focused, size});
+  }) => createTabBarIcon(colors)({route, focused});
 
-  // Dynamic screen options using theme colors
+  const tabLabels: Record<string, string> = {
+    Events: t('navigation.events') || 'Events',
+    Venues: t('navigation.venues') || 'Venues',
+    Profile: t('navigation.profile') || 'Profile',
+  };
+
+  const bottomInset = Platform.OS === 'ios' ? insets.bottom : 0;
+
   const screenOptions = ({route}: {route: any}) => ({
     headerShown: false,
-    tabBarLabel: () => null,
+    tabBarLabel: tabLabels[route.name] || route.name,
+    tabBarLabelStyle: {
+      fontSize: 11,
+      fontWeight: '700' as const,
+      letterSpacing: 0.3,
+      marginTop: 2,
+    },
     tabBarStyle: {
-      backgroundColor: colors.card,
+      backgroundColor: colors.background,
+      borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
-      paddingBottom: 10,
-      paddingTop: 10,
+      paddingTop: 8,
+      paddingBottom: bottomInset > 0 ? bottomInset : 10,
+      height: 64 + bottomInset,
+      elevation: 0,
+      shadowOpacity: 0,
+    },
+    tabBarItemStyle: {
+      paddingVertical: 0,
     },
     tabBarIcon: (props: {color: string; size: number; focused: boolean}) =>
-      themedTabBarIcon({route, focused: props.focused, size: props.size}),
+      themedTabBarIcon({route, focused: props.focused}),
     tabBarActiveTintColor: colors.primary,
-    tabBarInactiveTintColor: colors.text,
+    tabBarInactiveTintColor: colors.secondaryText,
   });
 
   return (

@@ -20,6 +20,7 @@ import {
   YourData,
 } from './src/components/LegalDocument';
 import {StatusBar, ActivityIndicator, View, StyleSheet} from 'react-native';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import UserContext from './src/components/UserContext';
 import {
   ThemeProvider,
@@ -463,13 +464,18 @@ const styles = StyleSheet.create({
   lightBackground: {
     backgroundColor: '#02131D',
   },
+  gestureRoot: {
+    flex: 1,
+  },
 });
 
 function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 

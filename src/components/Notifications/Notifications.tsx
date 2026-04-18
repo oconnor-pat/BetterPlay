@@ -1,16 +1,18 @@
-import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   RefreshControl,
   Image,
   ActivityIndicator,
   Alert,
+  Animated,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {Swipeable, RectButton} from 'react-native-gesture-handler';
+import {FlatList} from 'react-native-gesture-handler';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -22,7 +24,6 @@ import {
   faCalendarCheck,
   faCalendarPlus,
   faEnvelope,
-  faComment,
   faComments,
   faHeart,
   faUsers,
@@ -87,6 +88,10 @@ const Notifications: React.FC = () => {
   >(new Set());
   const [selectMode, setSelectMode] = useState(false);
 
+  // Track open swipeable rows so we can close the previous one when a new opens
+  const swipeableRefs = useRef<Map<string, Swipeable | null>>(new Map());
+  const openSwipeableId = useRef<string | null>(null);
+
   // Fetch notifications from backend
   const fetchNotifications = useCallback(async () => {
     try {
@@ -106,7 +111,6 @@ const Notifications: React.FC = () => {
         const data = await response.json();
         const fetched = data.notifications || [];
         setNotifications(fetched);
-        // Sync badge count with actual unread count
         const unread = fetched.filter((n: AppNotification) => !n.read).length;
         setBadgeCount(unread);
       }
@@ -122,7 +126,6 @@ const Notifications: React.FC = () => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Refresh badge count when leaving the screen
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', () => {
       refreshBadgeCount();
@@ -135,7 +138,6 @@ const Notifications: React.FC = () => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Mark notification as read
   const markAsRead = async (notificationId: string) => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -162,7 +164,6 @@ const Notifications: React.FC = () => {
     }
   };
 
-  // Mark all as read
   const markAllAsRead = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -184,33 +185,37 @@ const Notifications: React.FC = () => {
     }
   };
 
-  // Delete notification (for future swipe-to-delete feature)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const deleteNotification = async (notificationId: string) => {
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        return;
+  const deleteNotification = useCallback(
+    async (notificationId: string) => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) {
+          return;
+        }
+
+        await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        setNotifications(prev => {
+          const updated = prev.filter(n => n._id !== notificationId);
+          setBadgeCount(updated.filter(n => !n.read).length);
+          return updated;
+        });
+        swipeableRefs.current.delete(notificationId);
+        if (openSwipeableId.current === notificationId) {
+          openSwipeableId.current = null;
+        }
+      } catch (error) {
+        console.error('Error deleting notification:', error);
       }
+    },
+    [setBadgeCount],
+  );
 
-      await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setNotifications(prev => {
-        const updated = prev.filter(n => n._id !== notificationId);
-        setBadgeCount(updated.filter(n => !n.read).length);
-        return updated;
-      });
-    } catch (error) {
-      console.error('Error deleting notification:', error);
-    }
-  };
-
-  // Delete selected notifications
   const deleteSelected = async () => {
     if (selectedNotifications.size === 0) {
       return;
@@ -232,7 +237,6 @@ const Notifications: React.FC = () => {
                 return;
               }
 
-              // Delete all selected notifications
               await Promise.all(
                 Array.from(selectedNotifications).map(id =>
                   fetch(`${API_BASE_URL}/api/notifications/${id}`, {
@@ -260,10 +264,8 @@ const Notifications: React.FC = () => {
     );
   };
 
-  // Handle notification press
   const handleNotificationPress = (notification: AppNotification) => {
     if (selectMode) {
-      // Toggle selection
       const newSelected = new Set(selectedNotifications);
       if (newSelected.has(notification._id)) {
         newSelected.delete(notification._id);
@@ -274,12 +276,16 @@ const Notifications: React.FC = () => {
       return;
     }
 
-    // Mark as read
+    // Close any open swipe row before navigating
+    if (openSwipeableId.current) {
+      swipeableRefs.current.get(openSwipeableId.current)?.close();
+      openSwipeableId.current = null;
+    }
+
     if (!notification.read) {
       markAsRead(notification._id);
     }
 
-    // Navigate based on notification type
     switch (notification.type) {
       case 'friend_request':
         navigation.navigate('Profile', {
@@ -340,7 +346,6 @@ const Notifications: React.FC = () => {
     }
   };
 
-  // Get icon for notification type
   const getNotificationIcon = (type: AppNotification['type']) => {
     switch (type) {
       case 'friend_request':
@@ -375,7 +380,6 @@ const Notifications: React.FC = () => {
     }
   };
 
-  // Get color for notification type
   const getNotificationColor = (type: AppNotification['type']) => {
     switch (type) {
       case 'friend_request':
@@ -407,7 +411,6 @@ const Notifications: React.FC = () => {
     }
   };
 
-  // Format relative time
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -431,7 +434,6 @@ const Notifications: React.FC = () => {
     return date.toLocaleDateString();
   };
 
-  // Unread count
   const unreadCount = useMemo(
     () => notifications.filter(n => !n.read).length,
     [notifications],
@@ -445,221 +447,265 @@ const Notifications: React.FC = () => {
           flex: 1,
           backgroundColor: colors.background,
         },
+        // ── Header ──
         header: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 16,
           paddingVertical: 12,
-          borderBottomWidth: 1,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
+          backgroundColor: colors.background,
         },
         headerLeft: {
           flexDirection: 'row',
           alignItems: 'center',
+          flex: 1,
         },
         backButton: {
           padding: 8,
-          marginRight: 8,
+          marginRight: 4,
         },
         headerTitle: {
-          fontSize: 20,
-          fontWeight: 'bold',
+          fontSize: 16,
+          fontWeight: '700',
           color: colors.text,
+        },
+        unreadBadge: {
+          backgroundColor: colors.primary,
+          borderRadius: 10,
+          paddingHorizontal: 7,
+          paddingVertical: 2,
+          marginLeft: 8,
+          minWidth: 18,
+          alignItems: 'center',
+        },
+        unreadBadgeText: {
+          color: '#fff',
+          fontSize: 11,
+          fontWeight: '700',
         },
         headerRight: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 8,
+          gap: 4,
         },
         headerButton: {
           padding: 8,
         },
-        unreadBadge: {
-          backgroundColor: colors.primary,
-          borderRadius: 12,
-          paddingHorizontal: 8,
-          paddingVertical: 2,
-          marginLeft: 8,
-        },
-        unreadBadgeText: {
-          color: '#fff',
-          fontSize: 12,
-          fontWeight: 'bold',
-        },
-        loadingContainer: {
-          flex: 1,
-          justifyContent: 'center',
+        // ── Select mode bar (flat, hairline, no card) ──
+        selectModeBar: {
+          flexDirection: 'row',
           alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+          backgroundColor: colors.background,
         },
-        emptyContainer: {
-          flex: 1,
-          justifyContent: 'center',
+        selectAllText: {
+          fontSize: 13,
+          color: colors.primary,
+          fontWeight: '700',
+        },
+        selectModeActions: {
+          flexDirection: 'row',
           alignItems: 'center',
-          padding: 32,
+          gap: 14,
         },
-        emptyIcon: {
-          marginBottom: 16,
-          opacity: 0.5,
+        deleteButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
         },
-        emptyText: {
-          fontSize: 18,
-          fontWeight: '600',
-          color: colors.text,
-          marginBottom: 8,
+        deleteButtonText: {
+          color: colors.error,
+          fontWeight: '700',
+          fontSize: 13,
         },
-        emptySubtext: {
-          fontSize: 14,
-          color: colors.placeholder,
-          textAlign: 'center',
+        cancelButtonText: {
+          color: colors.primary,
+          fontWeight: '700',
+          fontSize: 13,
         },
+        // ── List ──
         list: {
           flex: 1,
         },
         listContent: {
-          paddingVertical: 8,
+          paddingTop: 0,
+          paddingBottom: 16,
+        },
+        // ── Notification row ──
+        notificationRowWrapper: {
+          backgroundColor: colors.background,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         notificationRow: {
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 16,
           paddingVertical: 12,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          backgroundColor: colors.background,
         },
         notificationRowUnread: {
-          backgroundColor: colors.primary + '10',
+          backgroundColor: colors.primary + '0A',
         },
         notificationRowSelected: {
-          backgroundColor: colors.primary + '20',
+          backgroundColor: colors.primary + '14',
         },
         iconContainer: {
-          width: 44,
-          height: 44,
-          borderRadius: 22,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
           justifyContent: 'center',
           alignItems: 'center',
           marginRight: 12,
         },
         notificationContent: {
           flex: 1,
+          paddingRight: 8,
         },
         notificationTitle: {
-          fontSize: 15,
-          fontWeight: '600',
+          fontSize: 14,
+          fontWeight: '700',
           color: colors.text,
           marginBottom: 2,
         },
         notificationBody: {
-          fontSize: 14,
-          color: colors.placeholder,
+          fontSize: 13,
+          color: colors.secondaryText,
+          lineHeight: 18,
           marginBottom: 4,
         },
         notificationTime: {
-          fontSize: 12,
-          color: colors.placeholder,
+          fontSize: 11,
+          color: colors.secondaryText,
         },
         notificationActions: {
           alignItems: 'center',
           justifyContent: 'center',
+          width: 24,
         },
         unreadDot: {
-          width: 10,
-          height: 10,
-          borderRadius: 5,
+          width: 8,
+          height: 8,
+          borderRadius: 4,
           backgroundColor: colors.primary,
         },
         selectbox: {
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          borderWidth: 2,
+          width: 22,
+          height: 22,
+          borderRadius: 11,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           justifyContent: 'center',
           alignItems: 'center',
+          backgroundColor: 'transparent',
         },
         selectboxSelected: {
           backgroundColor: colors.primary,
           borderColor: colors.primary,
         },
-        selectModeBar: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 16,
-          paddingVertical: 8,
-          backgroundColor: colors.card,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-        },
-        selectModeText: {
-          fontSize: 14,
-          color: colors.text,
-        },
-        selectAllText: {
-          fontSize: 14,
-          color: colors.primary,
-          fontWeight: '600',
-        },
-        selectModeActions: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 16,
-        },
-        cancelButtonText: {
-          color: colors.primary,
-          fontWeight: '600',
-        },
-        deleteButton: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-        },
-        deleteButtonText: {
-          color: '#F44336',
-          fontWeight: '600',
-        },
-        sectionHeader: {
-          paddingHorizontal: 16,
-          paddingVertical: 8,
-          backgroundColor: colors.card,
-        },
-        sectionHeaderText: {
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.placeholder,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-        },
         profilePic: {
-          width: 44,
-          height: 44,
-          borderRadius: 22,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
           marginRight: 12,
         },
-        profilePicPlaceholder: {
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          marginRight: 12,
+        // ── Swipe action ──
+        swipeAction: {
+          backgroundColor: colors.error,
           justifyContent: 'center',
           alignItems: 'center',
+          width: 88,
         },
-        profilePicText: {
+        swipeActionInner: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 4,
+          paddingHorizontal: 12,
+        },
+        swipeActionLabel: {
           color: '#fff',
+          fontSize: 12,
+          fontWeight: '700',
+        },
+        // ── Empty state ──
+        emptyContainer: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 32,
+          paddingVertical: 64,
+        },
+        emptyIcon: {
+          marginBottom: 14,
+          opacity: 0.4,
+        },
+        emptyText: {
           fontSize: 16,
-          fontWeight: 'bold',
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 6,
+          textAlign: 'center',
+        },
+        emptySubtext: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          textAlign: 'center',
+          lineHeight: 19,
+        },
+        loadingContainer: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
         },
       }),
     [colors],
   );
 
-  // Render notification item
+  // Render swipe-right delete action
+  const renderRightActions = useCallback(
+    (
+      progress: Animated.AnimatedInterpolation<number>,
+      _dragX: Animated.AnimatedInterpolation<number>,
+      notificationId: string,
+    ) => {
+      const scale = progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.6, 1],
+        extrapolate: 'clamp',
+      });
+
+      return (
+        <RectButton
+          style={themedStyles.swipeAction}
+          onPress={() => {
+            swipeableRefs.current.get(notificationId)?.close();
+            deleteNotification(notificationId);
+          }}>
+          <Animated.View
+            style={[themedStyles.swipeActionInner, {transform: [{scale}]}]}>
+            <FontAwesomeIcon icon={faTrash} size={18} color="#fff" />
+            <Text style={themedStyles.swipeActionLabel}>
+              {t('common.delete') || 'Delete'}
+            </Text>
+          </Animated.View>
+        </RectButton>
+      );
+    },
+    [themedStyles, deleteNotification, t],
+  );
+
   const renderNotification = ({item}: {item: AppNotification}) => {
     const iconColor = getNotificationColor(item.type);
     const isSelected = selectedNotifications.has(item._id);
 
-    return (
+    const rowContent = (
       <TouchableOpacity
         style={[
           themedStyles.notificationRow,
@@ -684,11 +730,11 @@ const Notifications: React.FC = () => {
           <View
             style={[
               themedStyles.iconContainer,
-              {backgroundColor: iconColor + '20'},
+              {backgroundColor: iconColor + '1A'},
             ]}>
             <FontAwesomeIcon
               icon={getNotificationIcon(item.type)}
-              size={20}
+              size={16}
               color={iconColor}
             />
           </View>
@@ -716,7 +762,7 @@ const Notifications: React.FC = () => {
                 isSelected && themedStyles.selectboxSelected,
               ]}>
               {isSelected && (
-                <FontAwesomeIcon icon={faCheck} size={14} color="#fff" />
+                <FontAwesomeIcon icon={faCheck} size={12} color="#fff" />
               )}
             </View>
           ) : !item.read ? (
@@ -725,57 +771,48 @@ const Notifications: React.FC = () => {
         </View>
       </TouchableOpacity>
     );
+
+    // Disable swipe-to-delete while in select mode
+    if (selectMode) {
+      return <View style={themedStyles.notificationRowWrapper}>{rowContent}</View>;
+    }
+
+    return (
+      <View style={themedStyles.notificationRowWrapper}>
+        <Swipeable
+          ref={ref => {
+            if (ref) {
+              swipeableRefs.current.set(item._id, ref);
+            } else {
+              swipeableRefs.current.delete(item._id);
+            }
+          }}
+          friction={2}
+          rightThreshold={40}
+          overshootRight={false}
+          renderRightActions={(progress, dragX) =>
+            renderRightActions(progress, dragX, item._id)
+          }
+          onSwipeableWillOpen={() => {
+            if (
+              openSwipeableId.current &&
+              openSwipeableId.current !== item._id
+            ) {
+              swipeableRefs.current.get(openSwipeableId.current)?.close();
+            }
+            openSwipeableId.current = item._id;
+          }}
+          onSwipeableClose={() => {
+            if (openSwipeableId.current === item._id) {
+              openSwipeableId.current = null;
+            }
+          }}>
+          {rowContent}
+        </Swipeable>
+      </View>
+    );
   };
 
-  // Group notifications by date (for future SectionList implementation)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const groupedNotifications = useMemo(() => {
-    const groups: {title: string; data: AppNotification[]}[] = [];
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    const todayStr = today.toDateString();
-    const yesterdayStr = yesterday.toDateString();
-
-    const todayNotifs: AppNotification[] = [];
-    const yesterdayNotifs: AppNotification[] = [];
-    const earlierNotifs: AppNotification[] = [];
-
-    notifications.forEach(n => {
-      const notifDate = new Date(n.createdAt).toDateString();
-      if (notifDate === todayStr) {
-        todayNotifs.push(n);
-      } else if (notifDate === yesterdayStr) {
-        yesterdayNotifs.push(n);
-      } else {
-        earlierNotifs.push(n);
-      }
-    });
-
-    if (todayNotifs.length > 0) {
-      groups.push({
-        title: t('notifications.today') || 'Today',
-        data: todayNotifs,
-      });
-    }
-    if (yesterdayNotifs.length > 0) {
-      groups.push({
-        title: t('notifications.yesterday') || 'Yesterday',
-        data: yesterdayNotifs,
-      });
-    }
-    if (earlierNotifs.length > 0) {
-      groups.push({
-        title: t('notifications.earlier') || 'Earlier',
-        data: earlierNotifs,
-      });
-    }
-
-    return groups;
-  }, [notifications, t]);
-
-  // Render loading state
   if (loading) {
     return (
       <SafeAreaView style={themedStyles.container}>
@@ -786,7 +823,7 @@ const Notifications: React.FC = () => {
               onPress={() => navigation.goBack()}>
               <FontAwesomeIcon
                 icon={faArrowLeft}
-                size={20}
+                size={18}
                 color={colors.text}
               />
             </TouchableOpacity>
@@ -817,7 +854,7 @@ const Notifications: React.FC = () => {
                 navigation.goBack();
               }
             }}>
-            <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
+            <FontAwesomeIcon icon={faArrowLeft} size={18} color={colors.text} />
           </TouchableOpacity>
           <Text style={themedStyles.headerTitle}>
             {t('notifications.title') || 'Notifications'}
@@ -835,7 +872,7 @@ const Notifications: React.FC = () => {
               onPress={markAllAsRead}>
               <FontAwesomeIcon
                 icon={faCheckDouble}
-                size={18}
+                size={16}
                 color={colors.primary}
               />
             </TouchableOpacity>
@@ -846,8 +883,8 @@ const Notifications: React.FC = () => {
               onPress={() => setSelectMode(true)}>
               <FontAwesomeIcon
                 icon={faEllipsisV}
-                size={18}
-                color={colors.text}
+                size={16}
+                color={colors.secondaryText}
               />
             </TouchableOpacity>
           )}
@@ -878,7 +915,11 @@ const Notifications: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.deleteButton}
                 onPress={deleteSelected}>
-                <FontAwesomeIcon icon={faTrash} size={16} color="#F44336" />
+                <FontAwesomeIcon
+                  icon={faTrash}
+                  size={14}
+                  color={colors.error}
+                />
                 <Text style={themedStyles.deleteButtonText}>
                   {t('common.delete') || 'Delete'}
                 </Text>
@@ -902,8 +943,8 @@ const Notifications: React.FC = () => {
         <View style={themedStyles.emptyContainer}>
           <FontAwesomeIcon
             icon={faBell}
-            size={64}
-            color={colors.placeholder}
+            size={42}
+            color={colors.secondaryText}
             style={themedStyles.emptyIcon}
           />
           <Text style={themedStyles.emptyText}>

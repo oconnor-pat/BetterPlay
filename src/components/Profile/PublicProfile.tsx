@@ -13,7 +13,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
@@ -30,9 +29,6 @@ import {
   faUserPlus,
   faUserCheck,
   faUserClock,
-  faUserMinus,
-  faFire,
-  faUserGroup,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 import {TouchableOpacity} from 'react-native';
@@ -365,17 +361,18 @@ const PublicProfile: React.FC = () => {
         header: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 8,
           paddingHorizontal: 16,
-          paddingTop: 8,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
           backgroundColor: colors.background,
         },
         backButton: {
           padding: 8,
-          marginRight: 12,
+          marginRight: 4,
         },
         title: {
-          fontSize: 22,
+          fontSize: 16,
           fontWeight: '700',
           color: colors.text,
         },
@@ -387,128 +384,101 @@ const PublicProfile: React.FC = () => {
         // ── Profile Header ──
         profileSection: {
           alignItems: 'center',
-          paddingTop: 16,
+          paddingTop: 20,
           paddingBottom: 20,
           paddingHorizontal: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         avatarContainer: {
-          marginBottom: 14,
+          marginBottom: 12,
         },
         avatar: {
-          width: 100,
-          height: 100,
-          borderRadius: 50,
-          borderWidth: 3,
+          width: 96,
+          height: 96,
+          borderRadius: 48,
+          borderWidth: 2,
           borderColor: colors.primary,
         },
         avatarPlaceholder: {
-          width: 100,
-          height: 100,
-          borderRadius: 50,
-          backgroundColor: colors.primary + '20',
+          width: 96,
+          height: 96,
+          borderRadius: 48,
+          backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
-          borderWidth: 3,
+          borderWidth: 2,
           borderColor: colors.primary,
         },
         avatarInitials: {
-          fontSize: 34,
+          fontSize: 32,
           fontWeight: '700',
           color: colors.primary,
         },
         userName: {
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: '700',
           color: colors.text,
           textAlign: 'center',
-          marginBottom: 4,
+          marginBottom: 2,
         },
         userHandle: {
-          fontSize: 14,
-          color: colors.placeholder,
-          marginBottom: 16,
+          fontSize: 13,
+          color: colors.secondaryText,
+          marginBottom: 14,
         },
-        // Friend action button
+        // Friend action button (outlined hairline pill, status-colored)
         friendButton: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: 28,
-          paddingVertical: 12,
-          borderRadius: 24,
+          paddingHorizontal: 18,
+          paddingVertical: 8,
+          borderRadius: 22,
+          borderWidth: StyleSheet.hairlineWidth,
+          backgroundColor: 'transparent',
           gap: 8,
         },
         friendButtonText: {
-          fontSize: 15,
+          fontSize: 13,
           fontWeight: '700',
         },
-        // ── Widget Card ──
-        widgetCard: {
-          backgroundColor: colors.card,
-          marginHorizontal: 16,
-          marginBottom: 14,
-          borderRadius: 16,
-          overflow: 'hidden',
-          ...Platform.select({
-            ios: {
-              shadowColor: '#000',
-              shadowOffset: {width: 0, height: 2},
-              shadowOpacity: 0.08,
-              shadowRadius: 8,
-            },
-            android: {
-              elevation: 3,
-            },
-          }),
+        // ── Flat Section ──
+        section: {
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
-        widgetCardInner: {
-          padding: 16,
-        },
-        widgetHeader: {
+        sectionHeaderRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 14,
+          justifyContent: 'space-between',
+          marginBottom: 12,
         },
-        widgetHeaderLeft: {
-          flexDirection: 'row',
-          alignItems: 'center',
-        },
-        widgetIcon: {
-          width: 32,
-          height: 32,
-          borderRadius: 10,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 10,
-        },
-        widgetTitle: {
-          fontSize: 15,
+        sectionLabel: {
+          fontSize: 12,
           fontWeight: '700',
-          color: colors.text,
+          color: colors.secondaryText,
           textTransform: 'uppercase',
-          letterSpacing: 0.5,
+          letterSpacing: 0.6,
         },
-        // ── Stats Grid ──
+        // ── Stats Grid (flat) ──
         statsGrid: {
           flexDirection: 'row',
           flexWrap: 'wrap',
-          gap: 10,
         },
         statCell: {
-          flex: 1,
-          minWidth: '45%',
-          backgroundColor: colors.background,
-          paddingVertical: 14,
-          paddingHorizontal: 14,
-          borderRadius: 12,
-          alignItems: 'center',
-        },
-        statCellIcon: {
-          width: 36,
-          height: 36,
-          borderRadius: 10,
+          width: '50%',
+          paddingVertical: 12,
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: 8,
+        },
+        statCellIconRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 4,
         },
         statCellValue: {
           fontSize: 22,
@@ -517,42 +487,38 @@ const PublicProfile: React.FC = () => {
         },
         statCellLabel: {
           fontSize: 12,
-          color: colors.placeholder,
+          color: colors.secondaryText,
           fontWeight: '500',
           marginTop: 2,
         },
         // ── Interests ──
-        interestsEmoji: {
-          fontSize: 20,
-          marginRight: 8,
-        },
         sportsContainer: {
           flexDirection: 'row',
           flexWrap: 'wrap',
-          gap: 10,
+          gap: 8,
         },
         sportTag: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.primary + '18',
-          paddingVertical: 8,
-          paddingHorizontal: 14,
-          borderRadius: 20,
-          borderWidth: 1.5,
-          borderColor: colors.primary + '35',
+          backgroundColor: colors.primary + '12',
+          paddingVertical: 6,
+          paddingHorizontal: 12,
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '40',
         },
         sportEmoji: {
-          fontSize: 17,
+          fontSize: 14,
         },
         sportTagText: {
-          fontSize: 14,
+          fontSize: 13,
           marginLeft: 6,
           color: colors.text,
-          fontWeight: '500',
+          fontWeight: '600',
         },
         noInterestsText: {
-          fontSize: 14,
-          color: colors.placeholder,
+          fontSize: 13,
+          color: colors.secondaryText,
           fontStyle: 'italic',
         },
       }),
@@ -576,7 +542,7 @@ const PublicProfile: React.FC = () => {
         <TouchableOpacity
           style={themedStyles.backButton}
           onPress={() => navigation.goBack()}>
-          <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
+          <FontAwesomeIcon icon={faArrowLeft} size={18} color={colors.text} />
         </TouchableOpacity>
         <Text style={themedStyles.title}>{t('profile.playerProfile')}</Text>
       </View>
@@ -609,7 +575,10 @@ const PublicProfile: React.FC = () => {
             <TouchableOpacity
               style={[
                 themedStyles.friendButton,
-                {backgroundColor: friendButtonConfig.bgColor},
+                {
+                  borderColor: friendButtonConfig.color + '66',
+                  backgroundColor: friendButtonConfig.color + '12',
+                },
               ]}
               onPress={handleFriendAction}
               disabled={friendStatus === 'loading'}>
@@ -619,7 +588,7 @@ const PublicProfile: React.FC = () => {
                 <>
                   <FontAwesomeIcon
                     icon={friendButtonConfig.icon}
-                    size={16}
+                    size={13}
                     color={friendButtonConfig.color}
                   />
                   <Text
@@ -635,105 +604,75 @@ const PublicProfile: React.FC = () => {
           )}
         </View>
 
-        {/* ── Activity Widget (2x2 grid) ── */}
-        <View style={themedStyles.widgetCard}>
-          <View style={themedStyles.widgetCardInner}>
-            <View style={themedStyles.widgetHeader}>
-              <View style={themedStyles.widgetHeaderLeft}>
-                <View
-                  style={[
-                    themedStyles.widgetIcon,
-                    {backgroundColor: colors.primary + '20'},
-                  ]}>
-                  <FontAwesomeIcon
-                    icon={faFire}
-                    size={15}
-                    color={colors.primary}
-                  />
-                </View>
-                <Text style={themedStyles.widgetTitle}>
-                  {t('profile.activity') || 'Activity'}
-                </Text>
-              </View>
-            </View>
-            <View style={themedStyles.statsGrid}>
-              <View style={themedStyles.statCell}>
-                <View
-                  style={[
-                    themedStyles.statCellIcon,
-                    {backgroundColor: colors.primary + '20'},
-                  ]}>
-                  <FontAwesomeIcon
-                    icon={faCalendarPlus}
-                    size={16}
-                    color={colors.primary}
-                  />
-                </View>
+        {/* ── Activity ── */}
+        <View style={themedStyles.section}>
+          <View style={themedStyles.sectionHeaderRow}>
+            <Text style={themedStyles.sectionLabel}>
+              {t('profile.activity') || 'Activity'}
+            </Text>
+          </View>
+          <View style={themedStyles.statsGrid}>
+            <View style={themedStyles.statCell}>
+              <View style={themedStyles.statCellIconRow}>
+                <FontAwesomeIcon
+                  icon={faCalendarPlus}
+                  size={14}
+                  color={colors.primary}
+                />
                 <Text style={themedStyles.statCellValue}>
                   {userStats.eventsCreated}
                 </Text>
-                <Text style={themedStyles.statCellLabel}>
-                  {t('profile.created') || 'Created'}
-                </Text>
               </View>
+              <Text style={themedStyles.statCellLabel}>
+                {t('profile.created') || 'Created'}
+              </Text>
+            </View>
 
-              <View style={themedStyles.statCell}>
-                <View
-                  style={[
-                    themedStyles.statCellIcon,
-                    {backgroundColor: '#4CAF50' + '20'},
-                  ]}>
-                  <FontAwesomeIcon
-                    icon={faCalendarCheck}
-                    size={16}
-                    color="#4CAF50"
-                  />
-                </View>
+            <View style={themedStyles.statCell}>
+              <View style={themedStyles.statCellIconRow}>
+                <FontAwesomeIcon
+                  icon={faCalendarCheck}
+                  size={14}
+                  color="#4CAF50"
+                />
                 <Text style={themedStyles.statCellValue}>
                   {userStats.eventsJoined}
                 </Text>
-                <Text style={themedStyles.statCellLabel}>
-                  {t('profile.joined') || 'Joined'}
-                </Text>
               </View>
+              <Text style={themedStyles.statCellLabel}>
+                {t('profile.joined') || 'Joined'}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* ── Interests Widget ── */}
-        <View style={themedStyles.widgetCard}>
-          <View style={themedStyles.widgetCardInner}>
-            <View style={themedStyles.widgetHeader}>
-              <View style={themedStyles.widgetHeaderLeft}>
-                <Text style={themedStyles.interestsEmoji}>✨</Text>
-                <Text style={themedStyles.widgetTitle}>
-                  {t('profile.interests') || 'Interests'}
-                </Text>
-              </View>
-            </View>
-            {favoriteSports.length > 0 ? (
-              <View style={themedStyles.sportsContainer}>
-                {favoriteSports.map(sportId => {
-                  const sport = INTERESTS_MAP[sportId];
-                  if (!sport) {
-                    return null;
-                  }
-                  return (
-                    <View key={sportId} style={themedStyles.sportTag}>
-                      <Text style={themedStyles.sportEmoji}>{sport.emoji}</Text>
-                      <Text style={themedStyles.sportTagText}>
-                        {sport.label}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : (
-              <Text style={themedStyles.noInterestsText}>
-                No interests added yet
-              </Text>
-            )}
+        {/* ── Interests ── */}
+        <View style={themedStyles.section}>
+          <View style={themedStyles.sectionHeaderRow}>
+            <Text style={themedStyles.sectionLabel}>
+              {t('profile.interests') || 'Interests'}
+            </Text>
           </View>
+          {favoriteSports.length > 0 ? (
+            <View style={themedStyles.sportsContainer}>
+              {favoriteSports.map(sportId => {
+                const sport = INTERESTS_MAP[sportId];
+                if (!sport) {
+                  return null;
+                }
+                return (
+                  <View key={sportId} style={themedStyles.sportTag}>
+                    <Text style={themedStyles.sportEmoji}>{sport.emoji}</Text>
+                    <Text style={themedStyles.sportTagText}>{sport.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={themedStyles.noInterestsText}>
+              No interests added yet
+            </Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

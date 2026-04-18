@@ -365,25 +365,26 @@ const SpaceDetail: React.FC = () => {
         header: {
           flexDirection: 'row',
           alignItems: 'center',
-          padding: 16,
-          borderBottomWidth: 1,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
-          backgroundColor: colors.card,
+          backgroundColor: colors.background,
         },
         backButton: {
           padding: 8,
-          marginRight: 12,
+          marginRight: 8,
         },
         headerContent: {
           flex: 1,
         },
         headerTitle: {
-          fontSize: 20,
+          fontSize: 16,
           fontWeight: '700',
           color: colors.text,
         },
         headerSubtitle: {
-          fontSize: 14,
+          fontSize: 12,
           color: colors.secondaryText,
           marginTop: 2,
         },
@@ -391,83 +392,82 @@ const SpaceDetail: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: 16,
-          backgroundColor: colors.card,
-          borderBottomWidth: 1,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          backgroundColor: colors.background,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         dateNavButton: {
-          padding: 12,
-          borderRadius: 8,
-          backgroundColor: colors.background,
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: 'transparent',
+          justifyContent: 'center',
+          alignItems: 'center',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         dateDisplay: {
           alignItems: 'center',
         },
         dateText: {
-          fontSize: 18,
+          fontSize: 15,
           fontWeight: '700',
           color: colors.text,
         },
         dateSubtext: {
-          fontSize: 13,
+          fontSize: 12,
           color: colors.secondaryText,
           marginTop: 2,
         },
         todayBadge: {
-          backgroundColor: colors.primary,
+          backgroundColor: colors.primary + '15',
           paddingHorizontal: 8,
           paddingVertical: 2,
           borderRadius: 10,
           marginTop: 4,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary,
         },
         todayText: {
-          color: '#FFFFFF',
-          fontSize: 11,
-          fontWeight: '600',
+          color: colors.primary,
+          fontSize: 10,
+          fontWeight: '700',
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.4,
         },
         slotsContainer: {
           flex: 1,
-          padding: 16,
         },
         slotCard: {
           backgroundColor: colors.card,
-          borderRadius: 12,
-          padding: 16,
-          marginBottom: 12,
-          borderLeftWidth: 4,
-          borderColor: colors.border,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
           flexDirection: 'row',
           alignItems: 'center',
         },
-        slotCardAvailable: {
-          borderLeftColor: colors.success || '#4CAF50',
-        },
+        slotCardAvailable: {},
         slotCardMyBooking: {
-          borderLeftColor: '#2196F3',
-          backgroundColor: '#2196F3' + '08',
+          backgroundColor: '#2196F3' + '0D',
         },
-        slotCardOtherBooking: {
-          borderLeftColor: '#9E9E9E',
-          backgroundColor: colors.card,
-        },
+        slotCardOtherBooking: {},
         slotCardExpanded: {
-          borderWidth: 1,
-          borderColor: colors.primary,
+          backgroundColor: colors.primary + '0A',
         },
-        slotCardBooked: {
-          // Removed opacity - using color coding instead
-        },
+        slotCardBooked: {},
         slotTime: {
-          width: 90,
+          width: 84,
         },
         slotTimeText: {
-          fontSize: 16,
+          fontSize: 15,
           fontWeight: '700',
           color: colors.text,
         },
         slotTimeRange: {
-          fontSize: 12,
+          fontSize: 11,
           color: colors.secondaryText,
           marginTop: 2,
         },
@@ -492,8 +492,8 @@ const SpaceDetail: React.FC = () => {
           backgroundColor: colors.error || '#F44336',
         },
         slotStatusText: {
-          fontSize: 14,
-          fontWeight: '600',
+          fontSize: 13,
+          fontWeight: '700',
         },
         slotStatusTextAvailable: {
           color: colors.success || '#4CAF50',
@@ -501,42 +501,104 @@ const SpaceDetail: React.FC = () => {
         slotStatusTextBooked: {
           color: colors.error || '#F44336',
         },
+        slotName: {
+          fontSize: 14,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 2,
+        },
         slotBookedBy: {
-          fontSize: 13,
+          fontSize: 12,
           color: colors.secondaryText,
           marginTop: 4,
         },
         slotPrice: {
-          fontSize: 16,
+          fontSize: 15,
           fontWeight: '700',
           color: colors.primary,
         },
         slotActions: {
           marginLeft: 12,
         },
+        slotMetaRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          marginTop: 4,
+          gap: 4,
+        },
+        slotMetaPill: {
+          paddingHorizontal: 8,
+          paddingVertical: 2,
+          borderRadius: 10,
+          borderWidth: StyleSheet.hairlineWidth,
+        },
+        slotMetaPillCategory: {
+          backgroundColor: colors.primary + '12',
+          borderColor: colors.primary + '40',
+        },
+        slotMetaPillAge: {
+          backgroundColor: '#FF9800' + '12',
+          borderColor: '#FF9800' + '40',
+        },
+        slotMetaPillText: {
+          fontSize: 10,
+          fontWeight: '700',
+        },
+        slotMetaPillTextCategory: {
+          color: colors.primary,
+        },
+        slotMetaPillTextAge: {
+          color: '#FF9800',
+        },
+        slotDescription: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          marginBottom: 10,
+          lineHeight: 18,
+        },
+        customSlotInfo: {
+          marginBottom: 16,
+        },
+        customSlotName: {
+          fontSize: 15,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 4,
+        },
+        customSlotDescription: {
+          color: colors.secondaryText,
+          fontSize: 13,
+          lineHeight: 18,
+          marginBottom: 8,
+        },
+        customSlotPillRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+        },
         bookButton: {
           backgroundColor: colors.primary,
           paddingHorizontal: 16,
           paddingVertical: 10,
-          borderRadius: 8,
+          borderRadius: 20,
         },
         bookButtonText: {
-          color: '#FFFFFF',
-          fontWeight: '600',
-          fontSize: 14,
+          color: colors.buttonText || '#FFFFFF',
+          fontWeight: '700',
+          fontSize: 13,
         },
         inquireButton: {
           backgroundColor: 'transparent',
           paddingHorizontal: 16,
           paddingVertical: 10,
-          borderRadius: 8,
-          borderWidth: 1,
+          borderRadius: 20,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.primary,
         },
         inquireButtonText: {
           color: colors.primary,
-          fontWeight: '600',
-          fontSize: 14,
+          fontWeight: '700',
+          fontSize: 13,
         },
         emptyContainer: {
           flex: 1,
@@ -545,18 +607,19 @@ const SpaceDetail: React.FC = () => {
           paddingVertical: 60,
         },
         emptyText: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.secondaryText,
           textAlign: 'center',
-          marginTop: 16,
+          marginTop: 12,
         },
         legendContainer: {
           flexDirection: 'row',
           justifyContent: 'center',
           flexWrap: 'wrap',
-          padding: 12,
-          backgroundColor: colors.card,
-          borderTopWidth: 1,
+          paddingVertical: 10,
+          paddingHorizontal: 16,
+          backgroundColor: colors.background,
+          borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
         },
         legendItem: {
@@ -566,9 +629,9 @@ const SpaceDetail: React.FC = () => {
           marginVertical: 2,
         },
         legendDot: {
-          width: 10,
-          height: 10,
-          borderRadius: 5,
+          width: 8,
+          height: 8,
+          borderRadius: 4,
           marginRight: 6,
         },
         legendMyBooking: {
@@ -578,8 +641,9 @@ const SpaceDetail: React.FC = () => {
           backgroundColor: '#9E9E9E',
         },
         legendText: {
-          fontSize: 12,
+          fontSize: 11,
           color: colors.secondaryText,
+          fontWeight: '500',
         },
         // Modal styles
         modalOverlay: {
@@ -590,54 +654,93 @@ const SpaceDetail: React.FC = () => {
         },
         modalContent: {
           backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 24,
+          borderRadius: 18,
           width: '90%',
-          maxHeight: '80%',
+          maxHeight: '85%',
+          paddingTop: 8,
+          paddingBottom: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        modalHandle: {
+          alignSelf: 'center',
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
+          marginBottom: 6,
         },
         modalTitle: {
-          fontSize: 22,
+          fontSize: 17,
           fontWeight: '700',
           color: colors.text,
-          marginBottom: 8,
+          paddingHorizontal: 20,
+          paddingBottom: 12,
           textAlign: 'center',
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         modalSubtitle: {
-          fontSize: 14,
+          fontSize: 13,
           color: colors.secondaryText,
-          marginBottom: 20,
+          marginBottom: 16,
           textAlign: 'center',
+          paddingTop: 12,
+        },
+        modalBody: {
+          paddingHorizontal: 20,
+          paddingTop: 4,
+          paddingBottom: 8,
         },
         modalSlotInfo: {
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          padding: 12,
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
           marginBottom: 16,
           alignItems: 'center',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         modalSlotTime: {
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: '700',
           color: colors.primary,
         },
         modalSlotDate: {
-          fontSize: 14,
+          fontSize: 12,
           color: colors.secondaryText,
           marginTop: 4,
         },
-        inputLabel: {
-          fontSize: 14,
-          fontWeight: '600',
+        modalSlotEventName: {
+          fontSize: 13,
           color: colors.text,
-          marginBottom: 6,
+          marginTop: 8,
+          fontWeight: '700',
+        },
+        modalHelpText: {
+          color: colors.secondaryText,
+          textAlign: 'center',
+          marginBottom: 16,
+          fontSize: 13,
+        },
+        inputLabel: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.6,
+          marginBottom: 8,
+          marginTop: 4,
         },
         input: {
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          padding: 14,
-          fontSize: 16,
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          fontSize: 14,
           color: colors.text,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           marginBottom: 16,
         },
@@ -647,29 +750,34 @@ const SpaceDetail: React.FC = () => {
         },
         submitButton: {
           backgroundColor: colors.primary,
-          borderRadius: 8,
-          padding: 16,
+          borderRadius: 24,
+          paddingVertical: 12,
           alignItems: 'center',
           marginTop: 8,
         },
         submitButtonText: {
-          color: '#FFFFFF',
-          fontSize: 16,
-          fontWeight: '600',
+          color: colors.buttonText || '#FFFFFF',
+          fontSize: 14,
+          fontWeight: '700',
         },
         cancelButton: {
-          padding: 16,
+          paddingVertical: 12,
           alignItems: 'center',
+          marginTop: 8,
+          borderRadius: 24,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         cancelButtonText: {
           color: colors.secondaryText,
-          fontSize: 16,
+          fontSize: 14,
+          fontWeight: '700',
         },
         loadingIndicator: {
           marginTop: 40,
         },
         slotsListContent: {
-          paddingVertical: 16,
+          paddingBottom: 16,
         },
         // Admin mode toggle styles
         adminModeContainer: {
@@ -678,27 +786,27 @@ const SpaceDetail: React.FC = () => {
           justifyContent: 'flex-end',
           paddingHorizontal: 16,
           paddingVertical: 8,
-          backgroundColor: colors.card,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
+          backgroundColor: colors.background,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
         },
         adminModeToggle: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.background,
+          backgroundColor: 'transparent',
           paddingHorizontal: 12,
           paddingVertical: 6,
           borderRadius: 16,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         adminModeToggleActive: {
-          backgroundColor: colors.primary + '20',
+          backgroundColor: colors.primary + '12',
           borderColor: colors.primary,
         },
         adminModeText: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: '700',
           color: colors.secondaryText,
           marginLeft: 6,
         },
@@ -712,7 +820,7 @@ const SpaceDetail: React.FC = () => {
           alignItems: 'center',
           marginTop: 12,
           paddingTop: 12,
-          borderTopWidth: 1,
+          borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
           gap: 8,
         },
@@ -721,24 +829,28 @@ const SpaceDetail: React.FC = () => {
           alignItems: 'center',
           paddingHorizontal: 14,
           paddingVertical: 8,
-          borderRadius: 8,
+          borderRadius: 20,
           gap: 6,
+          borderWidth: StyleSheet.hairlineWidth,
         },
         slotActionButtonPrimary: {
           backgroundColor: colors.primary,
+          borderColor: colors.primary,
         },
         slotActionButtonSecondary: {
-          backgroundColor: colors.primary + '20',
+          backgroundColor: 'transparent',
+          borderColor: colors.primary,
         },
         slotActionButtonDanger: {
-          backgroundColor: (colors.error || '#F44336') + '20',
+          backgroundColor: 'transparent',
+          borderColor: colors.error || '#F44336',
         },
         slotActionButtonText: {
-          fontSize: 13,
-          fontWeight: '600',
+          fontSize: 12,
+          fontWeight: '700',
         },
         slotActionButtonTextPrimary: {
-          color: '#FFFFFF',
+          color: colors.buttonText || '#FFFFFF',
         },
         slotActionButtonTextSecondary: {
           color: colors.primary,
@@ -757,27 +869,27 @@ const SpaceDetail: React.FC = () => {
           justifyContent: 'space-between',
           paddingHorizontal: 16,
           paddingVertical: 10,
-          backgroundColor: colors.card,
-          borderBottomWidth: 1,
+          backgroundColor: colors.background,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         filterButton: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.background,
+          backgroundColor: 'transparent',
           paddingHorizontal: 12,
           paddingVertical: 6,
           borderRadius: 16,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         filterButtonActive: {
-          backgroundColor: '#2196F3' + '20',
+          backgroundColor: '#2196F3' + '12',
           borderColor: '#2196F3',
         },
         filterButtonText: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: '700',
           color: colors.secondaryText,
           marginLeft: 6,
         },
@@ -802,7 +914,39 @@ const SpaceDetail: React.FC = () => {
         statText: {
           fontSize: 11,
           color: colors.secondaryText,
-          fontWeight: '500',
+          fontWeight: '600',
+        },
+        // Category filter chip strip (Day View)
+        categoryStrip: {
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          maxHeight: 48,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        categoryStripContent: {
+          gap: 8,
+          alignItems: 'center',
+        },
+        categoryChip: {
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: 'transparent',
+        },
+        categoryChipActive: {
+          borderColor: colors.primary,
+          backgroundColor: colors.primary + '12',
+        },
+        categoryChipText: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+        },
+        categoryChipTextActive: {
+          color: colors.primary,
         },
         // Admin slot management styles
         addSlotButton: {
@@ -815,11 +959,11 @@ const SpaceDetail: React.FC = () => {
           borderRadius: 28,
           justifyContent: 'center',
           alignItems: 'center',
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.25,
-          shadowRadius: 4,
-          elevation: 5,
+          shadowColor: colors.primary,
+          shadowOffset: {width: 0, height: 4},
+          shadowOpacity: 0.35,
+          shadowRadius: 8,
+          elevation: 8,
         },
         slotAdminActions: {
           flexDirection: 'row',
@@ -842,133 +986,155 @@ const SpaceDetail: React.FC = () => {
           marginHorizontal: 4,
         },
         timePickerButton: {
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          padding: 14,
-          borderWidth: 1,
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           alignItems: 'center',
         },
         timePickerButtonText: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.text,
-          fontWeight: '600',
+          fontWeight: '700',
         },
         timeOptionsContainer: {
           maxHeight: 200,
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          borderWidth: 1,
+          backgroundColor: colors.card,
+          borderRadius: 10,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          marginTop: 4,
+          marginTop: 6,
+          overflow: 'hidden',
         },
         timeOption: {
-          padding: 12,
-          borderBottomWidth: 1,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         timeOptionText: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.text,
           textAlign: 'center',
+          fontWeight: '500',
         },
         timeOptionSelected: {
-          backgroundColor: colors.primary + '20',
+          backgroundColor: colors.primary + '0D',
+        },
+        timeOptionTextSelected: {
+          color: colors.primary,
+          fontWeight: '700',
         },
         deleteButton: {
-          backgroundColor: colors.error || '#F44336',
-          borderRadius: 8,
-          padding: 16,
+          backgroundColor: 'transparent',
+          borderRadius: 24,
+          paddingVertical: 12,
           alignItems: 'center',
           marginTop: 8,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.error || '#F44336',
         },
         deleteButtonText: {
-          color: '#FFFFFF',
-          fontSize: 16,
-          fontWeight: '600',
+          color: colors.error || '#F44336',
+          fontSize: 14,
+          fontWeight: '700',
         },
         resetButton: {
-          borderRadius: 8,
-          padding: 14,
+          borderRadius: 24,
+          paddingVertical: 12,
           alignItems: 'center',
           marginTop: 8,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          backgroundColor: colors.background,
+          backgroundColor: 'transparent',
         },
         resetButtonText: {
           color: colors.secondaryText,
-          fontSize: 14,
-          fontWeight: '600',
+          fontSize: 13,
+          fontWeight: '700',
         },
         pickerButton: {
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          padding: 14,
-          borderWidth: 1,
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
         },
         pickerButtonText: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.text,
+          fontWeight: '500',
         },
         pickerPlaceholder: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.secondaryText,
         },
         pickerOptionsContainer: {
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          borderWidth: 1,
+          backgroundColor: colors.card,
+          borderRadius: 10,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          marginTop: 4,
+          marginTop: 6,
           overflow: 'hidden',
         },
         pickerOption: {
-          padding: 12,
-          borderBottomWidth: 1,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         pickerOptionSelected: {
-          backgroundColor: colors.primary + '20',
+          backgroundColor: colors.primary + '0D',
         },
         pickerOptionText: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.text,
           textAlign: 'center',
+          fontWeight: '500',
+        },
+        pickerOptionTextSelected: {
+          color: colors.primary,
+          fontWeight: '700',
         },
         // View mode toggle styles
         viewModeContainer: {
           flexDirection: 'row',
           justifyContent: 'center',
-          paddingVertical: 8,
-          backgroundColor: colors.card,
-          borderBottomWidth: 1,
+          paddingVertical: 10,
+          paddingHorizontal: 16,
+          backgroundColor: colors.background,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
+          gap: 8,
         },
         viewModeButton: {
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 16,
           paddingVertical: 8,
-          marginHorizontal: 4,
           borderRadius: 20,
-          backgroundColor: colors.background,
+          backgroundColor: 'transparent',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         viewModeButtonActive: {
           backgroundColor: colors.primary,
+          borderColor: colors.primary,
         },
         viewModeButtonText: {
-          fontSize: 14,
-          fontWeight: '600',
+          fontSize: 13,
+          fontWeight: '700',
           color: colors.secondaryText,
           marginLeft: 6,
         },
         viewModeButtonTextActive: {
-          color: '#FFFFFF',
+          color: colors.buttonText || '#FFFFFF',
         },
         // Week view styles
         weekContainer: {
@@ -976,16 +1142,16 @@ const SpaceDetail: React.FC = () => {
         },
         weekHeader: {
           flexDirection: 'row',
-          backgroundColor: colors.card,
-          borderBottomWidth: 2,
+          backgroundColor: colors.background,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         weekHeaderTime: {
-          width: 60,
+          width: 56,
           paddingVertical: 10,
           alignItems: 'center',
           justifyContent: 'center',
-          borderRightWidth: 1,
+          borderRightWidth: StyleSheet.hairlineWidth,
           borderRightColor: colors.border,
         },
         weekHeaderDay: {
@@ -993,23 +1159,25 @@ const SpaceDetail: React.FC = () => {
           paddingVertical: 10,
           alignItems: 'center',
           justifyContent: 'center',
-          borderRightWidth: 1,
+          borderRightWidth: StyleSheet.hairlineWidth,
           borderRightColor: colors.border,
         },
         weekHeaderDayText: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: '600',
           color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.4,
         },
         weekHeaderDateText: {
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: '700',
           color: colors.text,
           marginTop: 2,
         },
         weekHeaderToday: {
-          backgroundColor: colors.primary + '25',
-          borderBottomWidth: 3,
+          backgroundColor: colors.primary + '12',
+          borderBottomWidth: 2,
           borderBottomColor: colors.primary,
         },
         weekHeaderTodayText: {
@@ -1019,25 +1187,25 @@ const SpaceDetail: React.FC = () => {
           flexDirection: 'row',
         },
         weekTimeColumn: {
-          width: 60,
-          borderRightWidth: 1,
+          width: 56,
+          borderRightWidth: StyleSheet.hairlineWidth,
           borderRightColor: colors.border,
         },
         weekTimeCell: {
           height: 50,
           justifyContent: 'center',
           alignItems: 'center',
-          borderBottomWidth: 1,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         weekTimeCellText: {
           fontSize: 10,
           color: colors.secondaryText,
-          fontWeight: '500',
+          fontWeight: '600',
         },
         weekDayColumn: {
           flex: 1,
-          borderRightWidth: 1,
+          borderRightWidth: StyleSheet.hairlineWidth,
           borderRightColor: colors.border,
         },
         weekDayColumnToday: {
@@ -1045,27 +1213,27 @@ const SpaceDetail: React.FC = () => {
         },
         weekSlotCell: {
           height: 50,
-          borderBottomWidth: 1,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
           justifyContent: 'center',
           alignItems: 'center',
           padding: 2,
         },
         weekSlotAvailable: {
-          backgroundColor: (colors.success || '#4CAF50') + '15',
+          backgroundColor: (colors.success || '#4CAF50') + '12',
         },
         weekSlotBooked: {
-          backgroundColor: (colors.error || '#F44336') + '30',
+          backgroundColor: (colors.error || '#F44336') + '20',
         },
         weekSlotMyBooking: {
-          backgroundColor: '#2196F3' + '35',
+          backgroundColor: '#2196F3' + '25',
         },
         weekSlotTextMyBooking: {
           color: '#2196F3',
         },
         weekSlotText: {
           fontSize: 10,
-          fontWeight: '600',
+          fontWeight: '700',
           textAlign: 'center',
         },
         weekSlotTextAvailable: {
@@ -1085,10 +1253,11 @@ const SpaceDetail: React.FC = () => {
         // Recurring booking styles
         recurringContainer: {
           marginTop: 16,
-          padding: 12,
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          borderWidth: 1,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         recurringToggle: {
@@ -1101,8 +1270,8 @@ const SpaceDetail: React.FC = () => {
           alignItems: 'center',
         },
         recurringToggleText: {
-          fontSize: 16,
-          fontWeight: '600',
+          fontSize: 14,
+          fontWeight: '700',
           color: colors.text,
           marginLeft: 10,
         },
@@ -1113,19 +1282,21 @@ const SpaceDetail: React.FC = () => {
           marginLeft: 28,
         },
         recurringSwitch: {
-          transform: [{scaleX: 0.9}, {scaleY: 0.9}],
+          transform: [{scaleX: 0.85}, {scaleY: 0.85}],
         },
         recurringOptions: {
           marginTop: 12,
           paddingTop: 12,
-          borderTopWidth: 1,
+          borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
         },
         recurringOptionsLabel: {
-          fontSize: 14,
-          fontWeight: '600',
-          color: colors.text,
-          marginBottom: 8,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.6,
+          marginBottom: 10,
         },
         recurringOptionsRow: {
           flexDirection: 'row',
@@ -1133,35 +1304,39 @@ const SpaceDetail: React.FC = () => {
           gap: 8,
         },
         recurringOptionButton: {
-          paddingHorizontal: 14,
-          paddingVertical: 8,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
           borderRadius: 16,
-          backgroundColor: colors.background,
-          borderWidth: 1,
+          backgroundColor: 'transparent',
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         recurringOptionButtonActive: {
-          backgroundColor: colors.primary,
+          backgroundColor: colors.primary + '12',
           borderColor: colors.primary,
         },
         recurringOptionText: {
-          fontSize: 14,
-          fontWeight: '600',
-          color: colors.secondaryText,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.text,
         },
         recurringOptionTextActive: {
-          color: '#FFFFFF',
+          color: colors.primary,
         },
         recurringSummary: {
           marginTop: 12,
-          padding: 10,
-          backgroundColor: colors.primary + '15',
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          backgroundColor: colors.primary + '0D',
           borderRadius: 8,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '40',
         },
         recurringSummaryText: {
-          fontSize: 13,
+          fontSize: 12,
           color: colors.text,
           textAlign: 'center',
+          fontWeight: '500',
         },
       }),
     [colors],
@@ -1967,7 +2142,7 @@ const SpaceDetail: React.FC = () => {
 
             <View style={themedStyles.slotInfo}>
               {item.name ? (
-                <Text style={{fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 2}} numberOfLines={1}>
+                <Text style={themedStyles.slotName} numberOfLines={1}>
                   {item.name}
                 </Text>
               ) : null}
@@ -1992,15 +2167,35 @@ const SpaceDetail: React.FC = () => {
                 </Text>
               )}
               {(item.category || item.ageRestriction) && (
-                <View style={{flexDirection: 'row', flexWrap: 'wrap', marginTop: 4, gap: 4}}>
+                <View style={themedStyles.slotMetaRow}>
                   {item.category ? (
-                    <View style={{backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
-                      <Text style={{fontSize: 11, color: colors.primary, fontWeight: '600'}}>{item.category}</Text>
+                    <View
+                      style={[
+                        themedStyles.slotMetaPill,
+                        themedStyles.slotMetaPillCategory,
+                      ]}>
+                      <Text
+                        style={[
+                          themedStyles.slotMetaPillText,
+                          themedStyles.slotMetaPillTextCategory,
+                        ]}>
+                        {item.category}
+                      </Text>
                     </View>
                   ) : null}
                   {item.ageRestriction ? (
-                    <View style={{backgroundColor: '#FF9800' + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
-                      <Text style={{fontSize: 11, color: '#FF9800', fontWeight: '600'}}>{item.ageRestriction}</Text>
+                    <View
+                      style={[
+                        themedStyles.slotMetaPill,
+                        themedStyles.slotMetaPillAge,
+                      ]}>
+                      <Text
+                        style={[
+                          themedStyles.slotMetaPillText,
+                          themedStyles.slotMetaPillTextAge,
+                        ]}>
+                        {item.ageRestriction}
+                      </Text>
                     </View>
                   ) : null}
                 </View>
@@ -2024,7 +2219,7 @@ const SpaceDetail: React.FC = () => {
           {isExpanded && (
             <View style={themedStyles.slotExpandedActions}>
               {item.description ? (
-                <Text style={{fontSize: 13, color: colors.secondaryText, marginBottom: 10, lineHeight: 18}}>
+                <Text style={themedStyles.slotDescription}>
                   {item.description}
                 </Text>
               ) : null}
@@ -2197,12 +2392,15 @@ const SpaceDetail: React.FC = () => {
             activeOpacity={1}
             style={themedStyles.modalContent}
             onPress={e => e.stopPropagation()}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={themedStyles.modalTitle}>
-                {isEditing
-                  ? t('venues.editBooking') || 'Edit Booking'
-                  : t('venues.bookSlot')}
-              </Text>
+            <View style={themedStyles.modalHandle} />
+            <Text style={themedStyles.modalTitle}>
+              {isEditing
+                ? t('venues.editBooking') || 'Edit Booking'
+                : t('venues.bookSlot')}
+            </Text>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={themedStyles.modalBody}>
               <Text style={themedStyles.modalSubtitle}>
                 {spaceName} @{' '}
                 {selectedSlot
@@ -2220,27 +2418,43 @@ const SpaceDetail: React.FC = () => {
               )}
 
               {selectedSlot?.isCustom && selectedSlot?.name ? (
-                <View style={{marginBottom: 16}}>
-                  <Text style={[themedStyles.inputLabel, {marginBottom: 4}]}>
+                <View style={themedStyles.customSlotInfo}>
+                  <Text style={themedStyles.customSlotName}>
                     {selectedSlot.name}
                   </Text>
                   {selectedSlot.description ? (
-                    <Text style={{color: colors.secondaryText, fontSize: 14, marginBottom: 8}}>
+                    <Text style={themedStyles.customSlotDescription}>
                       {selectedSlot.description}
                     </Text>
                   ) : null}
-                  {(selectedSlot.category || selectedSlot.ageRestriction) ? (
-                    <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+                  {selectedSlot.category || selectedSlot.ageRestriction ? (
+                    <View style={themedStyles.customSlotPillRow}>
                       {selectedSlot.category ? (
-                        <View style={{backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
-                          <Text style={{fontSize: 12, color: colors.primary, fontWeight: '600'}}>
+                        <View
+                          style={[
+                            themedStyles.slotMetaPill,
+                            themedStyles.slotMetaPillCategory,
+                          ]}>
+                          <Text
+                            style={[
+                              themedStyles.slotMetaPillText,
+                              themedStyles.slotMetaPillTextCategory,
+                            ]}>
                             {selectedSlot.category}
                           </Text>
                         </View>
                       ) : null}
                       {selectedSlot.ageRestriction ? (
-                        <View style={{backgroundColor: '#FF9800' + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10}}>
-                          <Text style={{fontSize: 12, color: '#FF9800', fontWeight: '600'}}>
+                        <View
+                          style={[
+                            themedStyles.slotMetaPill,
+                            themedStyles.slotMetaPillAge,
+                          ]}>
+                          <Text
+                            style={[
+                              themedStyles.slotMetaPillText,
+                              themedStyles.slotMetaPillTextAge,
+                            ]}>
                             {selectedSlot.ageRestriction}
                           </Text>
                         </View>
@@ -2356,7 +2570,7 @@ const SpaceDetail: React.FC = () => {
                 onPress={submitBooking}
                 disabled={booking}>
                 {booking ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color={colors.buttonText || '#FFFFFF'} />
                 ) : (
                   <Text style={themedStyles.submitButtonText}>
                     {getBookButtonText()}
@@ -2399,64 +2613,57 @@ const SpaceDetail: React.FC = () => {
           activeOpacity={1}
           style={themedStyles.modalContent}
           onPress={e => e.stopPropagation()}>
+          <View style={themedStyles.modalHandle} />
           <Text style={themedStyles.modalTitle}>
             {viewingSlot?.isBooked
               ? t('venues.slotDetails') || 'Slot Details'
               : t('venues.availableSlot') || 'Available Slot'}
           </Text>
-          <Text style={themedStyles.modalSubtitle}>
-            {spaceName} @{' '}
-            {viewingSlot ? formatDateString(viewingSlot.date) : ''}
-          </Text>
+          <View style={themedStyles.modalBody}>
+            <Text style={themedStyles.modalSubtitle}>
+              {spaceName} @{' '}
+              {viewingSlot ? formatDateString(viewingSlot.date) : ''}
+            </Text>
 
-          {viewingSlot && (
-            <View style={themedStyles.modalSlotInfo}>
-              <Text style={themedStyles.modalSlotTime}>
-                {formatTime(viewingSlot.startTime)} -{' '}
-                {formatTime(viewingSlot.endTime)}
+            {viewingSlot && (
+              <View style={themedStyles.modalSlotInfo}>
+                <Text style={themedStyles.modalSlotTime}>
+                  {formatTime(viewingSlot.startTime)} -{' '}
+                  {formatTime(viewingSlot.endTime)}
+                </Text>
+                {viewingSlot.isBooked ? (
+                  <>
+                    {viewingSlot.eventName && (
+                      <Text style={themedStyles.modalSlotEventName}>
+                        {viewingSlot.eventName}
+                      </Text>
+                    )}
+                    {viewingSlot.bookedByUsername && (
+                      <Text style={themedStyles.modalSlotDate}>
+                        {t('venues.bookedBy') || 'Booked by'}{' '}
+                        {viewingSlot.bookedByUsername}
+                      </Text>
+                    )}
+                  </>
+                ) : null}
+              </View>
+            )}
+
+            {viewingSlot && !viewingSlot.isBooked && (
+              <Text style={themedStyles.modalHelpText}>
+                {t('venues.switchToDayView') ||
+                  'Switch to Day view to book this slot'}
               </Text>
-              {viewingSlot.isBooked ? (
-                <>
-                  {viewingSlot.eventName && (
-                    <Text
-                      style={[
-                        themedStyles.modalSlotDate,
-                        {marginTop: 8, fontWeight: '600'},
-                      ]}>
-                      {viewingSlot.eventName}
-                    </Text>
-                  )}
-                  {viewingSlot.bookedByUsername && (
-                    <Text style={themedStyles.modalSlotDate}>
-                      {t('venues.bookedBy') || 'Booked by'}{' '}
-                      {viewingSlot.bookedByUsername}
-                    </Text>
-                  )}
-                </>
-              ) : null}
-            </View>
-          )}
+            )}
 
-          {viewingSlot && !viewingSlot.isBooked && (
-            <Text
-              style={{
-                color: colors.secondaryText,
-                textAlign: 'center',
-                marginBottom: 16,
-                fontSize: 14,
-              }}>
-              {t('venues.switchToDayView') ||
-                'Switch to Day view to book this slot'}
-            </Text>
-          )}
-
-          <TouchableOpacity
-            style={themedStyles.cancelButton}
-            onPress={() => setShowSlotDetailModal(false)}>
-            <Text style={themedStyles.cancelButtonText}>
-              {t('common.close') || 'Close'}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={themedStyles.cancelButton}
+              onPress={() => setShowSlotDetailModal(false)}>
+              <Text style={themedStyles.cancelButtonText}>
+                {t('common.close') || 'Close'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -2477,10 +2684,13 @@ const SpaceDetail: React.FC = () => {
           activeOpacity={1}
           style={themedStyles.modalContent}
           onPress={e => e.stopPropagation()}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={themedStyles.modalTitle}>
-              {t('venues.inquireSlot')}
-            </Text>
+          <View style={themedStyles.modalHandle} />
+          <Text style={themedStyles.modalTitle}>
+            {t('venues.inquireSlot')}
+          </Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={themedStyles.modalBody}>
             <Text style={themedStyles.modalSubtitle}>
               {t('venues.inquireDescription')}
             </Text>
@@ -2520,7 +2730,7 @@ const SpaceDetail: React.FC = () => {
               onPress={submitInquiry}
               disabled={sendingInquiry}>
               {sendingInquiry ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.buttonText || '#FFFFFF'} />
               ) : (
                 <Text style={themedStyles.submitButtonText}>
                   {t('venues.sendInquiry')}
@@ -2556,10 +2766,13 @@ const SpaceDetail: React.FC = () => {
           activeOpacity={1}
           style={themedStyles.modalContent}
           onPress={e => e.stopPropagation()}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={themedStyles.modalTitle}>
-              {t('venues.addTimeSlot') || 'Add Time Slot'}
-            </Text>
+          <View style={themedStyles.modalHandle} />
+          <Text style={themedStyles.modalTitle}>
+            {t('venues.addTimeSlot') || 'Add Time Slot'}
+          </Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={themedStyles.modalBody}>
             <Text style={themedStyles.modalSubtitle}>
               {formatDate(selectedDate)}
             </Text>
@@ -2591,7 +2804,12 @@ const SpaceDetail: React.FC = () => {
                         setNewSlotStartTime(time);
                         setShowStartTimePicker(false);
                       }}>
-                      <Text style={themedStyles.timeOptionText}>
+                      <Text
+                        style={[
+                          themedStyles.timeOptionText,
+                          time === newSlotStartTime &&
+                            themedStyles.timeOptionTextSelected,
+                        ]}>
                         {formatTime(time)}
                       </Text>
                     </TouchableOpacity>
@@ -2627,7 +2845,12 @@ const SpaceDetail: React.FC = () => {
                         setNewSlotEndTime(time);
                         setShowEndTimePicker(false);
                       }}>
-                      <Text style={themedStyles.timeOptionText}>
+                      <Text
+                        style={[
+                          themedStyles.timeOptionText,
+                          time === newSlotEndTime &&
+                            themedStyles.timeOptionTextSelected,
+                        ]}>
                         {formatTime(time)}
                       </Text>
                     </TouchableOpacity>
@@ -2648,9 +2871,7 @@ const SpaceDetail: React.FC = () => {
               keyboardType="numeric"
             />
 
-            <Text style={themedStyles.inputLabel}>
-              {'Slot Name'}
-            </Text>
+            <Text style={themedStyles.inputLabel}>{'Slot Name'}</Text>
             <TextInput
               style={themedStyles.input}
               placeholder="e.g. Adult Open Skate"
@@ -2660,16 +2881,19 @@ const SpaceDetail: React.FC = () => {
             />
 
             <View style={themedStyles.timePickerContainer}>
-              <Text style={themedStyles.inputLabel}>
-                {'Category'}
-              </Text>
+              <Text style={themedStyles.inputLabel}>{'Category'}</Text>
               <TouchableOpacity
                 style={themedStyles.pickerButton}
                 onPress={() => {
                   setShowCategoryPicker(!showCategoryPicker);
                   setShowAgeRestrictionPicker(false);
                 }}>
-                <Text style={newSlotCategory ? themedStyles.pickerButtonText : themedStyles.pickerPlaceholder}>
+                <Text
+                  style={
+                    newSlotCategory
+                      ? themedStyles.pickerButtonText
+                      : themedStyles.pickerPlaceholder
+                  }>
                   {newSlotCategory || 'Select a category'}
                 </Text>
                 <FontAwesomeIcon
@@ -2687,13 +2911,21 @@ const SpaceDetail: React.FC = () => {
                       key={`add-cat-${option}`}
                       style={[
                         themedStyles.pickerOption,
-                        option === newSlotCategory && themedStyles.pickerOptionSelected,
+                        option === newSlotCategory &&
+                          themedStyles.pickerOptionSelected,
                       ]}
                       onPress={() => {
-                        setNewSlotCategory(option === newSlotCategory ? '' : option);
+                        setNewSlotCategory(
+                          option === newSlotCategory ? '' : option,
+                        );
                         setShowCategoryPicker(false);
                       }}>
-                      <Text style={themedStyles.pickerOptionText}>
+                      <Text
+                        style={[
+                          themedStyles.pickerOptionText,
+                          option === newSlotCategory &&
+                            themedStyles.pickerOptionTextSelected,
+                        ]}>
                         {option}
                       </Text>
                     </TouchableOpacity>
@@ -2703,16 +2935,19 @@ const SpaceDetail: React.FC = () => {
             </View>
 
             <View style={themedStyles.timePickerContainer}>
-              <Text style={themedStyles.inputLabel}>
-                {'Age Restriction'}
-              </Text>
+              <Text style={themedStyles.inputLabel}>{'Age Restriction'}</Text>
               <TouchableOpacity
                 style={themedStyles.pickerButton}
                 onPress={() => {
                   setShowAgeRestrictionPicker(!showAgeRestrictionPicker);
                   setShowCategoryPicker(false);
                 }}>
-                <Text style={newSlotAgeRestriction ? themedStyles.pickerButtonText : themedStyles.pickerPlaceholder}>
+                <Text
+                  style={
+                    newSlotAgeRestriction
+                      ? themedStyles.pickerButtonText
+                      : themedStyles.pickerPlaceholder
+                  }>
                   {newSlotAgeRestriction || 'Select age restriction'}
                 </Text>
                 <FontAwesomeIcon
@@ -2730,13 +2965,21 @@ const SpaceDetail: React.FC = () => {
                       key={`add-age-${option}`}
                       style={[
                         themedStyles.pickerOption,
-                        option === newSlotAgeRestriction && themedStyles.pickerOptionSelected,
+                        option === newSlotAgeRestriction &&
+                          themedStyles.pickerOptionSelected,
                       ]}
                       onPress={() => {
-                        setNewSlotAgeRestriction(option === newSlotAgeRestriction ? '' : option);
+                        setNewSlotAgeRestriction(
+                          option === newSlotAgeRestriction ? '' : option,
+                        );
                         setShowAgeRestrictionPicker(false);
                       }}>
-                      <Text style={themedStyles.pickerOptionText}>
+                      <Text
+                        style={[
+                          themedStyles.pickerOptionText,
+                          option === newSlotAgeRestriction &&
+                            themedStyles.pickerOptionTextSelected,
+                        ]}>
                         {option}
                       </Text>
                     </TouchableOpacity>
@@ -2745,11 +2988,9 @@ const SpaceDetail: React.FC = () => {
               )}
             </View>
 
-            <Text style={themedStyles.inputLabel}>
-              {'Description / Notes'}
-            </Text>
+            <Text style={themedStyles.inputLabel}>{'Description / Notes'}</Text>
             <TextInput
-              style={[themedStyles.input, {height: 80, textAlignVertical: 'top', paddingTop: 10}]}
+              style={[themedStyles.input, themedStyles.textArea]}
               placeholder="e.g. Helmets required, bring your own gear"
               placeholderTextColor={colors.secondaryText}
               value={newSlotDescription}
@@ -2762,7 +3003,7 @@ const SpaceDetail: React.FC = () => {
               onPress={saveNewSlot}
               disabled={savingSlot}>
               {savingSlot ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.buttonText || '#FFFFFF'} />
               ) : (
                 <Text style={themedStyles.submitButtonText}>
                   {t('venues.addSlot') || 'Add Slot'}
@@ -2798,10 +3039,13 @@ const SpaceDetail: React.FC = () => {
           activeOpacity={1}
           style={themedStyles.modalContent}
           onPress={e => e.stopPropagation()}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={themedStyles.modalTitle}>
-              {t('venues.editTimeSlot') || 'Edit Time Slot'}
-            </Text>
+          <View style={themedStyles.modalHandle} />
+          <Text style={themedStyles.modalTitle}>
+            {t('venues.editTimeSlot') || 'Edit Time Slot'}
+          </Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={themedStyles.modalBody}>
             <Text style={themedStyles.modalSubtitle}>
               {formatDate(selectedDate)}
             </Text>
@@ -2833,7 +3077,12 @@ const SpaceDetail: React.FC = () => {
                         setNewSlotStartTime(time);
                         setShowStartTimePicker(false);
                       }}>
-                      <Text style={themedStyles.timeOptionText}>
+                      <Text
+                        style={[
+                          themedStyles.timeOptionText,
+                          time === newSlotStartTime &&
+                            themedStyles.timeOptionTextSelected,
+                        ]}>
                         {formatTime(time)}
                       </Text>
                     </TouchableOpacity>
@@ -2869,7 +3118,12 @@ const SpaceDetail: React.FC = () => {
                         setNewSlotEndTime(time);
                         setShowEndTimePicker(false);
                       }}>
-                      <Text style={themedStyles.timeOptionText}>
+                      <Text
+                        style={[
+                          themedStyles.timeOptionText,
+                          time === newSlotEndTime &&
+                            themedStyles.timeOptionTextSelected,
+                        ]}>
                         {formatTime(time)}
                       </Text>
                     </TouchableOpacity>
@@ -2890,9 +3144,7 @@ const SpaceDetail: React.FC = () => {
               keyboardType="numeric"
             />
 
-            <Text style={themedStyles.inputLabel}>
-              {'Slot Name'}
-            </Text>
+            <Text style={themedStyles.inputLabel}>{'Slot Name'}</Text>
             <TextInput
               style={themedStyles.input}
               placeholder="e.g. Adult Open Skate"
@@ -2902,16 +3154,19 @@ const SpaceDetail: React.FC = () => {
             />
 
             <View style={themedStyles.timePickerContainer}>
-              <Text style={themedStyles.inputLabel}>
-                {'Category'}
-              </Text>
+              <Text style={themedStyles.inputLabel}>{'Category'}</Text>
               <TouchableOpacity
                 style={themedStyles.pickerButton}
                 onPress={() => {
                   setShowCategoryPicker(!showCategoryPicker);
                   setShowAgeRestrictionPicker(false);
                 }}>
-                <Text style={newSlotCategory ? themedStyles.pickerButtonText : themedStyles.pickerPlaceholder}>
+                <Text
+                  style={
+                    newSlotCategory
+                      ? themedStyles.pickerButtonText
+                      : themedStyles.pickerPlaceholder
+                  }>
                   {newSlotCategory || 'Select a category'}
                 </Text>
                 <FontAwesomeIcon
@@ -2929,13 +3184,21 @@ const SpaceDetail: React.FC = () => {
                       key={`edit-cat-${option}`}
                       style={[
                         themedStyles.pickerOption,
-                        option === newSlotCategory && themedStyles.pickerOptionSelected,
+                        option === newSlotCategory &&
+                          themedStyles.pickerOptionSelected,
                       ]}
                       onPress={() => {
-                        setNewSlotCategory(option === newSlotCategory ? '' : option);
+                        setNewSlotCategory(
+                          option === newSlotCategory ? '' : option,
+                        );
                         setShowCategoryPicker(false);
                       }}>
-                      <Text style={themedStyles.pickerOptionText}>
+                      <Text
+                        style={[
+                          themedStyles.pickerOptionText,
+                          option === newSlotCategory &&
+                            themedStyles.pickerOptionTextSelected,
+                        ]}>
                         {option}
                       </Text>
                     </TouchableOpacity>
@@ -2945,16 +3208,19 @@ const SpaceDetail: React.FC = () => {
             </View>
 
             <View style={themedStyles.timePickerContainer}>
-              <Text style={themedStyles.inputLabel}>
-                {'Age Restriction'}
-              </Text>
+              <Text style={themedStyles.inputLabel}>{'Age Restriction'}</Text>
               <TouchableOpacity
                 style={themedStyles.pickerButton}
                 onPress={() => {
                   setShowAgeRestrictionPicker(!showAgeRestrictionPicker);
                   setShowCategoryPicker(false);
                 }}>
-                <Text style={newSlotAgeRestriction ? themedStyles.pickerButtonText : themedStyles.pickerPlaceholder}>
+                <Text
+                  style={
+                    newSlotAgeRestriction
+                      ? themedStyles.pickerButtonText
+                      : themedStyles.pickerPlaceholder
+                  }>
                   {newSlotAgeRestriction || 'Select age restriction'}
                 </Text>
                 <FontAwesomeIcon
@@ -2972,13 +3238,21 @@ const SpaceDetail: React.FC = () => {
                       key={`edit-age-${option}`}
                       style={[
                         themedStyles.pickerOption,
-                        option === newSlotAgeRestriction && themedStyles.pickerOptionSelected,
+                        option === newSlotAgeRestriction &&
+                          themedStyles.pickerOptionSelected,
                       ]}
                       onPress={() => {
-                        setNewSlotAgeRestriction(option === newSlotAgeRestriction ? '' : option);
+                        setNewSlotAgeRestriction(
+                          option === newSlotAgeRestriction ? '' : option,
+                        );
                         setShowAgeRestrictionPicker(false);
                       }}>
-                      <Text style={themedStyles.pickerOptionText}>
+                      <Text
+                        style={[
+                          themedStyles.pickerOptionText,
+                          option === newSlotAgeRestriction &&
+                            themedStyles.pickerOptionTextSelected,
+                        ]}>
                         {option}
                       </Text>
                     </TouchableOpacity>
@@ -2987,11 +3261,9 @@ const SpaceDetail: React.FC = () => {
               )}
             </View>
 
-            <Text style={themedStyles.inputLabel}>
-              {'Description / Notes'}
-            </Text>
+            <Text style={themedStyles.inputLabel}>{'Description / Notes'}</Text>
             <TextInput
-              style={[themedStyles.input, {height: 80, textAlignVertical: 'top', paddingTop: 10}]}
+              style={[themedStyles.input, themedStyles.textArea]}
               placeholder="e.g. Helmets required, bring your own gear"
               placeholderTextColor={colors.secondaryText}
               value={newSlotDescription}
@@ -3004,7 +3276,7 @@ const SpaceDetail: React.FC = () => {
               onPress={saveEditedSlot}
               disabled={savingSlot}>
               {savingSlot ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.buttonText || '#FFFFFF'} />
               ) : (
                 <Text style={themedStyles.submitButtonText}>
                   {t('venues.saveChanges') || 'Save Changes'}
@@ -3260,7 +3532,7 @@ const SpaceDetail: React.FC = () => {
           <TouchableOpacity
             style={themedStyles.backButton}
             onPress={() => navigation.goBack()}>
-            <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
+            <FontAwesomeIcon icon={faArrowLeft} size={18} color={colors.text} />
           </TouchableOpacity>
           <View style={themedStyles.headerContent}>
             <Text style={themedStyles.headerTitle}>{spaceName}</Text>
@@ -3282,7 +3554,7 @@ const SpaceDetail: React.FC = () => {
         <TouchableOpacity
           style={themedStyles.backButton}
           onPress={() => navigation.goBack()}>
-          <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
+          <FontAwesomeIcon icon={faArrowLeft} size={18} color={colors.text} />
         </TouchableOpacity>
         <View style={themedStyles.headerContent}>
           <Text style={themedStyles.headerTitle}>
@@ -3304,8 +3576,12 @@ const SpaceDetail: React.FC = () => {
           onPress={() => setViewMode('day')}>
           <FontAwesomeIcon
             icon={faCalendarDay}
-            size={14}
-            color={viewMode === 'day' ? '#FFFFFF' : colors.secondaryText}
+            size={13}
+            color={
+              viewMode === 'day'
+                ? colors.buttonText || '#FFFFFF'
+                : colors.secondaryText
+            }
           />
           <Text
             style={[
@@ -3323,8 +3599,12 @@ const SpaceDetail: React.FC = () => {
           onPress={() => setViewMode('week')}>
           <FontAwesomeIcon
             icon={faCalendarWeek}
-            size={14}
-            color={viewMode === 'week' ? '#FFFFFF' : colors.secondaryText}
+            size={13}
+            color={
+              viewMode === 'week'
+                ? colors.buttonText || '#FFFFFF'
+                : colors.secondaryText
+            }
           />
           <Text
             style={[
@@ -3341,7 +3621,11 @@ const SpaceDetail: React.FC = () => {
         <TouchableOpacity
           style={themedStyles.dateNavButton}
           onPress={goToPreviousDay}>
-          <FontAwesomeIcon icon={faChevronLeft} size={18} color={colors.text} />
+          <FontAwesomeIcon
+            icon={faChevronLeft}
+            size={14}
+            color={colors.text}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -3367,7 +3651,7 @@ const SpaceDetail: React.FC = () => {
           onPress={goToNextDay}>
           <FontAwesomeIcon
             icon={faChevronRight}
-            size={18}
+            size={14}
             color={colors.text}
           />
         </TouchableOpacity>
@@ -3450,49 +3734,65 @@ const SpaceDetail: React.FC = () => {
       )}
 
       {/* Category Filter Chips - Day View Only */}
-      {viewMode === 'day' && (() => {
-        const categories = Array.from(new Set(timeSlots.map(s => s.category).filter((c): c is string => !!c)));
-        if (categories.length === 0) return null;
-        return (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{paddingHorizontal: 16, paddingVertical: 8, maxHeight: 44}}
-            contentContainerStyle={{gap: 8, alignItems: 'center'}}>
-            <TouchableOpacity
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: !selectedCategoryFilter ? colors.primary : colors.border,
-                backgroundColor: !selectedCategoryFilter ? colors.primary + '20' : colors.background,
-              }}
-              onPress={() => setSelectedCategoryFilter('')}>
-              <Text style={{fontSize: 12, fontWeight: '600', color: !selectedCategoryFilter ? colors.primary : colors.secondaryText}}>
-                All
-              </Text>
-            </TouchableOpacity>
-            {categories.map(cat => (
+      {viewMode === 'day' &&
+        (() => {
+          const categories = Array.from(
+            new Set(
+              timeSlots
+                .map(s => s.category)
+                .filter((c): c is string => !!c),
+            ),
+          );
+          if (categories.length === 0) {
+            return null;
+          }
+          return (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={themedStyles.categoryStrip}
+              contentContainerStyle={themedStyles.categoryStripContent}>
               <TouchableOpacity
-                key={cat}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: selectedCategoryFilter === cat ? colors.primary : colors.border,
-                  backgroundColor: selectedCategoryFilter === cat ? colors.primary + '20' : colors.background,
-                }}
-                onPress={() => setSelectedCategoryFilter(selectedCategoryFilter === cat ? '' : cat)}>
-                <Text style={{fontSize: 12, fontWeight: '600', color: selectedCategoryFilter === cat ? colors.primary : colors.secondaryText}}>
-                  {cat}
+                style={[
+                  themedStyles.categoryChip,
+                  !selectedCategoryFilter && themedStyles.categoryChipActive,
+                ]}
+                onPress={() => setSelectedCategoryFilter('')}>
+                <Text
+                  style={[
+                    themedStyles.categoryChipText,
+                    !selectedCategoryFilter &&
+                      themedStyles.categoryChipTextActive,
+                  ]}>
+                  All
                 </Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        );
-      })()}
+              {categories.map(cat => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    themedStyles.categoryChip,
+                    selectedCategoryFilter === cat &&
+                      themedStyles.categoryChipActive,
+                  ]}
+                  onPress={() =>
+                    setSelectedCategoryFilter(
+                      selectedCategoryFilter === cat ? '' : cat,
+                    )
+                  }>
+                  <Text
+                    style={[
+                      themedStyles.categoryChipText,
+                      selectedCategoryFilter === cat &&
+                        themedStyles.categoryChipTextActive,
+                    ]}>
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          );
+        })()}
 
       {/* Content: Day View or Week View */}
       {viewMode === 'week' ? (
@@ -3523,8 +3823,9 @@ const SpaceDetail: React.FC = () => {
             <View style={themedStyles.emptyContainer}>
               <FontAwesomeIcon
                 icon={showMyBookingsOnly ? faStar : faClock}
-                size={48}
+                size={36}
                 color={colors.secondaryText}
+                style={{opacity: 0.4}}
               />
               <Text style={themedStyles.emptyText}>
                 {showMyBookingsOnly

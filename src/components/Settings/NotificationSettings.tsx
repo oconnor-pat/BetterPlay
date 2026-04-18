@@ -4,7 +4,7 @@
  * Component for managing notification preferences
  */
 
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -33,7 +33,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
     updateSettings,
     requestPermission,
   } = useNotifications();
-  const {colors, darkMode} = useTheme();
+  const {colors} = useTheme();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRequestPermission = async () => {
@@ -86,70 +86,143 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
     }
   };
 
-  const themedStyles = {
-    container: {
-      // Remove background color - let parent modal handle it
-    },
-    text: {
-      color: darkMode ? '#fff' : '#000',
-    },
-    secondaryText: {
-      color: darkMode ? '#aaa' : '#666',
-    },
-    separator: {
-      backgroundColor: darkMode ? '#333' : '#e0e0e0',
-    },
-    card: {
-      backgroundColor: darkMode ? '#2a2a2a' : '#f5f5f5',
-    },
-    statusText: {
-      color: hasPermission ? '#4CAF50' : '#FF5722',
-    },
-  };
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          paddingBottom: 24,
+        },
+        // ── Sections ──
+        section: {
+          paddingTop: 16,
+          paddingBottom: 4,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        sectionHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          marginBottom: 8,
+        },
+        sectionTitle: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
+        },
+        statusText: {
+          fontSize: 12,
+          fontWeight: '700',
+          textTransform: 'uppercase',
+          letterSpacing: 0.4,
+        },
+        description: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          lineHeight: 19,
+          paddingHorizontal: 16,
+          paddingBottom: 14,
+        },
+        // ── Buttons (pill) ──
+        primaryButton: {
+          marginHorizontal: 16,
+          marginBottom: 14,
+          backgroundColor: colors.primary,
+          borderRadius: 24,
+          paddingVertical: 12,
+          alignItems: 'center',
+        },
+        primaryButtonText: {
+          color: '#fff',
+          fontSize: 14,
+          fontWeight: '700',
+        },
+        secondaryButton: {
+          marginHorizontal: 16,
+          marginBottom: 14,
+          backgroundColor: 'transparent',
+          borderRadius: 24,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          paddingVertical: 12,
+          alignItems: 'center',
+        },
+        secondaryButtonText: {
+          color: colors.secondaryText,
+          fontSize: 14,
+          fontWeight: '700',
+        },
+        // ── Setting rows ──
+        settingRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+        },
+        settingInfo: {
+          flex: 1,
+          marginRight: 12,
+        },
+        settingLabel: {
+          fontSize: 15,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 2,
+        },
+        settingDescription: {
+          fontSize: 12,
+          color: colors.secondaryText,
+        },
+      }),
+    [colors],
+  );
+
+  const statusColor = hasPermission ? '#4CAF50' : colors.error;
 
   return (
-    <View style={[styles.container, themedStyles.container]}>
+    <View style={styles.container}>
       {/* Permission Status */}
-      <View style={[styles.section, themedStyles.card]}>
+      <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, themedStyles.text]}>
-            System Permission
-          </Text>
-          <Text style={[styles.statusText, themedStyles.statusText]}>
+          <Text style={styles.sectionTitle}>System Permission</Text>
+          <Text style={[styles.statusText, {color: statusColor}]}>
             {getPermissionStatusText()}
           </Text>
         </View>
 
         {!hasPermission ? (
           <>
-            <Text style={[styles.description, themedStyles.secondaryText]}>
+            <Text style={styles.description}>
               Enable notifications to receive updates about events, friend
               requests, and more.
             </Text>
             <TouchableOpacity
-              style={[
-                styles.enableButton,
-                {backgroundColor: colors?.primary || '#007AFF'},
-              ]}
+              style={styles.primaryButton}
               onPress={handleRequestPermission}
               disabled={isLoading}>
-              <Text style={styles.enableButtonText}>
+              <Text style={styles.primaryButtonText}>
                 {isLoading ? 'Requesting...' : 'Enable Notifications'}
               </Text>
             </TouchableOpacity>
 
             {permissionStatus === AuthorizationStatus.DENIED && (
               <TouchableOpacity
-                style={[styles.enableButton, styles.debugButton]}
+                style={styles.secondaryButton}
                 onPress={() => notificationService.promptEnableNotifications()}>
-                <Text style={styles.enableButtonText}>
+                <Text style={styles.secondaryButtonText}>
                   Open Device Settings
                 </Text>
               </TouchableOpacity>
             )}
           </>
         ) : (
-          <Text style={[styles.description, themedStyles.secondaryText]}>
+          <Text style={styles.description}>
             You will receive notifications about events, friends, and updates.
           </Text>
         )}
@@ -157,43 +230,32 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
 
       {/* Notification Preferences */}
       {hasPermission && (
-        <View style={[styles.section, themedStyles.card]}>
-          <Text style={[styles.sectionTitle, themedStyles.text]}>
-            Notification Preferences
-          </Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Notification Preferences</Text>
+          </View>
 
           {/* Master Toggle */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                All Notifications
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>All Notifications</Text>
+              <Text style={styles.settingDescription}>
                 Master switch for all notifications
               </Text>
             </View>
             <Switch
               value={settings.enabled}
               onValueChange={value => handleToggleSetting('enabled', value)}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
 
-          <View style={[styles.separator, themedStyles.separator]} />
-
           {/* Friend Requests */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                Friend Requests
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>Friend Requests</Text>
+              <Text style={styles.settingDescription}>
                 New friend requests and acceptances
               </Text>
             </View>
@@ -203,24 +265,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 handleToggleSetting('friendRequests', value)
               }
               disabled={!settings.enabled}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
 
-          <View style={[styles.separator, themedStyles.separator]} />
-
           {/* Event Updates */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                Event Updates
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>Event Updates</Text>
+              <Text style={styles.settingDescription}>
                 Changes to events you're attending
               </Text>
             </View>
@@ -230,24 +284,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 handleToggleSetting('eventUpdates', value)
               }
               disabled={!settings.enabled}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
 
-          <View style={[styles.separator, themedStyles.separator]} />
-
           {/* Event Reminders */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                Event Reminders
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>Event Reminders</Text>
+              <Text style={styles.settingDescription}>
                 Reminders before your events start
               </Text>
             </View>
@@ -257,24 +303,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 handleToggleSetting('eventReminders', value)
               }
               disabled={!settings.enabled}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
 
-          <View style={[styles.separator, themedStyles.separator]} />
-
-          {/* Event Activity (likes, joins, leaves, comments on your events) */}
+          {/* Event Activity */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                Event Activity
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>Event Activity</Text>
+              <Text style={styles.settingDescription}>
                 Likes, joins, leaves, and comments on events you created
               </Text>
             </View>
@@ -284,24 +322,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 handleToggleSetting('eventActivity', value)
               }
               disabled={!settings.enabled}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
 
-          <View style={[styles.separator, themedStyles.separator]} />
-
           {/* Watched Events (Master) */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                Watched Events
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>Watched Events</Text>
+              <Text style={styles.settingDescription}>
                 Enable alerts for events you choose to watch
               </Text>
             </View>
@@ -311,24 +341,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 handleToggleSetting('watchedEvents', value)
               }
               disabled={!settings.enabled}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
 
-          <View style={[styles.separator, themedStyles.separator]} />
-
           {/* Watched Event Spot Alerts */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                Spots Opened Alerts
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>Spots Opened Alerts</Text>
+              <Text style={styles.settingDescription}>
                 Notify when a full watched event has an opening
               </Text>
             </View>
@@ -342,24 +364,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 handleToggleSetting('watchedEventSpotsAvailable', value)
               }
               disabled={!settings.enabled || !settings.watchedEvents}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
 
-          <View style={[styles.separator, themedStyles.separator]} />
-
           {/* Watched Event General Updates */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                Watched Event Updates
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>Watched Event Updates</Text>
+              <Text style={styles.settingDescription}>
                 General updates on watched events
               </Text>
             </View>
@@ -373,24 +387,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 handleToggleSetting('watchedEventGeneralUpdates', value)
               }
               disabled={!settings.enabled || !settings.watchedEvents}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
 
-          <View style={[styles.separator, themedStyles.separator]} />
-
           {/* Watched Event Roster Updates */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                Watched Roster Changes
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>Watched Roster Changes</Text>
+              <Text style={styles.settingDescription}>
                 Changes to roster size for watched events
               </Text>
             </View>
@@ -404,24 +410,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 handleToggleSetting('watchedEventRosterChanges', value)
               }
               disabled={!settings.enabled || !settings.watchedEvents}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
 
-          <View style={[styles.separator, themedStyles.separator]} />
-
           {/* Community Notes */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, themedStyles.text]}>
-                Community Notes
-              </Text>
-              <Text
-                style={[styles.settingDescription, themedStyles.secondaryText]}>
+              <Text style={styles.settingLabel}>Community Notes</Text>
+              <Text style={styles.settingDescription}>
                 Updates on community discussions
               </Text>
             </View>
@@ -431,10 +429,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 handleToggleSetting('communityNotes', value)
               }
               disabled={!settings.enabled}
-              trackColor={{
-                false: '#767577',
-                true: colors?.primary || '#007AFF',
-              }}
+              trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
@@ -443,12 +438,12 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
 
       {/* Debug: Copy FCM Token (for testing) */}
       {hasPermission && __DEV__ && (
-        <View style={[styles.section, themedStyles.card]}>
-          <Text style={[styles.sectionTitle, themedStyles.text]}>
-            Developer Tools
-          </Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Developer Tools</Text>
+          </View>
           <TouchableOpacity
-            style={[styles.enableButton, styles.debugButton]}
+            style={styles.secondaryButton}
             onPress={async () => {
               try {
                 const token = await notificationService.getDeviceToken();
@@ -468,11 +463,11 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 Alert.alert('Error', 'Failed to get token: ' + error);
               }
             }}>
-            <Text style={styles.enableButtonText}>Copy FCM Token</Text>
+            <Text style={styles.secondaryButtonText}>Copy FCM Token</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.enableButton, styles.testButton]}
+            style={styles.secondaryButton}
             onPress={async () => {
               try {
                 await notificationService.displayNotification({
@@ -487,84 +482,12 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
                 Alert.alert('Error', 'Failed to show notification: ' + error);
               }
             }}>
-            <Text style={styles.enableButtonText}>Send Local Test</Text>
+            <Text style={styles.secondaryButtonText}>Send Local Test</Text>
           </TouchableOpacity>
         </View>
       )}
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  section: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  description: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 4,
-  },
-  enableButton: {
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  enableButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  settingDescription: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  separator: {
-    height: 1,
-  },
-  debugButton: {
-    backgroundColor: '#666',
-    marginTop: 8,
-  },
-  testButton: {
-    backgroundColor: '#4CAF50',
-    marginTop: 8,
-  },
-});
 
 export default NotificationSettings;

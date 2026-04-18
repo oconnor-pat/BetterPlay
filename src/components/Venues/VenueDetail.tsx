@@ -49,7 +49,11 @@ import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
 import {VenueStackParamList} from './VenueList';
-import {openDirections as launchDirections} from '../../services/MapLauncher';
+import {
+  AvailableMapApp,
+  openDirections as launchDirections,
+} from '../../services/MapLauncher';
+import MapAppPicker from '../MapAppPicker/MapAppPicker';
 
 type VenueDetailRouteProp = RouteProp<VenueStackParamList, 'VenueDetail'>;
 
@@ -152,6 +156,14 @@ const VenueDetail: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
+  // Map app picker
+  const [mapPickerApps, setMapPickerApps] = useState<AvailableMapApp[]>([]);
+  const [mapPickerVisible, setMapPickerVisible] = useState<boolean>(false);
+  const presentMapPicker = useCallback((apps: AvailableMapApp[]) => {
+    setMapPickerApps(apps);
+    setMapPickerVisible(true);
+  }, []);
+
   // Add space modal
   const [showAddSpace, setShowAddSpace] = useState<boolean>(false);
   const [newSpaceName, setNewSpaceName] = useState<string>('');
@@ -170,60 +182,75 @@ const VenueDetail: React.FC = () => {
         header: {
           flexDirection: 'row',
           alignItems: 'center',
-          padding: 16,
-          borderBottomWidth: 1,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
-          backgroundColor: colors.card,
+          backgroundColor: colors.background,
         },
         backButton: {
           padding: 8,
-          marginRight: 12,
+          marginRight: 8,
         },
         headerContent: {
           flex: 1,
         },
-        headerTitle: {
+        headerEmoji: {
           fontSize: 20,
+          marginRight: 8,
+        },
+        headerTitleRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        headerTitle: {
+          fontSize: 16,
           fontWeight: '700',
           color: colors.text,
+          flexShrink: 1,
         },
         headerSubtitle: {
-          fontSize: 14,
+          fontSize: 12,
           color: colors.secondaryText,
           marginTop: 2,
         },
         venueInfo: {
-          backgroundColor: colors.card,
-          padding: 16,
-          marginBottom: 8,
+          paddingHorizontal: 16,
+          paddingTop: 14,
+          paddingBottom: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         infoRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginBottom: 12,
+          paddingVertical: 6,
+        },
+        infoIcon: {
+          marginRight: 10,
         },
         infoText: {
-          fontSize: 14,
-          color: colors.text,
-          marginLeft: 10,
+          fontSize: 13,
+          color: colors.secondaryText,
           flex: 1,
         },
         infoLink: {
           color: colors.primary,
-          textDecorationLine: 'underline',
+          fontWeight: '600',
         },
         directionsButton: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: colors.primary,
-          borderRadius: 8,
-          padding: 12,
-          marginTop: 8,
+          borderRadius: 24,
+          paddingVertical: 12,
+          marginTop: 12,
         },
         directionsText: {
-          color: '#FFFFFF',
-          fontWeight: '600',
+          color: colors.buttonText || '#FFFFFF',
+          fontWeight: '700',
+          fontSize: 14,
           marginLeft: 8,
         },
         sectionHeader: {
@@ -231,35 +258,39 @@ const VenueDetail: React.FC = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingTop: 16,
+          paddingBottom: 10,
           backgroundColor: colors.background,
         },
         sectionTitle: {
-          fontSize: 18,
+          fontSize: 12,
           fontWeight: '700',
-          color: colors.text,
+          color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.6,
         },
         addButton: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.primary,
+          backgroundColor: 'transparent',
           paddingHorizontal: 12,
-          paddingVertical: 8,
-          borderRadius: 20,
+          paddingVertical: 6,
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary,
         },
         addButtonText: {
-          color: '#FFFFFF',
-          fontWeight: '600',
+          color: colors.primary,
+          fontWeight: '700',
+          fontSize: 13,
           marginLeft: 6,
         },
         spaceCard: {
           backgroundColor: colors.card,
-          marginHorizontal: 16,
-          marginBottom: 12,
-          borderRadius: 12,
-          padding: 16,
-          borderWidth: 1,
-          borderColor: colors.border,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         spaceHeader: {
           flexDirection: 'row',
@@ -268,30 +299,35 @@ const VenueDetail: React.FC = () => {
           marginBottom: 8,
         },
         spaceName: {
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: '700',
           color: colors.text,
+          flex: 1,
         },
         spaceStatusRow: {
           flexDirection: 'row',
           alignItems: 'center',
+          gap: 6,
         },
         spaceStatus: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: 10,
-          paddingVertical: 4,
-          borderRadius: 12,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: 10,
+          borderWidth: StyleSheet.hairlineWidth,
         },
         statusAvailable: {
-          backgroundColor: (colors.success || '#4CAF50') + '20',
+          backgroundColor: (colors.success || '#4CAF50') + '12',
+          borderColor: (colors.success || '#4CAF50') + '40',
         },
         statusUnavailable: {
-          backgroundColor: (colors.error || '#F44336') + '20',
+          backgroundColor: (colors.error || '#F44336') + '12',
+          borderColor: (colors.error || '#F44336') + '40',
         },
         statusText: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 11,
+          fontWeight: '700',
           marginLeft: 4,
         },
         statusTextAvailable: {
@@ -301,10 +337,10 @@ const VenueDetail: React.FC = () => {
           color: colors.error || '#F44336',
         },
         spaceDetails: {
-          marginTop: 8,
+          marginTop: 4,
         },
         spaceCapacity: {
-          fontSize: 14,
+          fontSize: 13,
           color: colors.secondaryText,
         },
         spaceCapacityRow: {
@@ -315,30 +351,32 @@ const VenueDetail: React.FC = () => {
           marginLeft: 8,
         },
         spaceDescription: {
-          fontSize: 14,
-          color: colors.text,
-          marginTop: 8,
-          fontStyle: 'italic',
+          fontSize: 13,
+          color: colors.secondaryText,
+          marginTop: 6,
         },
         viewSlotsButton: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: colors.primary + '15',
-          borderRadius: 8,
-          padding: 12,
+          backgroundColor: 'transparent',
+          borderRadius: 20,
+          paddingVertical: 8,
           marginTop: 12,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary,
         },
         viewSlotsText: {
           color: colors.primary,
-          fontWeight: '600',
+          fontWeight: '700',
+          fontSize: 13,
           marginLeft: 8,
         },
         deleteButton: {
-          padding: 8,
+          padding: 6,
         },
         deleteVenueButton: {
-          padding: 10,
+          padding: 8,
           marginLeft: 8,
         },
         emptyContainer: {
@@ -348,13 +386,14 @@ const VenueDetail: React.FC = () => {
           paddingVertical: 60,
         },
         emptyText: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.secondaryText,
           textAlign: 'center',
-          marginTop: 16,
+          marginTop: 12,
         },
         emptyIcon: {
-          fontSize: 48,
+          fontSize: 40,
+          opacity: 0.4,
         },
         // Modal styles
         modalOverlay: {
@@ -365,31 +404,53 @@ const VenueDetail: React.FC = () => {
         },
         modalContent: {
           backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 24,
+          borderRadius: 18,
           width: '90%',
-          maxHeight: '80%',
+          maxHeight: '85%',
+          paddingTop: 8,
+          paddingBottom: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
-        modalTitle: {
-          fontSize: 22,
-          fontWeight: '700',
-          color: colors.text,
-          marginBottom: 20,
-          textAlign: 'center',
-        },
-        inputLabel: {
-          fontSize: 14,
-          fontWeight: '600',
-          color: colors.text,
+        modalHandle: {
+          alignSelf: 'center',
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
           marginBottom: 6,
         },
-        input: {
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          padding: 14,
-          fontSize: 16,
+        modalTitle: {
+          fontSize: 17,
+          fontWeight: '700',
           color: colors.text,
-          borderWidth: 1,
+          paddingHorizontal: 20,
+          paddingBottom: 12,
+          textAlign: 'center',
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        modalBody: {
+          paddingHorizontal: 20,
+          paddingTop: 16,
+        },
+        inputLabel: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.6,
+          marginBottom: 8,
+          marginTop: 4,
+        },
+        input: {
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          fontSize: 14,
+          color: colors.text,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           marginBottom: 16,
         },
@@ -399,23 +460,30 @@ const VenueDetail: React.FC = () => {
         },
         submitButton: {
           backgroundColor: colors.primary,
-          borderRadius: 8,
-          padding: 16,
+          borderRadius: 24,
+          paddingVertical: 12,
           alignItems: 'center',
           marginTop: 8,
+          marginHorizontal: 20,
         },
         submitButtonText: {
-          color: '#FFFFFF',
-          fontSize: 16,
-          fontWeight: '600',
+          color: colors.buttonText || '#FFFFFF',
+          fontSize: 14,
+          fontWeight: '700',
         },
         cancelButton: {
-          padding: 16,
+          paddingVertical: 12,
           alignItems: 'center',
+          marginTop: 8,
+          marginHorizontal: 20,
+          borderRadius: 24,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         cancelButtonText: {
           color: colors.secondaryText,
-          fontSize: 16,
+          fontSize: 14,
+          fontWeight: '700',
         },
         loadingIndicator: {
           marginTop: 40,
@@ -542,6 +610,7 @@ const VenueDetail: React.FC = () => {
         longitude: venue?.longitude,
       },
       t,
+      presentMapPicker,
     );
   };
 
@@ -730,7 +799,7 @@ const VenueDetail: React.FC = () => {
         onPress={() => handleSpacePress(item)}
         activeOpacity={0.7}>
         <View style={themedStyles.spaceHeader}>
-          <Text style={themedStyles.spaceName}>
+          <Text style={themedStyles.spaceName} numberOfLines={1}>
             {getSpaceIcon(venueType)} {item.name}
           </Text>
           <View style={themedStyles.spaceStatusRow}>
@@ -743,7 +812,7 @@ const VenueDetail: React.FC = () => {
               ]}>
               <FontAwesomeIcon
                 icon={item.isAvailable ? faCheck : faTimes}
-                size={12}
+                size={10}
                 color={
                   item.isAvailable
                     ? colors.success || '#4CAF50'
@@ -766,7 +835,7 @@ const VenueDetail: React.FC = () => {
                 onPress={() => handleDeleteSpace(item._id)}>
                 <FontAwesomeIcon
                   icon={faTrash}
-                  size={16}
+                  size={14}
                   color={colors.error || '#F44336'}
                 />
               </TouchableOpacity>
@@ -778,7 +847,7 @@ const VenueDetail: React.FC = () => {
           <View style={themedStyles.spaceCapacityRow}>
             <FontAwesomeIcon
               icon={faUsers}
-              size={14}
+              size={13}
               color={colors.secondaryText}
             />
             <Text
@@ -802,7 +871,7 @@ const VenueDetail: React.FC = () => {
           onPress={() => handleSpacePress(item)}>
           <FontAwesomeIcon
             icon={faCalendarAlt}
-            size={16}
+            size={13}
             color={colors.primary}
           />
           <Text style={themedStyles.viewSlotsText}>
@@ -831,39 +900,44 @@ const VenueDetail: React.FC = () => {
             activeOpacity={1}
             style={themedStyles.modalContent}
             onPress={e => e.stopPropagation()}>
+            <View style={themedStyles.modalHandle} />
             <Text style={themedStyles.modalTitle}>
               {t('venues.addSpace', {type: getSpaceLabel(venueType, true)})}
             </Text>
 
-            <Text style={themedStyles.inputLabel}>
-              {t('venues.spaceName')} *
-            </Text>
-            <TextInput
-              style={themedStyles.input}
-              placeholder={`e.g., ${getSpaceLabel(venueType, true)} A`}
-              placeholderTextColor={colors.secondaryText}
-              value={newSpaceName}
-              onChangeText={setNewSpaceName}
-              returnKeyType="next"
-            />
+            <View style={themedStyles.modalBody}>
+              <Text style={themedStyles.inputLabel}>
+                {t('venues.spaceName')} *
+              </Text>
+              <TextInput
+                style={themedStyles.input}
+                placeholder={`e.g., ${getSpaceLabel(venueType, true)} A`}
+                placeholderTextColor={colors.secondaryText}
+                value={newSpaceName}
+                onChangeText={setNewSpaceName}
+                returnKeyType="next"
+              />
 
-            <Text style={themedStyles.inputLabel}>{t('venues.capacity')}</Text>
-            <TextInput
-              style={themedStyles.input}
-              placeholder={t('venues.capacityPlaceholder')}
-              placeholderTextColor={colors.secondaryText}
-              keyboardType="numeric"
-              value={newSpaceCapacity}
-              onChangeText={setNewSpaceCapacity}
-              returnKeyType="done"
-            />
+              <Text style={themedStyles.inputLabel}>
+                {t('venues.capacity')}
+              </Text>
+              <TextInput
+                style={themedStyles.input}
+                placeholder={t('venues.capacityPlaceholder')}
+                placeholderTextColor={colors.secondaryText}
+                keyboardType="numeric"
+                value={newSpaceCapacity}
+                onChangeText={setNewSpaceCapacity}
+                returnKeyType="done"
+              />
+            </View>
 
             <TouchableOpacity
               style={themedStyles.submitButton}
               onPress={handleAddSpace}
               disabled={addingSpace}>
               {addingSpace ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.buttonText || '#FFFFFF'} />
               ) : (
                 <Text style={themedStyles.submitButtonText}>
                   {t('venues.addSpaceButton')}
@@ -894,7 +968,14 @@ const VenueDetail: React.FC = () => {
             <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
           </TouchableOpacity>
           <View style={themedStyles.headerContent}>
-            <Text style={themedStyles.headerTitle}>{venueName}</Text>
+            <View style={themedStyles.headerTitleRow}>
+              <Text style={themedStyles.headerEmoji}>
+                {getSpaceIcon(venueType)}
+              </Text>
+              <Text style={themedStyles.headerTitle} numberOfLines={1}>
+                {venueName}
+              </Text>
+            </View>
           </View>
         </View>
         <ActivityIndicator
@@ -919,9 +1000,14 @@ const VenueDetail: React.FC = () => {
           <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={themedStyles.headerContent}>
-          <Text style={themedStyles.headerTitle}>
-            {getSpaceIcon(venueType)} {venue?.name || venueName}
-          </Text>
+          <View style={themedStyles.headerTitleRow}>
+            <Text style={themedStyles.headerEmoji}>
+              {getSpaceIcon(venueType)}
+            </Text>
+            <Text style={themedStyles.headerTitle} numberOfLines={1}>
+              {venue?.name || venueName}
+            </Text>
+          </View>
           <Text style={themedStyles.headerSubtitle}>{venueType}</Text>
         </View>
         {/* Delete venue button for admins */}
@@ -931,9 +1017,13 @@ const VenueDetail: React.FC = () => {
             onPress={handleDeleteVenue}
             disabled={deletingVenue}>
             {deletingVenue ? (
-              <ActivityIndicator size="small" color="#FF3B30" />
+              <ActivityIndicator size="small" color={colors.error || '#FF3B30'} />
             ) : (
-              <FontAwesomeIcon icon={faTrash} size={20} color="#FF3B30" />
+              <FontAwesomeIcon
+                icon={faTrash}
+                size={18}
+                color={colors.error || '#FF3B30'}
+              />
             )}
           </TouchableOpacity>
         )}
@@ -952,13 +1042,14 @@ const VenueDetail: React.FC = () => {
         }
         ListHeaderComponent={
           <>
-            {/* Venue Info Card */}
+            {/* Venue Info */}
             <View style={themedStyles.venueInfo}>
               <View style={themedStyles.infoRow}>
                 <FontAwesomeIcon
                   icon={faMapMarkerAlt}
-                  size={16}
-                  color={colors.primary}
+                  size={13}
+                  color={colors.secondaryText}
+                  style={themedStyles.infoIcon}
                 />
                 <Text style={themedStyles.infoText}>{venue?.address}</Text>
               </View>
@@ -967,8 +1058,9 @@ const VenueDetail: React.FC = () => {
                 <View style={themedStyles.infoRow}>
                   <FontAwesomeIcon
                     icon={faClock}
-                    size={16}
-                    color={colors.primary}
+                    size={13}
+                    color={colors.secondaryText}
+                    style={themedStyles.infoIcon}
                   />
                   <Text style={themedStyles.infoText}>
                     {venue.operatingHours}
@@ -982,8 +1074,9 @@ const VenueDetail: React.FC = () => {
                   onPress={callVenue}>
                   <FontAwesomeIcon
                     icon={faPhone}
-                    size={16}
+                    size={13}
                     color={colors.primary}
+                    style={themedStyles.infoIcon}
                   />
                   <Text style={[themedStyles.infoText, themedStyles.infoLink]}>
                     {venue.contactPhone}
@@ -997,8 +1090,9 @@ const VenueDetail: React.FC = () => {
                   onPress={emailVenue}>
                   <FontAwesomeIcon
                     icon={faEnvelope}
-                    size={16}
+                    size={13}
                     color={colors.primary}
+                    style={themedStyles.infoIcon}
                   />
                   <Text style={[themedStyles.infoText, themedStyles.infoLink]}>
                     {venue.contactEmail}
@@ -1011,8 +1105,8 @@ const VenueDetail: React.FC = () => {
                 onPress={openDirections}>
                 <FontAwesomeIcon
                   icon={faLocationArrow}
-                  size={16}
-                  color="#FFFFFF"
+                  size={14}
+                  color={colors.buttonText || '#FFFFFF'}
                 />
                 <Text style={themedStyles.directionsText}>
                   {t('venues.getDirections')}
@@ -1029,7 +1123,11 @@ const VenueDetail: React.FC = () => {
                 <TouchableOpacity
                   style={themedStyles.addButton}
                   onPress={() => setShowAddSpace(true)}>
-                  <FontAwesomeIcon icon={faPlus} size={14} color="#FFFFFF" />
+                  <FontAwesomeIcon
+                    icon={faPlus}
+                    size={12}
+                    color={colors.primary}
+                  />
                   <Text style={themedStyles.addButtonText}>
                     {t('venues.add')}
                   </Text>
@@ -1055,6 +1153,16 @@ const VenueDetail: React.FC = () => {
       />
 
       {renderAddSpaceModal()}
+
+      <MapAppPicker
+        visible={mapPickerVisible}
+        apps={mapPickerApps}
+        onSelect={async app => {
+          setMapPickerVisible(false);
+          await app.open();
+        }}
+        onClose={() => setMapPickerVisible(false)}
+      />
     </SafeAreaView>
   );
 };

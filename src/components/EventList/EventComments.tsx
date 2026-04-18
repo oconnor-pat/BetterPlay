@@ -30,6 +30,7 @@ import {
   faComments,
   faPaperPlane,
   faChevronUp,
+  faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 import UserContext, {UserContextType} from '../UserContext';
 import axios from 'axios';
@@ -773,61 +774,55 @@ const EventComments: React.FC<EventCommentsProps> = ({
     () =>
       StyleSheet.create({
         container: {
-          backgroundColor: colors.card,
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: colors.border,
-          paddingTop: 18,
-          paddingBottom: 14,
+          marginTop: 12,
+          marginHorizontal: -16,
+          paddingTop: 12,
           paddingHorizontal: 16,
-          marginTop: 14,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
         },
         header: {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          paddingHorizontal: 0,
-          marginBottom: 16,
+          marginBottom: 8,
         },
         headerTitle: {
-          fontSize: 16,
-          fontWeight: '600',
-          color: colors.text,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
         },
         closeButton: {
           padding: 4,
         },
         loadingContainer: {
-          padding: 20,
+          paddingVertical: 24,
           alignItems: 'center',
         },
-        // Composer
+        // Composer (when no post yet) — flat row, no card wrapper
         composerCard: {
-          backgroundColor: colors.background,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: colors.border,
-          padding: 16,
-          marginBottom: 16,
+          paddingVertical: 4,
         },
         composerRow: {
           flexDirection: 'row',
           alignItems: 'center',
         },
         composerAvatar: {
-          width: 38,
-          height: 38,
-          borderRadius: 19,
-          backgroundColor: colors.primary + '20',
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
-          marginRight: 12,
+          marginRight: 10,
         },
         composerAvatarImage: {
-          width: 38,
-          height: 38,
-          borderRadius: 19,
-          marginRight: 12,
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          marginRight: 10,
         },
         composerAvatarText: {
           fontSize: 14,
@@ -836,20 +831,20 @@ const EventComments: React.FC<EventCommentsProps> = ({
         },
         composerInput: {
           flex: 1,
-          height: 44,
+          height: 40,
           borderColor: colors.border,
-          borderWidth: 1,
-          borderRadius: 22,
-          paddingHorizontal: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderRadius: 20,
+          paddingHorizontal: 14,
           color: colors.text,
-          backgroundColor: colors.card,
-          fontSize: 15,
-          marginRight: 12,
+          backgroundColor: colors.inputBackground || colors.background,
+          fontSize: 14,
+          marginRight: 10,
         },
         sendButton: {
-          width: 44,
-          height: 44,
-          borderRadius: 22,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
           backgroundColor: colors.primary,
           alignItems: 'center',
           justifyContent: 'center',
@@ -864,31 +859,31 @@ const EventComments: React.FC<EventCommentsProps> = ({
         },
         // Post
         postContainer: {
-          marginBottom: 16,
-          paddingHorizontal: 2,
+          paddingTop: 4,
+          paddingBottom: 4,
         },
         postHeaderRow: {
           flexDirection: 'row',
           alignItems: 'flex-start',
-          marginBottom: 12,
+          marginBottom: 6,
         },
         postAvatar: {
-          width: 42,
-          height: 42,
-          borderRadius: 21,
-          backgroundColor: colors.primary + '20',
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
-          marginRight: 12,
+          marginRight: 10,
         },
         postAvatarImage: {
-          width: 42,
-          height: 42,
-          borderRadius: 21,
-          marginRight: 12,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          marginRight: 10,
         },
         postAvatarText: {
-          fontSize: 16,
+          fontSize: 15,
           fontWeight: '700',
           color: colors.primary,
         },
@@ -902,14 +897,14 @@ const EventComments: React.FC<EventCommentsProps> = ({
         },
         postUsername: {
           color: colors.text,
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: '700',
         },
         timestamp: {
           color: colors.secondaryText,
           fontSize: 12,
           fontWeight: '400',
-          marginLeft: 8,
+          marginLeft: 6,
         },
         timestampSmall: {
           color: colors.secondaryText,
@@ -943,60 +938,57 @@ const EventComments: React.FC<EventCommentsProps> = ({
         postText: {
           fontSize: 15,
           color: colors.text,
-          lineHeight: 23,
-          marginBottom: 14,
-          paddingLeft: 4,
+          lineHeight: 21,
+          marginTop: 2,
+          marginBottom: 6,
+          marginLeft: 50,
         },
-        // Social actions
+        // Social actions — Bluesky-style ghost icon+count clusters
         socialActionsRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingTop: 10,
+          paddingTop: 4,
           paddingBottom: 2,
-          gap: 6,
+          gap: 28,
+          marginLeft: 50,
         },
         socialPill: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 6,
-          paddingHorizontal: 12,
-          borderRadius: 20,
-          borderWidth: 1,
-          borderColor: colors.border + '60',
+          paddingVertical: 4,
           gap: 6,
         },
         socialPillText: {
           fontSize: 13,
           color: colors.secondaryText,
-          fontWeight: '600',
+          fontWeight: '500',
         },
         socialPillTextActive: {
           color: '#e74c3c',
         },
-        // Comment input
+        // Comment input — flat row above comments
         commentInputRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginTop: 14,
-          paddingTop: 14,
-          paddingHorizontal: 4,
-          borderTopWidth: 1,
+          marginTop: 12,
+          paddingTop: 12,
+          borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
         },
         commentInputAvatar: {
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          backgroundColor: colors.primary + '20',
+          width: 30,
+          height: 30,
+          borderRadius: 15,
+          backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
-          marginRight: 12,
+          marginRight: 10,
         },
         commentInputAvatarImage: {
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          marginRight: 12,
+          width: 30,
+          height: 30,
+          borderRadius: 15,
+          marginRight: 10,
         },
         commentInputAvatarText: {
           fontSize: 11,
@@ -1005,15 +997,15 @@ const EventComments: React.FC<EventCommentsProps> = ({
         },
         commentInput: {
           flex: 1,
-          height: 40,
+          height: 38,
           borderColor: colors.border,
-          borderWidth: 1,
-          borderRadius: 20,
-          paddingHorizontal: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderRadius: 19,
+          paddingHorizontal: 14,
           color: colors.text,
-          backgroundColor: colors.background,
-          marginRight: 12,
-          fontSize: 14,
+          backgroundColor: colors.inputBackground || colors.background,
+          marginRight: 10,
+          fontSize: 13,
         },
         commentSendButton: {
           width: 36,
@@ -1025,12 +1017,28 @@ const EventComments: React.FC<EventCommentsProps> = ({
         },
         // Comments section
         commentsSection: {
-          marginTop: 8,
+          marginTop: 4,
         },
         commentContainer: {
           paddingVertical: 12,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
+        },
+        commentRow: {
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+        },
+        commentLeftCol: {
+          width: 32,
+          alignItems: 'center',
+          marginRight: 10,
+        },
+        threadSpine: {
+          width: StyleSheet.hairlineWidth,
+          backgroundColor: colors.border,
+          flex: 1,
+          marginTop: 4,
+          minHeight: 8,
         },
         commentHeaderRow: {
           flexDirection: 'row',
@@ -1040,16 +1048,14 @@ const EventComments: React.FC<EventCommentsProps> = ({
           width: 32,
           height: 32,
           borderRadius: 16,
-          backgroundColor: colors.primary + '15',
+          backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
-          marginRight: 10,
         },
         commentAvatarImage: {
           width: 32,
           height: 32,
           borderRadius: 16,
-          marginRight: 10,
         },
         commentAvatarText: {
           fontSize: 11,
@@ -1062,7 +1068,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
         commentUsername: {
           color: colors.text,
           fontSize: 14,
-          fontWeight: '600',
+          fontWeight: '700',
         },
         commentActionsRow: {
           flexDirection: 'row',
@@ -1071,20 +1077,21 @@ const EventComments: React.FC<EventCommentsProps> = ({
         commentText: {
           color: colors.text,
           fontSize: 14,
-          marginTop: 4,
-          lineHeight: 20,
+          marginTop: 2,
+          lineHeight: 19,
         },
         replyButton: {
           flexDirection: 'row',
           alignItems: 'center',
           paddingVertical: 2,
-          paddingHorizontal: 6,
+          paddingHorizontal: 0,
+          marginRight: 6,
+          gap: 4,
         },
         replyButtonText: {
           color: colors.primary,
-          marginLeft: 4,
           fontSize: 12,
-          fontWeight: '500',
+          fontWeight: '600',
         },
         commentLikeRow: {
           flexDirection: 'row',
@@ -1094,11 +1101,8 @@ const EventComments: React.FC<EventCommentsProps> = ({
         commentLikePill: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 4,
-          paddingHorizontal: 8,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: colors.border + '40',
+          paddingVertical: 2,
+          paddingHorizontal: 0,
           gap: 5,
         },
         commentLikePillText: {
@@ -1109,65 +1113,79 @@ const EventComments: React.FC<EventCommentsProps> = ({
         commentLikePillTextActive: {
           color: '#e74c3c',
         },
-        // Reply input
+        // Reply input — sits inside comment content column, indented to align with reply avatars
         replyInputRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginTop: 8,
-          marginLeft: 34,
-          paddingTop: 6,
+          marginTop: 10,
+          paddingTop: 2,
         },
         replyInput: {
           flex: 1,
           height: 34,
           borderColor: colors.border,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderRadius: 17,
-          paddingHorizontal: 14,
+          paddingHorizontal: 12,
           color: colors.text,
-          backgroundColor: colors.background,
-          marginRight: 10,
+          backgroundColor: colors.inputBackground || colors.background,
+          marginRight: 8,
           fontSize: 13,
         },
         replySendButton: {
-          width: 34,
-          height: 34,
-          borderRadius: 17,
+          width: 32,
+          height: 32,
+          borderRadius: 16,
           backgroundColor: colors.primary,
           alignItems: 'center',
           justifyContent: 'center',
         },
-        // Replies
+        // Replies — nested inside comment content column with their own threading spine
         repliesContainer: {
-          marginLeft: 42,
-          marginTop: 4,
-          borderLeftWidth: 2,
-          borderLeftColor: colors.border,
-          paddingLeft: 14,
+          marginTop: 6,
         },
         replyContainer: {
-          paddingVertical: 10,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          paddingTop: 8,
+          paddingBottom: 4,
+        },
+        replyRow: {
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+        },
+        replyLeftCol: {
+          width: 26,
+          alignItems: 'center',
+          marginRight: 8,
+        },
+        replyThreadSpineTop: {
+          width: StyleSheet.hairlineWidth,
+          backgroundColor: colors.border,
+          height: 12,
+          marginBottom: 0,
+        },
+        replyThreadSpineBottom: {
+          width: StyleSheet.hairlineWidth,
+          backgroundColor: colors.border,
+          flex: 1,
+          marginTop: 4,
+          minHeight: 8,
         },
         replyHeaderRow: {
           flexDirection: 'row',
           alignItems: 'flex-start',
         },
         replyAvatar: {
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          backgroundColor: colors.primary + '15',
+          width: 26,
+          height: 26,
+          borderRadius: 13,
+          backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
-          marginRight: 8,
         },
         replyAvatarImage: {
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          marginRight: 8,
+          width: 26,
+          height: 26,
+          borderRadius: 13,
         },
         replyAvatarText: {
           fontSize: 9,
@@ -1180,7 +1198,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
         replyUsername: {
           color: colors.text,
           fontSize: 13,
-          fontWeight: '600',
+          fontWeight: '700',
         },
         replyActionsRow: {
           flexDirection: 'row',
@@ -1189,7 +1207,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
         replyText: {
           color: colors.text,
           fontSize: 13,
-          marginTop: 3,
+          marginTop: 2,
           lineHeight: 18,
         },
         // Edit
@@ -1199,13 +1217,14 @@ const EventComments: React.FC<EventCommentsProps> = ({
         },
         editInput: {
           flex: 1,
-          height: 34,
-          borderColor: colors.primary,
-          borderWidth: 1,
-          borderRadius: 8,
-          paddingHorizontal: 10,
+          minHeight: 36,
+          borderColor: colors.border,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
           color: colors.text,
-          backgroundColor: colors.background,
+          backgroundColor: colors.inputBackground || colors.background,
           fontSize: 14,
           marginRight: 6,
         },
@@ -1216,97 +1235,134 @@ const EventComments: React.FC<EventCommentsProps> = ({
         // Empty state
         emptyState: {
           alignItems: 'center',
-          paddingVertical: 20,
+          paddingVertical: 14,
         },
         emptyStateText: {
-          fontSize: 14,
-          color: colors.text,
+          fontSize: 13,
+          color: colors.secondaryText,
           textAlign: 'center',
-          marginBottom: 12,
+          marginBottom: 8,
         },
-        // Likes modal
+        // Likes modal — bottom-sheet
         likesModalOverlay: {
           flex: 1,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+          justifyContent: 'flex-end',
         },
         likesModalContent: {
-          backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 20,
-          width: '80%',
-          maxWidth: 300,
-          maxHeight: '50%',
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          paddingTop: 8,
+          paddingBottom: 16,
+          maxHeight: '70%',
+        },
+        modalHandle: {
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
+          alignSelf: 'center',
+          marginBottom: 8,
+        },
+        likesModalHeaderBlock: {
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        likesModalTitleRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
         },
         likesModalTitle: {
-          fontSize: 16,
+          fontSize: 17,
           fontWeight: '700',
           color: colors.text,
           textAlign: 'center',
-          marginBottom: 14,
+        },
+        likesModalCount: {
+          fontSize: 12,
+          fontWeight: '500',
+          color: colors.secondaryText,
+          textAlign: 'center',
+          marginTop: 4,
         },
         likesModalScroll: {
-          maxHeight: 220,
+          paddingHorizontal: 16,
+          maxHeight: 360,
         },
         likesModalUserRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 8,
-          borderBottomWidth: 1,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
+        likesModalChevron: {
+          marginLeft: 8,
+        },
         likesModalAvatar: {
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          marginRight: 10,
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          marginRight: 12,
         },
         likesModalAvatarPlaceholder: {
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          backgroundColor: colors.primary,
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: colors.primary + '14',
           justifyContent: 'center',
           alignItems: 'center',
-          marginRight: 10,
+          marginRight: 12,
         },
         likesModalAvatarText: {
-          color: '#fff',
-          fontSize: 12,
-          fontWeight: '600',
+          color: colors.primary,
+          fontSize: 13,
+          fontWeight: '700',
         },
         likesModalUsername: {
           fontSize: 14,
           color: colors.text,
           flex: 1,
+          fontWeight: '500',
         },
         likesModalUsernameClickable: {
           color: colors.primary,
+          fontWeight: '600',
         },
         likesModalAnonymous: {
           fontSize: 13,
           color: colors.secondaryText,
           fontStyle: 'italic',
-          paddingVertical: 8,
+          paddingVertical: 12,
           textAlign: 'center',
         },
         likesModalEmpty: {
           textAlign: 'center',
-          color: colors.placeholder || '#888',
+          color: colors.secondaryText,
           fontSize: 13,
-          paddingVertical: 16,
+          paddingVertical: 20,
         },
         likesModalClose: {
+          marginHorizontal: 16,
           marginTop: 14,
-          paddingVertical: 10,
-          backgroundColor: colors.primary,
-          borderRadius: 8,
+          height: 44,
+          borderRadius: 22,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: 'transparent',
           alignItems: 'center',
+          justifyContent: 'center',
         },
         likesModalCloseText: {
-          color: '#fff',
-          fontWeight: '600',
+          color: colors.secondaryText,
+          fontWeight: '700',
           fontSize: 14,
         },
       }),
@@ -1568,29 +1624,37 @@ const EventComments: React.FC<EventCommentsProps> = ({
               <View
                 key={comment._id || comment.text}
                 style={styles.commentContainer}>
-                <View style={styles.commentHeaderRow}>
-                  <TouchableOpacity
-                    onPress={() =>
-                      navigateToProfile(
-                        comment.userId,
-                        comment.username,
-                        comment.profilePicUrl,
-                      )
-                    }
-                    disabled={!!(userData && comment.userId === userData._id)}>
-                    {comment.profilePicUrl ? (
-                      <Image
-                        source={{uri: comment.profilePicUrl}}
-                        style={styles.commentAvatarImage}
-                      />
-                    ) : (
-                      <View style={styles.commentAvatar}>
-                        <Text style={styles.commentAvatarText}>
-                          {getInitials(comment.username)}
-                        </Text>
-                      </View>
+                <View style={styles.commentRow}>
+                  <View style={styles.commentLeftCol}>
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigateToProfile(
+                          comment.userId,
+                          comment.username,
+                          comment.profilePicUrl,
+                        )
+                      }
+                      disabled={
+                        !!(userData && comment.userId === userData._id)
+                      }>
+                      {comment.profilePicUrl ? (
+                        <Image
+                          source={{uri: comment.profilePicUrl}}
+                          style={styles.commentAvatarImage}
+                        />
+                      ) : (
+                        <View style={styles.commentAvatar}>
+                          <Text style={styles.commentAvatarText}>
+                            {getInitials(comment.username)}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    {((comment.replies && comment.replies.length > 0) ||
+                      replyingTo === comment._id) && (
+                      <View style={styles.threadSpine} />
                     )}
-                  </TouchableOpacity>
+                  </View>
                   <View style={styles.commentContent}>
                     <View style={styles.postUsernameRow}>
                       <View style={styles.usernameWithTimestamp}>
@@ -1712,163 +1776,181 @@ const EventComments: React.FC<EventCommentsProps> = ({
                         </View>
                       </>
                     )}
+
+                    {/* Reply input */}
+                    {replyingTo === comment._id && (
+                      <View style={styles.replyInputRow}>
+                        <TextInput
+                          ref={ref => {
+                            if (ref) {
+                              replyInputRefs.current[comment._id!] = ref;
+                            }
+                          }}
+                          style={styles.replyInput}
+                          placeholder={
+                            t('communityNotes.writeReply') ||
+                            'Write a reply...'
+                          }
+                          placeholderTextColor={colors.border}
+                          value={replyText[comment._id!] || ''}
+                          onChangeText={text =>
+                            setReplyText(prev => ({
+                              ...prev,
+                              [comment._id!]: text,
+                            }))
+                          }
+                        />
+                        <TouchableOpacity
+                          style={styles.replySendButton}
+                          onPress={() => {
+                            addReply(post._id, comment._id!);
+                            setReplyingTo(null);
+                          }}>
+                          <FontAwesomeIcon
+                            icon={faPaperPlane}
+                            size={12}
+                            color="#fff"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {/* Replies */}
+                    {comment.replies && comment.replies.length > 0 && (
+                      <View style={styles.repliesContainer}>
+                        {comment.replies.map((reply, replyIdx, replyArr) => {
+                          const isLastReply =
+                            replyIdx === replyArr.length - 1;
+                          return (
+                            <View
+                              key={reply._id || reply.text}
+                              style={styles.replyContainer}>
+                              <View style={styles.replyRow}>
+                                <View style={styles.replyLeftCol}>
+                                  <View style={styles.replyThreadSpineTop} />
+                                  <TouchableOpacity
+                                    onPress={() =>
+                                      navigateToProfile(
+                                        reply.userId,
+                                        reply.username,
+                                        reply.profilePicUrl,
+                                      )
+                                    }
+                                    disabled={
+                                      !!(
+                                        userData &&
+                                        reply.userId === userData._id
+                                      )
+                                    }>
+                                    {reply.profilePicUrl ? (
+                                      <Image
+                                        source={{uri: reply.profilePicUrl}}
+                                        style={styles.replyAvatarImage}
+                                      />
+                                    ) : (
+                                      <View style={styles.replyAvatar}>
+                                        <Text style={styles.replyAvatarText}>
+                                          {getInitials(reply.username)}
+                                        </Text>
+                                      </View>
+                                    )}
+                                  </TouchableOpacity>
+                                  {!isLastReply && (
+                                    <View
+                                      style={styles.replyThreadSpineBottom}
+                                    />
+                                  )}
+                                </View>
+                                <View style={styles.replyContent}>
+                                  <View style={styles.postUsernameRow}>
+                                    <View style={styles.usernameWithTimestamp}>
+                                      <Text style={styles.replyUsername}>
+                                        {reply.username}
+                                      </Text>
+                                      {reply.createdAt && (
+                                        <Text style={styles.timestampTiny}>
+                                          {formatRelativeTime(reply.createdAt)}
+                                        </Text>
+                                      )}
+                                    </View>
+                                    {userData &&
+                                      reply.userId === userData._id &&
+                                      reply._id && (
+                                        <View style={styles.replyActionsRow}>
+                                          <TouchableOpacity
+                                            style={styles.editActionIcon}
+                                            onPress={() =>
+                                              startEditReply(
+                                                post._id,
+                                                comment._id!,
+                                                reply,
+                                              )
+                                            }>
+                                            <FontAwesomeIcon
+                                              icon={faEdit}
+                                              size={10}
+                                              color={colors.primary}
+                                            />
+                                          </TouchableOpacity>
+                                          <TouchableOpacity
+                                            style={styles.editActionIcon}
+                                            onPress={() =>
+                                              deleteReply(
+                                                post._id,
+                                                comment._id!,
+                                                reply._id!,
+                                              )
+                                            }>
+                                            <FontAwesomeIcon
+                                              icon={faTrash}
+                                              size={10}
+                                              color={colors.text}
+                                            />
+                                          </TouchableOpacity>
+                                        </View>
+                                      )}
+                                  </View>
+                                  {editingReplyId === reply._id ? (
+                                    <View style={styles.rowCenter}>
+                                      <TextInput
+                                        style={styles.editInput}
+                                        value={editingReplyText}
+                                        onChangeText={setEditingReplyText}
+                                        autoFocus
+                                      />
+                                      <TouchableOpacity
+                                        style={styles.editActionIcon}
+                                        onPress={saveEditReply}>
+                                        <FontAwesomeIcon
+                                          icon={faCheck}
+                                          size={10}
+                                          color={colors.primary}
+                                        />
+                                      </TouchableOpacity>
+                                      <TouchableOpacity
+                                        style={styles.editActionIcon}
+                                        onPress={cancelEditReply}>
+                                        <FontAwesomeIcon
+                                          icon={faTimes}
+                                          size={10}
+                                          color={colors.text}
+                                        />
+                                      </TouchableOpacity>
+                                    </View>
+                                  ) : (
+                                    <Text style={styles.replyText}>
+                                      {reply.text}
+                                    </Text>
+                                  )}
+                                </View>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 </View>
-
-                {/* Reply input */}
-                {replyingTo === comment._id && (
-                  <View style={styles.replyInputRow}>
-                    <TextInput
-                      ref={ref => {
-                        if (ref) {
-                          replyInputRefs.current[comment._id!] = ref;
-                        }
-                      }}
-                      style={styles.replyInput}
-                      placeholder={
-                        t('communityNotes.writeReply') || 'Write a reply...'
-                      }
-                      placeholderTextColor={colors.border}
-                      value={replyText[comment._id!] || ''}
-                      onChangeText={text =>
-                        setReplyText(prev => ({
-                          ...prev,
-                          [comment._id!]: text,
-                        }))
-                      }
-                    />
-                    <TouchableOpacity
-                      style={styles.replySendButton}
-                      onPress={() => {
-                        addReply(post._id, comment._id!);
-                        setReplyingTo(null);
-                      }}>
-                      <FontAwesomeIcon
-                        icon={faPaperPlane}
-                        size={12}
-                        color="#fff"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Replies */}
-                {comment.replies && comment.replies.length > 0 && (
-                  <View style={styles.repliesContainer}>
-                    {comment.replies.map(reply => (
-                      <View
-                        key={reply._id || reply.text}
-                        style={styles.replyContainer}>
-                        <View style={styles.replyHeaderRow}>
-                          <TouchableOpacity
-                            onPress={() =>
-                              navigateToProfile(
-                                reply.userId,
-                                reply.username,
-                                reply.profilePicUrl,
-                              )
-                            }
-                            disabled={
-                              !!(userData && reply.userId === userData._id)
-                            }>
-                            {reply.profilePicUrl ? (
-                              <Image
-                                source={{uri: reply.profilePicUrl}}
-                                style={styles.replyAvatarImage}
-                              />
-                            ) : (
-                              <View style={styles.replyAvatar}>
-                                <Text style={styles.replyAvatarText}>
-                                  {getInitials(reply.username)}
-                                </Text>
-                              </View>
-                            )}
-                          </TouchableOpacity>
-                          <View style={styles.replyContent}>
-                            <View style={styles.postUsernameRow}>
-                              <View style={styles.usernameWithTimestamp}>
-                                <Text style={styles.replyUsername}>
-                                  {reply.username}
-                                </Text>
-                                {reply.createdAt && (
-                                  <Text style={styles.timestampTiny}>
-                                    {formatRelativeTime(reply.createdAt)}
-                                  </Text>
-                                )}
-                              </View>
-                              {userData &&
-                                reply.userId === userData._id &&
-                                reply._id && (
-                                  <View style={styles.replyActionsRow}>
-                                    <TouchableOpacity
-                                      style={styles.editActionIcon}
-                                      onPress={() =>
-                                        startEditReply(
-                                          post._id,
-                                          comment._id!,
-                                          reply,
-                                        )
-                                      }>
-                                      <FontAwesomeIcon
-                                        icon={faEdit}
-                                        size={10}
-                                        color={colors.primary}
-                                      />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      style={styles.editActionIcon}
-                                      onPress={() =>
-                                        deleteReply(
-                                          post._id,
-                                          comment._id!,
-                                          reply._id!,
-                                        )
-                                      }>
-                                      <FontAwesomeIcon
-                                        icon={faTrash}
-                                        size={10}
-                                        color={colors.text}
-                                      />
-                                    </TouchableOpacity>
-                                  </View>
-                                )}
-                            </View>
-                            {editingReplyId === reply._id ? (
-                              <View style={styles.rowCenter}>
-                                <TextInput
-                                  style={styles.editInput}
-                                  value={editingReplyText}
-                                  onChangeText={setEditingReplyText}
-                                  autoFocus
-                                />
-                                <TouchableOpacity
-                                  style={styles.editActionIcon}
-                                  onPress={saveEditReply}>
-                                  <FontAwesomeIcon
-                                    icon={faCheck}
-                                    size={10}
-                                    color={colors.primary}
-                                  />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={styles.editActionIcon}
-                                  onPress={cancelEditReply}>
-                                  <FontAwesomeIcon
-                                    icon={faTimes}
-                                    size={10}
-                                    color={colors.text}
-                                  />
-                                </TouchableOpacity>
-                              </View>
-                            ) : (
-                              <Text style={styles.replyText}>{reply.text}</Text>
-                            )}
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
               </View>
             ))}
           </View>
@@ -1885,8 +1967,38 @@ const EventComments: React.FC<EventCommentsProps> = ({
           style={styles.likesModalOverlay}
           activeOpacity={1}
           onPress={() => setLikesModalVisible(false)}>
-          <View style={styles.likesModalContent}>
-            <Text style={styles.likesModalTitle}>{likesModalData.title}</Text>
+          <TouchableOpacity
+            style={styles.likesModalContent}
+            activeOpacity={1}
+            onPress={() => {}}>
+            <View style={styles.modalHandle} />
+            <View style={styles.likesModalHeaderBlock}>
+              <View style={styles.likesModalTitleRow}>
+                <FontAwesomeIcon
+                  icon={faHeart}
+                  size={14}
+                  color={'#e74c3c'}
+                />
+                <Text style={styles.likesModalTitle}>
+                  {likesModalData.title}
+                </Text>
+              </View>
+              {likesModalData.users.length + likesModalData.anonymousCount >
+                0 && (
+                <Text style={styles.likesModalCount}>
+                  {`${
+                    likesModalData.users.length +
+                    likesModalData.anonymousCount
+                  } ${
+                    likesModalData.users.length +
+                      likesModalData.anonymousCount ===
+                    1
+                      ? 'person'
+                      : 'people'
+                  }`}
+                </Text>
+              )}
+            </View>
             <ScrollView style={styles.likesModalScroll}>
               {likesModalData.users.length > 0 ? (
                 <>
@@ -1925,6 +2037,14 @@ const EventComments: React.FC<EventCommentsProps> = ({
                         ]}>
                         {user.username}
                       </Text>
+                      {!!user._id && (
+                        <FontAwesomeIcon
+                          icon={faChevronRight}
+                          size={12}
+                          color={colors.secondaryText}
+                          style={styles.likesModalChevron}
+                        />
+                      )}
                     </TouchableOpacity>
                   ))}
                   {likesModalData.anonymousCount > 0 && (
@@ -1951,10 +2071,10 @@ const EventComments: React.FC<EventCommentsProps> = ({
               style={styles.likesModalClose}
               onPress={() => setLikesModalVisible(false)}>
               <Text style={styles.likesModalCloseText}>
-                {t('close') || 'Close'}
+                {t('common.close') || 'Close'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>

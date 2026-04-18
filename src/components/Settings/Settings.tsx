@@ -127,6 +127,7 @@ const Settings: React.FC = () => {
     null,
   );
   const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [aboutModalVisible, setAboutModalVisible] = useState(false);
 
   // Load saved preferences on mount
   useEffect(() => {
@@ -341,7 +342,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  // Themed styles
+  // Themed styles (Bluesky-flat treatment)
   const themedStyles = useMemo(
     () =>
       StyleSheet.create({
@@ -350,56 +351,66 @@ const Settings: React.FC = () => {
           backgroundColor: colors.background,
         },
         scrollContent: {
-          padding: 16,
+          paddingBottom: 24,
         },
+        // ── Inline header ──
         header: {
-          marginBottom: 24,
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         title: {
-          fontSize: 28,
-          fontWeight: 'bold',
+          fontSize: 22,
+          fontWeight: '700',
           color: colors.text,
-          marginBottom: 8,
+          marginBottom: 2,
         },
         loadingTitle: {
           textAlign: 'center',
         },
         subtitle: {
-          fontSize: 14,
-          color: colors.placeholder,
+          fontSize: 13,
+          color: colors.secondaryText,
         },
+        // ── Flat section ──
         section: {
-          marginBottom: 24,
+          paddingTop: 16,
+          paddingBottom: 4,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         sectionTitle: {
-          fontSize: 16,
-          fontWeight: '600',
-          color: colors.placeholder,
-          marginBottom: 12,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          paddingHorizontal: 16,
+          marginBottom: 8,
           textTransform: 'uppercase',
-          letterSpacing: 0.5,
+          letterSpacing: 0.6,
         },
+        // Card → flat group of rows (no rounded card / no background)
         settingCard: {
-          backgroundColor: colors.card,
-          borderRadius: 12,
-          marginBottom: 12,
-          overflow: 'hidden',
+          backgroundColor: 'transparent',
         },
         settingRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          padding: 16,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
         },
         settingRowLast: {
-          borderBottomWidth: 0,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         iconContainer: {
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: colors.primary + '20',
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          backgroundColor: colors.primary + '15',
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 12,
@@ -408,18 +419,19 @@ const Settings: React.FC = () => {
           flex: 1,
         },
         settingTitle: {
-          fontSize: 16,
-          fontWeight: '500',
+          fontSize: 15,
+          fontWeight: '600',
           color: colors.text,
           marginBottom: 2,
         },
         settingDescription: {
-          fontSize: 13,
-          color: colors.placeholder,
+          fontSize: 12,
+          color: colors.secondaryText,
         },
         settingAction: {
           marginLeft: 8,
         },
+        // Visibility / segmented chips (outlined-then-tinted-primary pattern)
         visibilityOptions: {
           flexDirection: 'row',
           gap: 8,
@@ -430,53 +442,40 @@ const Settings: React.FC = () => {
           alignItems: 'center',
           gap: 6,
           paddingHorizontal: 12,
-          paddingVertical: 8,
-          borderRadius: 20,
-          backgroundColor: colors.background,
-          borderWidth: 1,
+          paddingVertical: 6,
+          borderRadius: 18,
+          backgroundColor: 'transparent',
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         visibilityOptionActive: {
-          backgroundColor: colors.primary,
+          backgroundColor: colors.primary + '14',
           borderColor: colors.primary,
         },
         visibilityOptionText: {
-          fontSize: 13,
-          fontWeight: '500',
-          color: colors.text,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
         },
         visibilityOptionTextActive: {
-          color: '#FFFFFF',
+          color: colors.primary,
         },
         chevronContainer: {
           padding: 4,
         },
-        button: {
-          backgroundColor: colors.card,
-          borderRadius: 12,
-          padding: 16,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 12,
-        },
-        buttonText: {
-          fontSize: 16,
-          fontWeight: '500',
-          color: colors.primary,
-          marginLeft: 8,
-        },
         version: {
           textAlign: 'center',
-          color: colors.placeholder,
+          color: colors.secondaryText,
           fontSize: 12,
           marginTop: 24,
-          marginBottom: 8,
+          marginBottom: 12,
         },
+        // ── Theme picker (segmented pills) ──
         themePicker: {
           flexDirection: 'row',
-          padding: 12,
-          paddingTop: 0,
+          paddingHorizontal: 16,
+          paddingTop: 4,
+          paddingBottom: 12,
           gap: 8,
         },
         themeOption: {
@@ -484,114 +483,136 @@ const Settings: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          paddingVertical: 10,
+          paddingVertical: 8,
           paddingHorizontal: 12,
-          borderRadius: 10,
-          backgroundColor: colors.background,
+          borderRadius: 20,
+          backgroundColor: 'transparent',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
           gap: 6,
         },
         themeOptionActive: {
-          backgroundColor: colors.primary,
+          backgroundColor: colors.primary + '14',
+          borderColor: colors.primary,
         },
         themeOptionText: {
-          fontSize: 13,
-          fontWeight: '500',
-          color: colors.text,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
         },
         themeOptionTextActive: {
-          color: colors.buttonText,
+          color: colors.primary,
         },
-        // Keyboard Avoiding View
+        // ── Bottom-sheet modal shell ──
         keyboardAvoidingView: {
           flex: 1,
         },
-        // Language Modal Styles
         modalOverlay: {
           flex: 1,
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
           justifyContent: 'flex-end',
         },
         modalContent: {
-          backgroundColor: colors.card,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          paddingBottom: 40,
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          paddingTop: 8,
+          paddingBottom: 24,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+        },
+        modalHandle: {
+          alignSelf: 'center',
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
+          marginBottom: 8,
         },
         modalHeader: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: 16,
-          borderBottomWidth: 1,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         modalTitle: {
-          fontSize: 18,
-          fontWeight: '600',
+          fontSize: 17,
+          fontWeight: '700',
           color: colors.text,
         },
         modalCloseButton: {
           padding: 4,
         },
+        // ── List options inside modals (language / map app) ──
         languageList: {
-          paddingHorizontal: 8,
+          paddingHorizontal: 0,
         },
         languageOption: {
           flexDirection: 'row',
           alignItems: 'center',
-          padding: 16,
-          marginHorizontal: 8,
-          marginVertical: 4,
-          borderRadius: 12,
-          backgroundColor: colors.background,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+          backgroundColor: 'transparent',
         },
         languageOptionSelected: {
-          backgroundColor: colors.primary + '20',
-          borderWidth: 1,
-          borderColor: colors.primary,
+          backgroundColor: colors.primary + '0D',
         },
         languageInfo: {
           flex: 1,
         },
         languageName: {
-          fontSize: 16,
-          fontWeight: '500',
+          fontSize: 15,
+          fontWeight: '600',
           color: colors.text,
         },
+        languageNameSelected: {
+          color: colors.primary,
+          fontWeight: '700',
+        },
         languageNativeName: {
-          fontSize: 14,
-          color: colors.placeholder,
+          fontSize: 12,
+          color: colors.secondaryText,
           marginTop: 2,
         },
         languageCheck: {
           marginLeft: 12,
         },
-        // Delete Account Styles
+        // ── Danger zone ──
         dangerSection: {
-          marginTop: 8,
+          paddingTop: 16,
+          paddingBottom: 4,
+          borderBottomWidth: 0,
         },
         dangerSectionTitle: {
-          fontSize: 16,
-          fontWeight: '600',
-          color: '#DC3545',
-          marginBottom: 12,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.error,
+          paddingHorizontal: 16,
+          marginBottom: 8,
           textTransform: 'uppercase',
-          letterSpacing: 0.5,
+          letterSpacing: 0.6,
         },
         deleteButton: {
-          backgroundColor: colors.card,
-          borderRadius: 12,
-          padding: 16,
           flexDirection: 'row',
           alignItems: 'center',
-          borderWidth: 1,
-          borderColor: '#DC3545',
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          marginHorizontal: 16,
+          backgroundColor: 'transparent',
+          borderRadius: 14,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.error,
         },
         deleteIconContainer: {
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: '#DC354520',
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          backgroundColor: colors.error + '15',
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 12,
@@ -600,117 +621,191 @@ const Settings: React.FC = () => {
           flex: 1,
         },
         deleteButtonTitle: {
-          fontSize: 16,
-          fontWeight: '500',
-          color: '#DC3545',
+          fontSize: 15,
+          fontWeight: '700',
+          color: colors.error,
           marginBottom: 2,
         },
         deleteButtonDescription: {
-          fontSize: 13,
-          color: colors.placeholder,
+          fontSize: 12,
+          color: colors.secondaryText,
         },
+        // ── Delete confirmation modal ──
         deleteModalContent: {
-          backgroundColor: colors.card,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          paddingBottom: 34,
-          paddingHorizontal: 20,
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          paddingTop: 8,
+          paddingBottom: 24,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
         },
         deleteModalHeader: {
-          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: 20,
-          borderBottomWidth: 1,
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         deleteModalIconContainer: {
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: colors.error + '15',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.error + '40',
           alignItems: 'center',
-          marginBottom: 8,
-        },
-        deleteModalIcon: {
+          justifyContent: 'center',
           marginBottom: 12,
         },
+        deleteModalIcon: {
+          marginBottom: 0,
+        },
         deleteModalTitle: {
-          fontSize: 20,
+          fontSize: 17,
           fontWeight: '700',
-          color: '#DC3545',
+          color: colors.error,
           textAlign: 'center',
         },
         deleteModalBody: {
-          paddingVertical: 20,
+          paddingHorizontal: 16,
+          paddingTop: 16,
         },
         deleteWarningText: {
-          fontSize: 15,
+          fontSize: 14,
           color: colors.text,
-          lineHeight: 22,
-          marginBottom: 16,
+          lineHeight: 20,
+          marginBottom: 14,
           textAlign: 'center',
         },
         deleteWarningList: {
-          backgroundColor: '#DC354510',
+          backgroundColor: colors.error + '0D',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.error + '40',
           borderRadius: 12,
-          padding: 16,
-          marginBottom: 20,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          marginBottom: 18,
         },
         deleteWarningItem: {
-          fontSize: 14,
+          fontSize: 13,
           color: colors.text,
-          marginBottom: 8,
-          paddingLeft: 8,
+          marginBottom: 6,
+          paddingLeft: 4,
         },
         deleteWarningItemLast: {
-          fontSize: 14,
+          fontSize: 13,
           color: colors.text,
           marginBottom: 0,
-          paddingLeft: 8,
+          paddingLeft: 4,
         },
         deleteConfirmLabel: {
-          fontSize: 14,
-          fontWeight: '600',
-          color: colors.text,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
           marginBottom: 8,
         },
         deleteConfirmInput: {
-          backgroundColor: colors.background,
-          borderRadius: 12,
-          padding: 16,
-          fontSize: 16,
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          fontSize: 15,
           color: colors.text,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          marginBottom: 20,
+          marginBottom: 18,
         },
         deleteModalButtons: {
           flexDirection: 'row',
-          gap: 12,
+          gap: 10,
         },
         cancelButton: {
           flex: 1,
-          backgroundColor: colors.background,
-          borderRadius: 12,
-          padding: 16,
+          backgroundColor: 'transparent',
+          borderRadius: 24,
+          paddingVertical: 12,
           alignItems: 'center',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         cancelButtonText: {
-          fontSize: 16,
-          fontWeight: '600',
-          color: colors.text,
+          fontSize: 14,
+          fontWeight: '700',
+          color: colors.secondaryText,
         },
         confirmDeleteButton: {
           flex: 1,
-          backgroundColor: '#DC3545',
-          borderRadius: 12,
-          padding: 16,
+          backgroundColor: colors.error,
+          borderRadius: 24,
+          paddingVertical: 12,
           alignItems: 'center',
         },
         confirmDeleteButtonDisabled: {
-          backgroundColor: '#DC354550',
+          backgroundColor: colors.error + '55',
         },
         confirmDeleteButtonText: {
-          fontSize: 16,
-          fontWeight: '600',
+          fontSize: 14,
+          fontWeight: '700',
           color: '#FFFFFF',
+        },
+        // ── About modal ──
+        aboutBody: {
+          paddingHorizontal: 16,
+          paddingTop: 16,
+        },
+        aboutAppName: {
+          fontSize: 18,
+          fontWeight: '700',
+          color: colors.text,
+          textAlign: 'center',
+          marginBottom: 4,
+        },
+        aboutVersion: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          textAlign: 'center',
+          marginBottom: 14,
+        },
+        aboutCopyright: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          textAlign: 'center',
+          lineHeight: 18,
+          marginBottom: 18,
+        },
+        aboutLinkRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          marginHorizontal: -16,
+        },
+        aboutLinkLabel: {
+          flex: 1,
+          fontSize: 15,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        aboutCloseButton: {
+          marginTop: 16,
+          marginHorizontal: 0,
+          backgroundColor: 'transparent',
+          borderRadius: 24,
+          paddingVertical: 12,
+          alignItems: 'center',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        aboutCloseButtonText: {
+          fontSize: 14,
+          fontWeight: '700',
+          color: colors.secondaryText,
         },
       }),
     [colors],
@@ -730,393 +825,374 @@ const Settings: React.FC = () => {
 
   return (
     <SafeAreaView style={themedStyles.container}>
-      <ScrollView style={themedStyles.container}>
-        <View style={themedStyles.scrollContent}>
-          {/* Header */}
-          <View style={themedStyles.header}>
-            <Text style={themedStyles.title}>{t('settings.title')}</Text>
-            <Text style={themedStyles.subtitle}>{t('settings.subtitle')}</Text>
-          </View>
+      <ScrollView
+        style={themedStyles.container}
+        contentContainerStyle={themedStyles.scrollContent}>
+        {/* Inline header */}
+        <View style={themedStyles.header}>
+          <Text style={themedStyles.title}>{t('settings.title')}</Text>
+          <Text style={themedStyles.subtitle}>{t('settings.subtitle')}</Text>
+        </View>
 
-          {/* Appearance Section */}
-          <View style={themedStyles.section}>
-            <Text style={themedStyles.sectionTitle}>
-              {t('settings.appearance')}
-            </Text>
-            <View style={themedStyles.settingCard}>
-              <View
-                style={[themedStyles.settingRow, themedStyles.settingRowLast]}>
+        {/* Appearance Section */}
+        <View style={themedStyles.section}>
+          <Text style={themedStyles.sectionTitle}>
+            {t('settings.appearance')}
+          </Text>
+          <View style={themedStyles.settingCard}>
+            <View style={themedStyles.settingRow}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={
+                    themeMode === 'system'
+                      ? faCircleHalfStroke
+                      : darkMode
+                      ? faMoon
+                      : faSun
+                  }
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('settings.theme')}
+                </Text>
+                <Text style={themedStyles.settingDescription}>
+                  {themeMode === 'system'
+                    ? `${t('settings.system')} (${
+                        darkMode ? t('settings.dark') : t('settings.light')
+                      })`
+                    : themeMode === 'dark'
+                    ? t('settings.dark')
+                    : t('settings.light')}
+                </Text>
+              </View>
+            </View>
+            {/* Theme Picker */}
+            <View style={themedStyles.themePicker}>
+              <TouchableOpacity
+                style={[
+                  themedStyles.themeOption,
+                  themeMode === 'system' && themedStyles.themeOptionActive,
+                ]}
+                onPress={() => setThemeMode('system')}
+                activeOpacity={0.7}>
+                <FontAwesomeIcon
+                  icon={faCircleHalfStroke}
+                  size={12}
+                  color={
+                    themeMode === 'system'
+                      ? colors.primary
+                      : colors.secondaryText
+                  }
+                />
+                <Text
+                  style={[
+                    themedStyles.themeOptionText,
+                    themeMode === 'system' &&
+                      themedStyles.themeOptionTextActive,
+                  ]}>
+                  {t('settings.system')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  themedStyles.themeOption,
+                  themeMode === 'light' && themedStyles.themeOptionActive,
+                ]}
+                onPress={() => setThemeMode('light')}
+                activeOpacity={0.7}>
+                <FontAwesomeIcon
+                  icon={faSun}
+                  size={12}
+                  color={
+                    themeMode === 'light'
+                      ? colors.primary
+                      : colors.secondaryText
+                  }
+                />
+                <Text
+                  style={[
+                    themedStyles.themeOptionText,
+                    themeMode === 'light' &&
+                      themedStyles.themeOptionTextActive,
+                  ]}>
+                  {t('settings.light')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  themedStyles.themeOption,
+                  themeMode === 'dark' && themedStyles.themeOptionActive,
+                ]}
+                onPress={() => setThemeMode('dark')}
+                activeOpacity={0.7}>
+                <FontAwesomeIcon
+                  icon={faMoon}
+                  size={12}
+                  color={
+                    themeMode === 'dark'
+                      ? colors.primary
+                      : colors.secondaryText
+                  }
+                />
+                <Text
+                  style={[
+                    themedStyles.themeOptionText,
+                    themeMode === 'dark' && themedStyles.themeOptionTextActive,
+                  ]}>
+                  {t('settings.dark')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Privacy & Permissions Section */}
+        <View style={themedStyles.section}>
+          <Text style={themedStyles.sectionTitle}>
+            {t('settings.privacyPermissions')}
+          </Text>
+          <View style={themedStyles.settingCard}>
+            <TouchableOpacity
+              style={themedStyles.settingRow}
+              onPress={handleLocationToggle}
+              activeOpacity={0.7}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={faLocationDot}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('settings.locationServices')}
+                </Text>
+                <Text style={themedStyles.settingDescription}>
+                  {t('settings.locationDescription')}
+                </Text>
+              </View>
+              <View style={themedStyles.settingAction}>
+                <Switch
+                  value={locationEnabled}
+                  onValueChange={handleLocationToggle}
+                  trackColor={{false: colors.border, true: colors.primary}}
+                  thumbColor={colors.buttonText}
+                />
+              </View>
+            </TouchableOpacity>
+
+            {locationEnabled && (
+              <View style={themedStyles.settingRow}>
                 <View style={themedStyles.iconContainer}>
                   <FontAwesomeIcon
                     icon={
-                      themeMode === 'system'
-                        ? faCircleHalfStroke
-                        : darkMode
-                        ? faMoon
-                        : faSun
+                      proximityVisibility === 'public'
+                        ? faEye
+                        : proximityVisibility === 'friends'
+                        ? faUserGroup
+                        : faLock
                     }
-                    size={18}
+                    size={14}
                     color={colors.primary}
                   />
                 </View>
                 <View style={themedStyles.settingContent}>
                   <Text style={themedStyles.settingTitle}>
-                    {t('settings.theme')}
+                    {t('settings.proximityVisibility')}
                   </Text>
                   <Text style={themedStyles.settingDescription}>
-                    {themeMode === 'system'
-                      ? `${t('settings.system')} (${
-                          darkMode ? t('settings.dark') : t('settings.light')
-                        })`
-                      : themeMode === 'dark'
-                      ? t('settings.dark')
-                      : t('settings.light')}
+                    {t('settings.proximityVisibilityDesc')}
                   </Text>
-                </View>
-              </View>
-              {/* Theme Picker */}
-              <View style={themedStyles.themePicker}>
-                <TouchableOpacity
-                  style={[
-                    themedStyles.themeOption,
-                    themeMode === 'system' && themedStyles.themeOptionActive,
-                  ]}
-                  onPress={() => setThemeMode('system')}
-                  activeOpacity={0.7}>
-                  <FontAwesomeIcon
-                    icon={faCircleHalfStroke}
-                    size={16}
-                    color={
-                      themeMode === 'system' ? colors.buttonText : colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      themedStyles.themeOptionText,
-                      themeMode === 'system' &&
-                        themedStyles.themeOptionTextActive,
-                    ]}>
-                    {t('settings.system')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    themedStyles.themeOption,
-                    themeMode === 'light' && themedStyles.themeOptionActive,
-                  ]}
-                  onPress={() => setThemeMode('light')}
-                  activeOpacity={0.7}>
-                  <FontAwesomeIcon
-                    icon={faSun}
-                    size={16}
-                    color={
-                      themeMode === 'light' ? colors.buttonText : colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      themedStyles.themeOptionText,
-                      themeMode === 'light' &&
-                        themedStyles.themeOptionTextActive,
-                    ]}>
-                    {t('settings.light')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    themedStyles.themeOption,
-                    themeMode === 'dark' && themedStyles.themeOptionActive,
-                  ]}
-                  onPress={() => setThemeMode('dark')}
-                  activeOpacity={0.7}>
-                  <FontAwesomeIcon
-                    icon={faMoon}
-                    size={16}
-                    color={
-                      themeMode === 'dark' ? colors.buttonText : colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      themedStyles.themeOptionText,
-                      themeMode === 'dark' &&
-                        themedStyles.themeOptionTextActive,
-                    ]}>
-                    {t('settings.dark')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* Privacy & Permissions Section */}
-          <View style={themedStyles.section}>
-            <Text style={themedStyles.sectionTitle}>
-              {t('settings.privacyPermissions')}
-            </Text>
-            <View style={themedStyles.settingCard}>
-              <TouchableOpacity
-                style={themedStyles.settingRow}
-                onPress={handleLocationToggle}
-                activeOpacity={0.7}>
-                <View style={themedStyles.iconContainer}>
-                  <FontAwesomeIcon
-                    icon={faLocationDot}
-                    size={18}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>
-                    {t('settings.locationServices')}
-                  </Text>
-                  <Text style={themedStyles.settingDescription}>
-                    {t('settings.locationDescription')}
-                  </Text>
-                </View>
-                <View style={themedStyles.settingAction}>
-                  <Switch
-                    value={locationEnabled}
-                    onValueChange={handleLocationToggle}
-                    trackColor={{false: colors.border, true: colors.primary}}
-                    thumbColor={colors.buttonText}
-                  />
-                </View>
-              </TouchableOpacity>
-
-              {locationEnabled && (
-                <View style={themedStyles.settingRow}>
-                  <View style={themedStyles.iconContainer}>
-                    <FontAwesomeIcon
-                      icon={
-                        proximityVisibility === 'public'
-                          ? faEye
-                          : proximityVisibility === 'friends'
-                          ? faUserGroup
-                          : faLock
-                      }
-                      size={18}
-                      color={colors.primary}
-                    />
-                  </View>
-                  <View style={{flex: 1}}>
-                    <Text style={themedStyles.settingTitle}>
-                      {t('settings.proximityVisibility')}
-                    </Text>
-                    <Text style={themedStyles.settingDescription}>
-                      {t('settings.proximityVisibilityDesc')}
-                    </Text>
-                    <View style={themedStyles.visibilityOptions}>
-                      {VISIBILITY_OPTIONS.map(option => (
+                  <View style={themedStyles.visibilityOptions}>
+                    {VISIBILITY_OPTIONS.map(option => {
+                      const isActive = proximityVisibility === option.value;
+                      return (
                         <TouchableOpacity
                           key={option.value}
                           style={[
                             themedStyles.visibilityOption,
-                            proximityVisibility === option.value &&
-                              themedStyles.visibilityOptionActive,
+                            isActive && themedStyles.visibilityOptionActive,
                           ]}
                           onPress={() => handleVisibilityChange(option.value)}
                           activeOpacity={0.7}>
                           <FontAwesomeIcon
                             icon={option.icon}
-                            size={14}
+                            size={11}
                             color={
-                              proximityVisibility === option.value
-                                ? '#FFFFFF'
-                                : colors.text
+                              isActive ? colors.primary : colors.secondaryText
                             }
                           />
                           <Text
                             style={[
                               themedStyles.visibilityOptionText,
-                              proximityVisibility === option.value &&
+                              isActive &&
                                 themedStyles.visibilityOptionTextActive,
                             ]}>
                             {t(option.labelKey)}
                           </Text>
                         </TouchableOpacity>
-                      ))}
-                    </View>
+                      );
+                    })}
                   </View>
                 </View>
-              )}
-
-              <TouchableOpacity
-                style={[themedStyles.settingRow, themedStyles.settingRowLast]}
-                onPress={() => setNotificationSettingsModalVisible(true)}
-                activeOpacity={0.7}>
-                <View style={themedStyles.iconContainer}>
-                  <FontAwesomeIcon
-                    icon={faBell}
-                    size={18}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>
-                    {t('settings.notifications')}
-                  </Text>
-                  <Text style={themedStyles.settingDescription}>
-                    {t('settings.notificationsDescription')}
-                  </Text>
-                </View>
-                <View style={themedStyles.settingAction}>
-                  <FontAwesomeIcon
-                    icon={faChevronRight}
-                    size={16}
-                    color={colors.placeholder}
-                  />
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* More Options Section */}
-          <View style={themedStyles.section}>
-            <Text style={themedStyles.sectionTitle}>{t('settings.more')}</Text>
-            <View style={themedStyles.settingCard}>
-              <TouchableOpacity
-                style={themedStyles.settingRow}
-                activeOpacity={0.7}
-                onPress={() => setLanguageModalVisible(true)}>
-                <View style={themedStyles.iconContainer}>
-                  <FontAwesomeIcon
-                    icon={faGlobe}
-                    size={18}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>
-                    {t('settings.language')}
-                  </Text>
-                  <Text style={themedStyles.settingDescription}>
-                    {selectedLanguage.name} ({selectedLanguage.nativeName})
-                  </Text>
-                </View>
-                <View style={themedStyles.chevronContainer}>
-                  <FontAwesomeIcon
-                    icon={faChevronRight}
-                    size={16}
-                    color={colors.placeholder}
-                  />
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={themedStyles.settingRow}
-                activeOpacity={0.7}
-                onPress={() => setMapModalVisible(true)}>
-                <View style={themedStyles.iconContainer}>
-                  <FontAwesomeIcon
-                    icon={faMapLocationDot}
-                    size={18}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>
-                    {t('settings.defaultMapApp')}
-                  </Text>
-                  <Text style={themedStyles.settingDescription}>
-                    {defaultMapApp || t('settings.alwaysAsk')}
-                  </Text>
-                </View>
-                <View style={themedStyles.chevronContainer}>
-                  <FontAwesomeIcon
-                    icon={faChevronRight}
-                    size={16}
-                    color={colors.placeholder}
-                  />
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[themedStyles.settingRow, themedStyles.settingRowLast]}
-                activeOpacity={0.7}
-                onPress={() =>
-                  Alert.alert(
-                    t('settings.about'),
-                    `BetterPlay\nVersion ${appVersion}\n\n© 2026 Patrick O'Connor\nAll rights reserved.`,
-                    [
-                      {
-                        text:
-                          t('settings.termsOfService') || 'Terms of Service',
-                        onPress: () =>
-                          navigation.navigate('TermsOfService' as never),
-                      },
-                      {
-                        text: t('settings.privacyPolicy'),
-                        onPress: () =>
-                          navigation.navigate('PrivacyPolicy' as never),
-                      },
-                      {
-                        text: t('settings.yourData') || 'Your Data',
-                        onPress: () => navigation.navigate('YourData' as never),
-                      },
-                      {text: t('common.close') || 'Close', style: 'cancel'},
-                    ],
-                  )
-                }>
-                <View style={themedStyles.iconContainer}>
-                  <FontAwesomeIcon
-                    icon={faCircleInfo}
-                    size={18}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={themedStyles.settingContent}>
-                  <Text style={themedStyles.settingTitle}>
-                    {t('settings.about')}
-                  </Text>
-                  <Text style={themedStyles.settingDescription}>
-                    {t('settings.aboutDescription')}
-                  </Text>
-                </View>
-                <View style={themedStyles.chevronContainer}>
-                  <FontAwesomeIcon
-                    icon={faChevronRight}
-                    size={16}
-                    color={colors.placeholder}
-                  />
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Danger Zone - Delete Account */}
-          <View style={[themedStyles.section, themedStyles.dangerSection]}>
-            <Text style={themedStyles.dangerSectionTitle}>
-              {t('settings.dangerZone')}
-            </Text>
-            <TouchableOpacity
-              style={themedStyles.deleteButton}
-              activeOpacity={0.7}
-              onPress={() => setDeleteAccountModalVisible(true)}>
-              <View style={themedStyles.deleteIconContainer}>
-                <FontAwesomeIcon icon={faTrash} size={18} color="#DC3545" />
               </View>
-              <View style={themedStyles.deleteButtonText}>
-                <Text style={themedStyles.deleteButtonTitle}>
-                  {t('settings.deleteAccount')}
+            )}
+
+            <TouchableOpacity
+              style={themedStyles.settingRow}
+              onPress={() => setNotificationSettingsModalVisible(true)}
+              activeOpacity={0.7}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={faBell}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('settings.notifications')}
                 </Text>
-                <Text style={themedStyles.deleteButtonDescription}>
-                  {t('settings.deleteAccountDescription')}
+                <Text style={themedStyles.settingDescription}>
+                  {t('settings.notificationsDescription')}
+                </Text>
+              </View>
+              <View style={themedStyles.settingAction}>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* More Options Section */}
+        <View style={themedStyles.section}>
+          <Text style={themedStyles.sectionTitle}>{t('settings.more')}</Text>
+          <View style={themedStyles.settingCard}>
+            <TouchableOpacity
+              style={themedStyles.settingRow}
+              activeOpacity={0.7}
+              onPress={() => setLanguageModalVisible(true)}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={faGlobe}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('settings.language')}
+                </Text>
+                <Text style={themedStyles.settingDescription}>
+                  {selectedLanguage.name} ({selectedLanguage.nativeName})
                 </Text>
               </View>
               <View style={themedStyles.chevronContainer}>
                 <FontAwesomeIcon
                   icon={faChevronRight}
-                  size={16}
-                  color="#DC3545"
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={themedStyles.settingRow}
+              activeOpacity={0.7}
+              onPress={() => setMapModalVisible(true)}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={faMapLocationDot}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('settings.defaultMapApp')}
+                </Text>
+                <Text style={themedStyles.settingDescription}>
+                  {defaultMapApp || t('settings.alwaysAsk')}
+                </Text>
+              </View>
+              <View style={themedStyles.chevronContainer}>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={themedStyles.settingRow}
+              activeOpacity={0.7}
+              onPress={() => setAboutModalVisible(true)}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={faCircleInfo}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('settings.about')}
+                </Text>
+                <Text style={themedStyles.settingDescription}>
+                  {t('settings.aboutDescription')}
+                </Text>
+              </View>
+              <View style={themedStyles.chevronContainer}>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
                 />
               </View>
             </TouchableOpacity>
           </View>
-
-          {/* App Version */}
-          <Text style={themedStyles.version}>BetterPlay v{appVersion}</Text>
         </View>
+
+        {/* Danger Zone - Delete Account */}
+        <View style={themedStyles.dangerSection}>
+          <Text style={themedStyles.dangerSectionTitle}>
+            {t('settings.dangerZone')}
+          </Text>
+          <TouchableOpacity
+            style={themedStyles.deleteButton}
+            activeOpacity={0.7}
+            onPress={() => setDeleteAccountModalVisible(true)}>
+            <View style={themedStyles.deleteIconContainer}>
+              <FontAwesomeIcon icon={faTrash} size={14} color={colors.error} />
+            </View>
+            <View style={themedStyles.deleteButtonText}>
+              <Text style={themedStyles.deleteButtonTitle}>
+                {t('settings.deleteAccount')}
+              </Text>
+              <Text style={themedStyles.deleteButtonDescription}>
+                {t('settings.deleteAccountDescription')}
+              </Text>
+            </View>
+            <View style={themedStyles.chevronContainer}>
+              <FontAwesomeIcon
+                icon={faChevronRight}
+                size={13}
+                color={colors.error}
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* App Version */}
+        <Text style={themedStyles.version}>BetterPlay v{appVersion}</Text>
       </ScrollView>
 
       {/* Language Selection Modal */}
@@ -1132,6 +1208,7 @@ const Settings: React.FC = () => {
           <View
             style={themedStyles.modalContent}
             onStartShouldSetResponder={() => true}>
+            <View style={themedStyles.modalHandle} />
             <View style={themedStyles.modalHeader}>
               <Text style={themedStyles.modalTitle}>
                 {t('settings.selectLanguage')}
@@ -1139,39 +1216,45 @@ const Settings: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.modalCloseButton}
                 onPress={() => setLanguageModalVisible(false)}>
-                <FontAwesomeIcon icon={faXmark} size={22} color={colors.text} />
+                <FontAwesomeIcon icon={faXmark} size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
             <ScrollView style={themedStyles.languageList}>
-              {LANGUAGES.map(language => (
-                <TouchableOpacity
-                  key={language.code}
-                  style={[
-                    themedStyles.languageOption,
-                    selectedLanguage.code === language.code &&
-                      themedStyles.languageOptionSelected,
-                  ]}
-                  onPress={() => handleLanguageSelect(language)}
-                  activeOpacity={0.7}>
-                  <View style={themedStyles.languageInfo}>
-                    <Text style={themedStyles.languageName}>
-                      {language.name}
-                    </Text>
-                    <Text style={themedStyles.languageNativeName}>
-                      {language.nativeName}
-                    </Text>
-                  </View>
-                  {selectedLanguage.code === language.code && (
-                    <View style={themedStyles.languageCheck}>
-                      <FontAwesomeIcon
-                        icon={faCheck}
-                        size={18}
-                        color={colors.primary}
-                      />
+              {LANGUAGES.map(language => {
+                const isSelected = selectedLanguage.code === language.code;
+                return (
+                  <TouchableOpacity
+                    key={language.code}
+                    style={[
+                      themedStyles.languageOption,
+                      isSelected && themedStyles.languageOptionSelected,
+                    ]}
+                    onPress={() => handleLanguageSelect(language)}
+                    activeOpacity={0.7}>
+                    <View style={themedStyles.languageInfo}>
+                      <Text
+                        style={[
+                          themedStyles.languageName,
+                          isSelected && themedStyles.languageNameSelected,
+                        ]}>
+                        {language.name}
+                      </Text>
+                      <Text style={themedStyles.languageNativeName}>
+                        {language.nativeName}
+                      </Text>
                     </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+                    {isSelected && (
+                      <View style={themedStyles.languageCheck}>
+                        <FontAwesomeIcon
+                          icon={faCheck}
+                          size={14}
+                          color={colors.primary}
+                        />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -1190,6 +1273,7 @@ const Settings: React.FC = () => {
           <View
             style={themedStyles.modalContent}
             onStartShouldSetResponder={() => true}>
+            <View style={themedStyles.modalHandle} />
             <View style={themedStyles.modalHeader}>
               <Text style={themedStyles.modalTitle}>
                 {t('settings.defaultMapApp')}
@@ -1197,36 +1281,42 @@ const Settings: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.modalCloseButton}
                 onPress={() => setMapModalVisible(false)}>
-                <FontAwesomeIcon icon={faXmark} size={22} color={colors.text} />
+                <FontAwesomeIcon icon={faXmark} size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
             <ScrollView style={themedStyles.languageList}>
-              {MAP_OPTIONS.map(option => (
-                <TouchableOpacity
-                  key={option.label}
-                  style={[
-                    themedStyles.languageOption,
-                    defaultMapApp === option.value &&
-                      themedStyles.languageOptionSelected,
-                  ]}
-                  onPress={() => handleMapAppSelect(option.value)}
-                  activeOpacity={0.7}>
-                  <View style={themedStyles.languageInfo}>
-                    <Text style={themedStyles.languageName}>
-                      {option.label}
-                    </Text>
-                  </View>
-                  {defaultMapApp === option.value && (
-                    <View style={themedStyles.languageCheck}>
-                      <FontAwesomeIcon
-                        icon={faCheck}
-                        size={18}
-                        color={colors.primary}
-                      />
+              {MAP_OPTIONS.map(option => {
+                const isSelected = defaultMapApp === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.label}
+                    style={[
+                      themedStyles.languageOption,
+                      isSelected && themedStyles.languageOptionSelected,
+                    ]}
+                    onPress={() => handleMapAppSelect(option.value)}
+                    activeOpacity={0.7}>
+                    <View style={themedStyles.languageInfo}>
+                      <Text
+                        style={[
+                          themedStyles.languageName,
+                          isSelected && themedStyles.languageNameSelected,
+                        ]}>
+                        {option.label}
+                      </Text>
                     </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+                    {isSelected && (
+                      <View style={themedStyles.languageCheck}>
+                        <FontAwesomeIcon
+                          icon={faCheck}
+                          size={14}
+                          color={colors.primary}
+                        />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -1248,19 +1338,18 @@ const Settings: React.FC = () => {
             <View
               style={themedStyles.deleteModalContent}
               onStartShouldSetResponder={() => true}>
+              <View style={themedStyles.modalHandle} />
               <View style={themedStyles.deleteModalHeader}>
-                <View>
-                  <View style={themedStyles.deleteModalIconContainer}>
-                    <FontAwesomeIcon
-                      icon={faExclamationTriangle}
-                      size={40}
-                      color="#DC3545"
-                    />
-                  </View>
-                  <Text style={themedStyles.deleteModalTitle}>
-                    {t('settings.deleteAccountTitle')}
-                  </Text>
+                <View style={themedStyles.deleteModalIconContainer}>
+                  <FontAwesomeIcon
+                    icon={faExclamationTriangle}
+                    size={26}
+                    color={colors.error}
+                  />
                 </View>
+                <Text style={themedStyles.deleteModalTitle}>
+                  {t('settings.deleteAccountTitle')}
+                </Text>
               </View>
               <View style={themedStyles.deleteModalBody}>
                 <Text style={themedStyles.deleteWarningText}>
@@ -1339,6 +1428,7 @@ const Settings: React.FC = () => {
           <View
             style={[themedStyles.modalContent, {maxHeight: '85%'}]}
             onStartShouldSetResponder={() => true}>
+            <View style={themedStyles.modalHandle} />
             <View style={themedStyles.modalHeader}>
               <Text style={themedStyles.modalTitle}>
                 {t('settings.notifications')}
@@ -1346,7 +1436,7 @@ const Settings: React.FC = () => {
               <TouchableOpacity
                 style={themedStyles.modalCloseButton}
                 onPress={() => setNotificationSettingsModalVisible(false)}>
-                <FontAwesomeIcon icon={faXmark} size={22} color={colors.text} />
+                <FontAwesomeIcon icon={faXmark} size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} bounces={true}>
@@ -1354,6 +1444,97 @@ const Settings: React.FC = () => {
                 onClose={() => setNotificationSettingsModalVisible(false)}
               />
             </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* About Modal */}
+      <Modal
+        visible={aboutModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAboutModalVisible(false)}>
+        <TouchableOpacity
+          style={themedStyles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setAboutModalVisible(false)}>
+          <View
+            style={themedStyles.modalContent}
+            onStartShouldSetResponder={() => true}>
+            <View style={themedStyles.modalHandle} />
+            <View style={themedStyles.modalHeader}>
+              <Text style={themedStyles.modalTitle}>{t('settings.about')}</Text>
+              <TouchableOpacity
+                style={themedStyles.modalCloseButton}
+                onPress={() => setAboutModalVisible(false)}>
+                <FontAwesomeIcon icon={faXmark} size={18} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={themedStyles.aboutBody}>
+              <Text style={themedStyles.aboutAppName}>BetterPlay</Text>
+              <Text style={themedStyles.aboutVersion}>
+                Version {appVersion}
+              </Text>
+              <Text style={themedStyles.aboutCopyright}>
+                © 2026 Patrick O'Connor{'\n'}All rights reserved.
+              </Text>
+
+              <TouchableOpacity
+                style={themedStyles.aboutLinkRow}
+                onPress={() => {
+                  setAboutModalVisible(false);
+                  navigation.navigate('TermsOfService' as never);
+                }}>
+                <Text style={themedStyles.aboutLinkLabel}>
+                  {t('settings.termsOfService') || 'Terms of Service'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={themedStyles.aboutLinkRow}
+                onPress={() => {
+                  setAboutModalVisible(false);
+                  navigation.navigate('PrivacyPolicy' as never);
+                }}>
+                <Text style={themedStyles.aboutLinkLabel}>
+                  {t('settings.privacyPolicy')}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={themedStyles.aboutLinkRow}
+                onPress={() => {
+                  setAboutModalVisible(false);
+                  navigation.navigate('YourData' as never);
+                }}>
+                <Text style={themedStyles.aboutLinkLabel}>
+                  {t('settings.yourData') || 'Your Data'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={themedStyles.aboutCloseButton}
+                onPress={() => setAboutModalVisible(false)}>
+                <Text style={themedStyles.aboutCloseButtonText}>
+                  {t('common.close') || 'Close'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>

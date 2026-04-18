@@ -70,6 +70,13 @@ import {
   faBell,
   faChevronRight,
   faRotate,
+  faEllipsisH,
+  faMapMarkerAlt,
+  faCalendarAlt,
+  faUsers,
+  faCheck,
+  faPenToSquare,
+  faUserPlus,
 } from '@fortawesome/free-solid-svg-icons';
 import {
   useNavigation,
@@ -89,7 +96,11 @@ import {useNotifications} from '../../Context/NotificationContext';
 import {useSocket} from '../../Context/SocketContext';
 import notificationService from '../../services/NotificationService';
 import locationService, {Coordinates} from '../../services/LocationService';
-import {openDirections} from '../../services/MapLauncher';
+import {
+  AvailableMapApp,
+  openDirections,
+} from '../../services/MapLauncher';
+import MapAppPicker from '../MapAppPicker/MapAppPicker';
 import eventWatchService, {
   EventWatchPreferences,
 } from '../../services/EventWatchService';
@@ -159,6 +170,7 @@ interface Event {
   eventType: string;
   createdBy: string;
   createdByUsername?: string;
+  createdByProfilePicUrl?: string;
   createdAt?: string;
   likes?: string[];
   latitude?: number;
@@ -371,10 +383,35 @@ const getInitials = (username: string): string => {
   return username.slice(0, 2).toUpperCase();
 };
 
+const AVATAR_COLORS = [
+  '#E74C3C',
+  '#3498DB',
+  '#2ECC71',
+  '#9B59B6',
+  '#E67E22',
+  '#1ABC9C',
+  '#F39C12',
+  '#16A085',
+  '#D35400',
+  '#8E44AD',
+];
+
+const getAvatarColor = (username?: string): string => {
+  if (!username) {
+    return AVATAR_COLORS[0];
+  }
+  let hash = 0;
+  for (let i = 0; i < username.length; i++) {
+    hash = username.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+};
+
 // Interface for liked by user data
 interface LikedByUser {
   _id: string;
   username: string;
+  name?: string;
   profilePicUrl?: string;
 }
 
@@ -458,6 +495,7 @@ const getEventTypeEmoji = (eventType: string) => {
 const openMapsForEvent = async (
   event: Partial<Event>,
   t: (key: string) => string,
+  presentPicker?: (apps: AvailableMapApp[], onCancel: () => void) => void,
 ) => {
   const name = event?.name || 'Destination';
   const address = event?.location || '';
@@ -475,6 +513,7 @@ const openMapsForEvent = async (
       longitude: coords.longitude,
     },
     t,
+    presentPicker,
   );
 };
 
@@ -702,7 +741,7 @@ const RecurringDeck: React.FC<RecurringDeckProps> = ({
 
 const EventList: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
-  const {colors} = useTheme();
+  const {colors, darkMode} = useTheme();
   const {t} = useTranslation();
   const {badgeCount, hasPermission, requestPermission, settings} =
     useNotifications();
@@ -713,7 +752,7 @@ const EventList: React.FC = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          padding: 16,
+          paddingTop: 16,
           backgroundColor: colors.background,
         },
         header: {
@@ -722,6 +761,7 @@ const EventList: React.FC = () => {
           alignItems: 'center',
           marginBottom: 16,
           paddingTop: 8,
+          paddingHorizontal: 16,
           backgroundColor: colors.background,
           zIndex: 1,
         },
@@ -731,25 +771,162 @@ const EventList: React.FC = () => {
           width: 90,
         },
         title: {
-          fontSize: 25,
+          fontSize: 22,
           fontWeight: '700',
           color: colors.primary,
           textAlign: 'center',
           flex: 1,
+          letterSpacing: 0.2,
         },
         card: {
           backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 20,
-          marginBottom: 20,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border + '80',
+          paddingHorizontal: 16,
+          paddingTop: 14,
+          paddingBottom: 10,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
           overflow: 'hidden',
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
+        },
+        cardHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+        },
+        cardHeaderLeft: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          flex: 1,
+          gap: 10,
+        },
+        avatar: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        avatarText: {
+          color: '#fff',
+          fontSize: 15,
+          fontWeight: '700',
+          letterSpacing: 0.3,
+        },
+        cardHeaderIdentity: {
+          flex: 1,
+        },
+        cardHeaderUsername: {
+          color: colors.text,
+          fontSize: 15,
+          fontWeight: '700',
+        },
+        cardHeaderMetaRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginTop: 1,
+          flexWrap: 'wrap',
+          gap: 4,
+        },
+        cardHeaderMeta: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          fontWeight: '400',
+        },
+        cardHeaderMetaDot: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          marginHorizontal: 1,
+        },
+        pastEventLabel: {
+          fontWeight: '600',
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.4,
+          fontSize: 10,
+        },
+        cardOptionsButton: {
+          padding: 6,
+          marginLeft: 6,
+        },
+        cardBody: {
+          marginBottom: 10,
+        },
+        cardTitleRow: {
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          marginBottom: 8,
+          gap: 8,
+        },
+        cardEventEmoji: {
+          fontSize: 20,
+          lineHeight: 24,
+        },
+        cardEventTitle: {
+          color: colors.text,
+          fontSize: 18,
+          fontWeight: '700',
+          flex: 1,
+          lineHeight: 24,
+          letterSpacing: -0.2,
+        },
+        detailRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginTop: 4,
+        },
+        detailText: {
+          color: colors.secondaryText,
+          fontSize: 13.5,
+          flex: 1,
+        },
+        mapEmbed: {
+          borderRadius: 12,
+          overflow: 'hidden' as const,
+          marginBottom: 10,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        mapEmbedView: {
+          height: 140,
+          width: '100%',
+        },
+        mapEmbedOverlay: {
+          position: 'absolute',
+          bottom: 8,
+          right: 8,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: 'rgba(0,0,0,0.65)',
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 14,
+        },
+        mapEmbedOverlayText: {
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: '600',
+        },
+        engagementRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingTop: 8,
+          paddingBottom: 4,
+          gap: 24,
+        },
+        engagementButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          paddingVertical: 4,
+        },
+        engagementCount: {
+          color: colors.secondaryText,
+          fontSize: 13,
+          fontWeight: '500',
+        },
+        engagementSpacer: {
+          flex: 1,
         },
         pastEventCard: {
           opacity: 0.6,
@@ -987,110 +1164,196 @@ const EventList: React.FC = () => {
         modalOverlay: {
           flex: 1,
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          justifyContent: 'center',
-          padding: 16,
+          justifyContent: 'flex-end',
         },
         modalView: {
-          backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 20,
-          paddingTop: 16,
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
           shadowColor: '#000',
-          shadowOffset: {width: 0, height: 4},
-          shadowOpacity: 0.25,
-          shadowRadius: 12,
-          elevation: 8,
-          maxHeight: '85%',
+          shadowOffset: {width: 0, height: -4},
+          shadowOpacity: 0.18,
+          shadowRadius: 16,
+          elevation: 12,
+          maxHeight: '90%',
+        },
+        modalHandle: {
+          alignSelf: 'center',
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
+          marginBottom: 8,
         },
         modalFormScroll: {
           flexGrow: 0,
         },
+        modalBody: {
+          paddingHorizontal: 16,
+          paddingTop: 12,
+        },
         modalHeader: {
           color: colors.text,
-          fontSize: 22,
-          marginBottom: 16,
+          fontSize: 17,
+          paddingHorizontal: 16,
+          paddingBottom: 12,
           textAlign: 'center',
           fontWeight: '700',
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         modalLabel: {
-          color: colors.text,
-          fontSize: 14,
-          fontWeight: '600',
-          marginBottom: 8,
-          marginLeft: 4,
+          color: colors.secondaryText,
+          fontSize: 12,
+          fontWeight: '700',
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
+          marginBottom: 6,
         },
         modalInput: {
           backgroundColor: colors.inputBackground || colors.background,
           color: colors.text,
-          padding: 12,
-          marginBottom: 12,
-          borderRadius: 10,
-          borderWidth: 1,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          marginBottom: 10,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           fontSize: 15,
+          minHeight: 46,
+          justifyContent: 'center',
         },
         autocompleteContainer: {
-          marginBottom: 12,
+          marginBottom: 10,
           zIndex: 1000,
         },
         saveButton: {
           backgroundColor: colors.primary,
           paddingVertical: 12,
           paddingHorizontal: 16,
-          borderRadius: 10,
-          marginVertical: 4,
+          borderRadius: 24,
           flex: 1,
           alignItems: 'center',
           marginHorizontal: 5,
           minWidth: 90,
-          shadowColor: colors.primary,
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: 0.3,
-          shadowRadius: 4,
-          elevation: 3,
         },
         cancelButton: {
           backgroundColor: 'transparent',
-          borderWidth: 2,
-          borderColor: colors.error || '#b11313',
-          shadowOpacity: 0,
-          elevation: 0,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         buttonText: {
           color: colors.buttonText || '#fff',
           textAlign: 'center',
           fontWeight: '700',
-          fontSize: 16,
+          fontSize: 14,
         },
         cancelButtonText: {
-          color: colors.error || '#b11313',
+          color: colors.secondaryText,
         },
         buttonContainer: {
           flexDirection: 'row',
           justifyContent: 'center',
-          marginTop: 16,
+          paddingHorizontal: 16,
+          paddingTop: 16,
           alignItems: 'center',
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
         },
         confirmButton: {
-          color: colors.buttonText || '#fff',
+          color: '#fff',
           textAlign: 'center',
           marginTop: 8,
-          marginBottom: 12,
-          fontSize: 15,
-          fontWeight: '600',
+          marginBottom: 10,
+          fontSize: 13,
+          fontWeight: '700',
           backgroundColor: colors.primary,
-          paddingVertical: 8,
+          paddingVertical: 10,
           paddingHorizontal: 16,
-          borderRadius: 8,
+          borderRadius: 22,
           overflow: 'hidden',
+          alignSelf: 'center',
         },
         pickerContainer: {
           backgroundColor: colors.inputBackground || colors.background,
           borderRadius: 12,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           marginBottom: 8,
           overflow: 'hidden',
+        },
+        // ── Event card options menu (bottom sheet) ──
+        optionsMenuSheet: {
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+        },
+        optionsMenuHeaderBlock: {
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        optionsMenuTitle: {
+          fontSize: 17,
+          fontWeight: '700',
+          color: colors.text,
+          textAlign: 'center',
+        },
+        optionsMenuSubtitle: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          textAlign: 'center',
+          marginTop: 2,
+        },
+        optionsMenuRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        optionsMenuIconContainer: {
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 12,
+        },
+        optionsMenuLabel: {
+          flex: 1,
+          fontSize: 15,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        optionsMenuLabelDanger: {
+          color: colors.error,
+          fontWeight: '700',
+        },
+        optionsMenuCancel: {
+          marginTop: 12,
+          marginHorizontal: 16,
+          backgroundColor: 'transparent',
+          borderRadius: 24,
+          paddingVertical: 12,
+          alignItems: 'center',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        optionsMenuCancelText: {
+          fontSize: 14,
+          fontWeight: '700',
+          color: colors.secondaryText,
         },
         picker: {
           backgroundColor: 'transparent',
@@ -1121,21 +1384,22 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: colors.inputBackground || colors.card,
-          borderRadius: 20,
-          paddingHorizontal: 14,
+          borderRadius: 22,
+          paddingHorizontal: 12,
           marginBottom: 16,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
+          minHeight: 40,
         },
         searchInput: {
           flex: 1,
-          paddingVertical: 12,
-          paddingHorizontal: 8,
-          fontSize: 16,
+          paddingVertical: 9,
+          paddingHorizontal: 6,
+          fontSize: 14,
           color: colors.text,
         },
         searchIcon: {
-          marginRight: 4,
+          marginRight: 6,
         },
         clearButton: {
           padding: 4,
@@ -1150,55 +1414,82 @@ const EventList: React.FC = () => {
           justifyContent: 'center',
           alignItems: 'center',
           paddingVertical: 40,
+          paddingHorizontal: 32,
+        },
+        noResultsIconContainer: {
+          width: 72,
+          height: 72,
+          borderRadius: 20,
+          backgroundColor: colors.primary + '12',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '30',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 18,
         },
         noResultsText: {
           color: colors.text,
           fontSize: 16,
-          opacity: 0.7,
+          fontWeight: '700',
           textAlign: 'center',
         },
         noResultsSubtext: {
-          color: colors.text,
-          fontSize: 14,
-          opacity: 0.5,
+          color: colors.secondaryText,
+          fontSize: 13,
           textAlign: 'center',
-          marginTop: 8,
+          marginTop: 6,
+          lineHeight: 18,
+          maxWidth: 280,
         },
         ctaButton: {
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: colors.primary,
-          paddingHorizontal: 20,
-          paddingVertical: 12,
-          borderRadius: 25,
+          paddingHorizontal: 18,
+          paddingVertical: 11,
+          borderRadius: 24,
           marginTop: 20,
           gap: 8,
         },
         ctaButtonText: {
-          color: '#fff',
-          fontSize: 16,
-          fontWeight: '600',
+          color: colors.buttonText || '#fff',
+          fontSize: 14,
+          fontWeight: '700',
         },
         filterButton: {
-          padding: 8,
-          marginLeft: 8,
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: 'transparent',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginLeft: 10,
           position: 'relative',
+        },
+        filterButtonActive: {
+          borderColor: colors.primary,
+          backgroundColor: colors.primary + '14',
         },
         filterBadge: {
           position: 'absolute',
-          top: 0,
-          right: 0,
-          backgroundColor: colors.error || '#e74c3c',
-          borderRadius: 10,
+          top: -4,
+          right: -4,
+          backgroundColor: colors.primary,
+          borderRadius: 9,
           minWidth: 18,
           height: 18,
+          paddingHorizontal: 4,
           justifyContent: 'center',
           alignItems: 'center',
+          borderWidth: 2,
+          borderColor: colors.background,
         },
         filterBadgeText: {
-          color: '#fff',
-          fontSize: 11,
-          fontWeight: 'bold',
+          color: colors.buttonText || '#fff',
+          fontSize: 10,
+          fontWeight: '700',
         },
         profileFilterBanner: {
           flexDirection: 'row',
@@ -1239,142 +1530,159 @@ const EventList: React.FC = () => {
           backgroundColor: colors.card,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
-          paddingTop: 20,
-          paddingHorizontal: 20,
-          paddingBottom: 40,
-          maxHeight: '80%',
+          paddingTop: 8,
+          paddingBottom: 24,
+          maxHeight: '85%',
+        },
+        filterModalHandle: {
+          alignSelf: 'center',
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
+          marginBottom: 8,
         },
         filterModalHeader: {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 20,
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         filterModalTitle: {
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: '700',
           color: colors.text,
         },
         filterSection: {
-          marginBottom: 20,
+          paddingHorizontal: 20,
+          paddingVertical: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         filterSectionTitle: {
-          fontSize: 16,
-          fontWeight: '600',
-          color: colors.text,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.6,
           marginBottom: 12,
         },
         filterChipsContainer: {
           flexDirection: 'row',
           flexWrap: 'wrap',
-          marginHorizontal: -4,
+          gap: 8,
         },
         filterChip: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 10,
+          paddingVertical: 7,
           paddingHorizontal: 12,
-          borderRadius: 10,
-          borderWidth: 1,
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          backgroundColor: colors.background,
-          margin: 4,
+          backgroundColor: 'transparent',
+          gap: 6,
         },
         filterChipSelected: {
-          backgroundColor: colors.primary + '20',
+          backgroundColor: colors.primary + '12',
           borderColor: colors.primary,
-          borderWidth: 1.5,
         },
         filterChipText: {
-          fontSize: 14,
+          fontSize: 13,
           color: colors.text,
-          marginLeft: 6,
+          fontWeight: '600',
         },
         filterChipTextSelected: {
           color: colors.primary,
-          fontWeight: '600',
+          fontWeight: '700',
         },
         filterChipEmoji: {
-          fontSize: 16,
+          fontSize: 14,
         },
         dateFilterOption: {
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.background,
-          marginBottom: 8,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: 12,
+          marginHorizontal: -20,
+          paddingHorizontal: 20,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         dateFilterOptionSelected: {
-          backgroundColor: colors.primary,
-          borderColor: colors.primary,
+          backgroundColor: colors.primary + '0D',
         },
         dateFilterOptionText: {
-          fontSize: 15,
+          fontSize: 14,
           color: colors.text,
         },
         dateFilterOptionTextSelected: {
-          color: colors.buttonText || '#fff',
-          fontWeight: '600',
+          color: colors.primary,
+          fontWeight: '700',
         },
         toggleOption: {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.background,
+          paddingVertical: 4,
         },
-        toggleOptionSelected: {
-          backgroundColor: colors.primary + '20',
-          borderColor: colors.primary,
-          borderWidth: 1.5,
-        },
+        toggleOptionSelected: {},
         toggleOptionText: {
-          fontSize: 15,
+          fontSize: 14,
           color: colors.text,
+          flex: 1,
         },
         toggleOptionTextSelected: {
           color: colors.primary,
-          fontWeight: '600',
+          fontWeight: '700',
+        },
+        toggleCheck: {
+          width: 22,
+          height: 22,
+          borderRadius: 11,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        toggleCheckActive: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
         },
         filterButtonsRow: {
           flexDirection: 'row',
           justifyContent: 'space-between',
-          marginTop: 20,
+          paddingHorizontal: 20,
+          paddingTop: 16,
           gap: 12,
         },
         clearFiltersButton: {
           flex: 1,
-          paddingVertical: 14,
-          borderRadius: 12,
-          borderWidth: 2,
+          paddingVertical: 12,
+          borderRadius: 24,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.error || '#e74c3c',
           alignItems: 'center',
         },
         clearFiltersText: {
           color: colors.error || '#e74c3c',
-          fontWeight: '600',
-          fontSize: 16,
+          fontWeight: '700',
+          fontSize: 14,
         },
         applyFiltersButton: {
           flex: 1,
-          paddingVertical: 14,
-          borderRadius: 12,
+          paddingVertical: 12,
+          borderRadius: 24,
           backgroundColor: colors.primary,
           alignItems: 'center',
         },
         applyFiltersText: {
           color: colors.buttonText || '#fff',
-          fontWeight: '600',
-          fontSize: 16,
-        },
-        noResultsIcon: {
-          marginBottom: 16,
+          fontWeight: '700',
+          fontSize: 14,
         },
         disabledOpacity: {
           opacity: 0.7,
@@ -1395,14 +1703,18 @@ const EventList: React.FC = () => {
         // Jersey color picker styles
         jerseyColorPickerContainer: {
           backgroundColor: colors.inputBackground || colors.background,
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 16,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          padding: 14,
+          marginBottom: 12,
         },
         jerseyColorTitle: {
-          color: colors.text,
-          fontSize: 14,
-          fontWeight: '600',
+          color: colors.secondaryText,
+          fontSize: 12,
+          fontWeight: '700',
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
           marginBottom: 12,
           textAlign: 'center',
         },
@@ -1415,18 +1727,17 @@ const EventList: React.FC = () => {
         jerseyColorOption: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.card,
-          paddingVertical: 10,
-          paddingHorizontal: 14,
-          borderRadius: 8,
-          borderWidth: 1,
+          backgroundColor: 'transparent',
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderRadius: 18,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           minWidth: 100,
         },
         jerseyColorOptionSelected: {
           borderColor: colors.primary,
-          borderWidth: 2,
-          backgroundColor: colors.primary + '15',
+          backgroundColor: colors.primary + '14',
         },
         jerseyColorSwatch: {
           width: 20,
@@ -1452,28 +1763,29 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           flexWrap: 'wrap',
           marginBottom: 12,
-          gap: 8,
+          paddingHorizontal: 16,
+          gap: 6,
         },
         activeFilterTag: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.primary + '20',
-          paddingVertical: 6,
+          backgroundColor: colors.primary + '12',
+          paddingVertical: 5,
           paddingHorizontal: 10,
-          borderRadius: 16,
-          marginRight: 8,
-          marginBottom: 4,
+          borderRadius: 14,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '40',
+          gap: 6,
         },
         activeFilterTagText: {
           color: colors.primary,
-          fontSize: 13,
-          fontWeight: '500',
-          marginRight: 6,
+          fontSize: 12,
+          fontWeight: '600',
         },
         // Horizontal filter chip bar (compact pills)
         chipBarContainer: {
           marginBottom: 12,
-          minHeight: 50,
+          minHeight: 46,
           zIndex: 100,
           backgroundColor: colors.background,
           elevation: 10,
@@ -1481,9 +1793,9 @@ const EventList: React.FC = () => {
           overflow: 'visible',
         },
         chipBarContent: {
-          paddingHorizontal: 4,
-          paddingVertical: 8,
-          gap: 10,
+          paddingHorizontal: 16,
+          paddingVertical: 6,
+          gap: 8,
           alignItems: 'center',
         },
         chip: {
@@ -1493,33 +1805,33 @@ const EventList: React.FC = () => {
           paddingVertical: 6,
           paddingHorizontal: 12,
           borderRadius: 18,
-          backgroundColor: colors.card,
-          borderWidth: 1,
+          backgroundColor: 'transparent',
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          height: 36,
+          height: 32,
         },
         chipActive: {
-          backgroundColor: colors.primary + '18',
+          backgroundColor: colors.primary + '14',
           borderColor: colors.primary,
-          borderWidth: 1.5,
         },
         chipEmoji: {
-          fontSize: 15,
+          fontSize: 13,
           marginRight: 5,
         },
         chipText: {
           fontSize: 13,
-          fontWeight: '500',
+          fontWeight: '600',
           color: colors.secondaryText,
         },
         chipTextActive: {
           color: colors.primary,
-          fontWeight: '600',
+          fontWeight: '700',
         },
         searchFilterRow: {
           flexDirection: 'row',
           alignItems: 'center',
           marginBottom: 12,
+          paddingHorizontal: 16,
           backgroundColor: colors.background,
           zIndex: 100,
           elevation: 10,
@@ -1534,9 +1846,11 @@ const EventList: React.FC = () => {
           marginBottom: 12,
         },
         privacyLabel: {
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.text,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
           marginBottom: 8,
         },
         privacyOptions: {
@@ -1546,25 +1860,24 @@ const EventList: React.FC = () => {
         privacyOption: {
           flex: 1,
           alignItems: 'center',
-          backgroundColor: colors.inputBackground || colors.background,
-          paddingVertical: 10,
+          backgroundColor: 'transparent',
+          paddingVertical: 12,
           paddingHorizontal: 8,
-          borderRadius: 8,
-          borderWidth: 1,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         privacyOptionSelected: {
           borderColor: colors.primary,
-          borderWidth: 2,
-          backgroundColor: colors.primary + '10',
+          backgroundColor: colors.primary + '14',
         },
         privacyOptionTextContainer: {
           alignItems: 'center',
           marginTop: 6,
         },
         privacyOptionLabel: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 13,
+          fontWeight: '700',
           color: colors.text,
           textAlign: 'center',
         },
@@ -1572,10 +1885,11 @@ const EventList: React.FC = () => {
           color: colors.primary,
         },
         privacyOptionDescription: {
-          fontSize: 10,
+          fontSize: 11,
           color: colors.secondaryText,
           marginTop: 2,
           textAlign: 'center',
+          lineHeight: 14,
         },
         // Privacy badge on event cards
         privacyBadge: {
@@ -1595,16 +1909,16 @@ const EventList: React.FC = () => {
         },
         // Invite users styles
         inviteContainer: {
-          marginBottom: 16,
+          marginBottom: 12,
         },
         inviteSearchContainer: {
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: colors.inputBackground || colors.background,
-          borderRadius: 8,
-          borderWidth: 1,
+          borderRadius: 22,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          paddingHorizontal: 12,
+          paddingHorizontal: 14,
           marginBottom: 8,
         },
         inviteSearchIcon: {
@@ -1612,23 +1926,25 @@ const EventList: React.FC = () => {
         },
         inviteSearchInput: {
           flex: 1,
-          paddingVertical: 12,
+          paddingVertical: 10,
           fontSize: 14,
           color: colors.text,
         },
         inviteSearchResults: {
-          backgroundColor: colors.card,
-          borderRadius: 8,
-          borderWidth: 1,
+          backgroundColor: colors.background,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           marginBottom: 12,
-          maxHeight: 150,
+          maxHeight: 180,
+          overflow: 'hidden',
         },
         inviteSearchResultRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          padding: 10,
-          borderBottomWidth: 1,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         inviteUserAvatar: {
@@ -1649,20 +1965,31 @@ const EventList: React.FC = () => {
         inviteUserAvatarText: {
           color: '#fff',
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: '700',
+        },
+        inviteUserTextBlock: {
+          flex: 1,
+          marginRight: 8,
         },
         inviteUserName: {
-          flex: 1,
           fontSize: 14,
+          fontWeight: '600',
           color: colors.text,
+        },
+        inviteUserHandle: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          marginTop: 1,
         },
         invitedUsersList: {
           marginTop: 8,
         },
         invitedUsersLabel: {
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.text,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
           marginBottom: 8,
         },
         invitedUsersChips: {
@@ -1673,60 +2000,76 @@ const EventList: React.FC = () => {
         invitedUserChip: {
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: colors.primary + '20',
-          paddingVertical: 6,
+          backgroundColor: colors.primary + '14',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '40',
+          paddingVertical: 5,
           paddingHorizontal: 10,
-          borderRadius: 16,
+          borderRadius: 14,
           gap: 6,
         },
         invitedUserChipText: {
-          fontSize: 13,
+          fontSize: 12,
           color: colors.primary,
-          fontWeight: '500',
+          fontWeight: '700',
         },
         inviteHint: {
           fontSize: 12,
           color: colors.secondaryText,
-          fontStyle: 'italic',
           marginTop: 4,
         },
-        // Likes modal styles
+        // Likes modal — bottom-sheet (matches EventComments)
         likesModalOverlay: {
           flex: 1,
-          backgroundColor: 'rgba(0, 0, 0, 0.55)',
+          backgroundColor: 'rgba(0, 0, 0, 0.45)',
           justifyContent: 'flex-end',
         },
         likesModalContent: {
-          backgroundColor: colors.card,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          paddingHorizontal: 20,
-          paddingBottom: Platform.OS === 'ios' ? 36 : 20,
-          maxHeight: '55%',
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+          maxHeight: '70%',
         },
         likesModalHandle: {
           alignSelf: 'center',
-          width: 40,
-          height: 5,
-          borderRadius: 3,
+          width: 36,
+          height: 4,
+          borderRadius: 2,
           backgroundColor: colors.border,
-          marginTop: 10,
-          marginBottom: 16,
+          marginBottom: 8,
         },
-        likesModalHeaderRow: {
+        likesModalHeaderBlock: {
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        likesModalTitleRow: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: 16,
           gap: 8,
         },
         likesModalTitle: {
-          fontSize: 18,
+          fontSize: 17,
           fontWeight: '700',
           color: colors.text,
+          textAlign: 'center',
+        },
+        likesModalCount: {
+          fontSize: 12,
+          fontWeight: '500',
+          color: colors.secondaryText,
+          textAlign: 'center',
+          marginTop: 4,
         },
         likesModalScroll: {
-          maxHeight: 320,
+          paddingHorizontal: 16,
+          maxHeight: 360,
         },
         likesModalUserRow: {
           flexDirection: 'row',
@@ -1736,37 +2079,37 @@ const EventList: React.FC = () => {
           borderBottomColor: colors.border,
         },
         likesModalAvatar: {
-          width: 42,
-          height: 42,
-          borderRadius: 21,
-          marginRight: 14,
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          marginRight: 12,
         },
         likesModalAvatarPlaceholder: {
-          width: 42,
-          height: 42,
-          borderRadius: 21,
-          backgroundColor: colors.primary,
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: colors.primary + '14',
           justifyContent: 'center',
           alignItems: 'center',
-          marginRight: 14,
+          marginRight: 12,
         },
         likesModalAvatarText: {
-          color: '#fff',
-          fontSize: 15,
+          color: colors.primary,
+          fontSize: 13,
           fontWeight: '700',
         },
         likesModalUsername: {
-          fontSize: 15,
+          fontSize: 14,
           color: colors.text,
           flex: 1,
           fontWeight: '500',
         },
         likesModalUsernameClickable: {
           color: colors.primary,
+          fontWeight: '600',
         },
         likesModalChevron: {
           marginLeft: 8,
-          opacity: 0.4,
         },
         likesModalAnonymous: {
           fontSize: 13,
@@ -1777,47 +2120,78 @@ const EventList: React.FC = () => {
         },
         likesModalEmpty: {
           textAlign: 'center',
-          color: colors.placeholder || '#888',
-          fontSize: 14,
-          paddingVertical: 24,
+          color: colors.secondaryText,
+          fontSize: 13,
+          paddingVertical: 20,
         },
         likesModalClose: {
-          marginTop: 16,
-          paddingVertical: 12,
-          backgroundColor: colors.primary,
-          borderRadius: 12,
+          marginHorizontal: 16,
+          marginTop: 14,
+          height: 44,
+          borderRadius: 22,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: 'transparent',
           alignItems: 'center',
+          justifyContent: 'center',
         },
         likesModalCloseText: {
-          color: '#fff',
+          color: colors.secondaryText,
           fontWeight: '700',
-          fontSize: 15,
+          fontSize: 14,
         },
-        watchModalCard: {
-          backgroundColor: colors.card,
-          borderRadius: 14,
-          padding: 16,
+        watchModalSheet: {
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          maxHeight: '90%',
+        },
+        watchModalHeaderBlock: {
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         watchModalTitle: {
           color: colors.text,
-          fontSize: 20,
+          fontSize: 17,
           fontWeight: '700',
-          marginBottom: 4,
+          textAlign: 'center',
         },
         watchModalSubtitle: {
           color: colors.secondaryText,
           fontSize: 13,
-          marginBottom: 14,
+          marginTop: 4,
+          textAlign: 'center',
+        },
+        watchOptionsList: {
+          paddingHorizontal: 16,
         },
         watchOptionRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingVertical: 10,
+          paddingVertical: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+          gap: 12,
+        },
+        watchOptionRowLast: {
+          borderBottomWidth: 0,
+        },
+        watchOptionIconContainer: {
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          backgroundColor: colors.primary + '15',
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         watchOptionInfo: {
           flex: 1,
-          paddingRight: 10,
         },
         watchOptionTitle: {
           color: colors.text,
@@ -1828,42 +2202,45 @@ const EventList: React.FC = () => {
           color: colors.secondaryText,
           fontSize: 12,
           marginTop: 2,
-        },
-        watchOptionDivider: {
-          height: 1,
-          backgroundColor: colors.border,
+          lineHeight: 16,
         },
         watchModalFooter: {
           flexDirection: 'row',
-          marginTop: 14,
+          paddingHorizontal: 16,
+          paddingTop: 14,
+          marginTop: 4,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
           gap: 10,
         },
         watchSecondaryButton: {
           flex: 1,
-          borderRadius: 10,
-          borderWidth: 1,
+          borderRadius: 24,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           paddingVertical: 12,
           alignItems: 'center',
+          backgroundColor: 'transparent',
         },
         watchSecondaryButtonText: {
-          color: colors.text,
-          fontWeight: '600',
+          color: colors.secondaryText,
+          fontWeight: '700',
           fontSize: 14,
         },
         watchDangerButton: {
           borderColor: colors.error || '#e74c3c',
-          backgroundColor: (colors.error || '#e74c3c') + '14',
+          backgroundColor: 'transparent',
         },
         watchDangerButtonText: {
           color: colors.error || '#e74c3c',
         },
         watchPrimaryButton: {
           flex: 1,
-          borderRadius: 10,
+          borderRadius: 24,
           backgroundColor: colors.primary,
           paddingVertical: 12,
           alignItems: 'center',
+          justifyContent: 'center',
         },
         watchPrimaryButtonText: {
           color: colors.buttonText || '#fff',
@@ -1871,17 +2248,23 @@ const EventList: React.FC = () => {
           fontSize: 14,
         },
         watchGlobalMutedNote: {
+          marginHorizontal: 16,
           marginTop: 12,
-          color: colors.secondaryText,
+          padding: 12,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: (colors.error || '#e74c3c') + '40',
+          backgroundColor: (colors.error || '#e74c3c') + '0D',
+          color: colors.error || '#e74c3c',
           fontSize: 12,
-          lineHeight: 18,
+          lineHeight: 17,
         },
         recurrenceSection: {
           backgroundColor: colors.inputBackground || colors.background,
           borderRadius: 12,
           padding: 14,
-          marginBottom: 12,
-          borderWidth: 1,
+          marginBottom: 10,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         recurrenceToggleRow: {
@@ -1891,8 +2274,8 @@ const EventList: React.FC = () => {
         },
         recurrenceLabel: {
           color: colors.text,
-          fontSize: 15,
-          fontWeight: '600',
+          fontSize: 14,
+          fontWeight: '700',
         },
         recurrenceDescription: {
           color: colors.secondaryText,
@@ -1900,15 +2283,17 @@ const EventList: React.FC = () => {
           marginTop: 2,
         },
         recurrenceOptions: {
-          marginTop: 14,
-          paddingTop: 14,
-          borderTopWidth: 1,
+          marginTop: 12,
+          paddingTop: 12,
+          borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
         },
         recurrenceSubLabel: {
-          color: colors.text,
-          fontSize: 13,
-          fontWeight: '600',
+          color: colors.secondaryText,
+          fontSize: 12,
+          fontWeight: '700',
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
           marginBottom: 8,
         },
         recurrenceFrequencyRow: {
@@ -1918,21 +2303,20 @@ const EventList: React.FC = () => {
         recurrenceFrequencyOption: {
           flex: 1,
           alignItems: 'center',
-          paddingVertical: 10,
-          borderRadius: 10,
-          borderWidth: 1,
+          paddingVertical: 8,
+          borderRadius: 18,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          backgroundColor: colors.card,
+          backgroundColor: 'transparent',
         },
         recurrenceFrequencySelected: {
           borderColor: colors.primary,
-          borderWidth: 2,
-          backgroundColor: colors.primary + '10',
+          backgroundColor: colors.primary + '14',
         },
         recurrenceFrequencyText: {
-          color: colors.text,
+          color: colors.secondaryText,
           fontSize: 13,
-          fontWeight: '600',
+          fontWeight: '700',
         },
         recurrenceFrequencyTextSelected: {
           color: colors.primary,
@@ -1942,25 +2326,24 @@ const EventList: React.FC = () => {
           marginBottom: 10,
         },
         recurrenceCountOption: {
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          borderWidth: 1,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          backgroundColor: colors.card,
+          backgroundColor: 'transparent',
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 8,
         },
         recurrenceCountSelected: {
           borderColor: colors.primary,
-          borderWidth: 2,
-          backgroundColor: colors.primary + '10',
+          backgroundColor: colors.primary + '14',
         },
         recurrenceCountText: {
-          color: colors.text,
-          fontSize: 15,
-          fontWeight: '600',
+          color: colors.secondaryText,
+          fontSize: 14,
+          fontWeight: '700',
         },
         recurrenceCountTextSelected: {
           color: colors.primary,
@@ -1968,7 +2351,6 @@ const EventList: React.FC = () => {
         recurrenceSummary: {
           color: colors.secondaryText,
           fontSize: 12,
-          fontStyle: 'italic',
           marginTop: 4,
         },
         recurringBadge: {
@@ -2106,25 +2488,25 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           flexWrap: 'wrap',
           gap: 8,
-          marginTop: 10,
+          marginTop: 12,
         },
         proximityDistanceChip: {
-          paddingHorizontal: 14,
-          paddingVertical: 7,
-          borderRadius: 16,
-          borderWidth: 1,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 14,
+          borderWidth: StyleSheet.hairlineWidth,
         },
         proximityDistanceChipSelected: {
-          backgroundColor: colors.primary + '20',
+          backgroundColor: colors.primary + '12',
           borderColor: colors.primary,
         },
         proximityDistanceChipDefault: {
-          backgroundColor: colors.card,
+          backgroundColor: 'transparent',
           borderColor: colors.border,
         },
         proximityDistanceText: {
-          fontSize: 13,
-          fontWeight: '600',
+          fontSize: 12,
+          fontWeight: '700',
         },
         proximityDistanceTextSelected: {
           color: colors.primary,
@@ -2148,30 +2530,33 @@ const EventList: React.FC = () => {
       textInput: {
         backgroundColor: colors.inputBackground || '#fff',
         color: colors.text,
-        padding: 12,
-        borderRadius: 8,
-        borderWidth: 1,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 12,
+        borderWidth: StyleSheet.hairlineWidth,
         borderColor: colors.border,
-        fontSize: 16,
+        fontSize: 15,
+        minHeight: 46,
       },
       listView: {
-        backgroundColor: colors.card || '#fff',
+        backgroundColor: colors.background || '#fff',
         borderColor: colors.border,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         borderTopWidth: 0,
-        borderRadius: 8,
+        borderRadius: 12,
         borderTopLeftRadius: 0,
         borderTopRightRadius: 0,
         maxHeight: 200,
       },
       row: {
-        backgroundColor: colors.card || '#fff',
-        padding: 13,
+        backgroundColor: colors.background || '#fff',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
         minHeight: 44,
         flexDirection: 'row' as const,
       },
       separator: {
-        height: 0.5,
+        height: StyleSheet.hairlineWidth,
         backgroundColor: colors.border,
       },
       description: {
@@ -2299,6 +2684,15 @@ const EventList: React.FC = () => {
   // Event watch state
   const [watchModalVisible, setWatchModalVisible] = useState(false);
   const [watchTargetEvent, setWatchTargetEvent] = useState<Event | null>(null);
+  const [optionsMenuEvent, setOptionsMenuEvent] = useState<Event | null>(null);
+
+  // Map app picker state
+  const [mapPickerApps, setMapPickerApps] = useState<AvailableMapApp[]>([]);
+  const [mapPickerVisible, setMapPickerVisible] = useState(false);
+  const presentMapPicker = useCallback((apps: AvailableMapApp[]) => {
+    setMapPickerApps(apps);
+    setMapPickerVisible(true);
+  }, []);
   const [watchPreferencesDraft, setWatchPreferencesDraft] =
     useState<EventWatchPreferences>(getDefaultWatchPreferences());
   const [watchedEventIds, setWatchedEventIds] = useState<Set<string>>(
@@ -3140,6 +3534,7 @@ const EventList: React.FC = () => {
       return matchedUsers.map((user: LikedByUser) => ({
         _id: user._id,
         username: user.username,
+        name: user.name,
         profilePicUrl: user.profilePicUrl,
       }));
     } catch {
@@ -3163,10 +3558,13 @@ const EventList: React.FC = () => {
         },
       });
       const allUsers = response.data?.users || response.data || [];
-      // Filter users by search query (exclude current user and already invited)
+      const normalizedQuery = query.toLowerCase();
+      // Filter users by username OR real name (exclude current user and already invited)
       const filteredUsers = allUsers.filter(
         (user: LikedByUser) =>
-          user.username.toLowerCase().includes(query.toLowerCase()) &&
+          (user.username?.toLowerCase().includes(normalizedQuery) ||
+            (user.name &&
+              user.name.toLowerCase().includes(normalizedQuery))) &&
           user._id !== userData?._id &&
           !newEvent.invitedUsers.includes(user._id),
       );
@@ -3174,6 +3572,7 @@ const EventList: React.FC = () => {
         filteredUsers.slice(0, 10).map((user: LikedByUser) => ({
           _id: user._id,
           username: user.username,
+          name: user.name,
           profilePicUrl: user.profilePicUrl,
         })),
       );
@@ -3372,106 +3771,168 @@ const EventList: React.FC = () => {
     const isCommentsExpanded = expandedCommentsEventId === item._id;
     const isWatching = watchedEventIds.has(item._id);
     const isEventFull = item.rosterSpotsFilled >= item.totalSpots;
-    const watchButtonLabel = isWatching ? 'Watching' : 'Watch Event';
+    const isCreator = userData?._id === item.createdBy;
+    const username = item.createdByUsername || '';
+    const likeCount = item.likes?.length || 0;
+    const commentCount =
+      localCommentCounts[item._id] ?? item.commentCount ?? 0;
+
+    const showOptionsMenu = () => {
+      setOptionsMenuEvent(item);
+    };
 
     return (
       <View style={[themedStyles.card, isPast && themedStyles.pastEventCard]}>
-        <TouchableOpacity
-          onPress={() => handleEventPress(item)}
-          activeOpacity={0.9}>
-          {/* Past Event Badge */}
-          {isPast && (
-            <View style={themedStyles.pastEventBadge}>
-              <Text style={themedStyles.pastEventBadgeText}>
-                {t('events.past') || 'Past'}
-              </Text>
-            </View>
-          )}
-
-          {/* Header: Name + Creator */}
-          <View style={themedStyles.cardHeaderSection}>
-            <View style={themedStyles.cardRow}>
-              <Text style={themedStyles.cardEmoji}>
-                {getEventTypeEmoji(item.eventType)}
-              </Text>
-              <Text style={themedStyles.cardTitle}>{item.name}</Text>
-              {item.privacy && item.privacy !== 'public' && (
-                <View style={themedStyles.privacyBadge}>
-                  <FontAwesomeIcon
-                    icon={item.privacy === 'private' ? faLock : faEnvelope}
-                    size={12}
-                    color={colors.secondaryText}
-                  />
-                  <Text style={themedStyles.privacyBadgeText}>
-                    {item.privacy === 'private' ? 'Private' : 'Invite Only'}
-                  </Text>
-                </View>
-              )}
-              {item.isRecurring && (
-                <View style={themedStyles.recurringBadge}>
-                  <FontAwesomeIcon
-                    icon={faRotate}
-                    size={10}
-                    color={colors.primary}
-                  />
-                  <Text style={themedStyles.recurringBadgeText}>Recurring</Text>
-                </View>
-              )}
-            </View>
-            {item.createdByUsername && (
-              <View style={themedStyles.creatorRow}>
-                <Text style={themedStyles.eventUsername}>
-                  {t('events.createdBy')} {item.createdByUsername}
+        {/* Header: Avatar + Identity + Options */}
+        <View style={themedStyles.cardHeader}>
+          <TouchableOpacity
+            onPress={() => handleEventPress(item)}
+            activeOpacity={0.7}
+            style={themedStyles.cardHeaderLeft}>
+            {item.createdByProfilePicUrl ? (
+              <Image
+                source={{uri: item.createdByProfilePicUrl}}
+                style={themedStyles.avatar}
+              />
+            ) : (
+              <View
+                style={[
+                  themedStyles.avatar,
+                  {backgroundColor: getAvatarColor(username)},
+                ]}>
+                <Text style={themedStyles.avatarText}>
+                  {getInitials(username)}
                 </Text>
+              </View>
+            )}
+            <View style={themedStyles.cardHeaderIdentity}>
+              <Text
+                style={themedStyles.cardHeaderUsername}
+                numberOfLines={1}>
+                {username || t('events.anonymous') || 'Unknown'}
+              </Text>
+              <View style={themedStyles.cardHeaderMetaRow}>
                 {item.createdAt && (
-                  <Text style={themedStyles.eventTimestamp}>
+                  <Text style={themedStyles.cardHeaderMeta}>
                     {formatRelativeTime(item.createdAt)}
                   </Text>
                 )}
+                {item.privacy && item.privacy !== 'public' && (
+                  <>
+                    <Text style={themedStyles.cardHeaderMetaDot}>·</Text>
+                    <FontAwesomeIcon
+                      icon={item.privacy === 'private' ? faLock : faEnvelope}
+                      size={10}
+                      color={colors.secondaryText}
+                    />
+                    <Text style={themedStyles.cardHeaderMeta}>
+                      {item.privacy === 'private' ? 'Private' : 'Invite Only'}
+                    </Text>
+                  </>
+                )}
+                {item.isRecurring && (
+                  <>
+                    <Text style={themedStyles.cardHeaderMetaDot}>·</Text>
+                    <FontAwesomeIcon
+                      icon={faRotate}
+                      size={10}
+                      color={colors.secondaryText}
+                    />
+                    <Text style={themedStyles.cardHeaderMeta}>Recurring</Text>
+                  </>
+                )}
+                {isPast && (
+                  <>
+                    <Text style={themedStyles.cardHeaderMetaDot}>·</Text>
+                    <Text
+                      style={[
+                        themedStyles.cardHeaderMeta,
+                        themedStyles.pastEventLabel,
+                      ]}>
+                      {t('events.past') || 'Past'}
+                    </Text>
+                  </>
+                )}
               </View>
-            )}
-          </View>
-
-          {/* Details: Location, Date/Time, Roster */}
-          <View style={themedStyles.cardDetailsSection}>
-            <View style={themedStyles.cardRow}>
-              <Text style={themedStyles.cardEmoji}>📍</Text>
-              <Text style={themedStyles.cardText}>{item.location}</Text>
             </View>
-            <View style={themedStyles.cardRow}>
-              <Text style={themedStyles.cardEmoji}>🗓️</Text>
-              <Text style={themedStyles.cardText}>
-                {item.date} @ {formatDisplayTime(item.time)}
+          </TouchableOpacity>
+          {isCreator && (
+            <TouchableOpacity
+              style={themedStyles.cardOptionsButton}
+              onPress={showOptionsMenu}
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+              <FontAwesomeIcon
+                icon={faEllipsisH}
+                size={18}
+                color={colors.secondaryText}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Title + Details */}
+        <TouchableOpacity
+          onPress={() => handleEventPress(item)}
+          activeOpacity={0.7}>
+          <View style={themedStyles.cardBody}>
+            <View style={themedStyles.cardTitleRow}>
+              <Text style={themedStyles.cardEventEmoji}>
+                {getEventTypeEmoji(item.eventType)}
+              </Text>
+              <Text style={themedStyles.cardEventTitle} numberOfLines={2}>
+                {item.name}
               </Text>
             </View>
-            <View style={themedStyles.cardRow}>
-              <Text style={themedStyles.cardEmoji}>👥</Text>
-              <Text style={themedStyles.cardText}>
-                {item.rosterSpotsFilled} / {item.totalSpots}{' '}
+
+            <View style={themedStyles.detailRow}>
+              <FontAwesomeIcon
+                icon={faMapMarkerAlt}
+                size={12}
+                color={colors.secondaryText}
+              />
+              <Text style={themedStyles.detailText} numberOfLines={1}>
+                {item.location}
+              </Text>
+            </View>
+
+            <View style={themedStyles.detailRow}>
+              <FontAwesomeIcon
+                icon={faCalendarAlt}
+                size={12}
+                color={colors.secondaryText}
+              />
+              <Text style={themedStyles.detailText}>
+                {item.date} · {formatDisplayTime(item.time)}
+              </Text>
+            </View>
+
+            <View style={themedStyles.detailRow}>
+              <FontAwesomeIcon
+                icon={faUsers}
+                size={12}
+                color={colors.secondaryText}
+              />
+              <Text style={themedStyles.detailText}>
+                {item.rosterSpotsFilled}/{item.totalSpots}{' '}
                 {t('events.playersJoined')}
                 {isEventFull && item.waitlist && item.waitlist.length > 0
-                  ? ` · ${item.waitlist.length} on waitlist`
+                  ? ` · ${item.waitlist.length} waitlisted`
                   : ''}
               </Text>
             </View>
-          </View>
 
-          {/* Countdown Timer */}
-          {!isPast && (
-            <CountdownTimer eventDate={item.date} eventTime={item.time} />
-          )}
+            {!isPast && (
+              <CountdownTimer eventDate={item.date} eventTime={item.time} />
+            )}
+          </View>
         </TouchableOpacity>
 
-        {/* Spacer */}
-        <View style={themedStyles.cardSpacer} />
-
-        {/* Interactive Map View */}
+        {/* Embedded Map Preview */}
         <TouchableOpacity
-          style={themedStyles.mapBox}
-          onPress={() => openMapsForEvent(item, t)}
-          activeOpacity={0.7}>
+          style={themedStyles.mapEmbed}
+          onPress={() => openMapsForEvent(item, t, presentMapPicker)}
+          activeOpacity={0.85}>
           {(() => {
-            // Use exact coordinates if available, otherwise use location lookup
             const coords =
               item.latitude && item.longitude
                 ? {latitude: item.latitude, longitude: item.longitude}
@@ -3483,7 +3944,7 @@ const EventList: React.FC = () => {
                   Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined
                 }
                 liteMode={Platform.OS === 'android'}
-                style={themedStyles.mapView}
+                style={themedStyles.mapEmbedView}
                 initialRegion={{
                   latitude: coords.latitude,
                   longitude: coords.longitude,
@@ -3502,131 +3963,97 @@ const EventList: React.FC = () => {
               </MapView>
             );
           })()}
-          <View style={themedStyles.mapOverlay}>
-            <Text style={themedStyles.mapText}>📍 {item.location}</Text>
-            <Text style={themedStyles.mapSubtext}>
-              {t('events.tapToOpenMaps')}
+          <View style={themedStyles.mapEmbedOverlay}>
+            <FontAwesomeIcon
+              icon={faLocationArrow}
+              size={11}
+              color="#fff"
+            />
+            <Text style={themedStyles.mapEmbedOverlayText}>
+              {t('events.getDirections')}
             </Text>
           </View>
         </TouchableOpacity>
 
-        {/* Spacer */}
-        <View style={themedStyles.cardSpacer} />
-
-        {/* Action Buttons */}
-        <View style={themedStyles.actionRow}>
+        {/* Engagement Footer */}
+        <View style={themedStyles.engagementRow}>
           <TouchableOpacity
-            style={[
-              themedStyles.actionButton,
-              isWatching && themedStyles.watchButtonWatched,
-            ]}
-            onPress={() => openWatchModal(item)}>
-            <FontAwesomeIcon
-              icon={faBell}
-              size={16}
-              color={isWatching ? colors.primary : colors.primary}
-              style={themedStyles.actionButtonIcon}
-            />
-            <Text
-              style={[
-                themedStyles.actionButtonText,
-                isWatching && themedStyles.watchButtonTextWatched,
-              ]}>
-              {watchButtonLabel}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[themedStyles.actionButton, themedStyles.joinButton]}
-            onPress={() => openMapsForEvent(item, t)}>
-            <FontAwesomeIcon
-              icon={faLocationArrow}
-              size={16}
-              color={colors.buttonText || '#fff'}
-              style={themedStyles.actionButtonIcon}
-            />
-            <Text
-              style={[
-                themedStyles.actionButtonText,
-                themedStyles.joinButtonText,
-              ]}>
-              {t('events.getDirections')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Share/Discuss/Like/Settings/Delete Icons */}
-        <View style={themedStyles.iconContainer}>
-          {/* Like Button with Count Badge */}
-          <TouchableOpacity
-            style={themedStyles.likeButtonContainer}
+            style={themedStyles.engagementButton}
             onPress={() => toggleEventLike(item)}
-            onLongPress={() =>
-              (item.likes?.length || 0) > 0 && showEventLikedBy(item)
-            }>
+            onLongPress={() => likeCount > 0 && showEventLikedBy(item)}
+            hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
             <FontAwesomeIcon
               icon={faHeart}
-              size={18}
+              size={16}
               color={
                 likedEvents.has(item._id) ? '#e74c3c' : colors.secondaryText
               }
             />
-            {(item.likes?.length || 0) > 0 && (
-              <View style={themedStyles.iconCountBadge}>
-                <Text style={themedStyles.iconCountBadgeText}>
-                  {item.likes!.length}
-                </Text>
-              </View>
+            {likeCount > 0 && (
+              <Text
+                style={[
+                  themedStyles.engagementCount,
+                  likedEvents.has(item._id) && {color: '#e74c3c'},
+                ]}>
+                {likeCount}
+              </Text>
             )}
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={themedStyles.iconButton}
-            onPress={() => handleShareEvent(item)}>
+            style={themedStyles.engagementButton}
+            onPress={() => handleDiscussEvent(item)}
+            hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
+            <FontAwesomeIcon
+              icon={faComments}
+              size={16}
+              color={
+                isCommentsExpanded ? colors.primary : colors.secondaryText
+              }
+            />
+            {commentCount > 0 && (
+              <Text
+                style={[
+                  themedStyles.engagementCount,
+                  isCommentsExpanded && {color: colors.primary},
+                ]}>
+                {commentCount}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={themedStyles.engagementButton}
+            onPress={() => handleShareEvent(item)}
+            hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
             <FontAwesomeIcon
               icon={faShareAlt}
-              size={18}
-              color={colors.primary}
+              size={16}
+              color={colors.secondaryText}
             />
           </TouchableOpacity>
-          {/* Comment Button with Count Badge */}
-          <View style={themedStyles.commentButtonContainer}>
-            <TouchableOpacity
-              style={[
-                themedStyles.iconButton,
-                isCommentsExpanded && {backgroundColor: colors.primary + '20'},
-              ]}
-              onPress={() => handleDiscussEvent(item)}>
-              <FontAwesomeIcon
-                icon={faComments}
-                size={18}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-            {(localCommentCounts[item._id] ?? item.commentCount ?? 0) > 0 && (
-              <View style={themedStyles.iconCountBadge}>
-                <Text style={themedStyles.iconCountBadgeText}>
-                  {localCommentCounts[item._id] ?? item.commentCount ?? 0}
-                </Text>
-              </View>
+
+          <View style={themedStyles.engagementSpacer} />
+
+          <TouchableOpacity
+            style={themedStyles.engagementButton}
+            onPress={() => openWatchModal(item)}
+            hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
+            <FontAwesomeIcon
+              icon={faBell}
+              size={16}
+              color={isWatching ? colors.primary : colors.secondaryText}
+            />
+            {isWatching && (
+              <Text
+                style={[
+                  themedStyles.engagementCount,
+                  {color: colors.primary},
+                ]}>
+                Watching
+              </Text>
             )}
-          </View>
-          {userData?._id === item.createdBy && (
-            <TouchableOpacity
-              style={themedStyles.iconButton}
-              onPress={() => handleEditEvent(item)}>
-              <FontAwesomeIcon icon={faCog} size={18} color={colors.text} />
-            </TouchableOpacity>
-          )}
-          {userData?._id === item.createdBy && (
-            <TouchableOpacity
-              style={themedStyles.iconButton}
-              onPress={() => handleDeleteEvent(item)}>
-              <FontAwesomeIcon
-                icon={faTrash}
-                size={18}
-                color={colors.error || '#e74c3c'}
-              />
-            </TouchableOpacity>
-          )}
+          </TouchableOpacity>
         </View>
 
         {/* Inline Event Comments */}
@@ -3774,14 +4201,14 @@ const EventList: React.FC = () => {
           ]}>
           <FontAwesomeIcon
             icon={faSearch}
-            size={18}
-            color={colors.placeholder || '#888'}
+            size={14}
+            color={colors.secondaryText}
             style={themedStyles.searchIcon}
           />
           <TextInput
             style={themedStyles.searchInput}
             placeholder={t('events.searchPlaceholder') || 'Search events...'}
-            placeholderTextColor={colors.placeholder || '#888'}
+            placeholderTextColor={colors.secondaryText}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
@@ -3793,19 +4220,24 @@ const EventList: React.FC = () => {
               onPress={() => setSearchQuery('')}>
               <FontAwesomeIcon
                 icon={faTimes}
-                size={18}
-                color={colors.placeholder || '#888'}
+                size={14}
+                color={colors.secondaryText}
               />
             </TouchableOpacity>
           )}
         </View>
         <TouchableOpacity
-          style={themedStyles.filterButton}
+          style={[
+            themedStyles.filterButton,
+            activeFilterCount > 0 && themedStyles.filterButtonActive,
+          ]}
           onPress={() => setShowFilterModal(true)}>
           <FontAwesomeIcon
             icon={faFilter}
-            size={20}
-            color={activeFilterCount > 0 ? colors.primary : colors.text}
+            size={16}
+            color={
+              activeFilterCount > 0 ? colors.primary : colors.secondaryText
+            }
           />
           {activeFilterCount > 0 && (
             <View style={themedStyles.filterBadge}>
@@ -3879,7 +4311,7 @@ const EventList: React.FC = () => {
                 </Text>
                 <FontAwesomeIcon
                   icon={faTimes}
-                  size={12}
+                  size={10}
                   color={colors.primary}
                 />
               </TouchableOpacity>
@@ -3897,7 +4329,7 @@ const EventList: React.FC = () => {
                 </Text>
                 <FontAwesomeIcon
                   icon={faTimes}
-                  size={12}
+                  size={10}
                   color={colors.primary}
                 />
               </TouchableOpacity>
@@ -3911,7 +4343,7 @@ const EventList: React.FC = () => {
                 </Text>
                 <FontAwesomeIcon
                   icon={faTimes}
-                  size={12}
+                  size={10}
                   color={colors.primary}
                 />
               </TouchableOpacity>
@@ -3925,7 +4357,7 @@ const EventList: React.FC = () => {
                 </Text>
                 <FontAwesomeIcon
                   icon={faTimes}
-                  size={12}
+                  size={10}
                   color={colors.primary}
                 />
               </TouchableOpacity>
@@ -3964,44 +4396,52 @@ const EventList: React.FC = () => {
                   themedStyles.noResultsContainer,
                   themedStyles.noResultsContainerCompact,
                 ]}>
-                <FontAwesomeIcon
-                  icon={faPlus}
-                  size={48}
-                  color={colors.border}
-                  style={themedStyles.noResultsIcon}
-                />
+                <View style={themedStyles.noResultsIconContainer}>
+                  <FontAwesomeIcon
+                    icon={
+                      searchQuery
+                        ? faSearch
+                        : activeFilterCount > 0
+                        ? faFilter
+                        : faCalendarAlt
+                    }
+                    size={28}
+                    color={colors.primary}
+                  />
+                </View>
                 <Text style={themedStyles.noResultsText}>
                   {searchQuery
                     ? t('common.noResults')
                     : activeFilterCount > 0
-                    ? t('events.noMatchingEvents') || 'No matching events'
+                    ? t('events.noMatchingEvents')
                     : t('events.noEvents')}
                 </Text>
                 {searchQuery ? (
                   <Text style={themedStyles.noResultsSubtext}>
-                    {t('events.tryDifferentSearch') ||
-                      'Try a different search term'}
+                    {t('events.tryDifferentSearch')}
                   </Text>
                 ) : activeFilterCount > 0 ? (
                   <>
                     <Text style={themedStyles.noResultsSubtext}>
-                      {t('events.tryDifferentFilter') ||
-                        'Try a different filter or clear your current filters'}
+                      {t('events.tryDifferentFilter')}
                     </Text>
                     <TouchableOpacity
                       style={themedStyles.ctaButton}
                       onPress={clearFilters}>
-                      <FontAwesomeIcon icon={faTimes} size={16} color="#fff" />
+                      <FontAwesomeIcon
+                        icon={faTimes}
+                        size={14}
+                        color={colors.buttonText || '#fff'}
+                      />
                       <Text style={themedStyles.ctaButtonText}>
-                        {t('events.clearFilters') || 'Clear Filters'}
+                        {t('events.clearFilters')}
                       </Text>
                     </TouchableOpacity>
                   </>
                 ) : showFirstTimeHint ? (
                   <>
                     <Text style={themedStyles.noResultsSubtext}>
-                      {t('events.noEventsSubtext') ||
-                        'Create your first event and invite others to join!'}
+                      {t('events.noEventsSubtext')}
                     </Text>
                     <TouchableOpacity
                       style={themedStyles.ctaButton}
@@ -4010,10 +4450,13 @@ const EventList: React.FC = () => {
                         setPlacesApiFailed(false);
                         setModalVisible(true);
                       }}>
-                      <FontAwesomeIcon icon={faPlus} size={16} color="#fff" />
+                      <FontAwesomeIcon
+                        icon={faPlus}
+                        size={14}
+                        color={colors.buttonText || '#fff'}
+                      />
                       <Text style={themedStyles.ctaButtonText}>
-                        {t('events.createFirstEvent') ||
-                          'Create Your First Event'}
+                        {t('events.createFirstEvent')}
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -4052,14 +4495,16 @@ const EventList: React.FC = () => {
           style={themedStyles.keyboardAvoidingView}>
           <View style={themedStyles.modalOverlay}>
             <View style={themedStyles.modalView}>
+              <View style={themedStyles.modalHandle} />
               <Text style={themedStyles.modalHeader}>
                 {isEditing
-                  ? `✏️ ${t('events.editEvent')}`
-                  : `🎉 ${t('events.createEvent')}`}
+                  ? t('events.editEvent')
+                  : t('events.createEvent')}
               </Text>
 
               <ScrollView
                 style={themedStyles.modalFormScroll}
+                contentContainerStyle={themedStyles.modalBody}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled">
                 <TextInput
@@ -4151,8 +4596,9 @@ const EventList: React.FC = () => {
                       display={Platform.OS === 'ios' ? 'inline' : 'default'}
                       onChange={onDateChange}
                       minimumDate={new Date()}
-                      themeVariant="dark"
+                      themeVariant={darkMode ? 'dark' : 'light'}
                       accentColor={colors.primary}
+                      textColor={colors.text}
                     />
                     {Platform.OS === 'ios' && (
                       <TouchableOpacity
@@ -4189,6 +4635,8 @@ const EventList: React.FC = () => {
                       minuteInterval={15}
                       display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                       onChange={onTimeChange}
+                      themeVariant={darkMode ? 'dark' : 'light'}
+                      accentColor={colors.primary}
                       textColor={colors.text}
                       minimumDate={
                         date &&
@@ -4226,7 +4674,7 @@ const EventList: React.FC = () => {
                           setNewEvent({...newEvent, isRecurring: value})
                         }
                         trackColor={{
-                          false: '#767577',
+                          false: colors.border,
                           true: colors.primary,
                         }}
                       />
@@ -4609,13 +5057,24 @@ const EventList: React.FC = () => {
                                   themedStyles.inviteUserAvatarPlaceholder
                                 }>
                                 <Text style={themedStyles.inviteUserAvatarText}>
-                                  {getInitials(user.username)}
+                                  {getInitials(user.name || user.username)}
                                 </Text>
                               </View>
                             )}
-                            <Text style={themedStyles.inviteUserName}>
-                              {user.username}
-                            </Text>
+                            <View style={themedStyles.inviteUserTextBlock}>
+                              <Text
+                                style={themedStyles.inviteUserName}
+                                numberOfLines={1}>
+                                {user.name || user.username}
+                              </Text>
+                              {user.name ? (
+                                <Text
+                                  style={themedStyles.inviteUserHandle}
+                                  numberOfLines={1}>
+                                  @{user.username}
+                                </Text>
+                              ) : null}
+                            </View>
                             <FontAwesomeIcon
                               icon={faPlus}
                               size={16}
@@ -4639,7 +5098,7 @@ const EventList: React.FC = () => {
                               key={user._id}
                               style={themedStyles.invitedUserChip}>
                               <Text style={themedStyles.invitedUserChipText}>
-                                {user.username}
+                                {user.name || user.username}
                               </Text>
                               <TouchableOpacity
                                 onPress={() => removeUserFromInvite(user._id)}
@@ -4706,6 +5165,106 @@ const EventList: React.FC = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      {/* Event Card Options Menu (themed bottom sheet) */}
+      <Modal
+        visible={optionsMenuEvent !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setOptionsMenuEvent(null)}>
+        <TouchableOpacity
+          style={themedStyles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setOptionsMenuEvent(null)}>
+          <View
+            style={themedStyles.optionsMenuSheet}
+            onStartShouldSetResponder={() => true}>
+            <View style={themedStyles.modalHandle} />
+            <View style={themedStyles.optionsMenuHeaderBlock}>
+              <Text style={themedStyles.optionsMenuTitle}>
+                {t('events.eventDetails') || 'Event Options'}
+              </Text>
+              {optionsMenuEvent && (
+                <Text
+                  style={themedStyles.optionsMenuSubtitle}
+                  numberOfLines={1}>
+                  {optionsMenuEvent.name}
+                </Text>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={themedStyles.optionsMenuRow}
+              activeOpacity={0.7}
+              onPress={() => {
+                const target = optionsMenuEvent;
+                setOptionsMenuEvent(null);
+                if (target) {
+                  handleEditEvent(target);
+                }
+              }}>
+              <View
+                style={[
+                  themedStyles.optionsMenuIconContainer,
+                  {backgroundColor: colors.primary + '15'},
+                ]}>
+                <FontAwesomeIcon
+                  icon={faPenToSquare}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <Text style={themedStyles.optionsMenuLabel}>
+                {t('common.edit') || 'Edit'}
+              </Text>
+              <FontAwesomeIcon
+                icon={faChevronRight}
+                size={12}
+                color={colors.secondaryText}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={themedStyles.optionsMenuRow}
+              activeOpacity={0.7}
+              onPress={() => {
+                const target = optionsMenuEvent;
+                setOptionsMenuEvent(null);
+                if (target) {
+                  handleDeleteEvent(target);
+                }
+              }}>
+              <View
+                style={[
+                  themedStyles.optionsMenuIconContainer,
+                  {backgroundColor: colors.error + '15'},
+                ]}>
+                <FontAwesomeIcon
+                  icon={faTrash}
+                  size={14}
+                  color={colors.error}
+                />
+              </View>
+              <Text
+                style={[
+                  themedStyles.optionsMenuLabel,
+                  themedStyles.optionsMenuLabelDanger,
+                ]}>
+                {t('common.delete') || 'Delete'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={themedStyles.optionsMenuCancel}
+              activeOpacity={0.7}
+              onPress={() => setOptionsMenuEvent(null)}>
+              <Text style={themedStyles.optionsMenuCancelText}>
+                {t('common.cancel') || 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal
         visible={watchModalVisible}
         transparent
@@ -4718,97 +5277,135 @@ const EventList: React.FC = () => {
           <TouchableOpacity
             activeOpacity={1}
             onPress={e => e.stopPropagation()}
-            style={themedStyles.watchModalCard}>
-            <Text style={themedStyles.watchModalTitle}>
-              {watchedEventIds.has(watchTargetEvent?._id || '')
-                ? 'Update Watch Settings'
-                : 'Watch This Event'}
-            </Text>
-            <Text style={themedStyles.watchModalSubtitle}>
-              {watchTargetEvent?.name || ''}
-            </Text>
-
-            <View style={themedStyles.watchOptionRow}>
-              <View style={themedStyles.watchOptionInfo}>
-                <Text style={themedStyles.watchOptionTitle}>Spots Opened</Text>
-                <Text style={themedStyles.watchOptionDescription}>
-                  Alert me when a full event has a free spot.
+            style={themedStyles.watchModalSheet}>
+            <View style={themedStyles.modalHandle} />
+            <View style={themedStyles.watchModalHeaderBlock}>
+              <Text style={themedStyles.watchModalTitle}>
+                {watchedEventIds.has(watchTargetEvent?._id || '')
+                  ? 'Update Watch Settings'
+                  : 'Watch This Event'}
+              </Text>
+              {!!watchTargetEvent?.name && (
+                <Text style={themedStyles.watchModalSubtitle}>
+                  {watchTargetEvent.name}
                 </Text>
-              </View>
-              <Switch
-                value={watchPreferencesDraft.spotsAvailable}
-                onValueChange={value =>
-                  setWatchPreferencesDraft(prev => ({
-                    ...prev,
-                    spotsAvailable: value,
-                  }))
-                }
-                trackColor={{false: '#767577', true: colors.primary}}
-              />
+              )}
             </View>
-            <View style={themedStyles.watchOptionDivider} />
 
-            <View style={themedStyles.watchOptionRow}>
-              <View style={themedStyles.watchOptionInfo}>
-                <Text style={themedStyles.watchOptionTitle}>
-                  General Updates
-                </Text>
-                <Text style={themedStyles.watchOptionDescription}>
-                  Important changes to date, time, or location.
-                </Text>
+            <View style={themedStyles.watchOptionsList}>
+              <View style={themedStyles.watchOptionRow}>
+                <View style={themedStyles.watchOptionIconContainer}>
+                  <FontAwesomeIcon
+                    icon={faUserPlus}
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={themedStyles.watchOptionInfo}>
+                  <Text style={themedStyles.watchOptionTitle}>
+                    Spots Opened
+                  </Text>
+                  <Text style={themedStyles.watchOptionDescription}>
+                    Alert me when a full event has a free spot.
+                  </Text>
+                </View>
+                <Switch
+                  value={watchPreferencesDraft.spotsAvailable}
+                  onValueChange={value =>
+                    setWatchPreferencesDraft(prev => ({
+                      ...prev,
+                      spotsAvailable: value,
+                    }))
+                  }
+                  trackColor={{false: colors.border, true: colors.primary}}
+                />
               </View>
-              <Switch
-                value={watchPreferencesDraft.generalUpdates}
-                onValueChange={value =>
-                  setWatchPreferencesDraft(prev => ({
-                    ...prev,
-                    generalUpdates: value,
-                  }))
-                }
-                trackColor={{false: '#767577', true: colors.primary}}
-              />
-            </View>
-            <View style={themedStyles.watchOptionDivider} />
 
-            <View style={themedStyles.watchOptionRow}>
-              <View style={themedStyles.watchOptionInfo}>
-                <Text style={themedStyles.watchOptionTitle}>
-                  Roster Changes
-                </Text>
-                <Text style={themedStyles.watchOptionDescription}>
-                  Notify me when roster activity changes this event.
-                </Text>
+              <View style={themedStyles.watchOptionRow}>
+                <View style={themedStyles.watchOptionIconContainer}>
+                  <FontAwesomeIcon
+                    icon={faPenToSquare}
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={themedStyles.watchOptionInfo}>
+                  <Text style={themedStyles.watchOptionTitle}>
+                    General Updates
+                  </Text>
+                  <Text style={themedStyles.watchOptionDescription}>
+                    Important changes to date, time, or location.
+                  </Text>
+                </View>
+                <Switch
+                  value={watchPreferencesDraft.generalUpdates}
+                  onValueChange={value =>
+                    setWatchPreferencesDraft(prev => ({
+                      ...prev,
+                      generalUpdates: value,
+                    }))
+                  }
+                  trackColor={{false: colors.border, true: colors.primary}}
+                />
               </View>
-              <Switch
-                value={watchPreferencesDraft.rosterChanges}
-                onValueChange={value =>
-                  setWatchPreferencesDraft(prev => ({
-                    ...prev,
-                    rosterChanges: value,
-                  }))
-                }
-                trackColor={{false: '#767577', true: colors.primary}}
-              />
-            </View>
-            <View style={themedStyles.watchOptionDivider} />
 
-            <View style={themedStyles.watchOptionRow}>
-              <View style={themedStyles.watchOptionInfo}>
-                <Text style={themedStyles.watchOptionTitle}>Reminders</Text>
-                <Text style={themedStyles.watchOptionDescription}>
-                  Day-of reminders for watched events.
-                </Text>
+              <View style={themedStyles.watchOptionRow}>
+                <View style={themedStyles.watchOptionIconContainer}>
+                  <FontAwesomeIcon
+                    icon={faUsers}
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={themedStyles.watchOptionInfo}>
+                  <Text style={themedStyles.watchOptionTitle}>
+                    Roster Changes
+                  </Text>
+                  <Text style={themedStyles.watchOptionDescription}>
+                    Notify me when roster activity changes this event.
+                  </Text>
+                </View>
+                <Switch
+                  value={watchPreferencesDraft.rosterChanges}
+                  onValueChange={value =>
+                    setWatchPreferencesDraft(prev => ({
+                      ...prev,
+                      rosterChanges: value,
+                    }))
+                  }
+                  trackColor={{false: colors.border, true: colors.primary}}
+                />
               </View>
-              <Switch
-                value={watchPreferencesDraft.reminders}
-                onValueChange={value =>
-                  setWatchPreferencesDraft(prev => ({
-                    ...prev,
-                    reminders: value,
-                  }))
-                }
-                trackColor={{false: '#767577', true: colors.primary}}
-              />
+
+              <View
+                style={[
+                  themedStyles.watchOptionRow,
+                  themedStyles.watchOptionRowLast,
+                ]}>
+                <View style={themedStyles.watchOptionIconContainer}>
+                  <FontAwesomeIcon
+                    icon={faBell}
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={themedStyles.watchOptionInfo}>
+                  <Text style={themedStyles.watchOptionTitle}>Reminders</Text>
+                  <Text style={themedStyles.watchOptionDescription}>
+                    Day-of reminders for watched events.
+                  </Text>
+                </View>
+                <Switch
+                  value={watchPreferencesDraft.reminders}
+                  onValueChange={value =>
+                    setWatchPreferencesDraft(prev => ({
+                      ...prev,
+                      reminders: value,
+                    }))
+                  }
+                  trackColor={{false: colors.border, true: colors.primary}}
+                />
+              </View>
             </View>
 
             {(!settings.enabled || !settings.watchedEvents) && (
@@ -4850,7 +5447,10 @@ const EventList: React.FC = () => {
                 disabled={savingWatch}
                 onPress={saveWatchPreferences}>
                 {savingWatch ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.buttonText || '#fff'}
+                  />
                 ) : (
                   <Text style={themedStyles.watchPrimaryButtonText}>Save</Text>
                 )}
@@ -4873,12 +5473,15 @@ const EventList: React.FC = () => {
             activeOpacity={1}
             onPress={e => e.stopPropagation()}
             style={themedStyles.filterModalContent}>
+            <View style={themedStyles.filterModalHandle} />
             <View style={themedStyles.filterModalHeader}>
               <Text style={themedStyles.filterModalTitle}>
                 {t('events.filterEvents') || 'Filter Events'}
               </Text>
-              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-                <FontAwesomeIcon icon={faTimes} size={24} color={colors.text} />
+              <TouchableOpacity
+                onPress={() => setShowFilterModal(false)}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <FontAwesomeIcon icon={faTimes} size={20} color={colors.secondaryText} />
               </TouchableOpacity>
             </View>
 
@@ -4919,25 +5522,34 @@ const EventList: React.FC = () => {
                 <Text style={themedStyles.filterSectionTitle}>
                   {t('events.dateRange') || 'Date'}
                 </Text>
-                {dateFilterOptions.map(option => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      themedStyles.dateFilterOption,
-                      selectedDateFilter === option.value &&
-                        themedStyles.dateFilterOptionSelected,
-                    ]}
-                    onPress={() => setSelectedDateFilter(option.value)}>
-                    <Text
+                {dateFilterOptions.map(option => {
+                  const isSelected = selectedDateFilter === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
                       style={[
-                        themedStyles.dateFilterOptionText,
-                        selectedDateFilter === option.value &&
-                          themedStyles.dateFilterOptionTextSelected,
-                      ]}>
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                        themedStyles.dateFilterOption,
+                        isSelected && themedStyles.dateFilterOptionSelected,
+                      ]}
+                      onPress={() => setSelectedDateFilter(option.value)}>
+                      <Text
+                        style={[
+                          themedStyles.dateFilterOptionText,
+                          isSelected &&
+                            themedStyles.dateFilterOptionTextSelected,
+                        ]}>
+                        {option.label}
+                      </Text>
+                      {isSelected && (
+                        <FontAwesomeIcon
+                          icon={faCheck}
+                          size={14}
+                          color={colors.primary}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               {/* Available Spots Filter */}
@@ -4946,11 +5558,9 @@ const EventList: React.FC = () => {
                   {t('events.availability') || 'Availability'}
                 </Text>
                 <TouchableOpacity
-                  style={[
-                    themedStyles.toggleOption,
-                    showAvailableOnly && themedStyles.toggleOptionSelected,
-                  ]}
-                  onPress={() => setShowAvailableOnly(!showAvailableOnly)}>
+                  style={themedStyles.toggleOption}
+                  onPress={() => setShowAvailableOnly(!showAvailableOnly)}
+                  activeOpacity={0.7}>
                   <Text
                     style={[
                       themedStyles.toggleOptionText,
@@ -4960,9 +5570,19 @@ const EventList: React.FC = () => {
                     {t('events.availableOnly') ||
                       'Show only events with available spots'}
                   </Text>
-                  {showAvailableOnly && (
-                    <Text style={{color: colors.buttonText || '#fff'}}>✓</Text>
-                  )}
+                  <View
+                    style={[
+                      themedStyles.toggleCheck,
+                      showAvailableOnly && themedStyles.toggleCheckActive,
+                    ]}>
+                    {showAvailableOnly && (
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={12}
+                        color={colors.buttonText || '#fff'}
+                      />
+                    )}
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -4972,11 +5592,9 @@ const EventList: React.FC = () => {
                   {t('events.pastEvents') || 'Past Events'}
                 </Text>
                 <TouchableOpacity
-                  style={[
-                    themedStyles.toggleOption,
-                    !hidePastEvents && themedStyles.toggleOptionSelected,
-                  ]}
-                  onPress={() => setHidePastEvents(!hidePastEvents)}>
+                  style={themedStyles.toggleOption}
+                  onPress={() => setHidePastEvents(!hidePastEvents)}
+                  activeOpacity={0.7}>
                   <Text
                     style={[
                       themedStyles.toggleOptionText,
@@ -4984,9 +5602,19 @@ const EventList: React.FC = () => {
                     ]}>
                     {t('events.showPastEvents') || 'Show past events'}
                   </Text>
-                  {!hidePastEvents && (
-                    <Text style={{color: colors.buttonText || '#fff'}}>✓</Text>
-                  )}
+                  <View
+                    style={[
+                      themedStyles.toggleCheck,
+                      !hidePastEvents && themedStyles.toggleCheckActive,
+                    ]}>
+                    {!hidePastEvents && (
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={12}
+                        color={colors.buttonText || '#fff'}
+                      />
+                    )}
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -4994,12 +5622,10 @@ const EventList: React.FC = () => {
               <View style={themedStyles.filterSection}>
                 <Text style={themedStyles.filterSectionTitle}>Nearby</Text>
                 <TouchableOpacity
-                  style={[
-                    themedStyles.toggleOption,
-                    proximityEnabled && themedStyles.toggleOptionSelected,
-                  ]}
+                  style={themedStyles.toggleOption}
                   onPress={handleEventProximityToggle}
-                  disabled={locationLoading}>
+                  disabled={locationLoading}
+                  activeOpacity={0.7}>
                   <View style={themedStyles.proximityToggleContent}>
                     {locationLoading ? (
                       <ActivityIndicator
@@ -5010,11 +5636,9 @@ const EventList: React.FC = () => {
                     ) : (
                       <FontAwesomeIcon
                         icon={faLocationArrow}
-                        size={14}
+                        size={13}
                         color={
-                          proximityEnabled
-                            ? colors.buttonText || '#fff'
-                            : colors.text
+                          proximityEnabled ? colors.primary : colors.secondaryText
                         }
                         style={themedStyles.proximityIconMargin}
                       />
@@ -5028,9 +5652,19 @@ const EventList: React.FC = () => {
                       Show events within {proximityRadius} mi
                     </Text>
                   </View>
-                  {proximityEnabled && (
-                    <Text style={{color: colors.buttonText || '#fff'}}>✓</Text>
-                  )}
+                  <View
+                    style={[
+                      themedStyles.toggleCheck,
+                      proximityEnabled && themedStyles.toggleCheckActive,
+                    ]}>
+                    {proximityEnabled && (
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={12}
+                        color={colors.buttonText || '#fff'}
+                      />
+                    )}
+                  </View>
                 </TouchableOpacity>
                 {proximityEnabled && (
                   <View style={themedStyles.proximityDistanceRow}>
@@ -5095,15 +5729,32 @@ const EventList: React.FC = () => {
             style={themedStyles.likesModalContent}
             onStartShouldSetResponder={() => true}>
             <View style={themedStyles.likesModalHandle} />
-            <View style={themedStyles.likesModalHeaderRow}>
-              <FontAwesomeIcon
-                icon={faHeart}
-                size={18}
-                color={colors.primary}
-              />
-              <Text style={themedStyles.likesModalTitle}>
-                {likesModalData.title}
-              </Text>
+            <View style={themedStyles.likesModalHeaderBlock}>
+              <View style={themedStyles.likesModalTitleRow}>
+                <FontAwesomeIcon
+                  icon={faHeart}
+                  size={14}
+                  color={'#e74c3c'}
+                />
+                <Text style={themedStyles.likesModalTitle}>
+                  {likesModalData.title}
+                </Text>
+              </View>
+              {likesModalData.users.length + likesModalData.anonymousCount >
+                0 && (
+                <Text style={themedStyles.likesModalCount}>
+                  {`${
+                    likesModalData.users.length +
+                    likesModalData.anonymousCount
+                  } ${
+                    likesModalData.users.length +
+                      likesModalData.anonymousCount ===
+                    1
+                      ? 'person'
+                      : 'people'
+                  }`}
+                </Text>
+              )}
             </View>
             <ScrollView
               style={themedStyles.likesModalScroll}
@@ -5177,11 +5828,23 @@ const EventList: React.FC = () => {
             <TouchableOpacity
               style={themedStyles.likesModalClose}
               onPress={() => setLikesModalVisible(false)}>
-              <Text style={themedStyles.likesModalCloseText}>Close</Text>
+              <Text style={themedStyles.likesModalCloseText}>
+                {t('common.close') || 'Close'}
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <MapAppPicker
+        visible={mapPickerVisible}
+        apps={mapPickerApps}
+        onSelect={async app => {
+          setMapPickerVisible(false);
+          await app.open();
+        }}
+        onClose={() => setMapPickerVisible(false)}
+      />
     </SafeAreaView>
   );
 };

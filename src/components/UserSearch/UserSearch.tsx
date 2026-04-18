@@ -519,18 +519,18 @@ const UserSearch: React.FC = () => {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingVertical: 12,
-      borderBottomWidth: 1,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
-      backgroundColor: colors.card,
+      backgroundColor: colors.background,
     },
     backButton: {
       padding: 8,
-      marginRight: 8,
+      marginRight: 4,
     },
     headerTitle: {
       flex: 1,
-      fontSize: 18,
-      fontWeight: '600',
+      fontSize: 16,
+      fontWeight: '700',
       color: colors.text,
     },
     filterButton: {
@@ -539,13 +539,13 @@ const UserSearch: React.FC = () => {
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: 12,
+      backgroundColor: colors.inputBackground,
+      borderRadius: 22,
       marginHorizontal: 16,
       marginTop: 12,
-      marginBottom: 8,
-      paddingHorizontal: 12,
-      borderWidth: 1,
+      marginBottom: 10,
+      paddingHorizontal: 14,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
     },
     searchIcon: {
@@ -553,55 +553,57 @@ const UserSearch: React.FC = () => {
     },
     searchInput: {
       flex: 1,
-      height: 44,
-      fontSize: 16,
+      height: 40,
+      fontSize: 15,
       color: colors.text,
     },
     clearButton: {
-      padding: 8,
+      padding: 6,
     },
     filtersContainer: {
-      paddingHorizontal: 16,
-      paddingBottom: 12,
+      paddingLeft: 16,
+      paddingBottom: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+      marginBottom: 4,
     },
     filtersScroll: {
       flexDirection: 'row',
+      paddingRight: 16,
     },
     filterChip: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 20,
+      paddingVertical: 6,
+      borderRadius: 16,
       marginRight: 8,
-      borderWidth: 1,
+      borderWidth: StyleSheet.hairlineWidth,
     },
     filterChipActive: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primary + '14',
       borderColor: colors.primary,
     },
     filterChipInactive: {
-      backgroundColor: colors.card,
+      backgroundColor: 'transparent',
       borderColor: colors.border,
     },
     filterEmoji: {
-      fontSize: 14,
+      fontSize: 13,
       marginRight: 6,
     },
     filterLabel: {
-      fontSize: 13,
-      fontWeight: '500',
+      fontSize: 12,
+      fontWeight: '600',
     },
     filterLabelActive: {
-      color: '#FFFFFF',
+      color: colors.primary,
     },
     filterLabelInactive: {
-      color: colors.text,
+      color: colors.secondaryText,
     },
     listContainer: {
       flex: 1,
-      paddingHorizontal: 16,
-      paddingTop: 8,
     },
     loadingContainer: {
       flex: 1,
@@ -613,20 +615,20 @@ const UserSearch: React.FC = () => {
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 32,
+      paddingVertical: 64,
     },
     emptyText: {
-      fontSize: 16,
-      color: colors.text,
+      fontSize: 14,
+      color: colors.secondaryText,
       textAlign: 'center',
-      opacity: 0.6,
       marginTop: 12,
     },
     resultsCount: {
-      fontSize: 13,
-      color: colors.text,
-      opacity: 0.6,
+      fontSize: 12,
+      color: colors.secondaryText,
       paddingHorizontal: 16,
       paddingBottom: 8,
+      paddingTop: 4,
     },
     activitySuggestion: {
       flexDirection: 'row',
@@ -635,19 +637,19 @@ const UserSearch: React.FC = () => {
       marginBottom: 8,
       paddingHorizontal: 14,
       paddingVertical: 10,
-      backgroundColor: colors.primary + '15',
+      backgroundColor: colors.primary + '12',
       borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.primary + '30',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.primary + '40',
     },
     activitySuggestionEmoji: {
-      fontSize: 16,
+      fontSize: 15,
       marginRight: 8,
     },
     activitySuggestionText: {
       flex: 1,
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: 13,
+      fontWeight: '600',
       color: colors.primary,
     },
     activeInterestTag: {
@@ -656,20 +658,23 @@ const UserSearch: React.FC = () => {
       alignSelf: 'flex-start',
       marginHorizontal: 16,
       marginBottom: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      backgroundColor: colors.primary + '20',
-      borderRadius: 16,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      backgroundColor: colors.primary + '12',
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.primary + '40',
     },
     activeInterestTagText: {
-      fontSize: 13,
-      fontWeight: '500',
+      fontSize: 12,
+      fontWeight: '700',
       color: colors.primary,
-      marginRight: 8,
+      marginRight: 6,
     },
     proximityContainer: {
       paddingHorizontal: 16,
-      paddingBottom: 12,
+      paddingBottom: 10,
+      paddingTop: 4,
     },
     proximityToggleRow: {
       flexDirection: 'row',
@@ -679,22 +684,22 @@ const UserSearch: React.FC = () => {
     proximityToggle: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 20,
-      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 18,
+      borderWidth: StyleSheet.hairlineWidth,
     },
     proximityToggleActive: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primary + '14',
       borderColor: colors.primary,
     },
     proximityToggleInactive: {
-      backgroundColor: colors.card,
+      backgroundColor: 'transparent',
       borderColor: colors.border,
     },
     proximityToggleText: {
-      fontSize: 13,
-      fontWeight: '600',
+      fontSize: 12,
+      fontWeight: '700',
       marginLeft: 6,
     },
     proximityPresetsRow: {
@@ -703,28 +708,28 @@ const UserSearch: React.FC = () => {
       gap: 8,
     },
     proximityPreset: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
     },
     proximityPresetActive: {
-      backgroundColor: colors.primary + '20',
+      backgroundColor: colors.primary + '12',
       borderColor: colors.primary,
     },
     proximityPresetInactive: {
-      backgroundColor: colors.card,
+      backgroundColor: 'transparent',
       borderColor: colors.border,
     },
     proximityPresetText: {
-      fontSize: 12,
-      fontWeight: '500',
+      fontSize: 11,
+      fontWeight: '700',
     },
     proximityPresetTextActive: {
       color: colors.primary,
     },
     proximityPresetTextInactive: {
-      color: colors.text,
+      color: colors.secondaryText,
     },
   });
 
@@ -742,7 +747,7 @@ const UserSearch: React.FC = () => {
 
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
-      <FontAwesomeIcon icon={faSearch} size={48} color={colors.border} />
+      <FontAwesomeIcon icon={faSearch} size={36} color={colors.secondaryText} />
       <Text style={styles.emptyText}>
         {searchQuery || selectedInterest !== 'all'
           ? 'No players found matching your criteria'
@@ -776,7 +781,7 @@ const UserSearch: React.FC = () => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
-          <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
+          <FontAwesomeIcon icon={faArrowLeft} size={18} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Find Players</Text>
         <TouchableOpacity
@@ -784,8 +789,10 @@ const UserSearch: React.FC = () => {
           onPress={() => setShowFilters(!showFilters)}>
           <FontAwesomeIcon
             icon={faFilter}
-            size={18}
-            color={selectedInterest !== 'all' ? colors.primary : colors.text}
+            size={16}
+            color={
+              selectedInterest !== 'all' ? colors.primary : colors.secondaryText
+            }
           />
         </TouchableOpacity>
       </View>
@@ -794,14 +801,14 @@ const UserSearch: React.FC = () => {
       <View style={styles.searchContainer}>
         <FontAwesomeIcon
           icon={faSearch}
-          size={16}
-          color={colors.text}
+          size={14}
+          color={colors.secondaryText}
           style={styles.searchIcon}
         />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by name, username, or interest..."
-          placeholderTextColor={addOpacity(colors.text, 0.5)}
+          placeholderTextColor={addOpacity(colors.secondaryText, 0.7)}
           value={searchQuery}
           onChangeText={setSearchQuery}
           autoCapitalize="none"
@@ -809,7 +816,11 @@ const UserSearch: React.FC = () => {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity style={styles.clearButton} onPress={clearSearch}>
-            <FontAwesomeIcon icon={faTimes} size={16} color={colors.text} />
+            <FontAwesomeIcon
+              icon={faTimes}
+              size={14}
+              color={colors.secondaryText}
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -828,7 +839,7 @@ const UserSearch: React.FC = () => {
           <Text style={styles.activitySuggestionText}>
             Filter by {matchedActivity.label}
           </Text>
-          <FontAwesomeIcon icon={faFilter} size={12} color={colors.primary} />
+          <FontAwesomeIcon icon={faFilter} size={11} color={colors.primary} />
         </TouchableOpacity>
       )}
 
@@ -883,14 +894,18 @@ const UserSearch: React.FC = () => {
             ) : (
               <FontAwesomeIcon
                 icon={faLocationArrow}
-                size={14}
-                color={proximityEnabled ? '#FFFFFF' : colors.text}
+                size={12}
+                color={proximityEnabled ? colors.primary : colors.secondaryText}
               />
             )}
             <Text
               style={[
                 styles.proximityToggleText,
-                {color: proximityEnabled ? '#FFFFFF' : colors.text},
+                {
+                  color: proximityEnabled
+                    ? colors.primary
+                    : colors.secondaryText,
+                },
               ]}>
               Nearby
             </Text>
@@ -932,7 +947,7 @@ const UserSearch: React.FC = () => {
             {INTEREST_FILTERS.find(f => f.id === selectedInterest)?.emoji}{' '}
             {INTEREST_FILTERS.find(f => f.id === selectedInterest)?.label}
           </Text>
-          <FontAwesomeIcon icon={faTimes} size={12} color={colors.primary} />
+          <FontAwesomeIcon icon={faTimes} size={11} color={colors.primary} />
         </TouchableOpacity>
       )}
 

@@ -5,6 +5,16 @@ const MAP_PREFERENCE_KEY = '@default_map_app';
 
 export type MapAppName = 'Apple Maps' | 'Google Maps' | 'Waze';
 
+export type AvailableMapApp = {
+  name: MapAppName;
+  open: () => Promise<void>;
+};
+
+export type MapPickerPresenter = (
+  apps: AvailableMapApp[],
+  onCancel: () => void,
+) => void;
+
 type MapApp = {
   name: MapAppName;
   scheme: string;
@@ -129,6 +139,7 @@ export const openDirections = async (
     longitude?: number;
   },
   t: (key: string) => string,
+  presentPicker?: MapPickerPresenter,
 ) => {
   const {name, address, latitude, longitude} = destination;
   const rawName = name || '';
@@ -212,6 +223,16 @@ export const openDirections = async (
       Alert.alert(t('events.mapsError'), t('events.mapsErrorMessage'));
     }
   };
+
+  // Prefer the caller-supplied themed picker when provided
+  if (presentPicker) {
+    const availableForPicker: AvailableMapApp[] = available.map(app => ({
+      name: app.name,
+      open: () => openWithApp(app),
+    }));
+    presentPicker(availableForPicker, () => {});
+    return;
+  }
 
   const buttons: {text: string; onPress: () => void}[] = available.map(app => ({
     text: app.name as string,

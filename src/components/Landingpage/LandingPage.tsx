@@ -34,6 +34,8 @@ import {
   faCheckCircle,
   faEye,
   faEyeSlash,
+  faExclamationTriangle,
+  faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 
@@ -84,257 +86,291 @@ function LandingPage() {
         // Hero Section
         heroSection: {
           alignItems: 'center',
-          marginBottom: 40,
+          marginBottom: 28,
         },
         logoContainer: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: 16,
+          marginBottom: 10,
+          gap: 6,
         },
         logoEmoji: {
-          fontSize: 48,
-          marginHorizontal: 6,
+          fontSize: 36,
         },
         appName: {
-          fontSize: 36,
+          fontSize: 30,
           fontWeight: '800',
           color: colors.primary,
-          letterSpacing: 1,
-          marginBottom: 8,
+          letterSpacing: 0.4,
+          marginBottom: 6,
         },
         tagline: {
-          fontSize: 16,
-          color: colors.placeholder,
+          fontSize: 14,
+          color: colors.secondaryText,
           textAlign: 'center',
-          lineHeight: 22,
+          lineHeight: 20,
         },
-        // Form Card
+        // Form Card — flat, hairline-bordered (no shadow)
         formCard: {
           backgroundColor: colors.card,
-          borderRadius: 24,
-          padding: 24,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 4},
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 5,
+          borderRadius: 18,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: 20,
         },
-        // Tabs
+        // Tabs — outlined hairline pills, primary fill when active
         tabContainer: {
           flexDirection: 'row',
-          backgroundColor: colors.background,
-          borderRadius: 16,
-          padding: 4,
-          marginBottom: 24,
+          gap: 8,
+          marginBottom: 18,
         },
         tab: {
           flex: 1,
-          paddingVertical: 12,
-          borderRadius: 12,
+          paddingVertical: 11,
+          borderRadius: 22,
           alignItems: 'center',
           flexDirection: 'row',
           justifyContent: 'center',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: 'transparent',
+          gap: 6,
         },
         tabActive: {
           backgroundColor: colors.primary,
+          borderColor: colors.primary,
         },
         tabText: {
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: '600',
-          color: colors.placeholder,
-          marginLeft: 8,
+          color: colors.secondaryText,
         },
         tabTextActive: {
           color: colors.buttonText,
+          fontWeight: '700',
         },
         // Form Title
         formTitle: {
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: '700',
           color: colors.text,
-          marginBottom: 8,
+          marginBottom: 4,
           textAlign: 'center',
         },
         formSubtitle: {
-          fontSize: 14,
-          color: colors.placeholder,
-          marginBottom: 24,
+          fontSize: 13,
+          color: colors.secondaryText,
+          marginBottom: 18,
           textAlign: 'center',
         },
         // Input Group
         inputGroup: {
-          marginBottom: 16,
+          marginBottom: 14,
         },
         inputLabel: {
-          fontSize: 14,
-          fontWeight: '600',
-          color: colors.text,
-          marginBottom: 8,
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          marginBottom: 6,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
         },
         inputContainer: {
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: colors.inputBackground,
-          borderRadius: 14,
-          borderWidth: 1,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          paddingHorizontal: 16,
+          paddingHorizontal: 14,
+          minHeight: 48,
         },
         inputContainerFocused: {
           borderColor: colors.primary,
-          borderWidth: 2,
         },
         inputIcon: {
-          marginRight: 12,
+          marginRight: 10,
         },
         input: {
           flex: 1,
-          height: 52,
-          fontSize: 16,
+          height: 48,
+          fontSize: 15,
           color: colors.text,
         },
-        // Primary Button
+        // Primary Button — pill, no shadow
         primaryButton: {
           backgroundColor: colors.primary,
-          borderRadius: 14,
-          paddingVertical: 16,
+          borderRadius: 24,
+          paddingVertical: 14,
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'row',
           marginTop: 8,
-          shadowColor: colors.primary,
-          shadowOffset: {width: 0, height: 4},
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-          elevation: 4,
+          gap: 8,
         },
         primaryButtonText: {
           color: colors.buttonText,
-          fontSize: 17,
+          fontSize: 16,
           fontWeight: '700',
-          marginRight: 8,
         },
-        // Messages
+        // Messages — hairline-bordered tinted cards
         errorContainer: {
-          backgroundColor: colors.error + '15',
+          backgroundColor: colors.error + '12',
           borderRadius: 12,
-          padding: 14,
-          marginTop: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.error + '40',
+          padding: 12,
+          marginTop: 14,
           flexDirection: 'row',
           alignItems: 'center',
+          gap: 10,
         },
         errorText: {
           color: colors.error,
-          fontSize: 14,
+          fontSize: 13,
           flex: 1,
-          marginLeft: 10,
         },
         successContainer: {
-          backgroundColor: '#4CAF50' + '15',
+          backgroundColor: '#4CAF50' + '12',
           borderRadius: 12,
-          padding: 14,
-          marginTop: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: '#4CAF50' + '40',
+          padding: 12,
+          marginTop: 14,
           flexDirection: 'row',
           alignItems: 'center',
+          gap: 10,
         },
         successText: {
           color: '#4CAF50',
-          fontSize: 14,
+          fontSize: 13,
           flex: 1,
-          marginLeft: 10,
         },
         // Footer
         footer: {
-          marginTop: 32,
+          marginTop: 28,
           alignItems: 'center',
         },
         footerText: {
-          fontSize: 13,
-          color: colors.placeholder,
+          fontSize: 12,
+          color: colors.secondaryText,
         },
         footerEmojis: {
-          fontSize: 20,
-          marginTop: 8,
+          fontSize: 16,
+          marginTop: 6,
+          letterSpacing: 4,
         },
         // Forgot Password
         forgotPasswordLink: {
           alignItems: 'center',
-          marginTop: 16,
+          marginTop: 14,
+          paddingVertical: 4,
         },
         forgotPasswordText: {
           color: colors.primary,
-          fontSize: 14,
-          fontWeight: '600',
+          fontSize: 13,
+          fontWeight: '700',
         },
-        // Modal styles
+        // Modal — bottom sheet pattern
         modalOverlay: {
           flex: 1,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: 24,
+          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+          justifyContent: 'flex-end',
         },
         modalContent: {
-          backgroundColor: colors.card,
-          borderRadius: 20,
-          padding: 24,
-          width: '100%',
-          maxWidth: 400,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 4},
-          shadowOpacity: 0.25,
-          shadowRadius: 12,
-          elevation: 8,
+          backgroundColor: colors.background,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 32 : 20,
+        },
+        modalHandle: {
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
+          alignSelf: 'center',
+          marginBottom: 8,
         },
         modalHeader: {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 8,
+          paddingHorizontal: 20,
+          paddingBottom: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         modalTitle: {
-          fontSize: 22,
+          fontSize: 17,
           fontWeight: '700',
           color: colors.text,
+          flex: 1,
+          textAlign: 'center',
+          marginLeft: 28,
         },
         modalCloseButton: {
           padding: 4,
+          width: 28,
+          alignItems: 'flex-end',
+        },
+        modalBody: {
+          paddingHorizontal: 20,
+          paddingTop: 16,
         },
         modalSubtitle: {
-          fontSize: 14,
-          color: colors.placeholder,
-          marginBottom: 24,
-          lineHeight: 20,
+          fontSize: 13,
+          color: colors.secondaryText,
+          marginBottom: 16,
+          lineHeight: 18,
+          textAlign: 'center',
         },
         modalSuccessContainer: {
           alignItems: 'center',
-          paddingVertical: 20,
+          paddingVertical: 12,
+          paddingHorizontal: 20,
+        },
+        modalSuccessIcon: {
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: '#4CAF50' + '15',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: '#4CAF50' + '40',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 14,
         },
         modalSuccessText: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.text,
           textAlign: 'center',
-          marginTop: 16,
-          lineHeight: 22,
+          lineHeight: 20,
+          marginBottom: 20,
         },
         modalSuccessButton: {
-          marginTop: 24,
-          paddingHorizontal: 48,
+          alignSelf: 'stretch',
         },
         failedAttemptsWarning: {
-          backgroundColor: colors.error + '15',
+          backgroundColor: colors.error + '12',
           borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.error + '40',
           padding: 12,
-          marginBottom: 16,
+          marginBottom: 14,
           flexDirection: 'row',
           alignItems: 'center',
+          gap: 8,
         },
         failedAttemptsText: {
           color: colors.error,
-          fontSize: 13,
+          fontSize: 12,
           flex: 1,
-          marginLeft: 8,
         },
       }),
     [colors],
@@ -569,7 +605,7 @@ function LandingPage() {
     <Modal
       visible={showForgotPassword}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={closeForgotPasswordModal}>
       <TouchableOpacity
         style={themedStyles.modalOverlay}
@@ -579,6 +615,7 @@ function LandingPage() {
           activeOpacity={1}
           style={themedStyles.modalContent}
           onPress={e => e.stopPropagation()}>
+          <View style={themedStyles.modalHandle} />
           <View style={themedStyles.modalHeader}>
             <Text style={themedStyles.modalTitle}>
               {t('forgotPassword.title')}
@@ -588,15 +625,21 @@ function LandingPage() {
               onPress={closeForgotPasswordModal}>
               <FontAwesomeIcon
                 icon={faTimes}
-                size={20}
-                color={colors.placeholder}
+                size={16}
+                color={colors.secondaryText}
               />
             </TouchableOpacity>
           </View>
 
           {forgotPasswordSuccess ? (
             <View style={themedStyles.modalSuccessContainer}>
-              <FontAwesomeIcon icon={faCheckCircle} size={48} color="#4CAF50" />
+              <View style={themedStyles.modalSuccessIcon}>
+                <FontAwesomeIcon
+                  icon={faCheckCircle}
+                  size={28}
+                  color="#4CAF50"
+                />
+              </View>
               <Text style={themedStyles.modalSuccessText}>
                 {t('forgotPassword.successMessage')}
               </Text>
@@ -612,7 +655,7 @@ function LandingPage() {
               </TouchableOpacity>
             </View>
           ) : (
-            <>
+            <View style={themedStyles.modalBody}>
               <Text style={themedStyles.modalSubtitle}>
                 {t('forgotPassword.subtitle')}
               </Text>
@@ -621,7 +664,7 @@ function LandingPage() {
                 <View style={themedStyles.failedAttemptsWarning}>
                   <FontAwesomeIcon
                     icon={faLock}
-                    size={16}
+                    size={14}
                     color={colors.error}
                   />
                   <Text style={themedStyles.failedAttemptsText}>
@@ -642,11 +685,11 @@ function LandingPage() {
                   ]}>
                   <FontAwesomeIcon
                     icon={faEnvelope}
-                    size={18}
+                    size={16}
                     color={
                       focusedField === 'forgotEmail'
                         ? colors.primary
-                        : colors.placeholder
+                        : colors.secondaryText
                     }
                     style={themedStyles.inputIcon}
                   />
@@ -670,8 +713,13 @@ function LandingPage() {
 
               {forgotPasswordError && (
                 <View style={themedStyles.errorContainer}>
+                  <FontAwesomeIcon
+                    icon={faExclamationTriangle}
+                    size={14}
+                    color={colors.error}
+                  />
                   <Text style={themedStyles.errorText}>
-                    ⚠️ {forgotPasswordError}
+                    {forgotPasswordError}
                   </Text>
                 </View>
               )}
@@ -689,13 +737,13 @@ function LandingPage() {
                     </Text>
                     <FontAwesomeIcon
                       icon={faKey}
-                      size={18}
+                      size={16}
                       color={colors.buttonText}
                     />
                   </>
                 )}
               </TouchableOpacity>
-            </>
+            </View>
           )}
         </TouchableOpacity>
       </TouchableOpacity>
@@ -720,7 +768,7 @@ function LandingPage() {
           ]}>
           <FontAwesomeIcon
             icon={faUser}
-            size={18}
+            size={16}
             color={
               focusedField === 'loginUsername'
                 ? colors.primary
@@ -755,7 +803,7 @@ function LandingPage() {
           ]}>
           <FontAwesomeIcon
             icon={faLock}
-            size={18}
+            size={16}
             color={
               focusedField === 'loginPassword'
                 ? colors.primary
@@ -782,7 +830,7 @@ function LandingPage() {
             hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
             <FontAwesomeIcon
               icon={showLoginPassword ? faEyeSlash : faEye}
-              size={18}
+              size={16}
               color={colors.placeholder}
             />
           </TouchableOpacity>
@@ -798,7 +846,7 @@ function LandingPage() {
         </Text>
         <FontAwesomeIcon
           icon={faArrowRight}
-          size={18}
+          size={16}
           color={colors.buttonText}
         />
       </TouchableOpacity>
@@ -832,7 +880,7 @@ function LandingPage() {
           ]}>
           <FontAwesomeIcon
             icon={faIdCard}
-            size={18}
+            size={16}
             color={
               focusedField === 'registerName'
                 ? colors.primary
@@ -869,7 +917,7 @@ function LandingPage() {
           ]}>
           <FontAwesomeIcon
             icon={faEnvelope}
-            size={18}
+            size={16}
             color={
               focusedField === 'registerEmail'
                 ? colors.primary
@@ -910,7 +958,7 @@ function LandingPage() {
           ]}>
           <FontAwesomeIcon
             icon={faUser}
-            size={18}
+            size={16}
             color={
               focusedField === 'registerUsername'
                 ? colors.primary
@@ -947,7 +995,7 @@ function LandingPage() {
           ]}>
           <FontAwesomeIcon
             icon={faLock}
-            size={18}
+            size={16}
             color={
               focusedField === 'registerPassword'
                 ? colors.primary
@@ -976,7 +1024,7 @@ function LandingPage() {
             hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
             <FontAwesomeIcon
               icon={showRegisterPassword ? faEyeSlash : faEye}
-              size={18}
+              size={16}
               color={colors.placeholder}
             />
           </TouchableOpacity>
@@ -992,7 +1040,7 @@ function LandingPage() {
         </Text>
         <FontAwesomeIcon
           icon={faArrowRight}
-          size={18}
+          size={16}
           color={colors.buttonText}
         />
       </TouchableOpacity>
@@ -1033,11 +1081,11 @@ function LandingPage() {
                 onPress={() => setActiveTab('login')}>
                 <FontAwesomeIcon
                   icon={faSignInAlt}
-                  size={16}
+                  size={14}
                   color={
                     activeTab === 'login'
                       ? colors.buttonText
-                      : colors.placeholder
+                      : colors.secondaryText
                   }
                 />
                 <Text
@@ -1056,11 +1104,11 @@ function LandingPage() {
                 onPress={() => setActiveTab('register')}>
                 <FontAwesomeIcon
                   icon={faUserPlus}
-                  size={16}
+                  size={14}
                   color={
                     activeTab === 'register'
                       ? colors.buttonText
-                      : colors.placeholder
+                      : colors.secondaryText
                   }
                 />
                 <Text
@@ -1079,14 +1127,20 @@ function LandingPage() {
             {/* Error Message */}
             {errorMessage && (
               <View style={themedStyles.errorContainer}>
-                <Text style={themedStyles.errorText}>⚠️ {errorMessage}</Text>
+                <FontAwesomeIcon
+                  icon={faExclamationTriangle}
+                  size={14}
+                  color={colors.error}
+                />
+                <Text style={themedStyles.errorText}>{errorMessage}</Text>
               </View>
             )}
 
             {/* Success Message */}
             {successMessage && (
               <View style={themedStyles.successContainer}>
-                <Text style={themedStyles.successText}>✓ {successMessage}</Text>
+                <FontAwesomeIcon icon={faCheck} size={14} color={'#4CAF50'} />
+                <Text style={themedStyles.successText}>{successMessage}</Text>
               </View>
             )}
           </View>

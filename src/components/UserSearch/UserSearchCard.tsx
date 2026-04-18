@@ -131,17 +131,16 @@ const UserSearchCard: React.FC<UserSearchCardProps> = ({
     card: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
+      backgroundColor: colors.background,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
     },
     avatarContainer: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       backgroundColor: colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
@@ -149,31 +148,31 @@ const UserSearchCard: React.FC<UserSearchCardProps> = ({
       overflow: 'hidden',
     },
     avatarImage: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
     },
     avatarText: {
       color: '#FFFFFF',
-      fontSize: 20,
-      fontWeight: 'bold',
+      fontSize: 18,
+      fontWeight: '700',
     },
     infoContainer: {
       flex: 1,
     },
     username: {
-      fontSize: 16,
-      fontWeight: '600',
+      fontSize: 15,
+      fontWeight: '700',
       color: colors.text,
-      marginBottom: 4,
+      marginBottom: 2,
     },
     sportsRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 6,
+      marginBottom: 4,
     },
     sportEmoji: {
-      fontSize: 14,
+      fontSize: 13,
       marginRight: 4,
     },
     statsRow: {
@@ -183,41 +182,44 @@ const UserSearchCard: React.FC<UserSearchCardProps> = ({
     stat: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginRight: 16,
+      marginRight: 14,
     },
     statText: {
       fontSize: 12,
-      color: colors.text,
-      opacity: 0.7,
+      color: colors.secondaryText,
       marginLeft: 4,
     },
     friendButton: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 20,
       marginLeft: 8,
       flexDirection: 'row',
       alignItems: 'center',
+      borderWidth: StyleSheet.hairlineWidth,
+      backgroundColor: 'transparent',
     },
     friendButtonLabel: {
-      fontSize: 11,
-      fontWeight: '600',
-      marginLeft: 4,
+      fontSize: 12,
+      fontWeight: '700',
+      marginLeft: 6,
     },
     distanceBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.primary + '15',
+      backgroundColor: colors.primary + '12',
       paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 10,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.primary + '40',
       alignSelf: 'flex-start',
       marginBottom: 4,
     },
     distanceText: {
       fontSize: 11,
       color: colors.primary,
-      fontWeight: '600',
+      fontWeight: '700',
       marginLeft: 4,
     },
   });
@@ -285,7 +287,13 @@ const UserSearchCard: React.FC<UserSearchCardProps> = ({
 
       {onFriendAction && (
         <TouchableOpacity
-          style={[styles.friendButton, {backgroundColor: buttonConfig.bgColor}]}
+          style={[
+            styles.friendButton,
+            {
+              borderColor: buttonConfig.color + '66',
+              backgroundColor: buttonConfig.color + '12',
+            },
+          ]}
           onPress={e => {
             e.stopPropagation();
             onFriendAction();
@@ -297,7 +305,7 @@ const UserSearchCard: React.FC<UserSearchCardProps> = ({
             <>
               <FontAwesomeIcon
                 icon={buttonConfig.icon}
-                size={14}
+                size={12}
                 color={buttonConfig.color}
               />
               <Text

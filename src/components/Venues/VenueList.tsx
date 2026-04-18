@@ -32,6 +32,7 @@ import {
   faPlus,
   faChevronDown,
   faTrash,
+  faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
@@ -329,20 +330,21 @@ const VenueList: React.FC = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          padding: 16,
+          paddingTop: 8,
           backgroundColor: colors.background,
         },
         header: {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 20,
+          marginBottom: 12,
           paddingTop: 8,
+          paddingHorizontal: 16,
           backgroundColor: colors.background,
           zIndex: 1,
         },
         title: {
-          fontSize: 25,
+          fontSize: 22,
           fontWeight: '700',
           color: colors.primary,
           textAlign: 'center',
@@ -355,58 +357,62 @@ const VenueList: React.FC = () => {
         },
         card: {
           backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 18,
-          marginBottom: 12,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
         },
         cardHeader: {
           flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: 12,
+          alignItems: 'center',
+          marginBottom: 10,
         },
         venueEmoji: {
-          fontSize: 32,
+          fontSize: 24,
           marginRight: 12,
         },
-        venueName: {
-          fontSize: 18,
-          fontWeight: '700',
-          color: colors.text,
+        venueTitleColumn: {
           flex: 1,
         },
+        venueName: {
+          fontSize: 16,
+          fontWeight: '700',
+          color: colors.text,
+        },
         venueType: {
-          fontSize: 13,
-          color: colors.primary,
-          fontWeight: '600',
+          fontSize: 12,
+          color: colors.secondaryText,
+          fontWeight: '500',
           marginTop: 2,
         },
-        venueAddress: {
-          fontSize: 14,
-          color: colors.secondaryText,
-          marginTop: 8,
+        detailRow: {
           flexDirection: 'row',
           alignItems: 'center',
+          marginTop: 6,
+        },
+        detailIcon: {
+          marginRight: 8,
+        },
+        detailText: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          flex: 1,
         },
         spacesInfo: {
           flexDirection: 'row',
           alignItems: 'center',
           marginTop: 12,
-          paddingTop: 12,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
         },
         spacesText: {
-          fontSize: 14,
+          fontSize: 13,
           color: colors.text,
+          fontWeight: '600',
           marginLeft: 8,
         },
         spacesAvailable: {
-          fontSize: 14,
-          color: colors.success || '#4CAF50',
-          fontWeight: '600',
+          fontSize: 13,
+          color: colors.primary,
+          fontWeight: '700',
           marginLeft: 'auto',
         },
         searchContainer: {
@@ -415,15 +421,17 @@ const VenueList: React.FC = () => {
           backgroundColor: colors.inputBackground,
           borderRadius: 20,
           paddingHorizontal: 14,
-          marginBottom: 16,
+          marginHorizontal: 16,
+          marginBottom: 12,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         searchInput: {
           flex: 1,
-          paddingVertical: 12,
+          paddingVertical: 10,
+          marginLeft: 8,
           color: colors.text,
-          fontSize: 16,
+          fontSize: 15,
         },
         // Filter dropdown
         filterWrapper: {
@@ -435,57 +443,62 @@ const VenueList: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: colors.primary,
-          borderRadius: 12,
-          paddingHorizontal: 16,
-          paddingVertical: 12,
+          backgroundColor: 'transparent',
+          borderRadius: 20,
+          paddingHorizontal: 14,
+          paddingVertical: 9,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         filterButtonOpen: {
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
+          backgroundColor: colors.primary + '12',
+          borderColor: colors.primary,
         },
         filterButtonLeft: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 10,
+          gap: 8,
         },
         filterButtonEmoji: {
-          fontSize: 18,
+          fontSize: 16,
         },
         filterButtonText: {
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: '700',
-          color: '#fff',
+          color: colors.text,
+        },
+        filterButtonTextActive: {
+          color: colors.primary,
         },
         filterList: {
           position: 'absolute',
           top: '100%',
           left: 0,
           right: 0,
+          marginTop: 6,
           backgroundColor: colors.card,
-          borderBottomLeftRadius: 12,
-          borderBottomRightRadius: 12,
+          borderRadius: 12,
           maxHeight: 360,
-          borderWidth: 1,
-          borderTopWidth: 0,
-          borderColor: colors.primary + '40',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          overflow: 'hidden',
           ...Platform.select({
             ios: {
-              shadowColor: colors.primary,
-              shadowOffset: {width: 0, height: 6},
-              shadowOpacity: 0.25,
-              shadowRadius: 12,
+              shadowColor: '#000',
+              shadowOffset: {width: 0, height: 4},
+              shadowOpacity: 0.12,
+              shadowRadius: 10,
             },
             android: {
-              elevation: 12,
+              elevation: 6,
             },
           }),
         },
         filterItem: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 13,
-          paddingHorizontal: 16,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
@@ -493,25 +506,20 @@ const VenueList: React.FC = () => {
           borderBottomWidth: 0,
         },
         filterItemActive: {
-          backgroundColor: colors.primary + '18',
+          backgroundColor: colors.primary + '0D',
         },
         filterItemEmoji: {
-          fontSize: 18,
-          width: 30,
+          fontSize: 16,
+          width: 26,
           textAlign: 'center',
         },
         filterItemText: {
-          fontSize: 15,
+          fontSize: 14,
           color: colors.text,
           marginLeft: 10,
           flex: 1,
         },
         filterItemTextActive: {
-          color: colors.primary,
-          fontWeight: '700',
-        },
-        filterCheck: {
-          fontSize: 14,
           color: colors.primary,
           fontWeight: '700',
         },
@@ -530,10 +538,10 @@ const VenueList: React.FC = () => {
           paddingTop: 60,
         },
         emptyText: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.secondaryText,
           textAlign: 'center',
-          marginTop: 16,
+          marginTop: 12,
         },
         headerActions: {
           flexDirection: 'row',
@@ -569,39 +577,62 @@ const VenueList: React.FC = () => {
         },
         modalContent: {
           backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 24,
+          borderRadius: 18,
           width: '90%',
           maxHeight: '85%',
+          paddingTop: 8,
+          paddingBottom: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
-        modalTitle: {
-          fontSize: 22,
-          fontWeight: '700',
-          color: colors.text,
-          marginBottom: 20,
-          textAlign: 'center',
-        },
-        inputLabel: {
-          fontSize: 14,
-          fontWeight: '600',
-          color: colors.text,
+        modalHandle: {
+          alignSelf: 'center',
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
           marginBottom: 6,
         },
-        input: {
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          padding: 14,
-          fontSize: 16,
+        modalTitle: {
+          fontSize: 17,
+          fontWeight: '700',
           color: colors.text,
-          borderWidth: 1,
+          paddingHorizontal: 20,
+          paddingBottom: 12,
+          textAlign: 'center',
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        modalBody: {
+          paddingHorizontal: 20,
+          paddingTop: 16,
+        },
+        inputLabel: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.6,
+          marginBottom: 8,
+          marginTop: 4,
+        },
+        input: {
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          fontSize: 14,
+          color: colors.text,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           marginBottom: 16,
         },
         pickerButton: {
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          padding: 14,
-          borderWidth: 1,
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           marginBottom: 16,
           flexDirection: 'row',
@@ -609,59 +640,98 @@ const VenueList: React.FC = () => {
           alignItems: 'center',
         },
         pickerButtonText: {
-          fontSize: 16,
+          fontSize: 14,
           color: colors.text,
+          fontWeight: '500',
         },
         pickerPlaceholder: {
           color: colors.secondaryText,
         },
-        submitButton: {
-          backgroundColor: colors.primary,
-          borderRadius: 8,
-          padding: 16,
-          alignItems: 'center',
-          marginTop: 8,
+        selectedLocationCard: {
+          marginBottom: 16,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          backgroundColor: colors.inputBackground,
+          borderRadius: 10,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
-        submitButtonText: {
-          color: '#FFFFFF',
-          fontSize: 16,
+        selectedLocationLabel: {
+          color: colors.secondaryText,
+          fontSize: 11,
+          fontWeight: '700',
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.5,
+          marginBottom: 4,
+        },
+        selectedLocationName: {
+          color: colors.text,
+          fontSize: 14,
           fontWeight: '600',
         },
-        cancelButton: {
-          padding: 16,
+        selectedLocationAddress: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          marginTop: 2,
+        },
+        submitButton: {
+          backgroundColor: colors.primary,
+          borderRadius: 24,
+          paddingVertical: 12,
           alignItems: 'center',
+          marginTop: 8,
+          marginHorizontal: 20,
+        },
+        submitButtonText: {
+          color: colors.buttonText || '#FFFFFF',
+          fontSize: 14,
+          fontWeight: '700',
+        },
+        cancelButton: {
+          paddingVertical: 12,
+          alignItems: 'center',
+          marginTop: 8,
+          marginHorizontal: 20,
+          borderRadius: 24,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         cancelButtonText: {
           color: colors.secondaryText,
-          fontSize: 16,
+          fontSize: 14,
+          fontWeight: '700',
         },
         venueTypeGrid: {
           flexDirection: 'row',
           flexWrap: 'wrap',
           justifyContent: 'space-between',
+          paddingHorizontal: 20,
+          paddingTop: 16,
         },
         venueTypeOption: {
           width: '48%',
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 8,
+          backgroundColor: 'transparent',
+          borderRadius: 10,
+          paddingVertical: 14,
+          paddingHorizontal: 8,
+          marginBottom: 10,
           alignItems: 'center',
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
         venueTypeOptionSelected: {
           borderColor: colors.primary,
-          backgroundColor: colors.primary + '20',
+          backgroundColor: colors.primary + '12',
         },
         venueTypeEmoji: {
-          fontSize: 24,
-          marginBottom: 4,
+          fontSize: 22,
+          marginBottom: 6,
         },
         venueTypeLabel: {
           fontSize: 12,
           color: colors.text,
           textAlign: 'center',
+          fontWeight: '500',
         },
         deleteButton: {
           position: 'absolute',
@@ -674,37 +744,43 @@ const VenueList: React.FC = () => {
           flexWrap: 'wrap',
           justifyContent: 'flex-start',
           gap: 8,
+          paddingHorizontal: 20,
+          paddingTop: 16,
         },
         timeOption: {
-          paddingVertical: 10,
-          paddingHorizontal: 14,
-          backgroundColor: colors.background,
-          borderRadius: 8,
-          borderWidth: 1,
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          backgroundColor: 'transparent',
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           marginBottom: 8,
         },
         timeOptionSelected: {
           borderColor: colors.primary,
-          backgroundColor: colors.primary + '20',
+          backgroundColor: colors.primary + '12',
         },
         timeOptionText: {
-          fontSize: 14,
+          fontSize: 13,
           color: colors.text,
+          fontWeight: '600',
         },
         hoursRow: {
           flexDirection: 'row',
           justifyContent: 'space-between',
-          marginBottom: 16,
+          marginBottom: 4,
         },
         hoursColumn: {
           flex: 1,
           marginHorizontal: 4,
         },
         hoursLabel: {
-          fontSize: 12,
+          fontSize: 11,
           color: colors.secondaryText,
-          marginBottom: 4,
+          fontWeight: '700',
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0.5,
+          marginBottom: 6,
         },
       }),
     [colors],
@@ -969,39 +1045,42 @@ const VenueList: React.FC = () => {
           <Text style={themedStyles.venueEmoji}>
             {getVenueTypeEmoji(item.type)}
           </Text>
-          <View style={{flex: 1}}>
+          <View style={themedStyles.venueTitleColumn}>
             <Text style={themedStyles.venueName}>{item.name}</Text>
             <Text style={themedStyles.venueType}>{item.type}</Text>
           </View>
         </View>
 
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+        <View style={themedStyles.detailRow}>
           <FontAwesomeIcon
             icon={faMapMarkerAlt}
-            size={14}
+            size={13}
             color={colors.secondaryText}
+            style={themedStyles.detailIcon}
           />
-          <Text style={[themedStyles.venueAddress, {marginLeft: 6}]}>
+          <Text style={themedStyles.detailText} numberOfLines={1}>
             {formatAddress(item.address)}
           </Text>
         </View>
 
         {todayHours && (
-          <View
-            style={{flexDirection: 'row', alignItems: 'center', marginTop: 6}}>
+          <View style={themedStyles.detailRow}>
             <FontAwesomeIcon
               icon={faClock}
-              size={14}
+              size={13}
               color={colors.secondaryText}
+              style={themedStyles.detailIcon}
             />
-            <Text style={[themedStyles.venueAddress, {marginLeft: 6}]}>
-              {todayHours}
-            </Text>
+            <Text style={themedStyles.detailText}>{todayHours}</Text>
           </View>
         )}
 
         <View style={themedStyles.spacesInfo}>
-          <FontAwesomeIcon icon={faBuilding} size={16} color={colors.primary} />
+          <FontAwesomeIcon
+            icon={faBuilding}
+            size={14}
+            color={colors.secondaryText}
+          />
           <Text style={themedStyles.spacesText}>
             {totalSpaces} {spaceLabel}
           </Text>
@@ -1037,71 +1116,86 @@ const VenueList: React.FC = () => {
   }, []);
 
   // Render filter dropdown
-  const renderFilterDropdown = () => (
-    <View style={themedStyles.filterWrapper}>
-      <TouchableOpacity
-        style={[
-          themedStyles.filterButton,
-          showFilterDropdown && themedStyles.filterButtonOpen,
-        ]}
-        onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-        activeOpacity={0.8}>
-        <View style={themedStyles.filterButtonLeft}>
-          <Text style={themedStyles.filterButtonEmoji}>
-            {selectedFilterInfo.emoji}
-          </Text>
-          <Text style={themedStyles.filterButtonText}>
-            {selectedFilterInfo.label}
-          </Text>
-        </View>
-        <FontAwesomeIcon
-          icon={faChevronDown}
-          size={14}
-          color="#fff"
-          style={{
-            transform: [{rotate: showFilterDropdown ? '180deg' : '0deg'}],
-          }}
-        />
-      </TouchableOpacity>
-
-      {showFilterDropdown && (
-        <ScrollView
-          style={themedStyles.filterList}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
-          {allFilterOptions.map((option, index) => (
-            <TouchableOpacity
-              key={option.value}
+  const renderFilterDropdown = () => {
+    const isActive = showFilterDropdown || selectedVenueType !== 'all';
+    return (
+      <View style={themedStyles.filterWrapper}>
+        <TouchableOpacity
+          style={[
+            themedStyles.filterButton,
+            (showFilterDropdown || selectedVenueType !== 'all') &&
+              themedStyles.filterButtonOpen,
+          ]}
+          onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+          activeOpacity={0.8}>
+          <View style={themedStyles.filterButtonLeft}>
+            <Text style={themedStyles.filterButtonEmoji}>
+              {selectedFilterInfo.emoji}
+            </Text>
+            <Text
               style={[
-                themedStyles.filterItem,
-                selectedVenueType === option.value &&
-                  themedStyles.filterItemActive,
-                index === allFilterOptions.length - 1 &&
-                  themedStyles.filterItemLast,
-              ]}
-              onPress={() => {
-                setSelectedVenueType(option.value);
-                setShowFilterDropdown(false);
-              }}>
-              <Text style={themedStyles.filterItemEmoji}>{option.emoji}</Text>
-              <Text
-                style={[
-                  themedStyles.filterItemText,
-                  selectedVenueType === option.value &&
-                    themedStyles.filterItemTextActive,
-                ]}>
-                {option.label}
-              </Text>
-              {selectedVenueType === option.value && (
-                <Text style={themedStyles.filterCheck}>✓</Text>
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-    </View>
-  );
+                themedStyles.filterButtonText,
+                isActive && themedStyles.filterButtonTextActive,
+              ]}>
+              {selectedFilterInfo.label}
+            </Text>
+          </View>
+          <FontAwesomeIcon
+            icon={faChevronDown}
+            size={12}
+            color={isActive ? colors.primary : colors.secondaryText}
+            style={{
+              transform: [{rotate: showFilterDropdown ? '180deg' : '0deg'}],
+            }}
+          />
+        </TouchableOpacity>
+
+        {showFilterDropdown && (
+          <ScrollView
+            style={themedStyles.filterList}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
+            {allFilterOptions.map((option, index) => {
+              const isSelected = selectedVenueType === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    themedStyles.filterItem,
+                    isSelected && themedStyles.filterItemActive,
+                    index === allFilterOptions.length - 1 &&
+                      themedStyles.filterItemLast,
+                  ]}
+                  onPress={() => {
+                    setSelectedVenueType(option.value);
+                    setShowFilterDropdown(false);
+                  }}>
+                  <Text style={themedStyles.filterItemEmoji}>
+                    {option.emoji}
+                  </Text>
+                  <Text
+                    style={[
+                      themedStyles.filterItemText,
+                      isSelected && themedStyles.filterItemTextActive,
+                    ]}>
+                    {option.label}
+                  </Text>
+                  {isSelected && (
+                    <FontAwesomeIcon
+                      icon={faCheck}
+                      size={13}
+                      color={colors.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -1220,255 +1314,238 @@ const VenueList: React.FC = () => {
             style={{flex: 1}}>
             <View style={themedStyles.modalOverlay}>
               <View style={themedStyles.modalContent}>
+                <View style={themedStyles.modalHandle} />
+                <Text style={themedStyles.modalTitle}>
+                  {t('venues.addVenue')}
+                </Text>
                 <ScrollView
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                   nestedScrollEnabled={true}>
-                  <Text style={themedStyles.modalTitle}>
-                    {t('venues.addVenue')}
-                  </Text>
+                  <View style={themedStyles.modalBody}>
+                    <Text style={themedStyles.inputLabel}>
+                      Venue/Facility *
+                    </Text>
+                    <View style={{zIndex: 1000, marginBottom: 16}}>
+                      {isApiKeyConfigured && !placesApiFailed ? (
+                        <GooglePlacesAutocomplete
+                          placeholder="Search for venue..."
+                          onPress={(data, details = null) => {
+                            console.log('Selected venue:', data, details);
+                            const venueName =
+                              details?.name ||
+                              data.structured_formatting?.main_text ||
+                              data.description.split(',')[0];
+                            const fullAddress = data.description;
+                            setNewVenue(prev => ({
+                              ...prev,
+                              name: venueName,
+                              address: fullAddress,
+                              latitude: details?.geometry?.location?.lat,
+                              longitude: details?.geometry?.location?.lng,
+                            }));
+                          }}
+                          query={{
+                            key: GOOGLE_PLACES_API_KEY,
+                            language: 'en',
+                            types: 'establishment',
+                          }}
+                          fetchDetails={true}
+                          disableScroll={true}
+                          listViewDisplayed="auto"
+                          styles={{
+                            container: {
+                              flex: 0,
+                            },
+                            textInputContainer: {
+                              backgroundColor: 'transparent',
+                            },
+                            textInput: {
+                              backgroundColor: colors.inputBackground,
+                              color: colors.text,
+                              paddingHorizontal: 14,
+                              paddingVertical: 12,
+                              borderRadius: 10,
+                              borderWidth: StyleSheet.hairlineWidth,
+                              borderColor: colors.border,
+                              fontSize: 14,
+                            },
+                            listView: {
+                              backgroundColor: colors.card,
+                              borderColor: colors.border,
+                              borderWidth: StyleSheet.hairlineWidth,
+                              borderTopWidth: 0,
+                              borderRadius: 10,
+                              borderTopLeftRadius: 0,
+                              borderTopRightRadius: 0,
+                              maxHeight: 200,
+                            },
+                            row: {
+                              backgroundColor: colors.card,
+                              padding: 12,
+                              minHeight: 44,
+                            },
+                            separator: {
+                              height: StyleSheet.hairlineWidth,
+                              backgroundColor: colors.border,
+                            },
+                            description: {
+                              color: colors.text,
+                              fontSize: 13,
+                            },
+                          }}
+                          textInputProps={{
+                            placeholderTextColor: colors.secondaryText,
+                          }}
+                          onFail={error => {
+                            console.warn(
+                              'GooglePlacesAutocomplete error:',
+                              error,
+                            );
+                            setPlacesApiFailed(true);
+                          }}
+                          enablePoweredByContainer={false}
+                          debounce={200}
+                        />
+                      ) : (
+                        <TextInput
+                          style={themedStyles.input}
+                          placeholder={
+                            placesApiFailed
+                              ? 'Enter venue name manually'
+                              : 'Enter venue name'
+                          }
+                          placeholderTextColor={colors.secondaryText}
+                          value={newVenue.name}
+                          onChangeText={text =>
+                            setNewVenue(prev => ({...prev, name: text}))
+                          }
+                        />
+                      )}
+                    </View>
 
-                  <Text style={themedStyles.inputLabel}>Venue/Facility *</Text>
-                  <View style={{zIndex: 1000, marginBottom: 16}}>
-                    {isApiKeyConfigured && !placesApiFailed ? (
-                      <GooglePlacesAutocomplete
-                        placeholder="Search for venue..."
-                        onPress={(data, details = null) => {
-                          console.log('Selected venue:', data, details);
-                          const venueName =
-                            details?.name ||
-                            data.structured_formatting?.main_text ||
-                            data.description.split(',')[0];
-                          const fullAddress = data.description;
-                          setNewVenue(prev => ({
-                            ...prev,
-                            name: venueName,
-                            address: fullAddress,
-                            latitude: details?.geometry?.location?.lat,
-                            longitude: details?.geometry?.location?.lng,
-                          }));
-                        }}
-                        query={{
-                          key: GOOGLE_PLACES_API_KEY,
-                          language: 'en',
-                          types: 'establishment',
-                        }}
-                        fetchDetails={true}
-                        disableScroll={true}
-                        listViewDisplayed="auto"
-                        styles={{
-                          container: {
-                            flex: 0,
-                          },
-                          textInputContainer: {
-                            backgroundColor: 'transparent',
-                          },
-                          textInput: {
-                            backgroundColor: colors.background,
-                            color: colors.text,
-                            padding: 14,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: colors.border,
-                            fontSize: 16,
-                          },
-                          listView: {
-                            backgroundColor: colors.card,
-                            borderColor: colors.border,
-                            borderWidth: 1,
-                            borderTopWidth: 0,
-                            borderRadius: 8,
-                            borderTopLeftRadius: 0,
-                            borderTopRightRadius: 0,
-                            maxHeight: 200,
-                          },
-                          row: {
-                            backgroundColor: colors.card,
-                            padding: 13,
-                            minHeight: 44,
-                          },
-                          separator: {
-                            height: 0.5,
-                            backgroundColor: colors.border,
-                          },
-                          description: {
-                            color: colors.text,
-                          },
-                        }}
-                        textInputProps={{
-                          placeholderTextColor: colors.secondaryText,
-                        }}
-                        onFail={error => {
-                          console.warn(
-                            'GooglePlacesAutocomplete error:',
-                            error,
-                          );
-                          setPlacesApiFailed(true);
-                        }}
-                        enablePoweredByContainer={false}
-                        debounce={200}
-                      />
-                    ) : (
-                      <TextInput
-                        style={themedStyles.input}
-                        placeholder={
-                          placesApiFailed
-                            ? 'Enter venue name manually'
-                            : 'Enter venue name'
-                        }
-                        placeholderTextColor={colors.secondaryText}
-                        value={newVenue.name}
-                        onChangeText={text =>
-                          setNewVenue(prev => ({...prev, name: text}))
-                        }
-                      />
+                    {/* Manual address input when Places API is unavailable */}
+                    {placesApiFailed && (
+                      <>
+                        <Text style={themedStyles.inputLabel}>Address *</Text>
+                        <TextInput
+                          style={themedStyles.input}
+                          placeholder="Enter full address"
+                          placeholderTextColor={colors.secondaryText}
+                          value={newVenue.address}
+                          onChangeText={text =>
+                            setNewVenue(prev => ({...prev, address: text}))
+                          }
+                        />
+                      </>
                     )}
-                  </View>
 
-                  {/* Manual address input when Places API is unavailable */}
-                  {placesApiFailed && (
-                    <>
-                      <Text style={themedStyles.inputLabel}>Address *</Text>
-                      <TextInput
-                        style={themedStyles.input}
-                        placeholder="Enter full address"
-                        placeholderTextColor={colors.secondaryText}
-                        value={newVenue.address}
-                        onChangeText={text =>
-                          setNewVenue(prev => ({...prev, address: text}))
-                        }
-                      />
-                    </>
-                  )}
+                    {/* Show selected address */}
+                    {newVenue.address && !placesApiFailed ? (
+                      <View style={themedStyles.selectedLocationCard}>
+                        <Text style={themedStyles.selectedLocationLabel}>
+                          Selected Location
+                        </Text>
+                        <Text style={themedStyles.selectedLocationName}>
+                          {newVenue.name}
+                        </Text>
+                        <Text style={themedStyles.selectedLocationAddress}>
+                          {newVenue.address}
+                        </Text>
+                      </View>
+                    ) : null}
 
-                  {/* Show selected address */}
-                  {newVenue.address && !placesApiFailed ? (
-                    <View
-                      style={{
-                        marginBottom: 16,
-                        padding: 12,
-                        backgroundColor: colors.background,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: colors.border,
+                    <Text style={themedStyles.inputLabel}>
+                      {t('venues.venueType')} *
+                    </Text>
+                    <TouchableOpacity
+                      style={themedStyles.pickerButton}
+                      onPress={() => {
+                        setModalVisible(false);
+                        setTimeout(() => setShowVenueTypePicker(true), 300);
                       }}>
                       <Text
-                        style={{
-                          color: colors.secondaryText,
-                          fontSize: 12,
-                          marginBottom: 4,
-                        }}>
-                        Selected Location
+                        style={[
+                          themedStyles.pickerButtonText,
+                          !newVenue.venueType && themedStyles.pickerPlaceholder,
+                        ]}>
+                        {newVenue.venueType
+                          ? `${getVenueTypeEmoji(newVenue.venueType)} ${
+                              newVenue.venueType
+                            }`
+                          : t('venues.selectVenueType')}
                       </Text>
-                      <Text
-                        style={{
-                          color: colors.text,
-                          fontSize: 14,
-                          fontWeight: '500',
-                        }}>
-                        {newVenue.name}
-                      </Text>
-                      <Text
-                        style={{
-                          color: colors.secondaryText,
-                          fontSize: 13,
-                          marginTop: 2,
-                        }}>
-                        {newVenue.address}
-                      </Text>
-                    </View>
-                  ) : null}
+                      <FontAwesomeIcon
+                        icon={faChevronDown}
+                        size={12}
+                        color={colors.secondaryText}
+                      />
+                    </TouchableOpacity>
 
-                  <Text style={themedStyles.inputLabel}>
-                    {t('venues.venueType')} *
-                  </Text>
-                  <TouchableOpacity
-                    style={themedStyles.pickerButton}
-                    onPress={() => {
-                      setModalVisible(false);
-                      setTimeout(() => setShowVenueTypePicker(true), 300);
-                    }}>
-                    <Text
-                      style={[
-                        themedStyles.pickerButtonText,
-                        !newVenue.venueType && themedStyles.pickerPlaceholder,
-                      ]}>
-                      {newVenue.venueType
-                        ? `${getVenueTypeEmoji(newVenue.venueType)} ${
-                            newVenue.venueType
-                          }`
-                        : t('venues.selectVenueType')}
+                    <Text style={themedStyles.inputLabel}>
+                      {t('venues.contactPhone')}
                     </Text>
-                    <FontAwesomeIcon
-                      icon={faChevronDown}
-                      size={14}
-                      color={colors.secondaryText}
+                    <TextInput
+                      style={themedStyles.input}
+                      placeholder={t('venues.phonePlaceholder')}
+                      placeholderTextColor={colors.secondaryText}
+                      keyboardType="phone-pad"
+                      value={newVenue.contactPhone}
+                      onChangeText={text =>
+                        setNewVenue(prev => ({...prev, contactPhone: text}))
+                      }
                     />
-                  </TouchableOpacity>
 
-                  <Text style={themedStyles.inputLabel}>
-                    {t('venues.contactPhone')}
-                  </Text>
-                  <TextInput
-                    style={themedStyles.input}
-                    placeholder={t('venues.phonePlaceholder')}
-                    placeholderTextColor={colors.secondaryText}
-                    keyboardType="phone-pad"
-                    value={newVenue.contactPhone}
-                    onChangeText={text =>
-                      setNewVenue(prev => ({...prev, contactPhone: text}))
-                    }
-                  />
-
-                  <Text style={themedStyles.inputLabel}>
-                    {t('venues.operatingHours')}
-                  </Text>
-                  <View style={themedStyles.hoursRow}>
-                    <View style={themedStyles.hoursColumn}>
-                      <Text style={themedStyles.hoursLabel}>Open</Text>
-                      <TouchableOpacity
-                        style={themedStyles.pickerButton}
-                        onPress={() => {
-                          setModalVisible(false);
-                          setTimeout(() => setShowOpenTimePicker(true), 300);
-                        }}>
-                        <Text
-                          style={[
-                            themedStyles.pickerButtonText,
-                            !newVenue.openTime &&
-                              themedStyles.pickerPlaceholder,
-                          ]}>
-                          {newVenue.openTime || '6:00 AM'}
-                        </Text>
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          size={14}
-                          color={colors.secondaryText}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={themedStyles.hoursColumn}>
-                      <Text style={themedStyles.hoursLabel}>Close</Text>
-                      <TouchableOpacity
-                        style={themedStyles.pickerButton}
-                        onPress={() => {
-                          setModalVisible(false);
-                          setTimeout(() => setShowCloseTimePicker(true), 300);
-                        }}>
-                        <Text
-                          style={[
-                            themedStyles.pickerButtonText,
-                            !newVenue.closeTime &&
-                              themedStyles.pickerPlaceholder,
-                          ]}>
-                          {newVenue.closeTime || '11:00 PM'}
-                        </Text>
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          size={14}
-                          color={colors.secondaryText}
-                        />
-                      </TouchableOpacity>
+                    <Text style={themedStyles.inputLabel}>
+                      {t('venues.operatingHours')}
+                    </Text>
+                    <View style={themedStyles.hoursRow}>
+                      <View style={themedStyles.hoursColumn}>
+                        <Text style={themedStyles.hoursLabel}>Open</Text>
+                        <TouchableOpacity
+                          style={themedStyles.pickerButton}
+                          onPress={() => {
+                            setModalVisible(false);
+                            setTimeout(() => setShowOpenTimePicker(true), 300);
+                          }}>
+                          <Text
+                            style={[
+                              themedStyles.pickerButtonText,
+                              !newVenue.openTime &&
+                                themedStyles.pickerPlaceholder,
+                            ]}>
+                            {newVenue.openTime || '6:00 AM'}
+                          </Text>
+                          <FontAwesomeIcon
+                            icon={faChevronDown}
+                            size={12}
+                            color={colors.secondaryText}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={themedStyles.hoursColumn}>
+                        <Text style={themedStyles.hoursLabel}>Close</Text>
+                        <TouchableOpacity
+                          style={themedStyles.pickerButton}
+                          onPress={() => {
+                            setModalVisible(false);
+                            setTimeout(() => setShowCloseTimePicker(true), 300);
+                          }}>
+                          <Text
+                            style={[
+                              themedStyles.pickerButtonText,
+                              !newVenue.closeTime &&
+                                themedStyles.pickerPlaceholder,
+                            ]}>
+                            {newVenue.closeTime || '11:00 PM'}
+                          </Text>
+                          <FontAwesomeIcon
+                            icon={faChevronDown}
+                            size={12}
+                            color={colors.secondaryText}
+                          />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
 
@@ -1477,7 +1554,7 @@ const VenueList: React.FC = () => {
                     onPress={handleCreateVenue}
                     disabled={creatingVenue}>
                     {creatingVenue ? (
-                      <ActivityIndicator color="#FFFFFF" />
+                      <ActivityIndicator color={colors.buttonText || '#FFFFFF'} />
                     ) : (
                       <Text style={themedStyles.submitButtonText}>
                         {t('venues.createVenue')}
@@ -1508,10 +1585,11 @@ const VenueList: React.FC = () => {
           onRequestClose={() => setShowVenueTypePicker(false)}>
           <View style={themedStyles.modalOverlay}>
             <View style={[themedStyles.modalContent, {maxHeight: '70%'}]}>
+              <View style={themedStyles.modalHandle} />
               <Text style={themedStyles.modalTitle}>
                 {t('venues.selectType')}
               </Text>
-              <ScrollView>
+              <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={themedStyles.venueTypeGrid}>
                   {venueTypeOptions.map(option => (
                     <TouchableOpacity
@@ -1553,6 +1631,7 @@ const VenueList: React.FC = () => {
           onRequestClose={() => setShowOpenTimePicker(false)}>
           <View style={themedStyles.modalOverlay}>
             <View style={[themedStyles.modalContent, {maxHeight: '60%'}]}>
+              <View style={themedStyles.modalHandle} />
               <Text style={themedStyles.modalTitle}>Select Open Time</Text>
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={themedStyles.timePickerGrid}>
@@ -1569,7 +1648,15 @@ const VenueList: React.FC = () => {
                         setShowOpenTimePicker(false);
                         setTimeout(() => setModalVisible(true), 300);
                       }}>
-                      <Text style={themedStyles.timeOptionText}>{time}</Text>
+                      <Text
+                        style={[
+                          themedStyles.timeOptionText,
+                          newVenue.openTime === time && {
+                            color: colors.primary,
+                          },
+                        ]}>
+                        {time}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1588,6 +1675,7 @@ const VenueList: React.FC = () => {
           onRequestClose={() => setShowCloseTimePicker(false)}>
           <View style={themedStyles.modalOverlay}>
             <View style={[themedStyles.modalContent, {maxHeight: '60%'}]}>
+              <View style={themedStyles.modalHandle} />
               <Text style={themedStyles.modalTitle}>Select Close Time</Text>
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={themedStyles.timePickerGrid}>
@@ -1604,7 +1692,15 @@ const VenueList: React.FC = () => {
                         setShowCloseTimePicker(false);
                         setTimeout(() => setModalVisible(true), 300);
                       }}>
-                      <Text style={themedStyles.timeOptionText}>{time}</Text>
+                      <Text
+                        style={[
+                          themedStyles.timeOptionText,
+                          newVenue.closeTime === time && {
+                            color: colors.primary,
+                          },
+                        ]}>
+                        {time}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
