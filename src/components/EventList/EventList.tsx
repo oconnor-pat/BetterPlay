@@ -383,6 +383,20 @@ const getInitials = (username: string): string => {
   return username.slice(0, 2).toUpperCase();
 };
 
+// Prefer real-name initials (first + last) when a full name is available.
+// Falls back to first two characters of name, then username.
+const getCreatorInitials = (name?: string, username?: string): string => {
+  const trimmedName = name?.trim();
+  if (trimmedName) {
+    const parts = trimmedName.split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return trimmedName.slice(0, 2).toUpperCase();
+  }
+  return getInitials(username || '');
+};
+
 const AVATAR_COLORS = [
   '#E74C3C',
   '#3498DB',
@@ -2661,6 +2675,13 @@ const EventList: React.FC = () => {
     [eventId: string]: number;
   }>({});
 
+  // Cache of event-creator profile pic + real-name lookups, keyed by username.
+  // Backend doesn't return these on /events yet, so we hydrate them from /users.
+  const [creatorInfoMap, setCreatorInfoMap] = useState<
+    Record<string, {profilePicUrl?: string; name?: string}>
+  >({});
+  const lastCreatorFetchRef = useRef<number>(0);
+
   // Likes modal state
   const [likesModalVisible, setLikesModalVisible] = useState(false);
   const [likesModalData, setLikesModalData] = useState<{
@@ -2751,6 +2772,81 @@ const EventList: React.FC = () => {
       setLikedEvents(new Set(userLikedEvents));
     }
   }, [eventData, userData]);
+
+  // Pre-seed creator cache with the current user so events they create
+  // optimistically render with their avatar before /users resolves.
+  useEffect(() => {
+    if (!userData?.username) {
+      return;
+    }
+    setCreatorInfoMap(prev => {
+      const existing = prev[userData.username];
+      if (existing?.profilePicUrl === userData.profilePicUrl) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [userData.username]: {
+          ...existing,
+          profilePicUrl: userData.profilePicUrl,
+        },
+      };
+    });
+  }, [userData?.username, userData?.profilePicUrl]);
+
+  // Hydrate event-creator profile pics + real names from /users.
+  // Backend doesn't include createdByProfilePicUrl on /events yet, so we
+  // build a username -> {profilePicUrl, name} cache and merge it client-side.
+  // Skips the network call when every visible creator is already cached or
+  // when we fetched recently (5 min TTL).
+  useEffect(() => {
+    if (eventData.length === 0) {
+      return;
+    }
+    const neededUsernames = Array.from(
+      new Set(
+        eventData
+          .map(e => e.createdByUsername)
+          .filter(
+            (u): u is string => typeof u === 'string' && u.length > 0,
+          ),
+      ),
+    );
+    const missing = neededUsernames.filter(u => !(u in creatorInfoMap));
+    if (missing.length === 0) {
+      return;
+    }
+    const now = Date.now();
+    const TTL_MS = 5 * 60 * 1000;
+    if (now - lastCreatorFetchRef.current < TTL_MS) {
+      return;
+    }
+    lastCreatorFetchRef.current = now;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await axios.get(`${API_BASE_URL}/users`, {
+          headers: token ? {Authorization: `Bearer ${token}`} : {},
+        });
+        const allUsers = response.data?.users || response.data || [];
+        const next: Record<
+          string,
+          {profilePicUrl?: string; name?: string}
+        > = {};
+        for (const u of allUsers) {
+          if (u?.username) {
+            next[u.username] = {
+              profilePicUrl: u.profilePicUrl,
+              name: u.name,
+            };
+          }
+        }
+        setCreatorInfoMap(prev => ({...prev, ...next}));
+      } catch {
+        // Silent fail — initials fallback still renders correctly.
+      }
+    })();
+  }, [eventData, creatorInfoMap]);
 
   // Load watched events from persistent storage
   useEffect(() => {
@@ -3773,6 +3869,10 @@ const EventList: React.FC = () => {
     const isEventFull = item.rosterSpotsFilled >= item.totalSpots;
     const isCreator = userData?._id === item.createdBy;
     const username = item.createdByUsername || '';
+    const creatorInfo = creatorInfoMap[username];
+    const creatorProfilePicUrl =
+      item.createdByProfilePicUrl || creatorInfo?.profilePicUrl;
+    const creatorInitials = getCreatorInitials(creatorInfo?.name, username);
     const likeCount = item.likes?.length || 0;
     const commentCount =
       localCommentCounts[item._id] ?? item.commentCount ?? 0;
@@ -3789,9 +3889,9 @@ const EventList: React.FC = () => {
             onPress={() => handleEventPress(item)}
             activeOpacity={0.7}
             style={themedStyles.cardHeaderLeft}>
-            {item.createdByProfilePicUrl ? (
+            {creatorProfilePicUrl ? (
               <Image
-                source={{uri: item.createdByProfilePicUrl}}
+                source={{uri: creatorProfilePicUrl}}
                 style={themedStyles.avatar}
               />
             ) : (
@@ -3801,7 +3901,7 @@ const EventList: React.FC = () => {
                   {backgroundColor: getAvatarColor(username)},
                 ]}>
                 <Text style={themedStyles.avatarText}>
-                  {getInitials(username)}
+                  {creatorInitials}
                 </Text>
               </View>
             )}
