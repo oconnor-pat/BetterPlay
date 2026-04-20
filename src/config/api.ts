@@ -1,8 +1,17 @@
 import {Platform} from 'react-native';
+import Config from 'react-native-config';
 
 // API Configuration
 // Production API (Heroku)
 const PRODUCTION_API_URL = 'https://omhl-be-9801a7de15ab.herokuapp.com';
+
+// Image upload Lambda endpoint. Sourced from .env (IMAGE_UPLOAD_URL) with a
+// production fallback so the app still works if the env var is missing.
+const DEFAULT_IMAGE_UPLOAD_URL =
+  'https://8nxzl6o6fd.execute-api.us-east-2.amazonaws.com/default/uploadImageFunction';
+
+export const IMAGE_UPLOAD_URL =
+  Config.IMAGE_UPLOAD_URL || DEFAULT_IMAGE_UPLOAD_URL;
 
 // Local development URLs:
 // - iOS Simulator: 'localhost' maps to host machine

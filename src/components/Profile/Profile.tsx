@@ -27,7 +27,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {useTheme} from '../ThemeContext/ThemeContext';
-import {API_BASE_URL} from '../../config/api';
+import {API_BASE_URL, IMAGE_UPLOAD_URL} from '../../config/api';
 import analyticsService from '../../services/AnalyticsService';
 import {useEventContext, Event} from '../../Context/EventContext';
 
@@ -930,13 +930,10 @@ const Profile: React.FC = () => {
   ) => {
     setUploadingImage(true);
     try {
-      const lambdaResponse = await axios.post(
-        'https://8nxzl6o6fd.execute-api.us-east-2.amazonaws.com/default/uploadImageFunction',
-        {
-          image: base64Image,
-          fileName: fileName,
-        },
-      );
+      const lambdaResponse = await axios.post(IMAGE_UPLOAD_URL, {
+        image: base64Image,
+        fileName: fileName,
+      });
 
       const imageUrl = lambdaResponse.data.url;
       setSelectedImage(imageUrl);
