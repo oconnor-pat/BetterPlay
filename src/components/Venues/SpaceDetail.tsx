@@ -39,6 +39,7 @@ import {
   faChevronDown,
   faFilter,
   faStar,
+  faFileArrowUp,
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import UserContext, {UserContextType} from '../UserContext';
@@ -48,6 +49,8 @@ import {API_BASE_URL} from '../../config/api';
 import analyticsService from '../../services/AnalyticsService';
 import {useTranslation} from 'react-i18next';
 import {VenueStackParamList} from './VenueList';
+import CsvScheduleUpload from './CsvScheduleUpload';
+import {ExistingSlotIndex} from '../../utils/parseScheduleFile';
 
 type SpaceDetailRouteProp = RouteProp<VenueStackParamList, 'SpaceDetail'>;
 
@@ -297,6 +300,9 @@ const SpaceDetail: React.FC = () => {
   // Admin mode toggle (hides admin controls unless enabled)
   const [adminModeEnabled, setAdminModeEnabled] = useState<boolean>(false);
 
+  // Bulk CSV/Excel schedule upload
+  const [showCsvUploadModal, setShowCsvUploadModal] = useState<boolean>(false);
+
   // Expanded slot state (for tap-to-expand functionality)
   const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null);
 
@@ -353,6 +359,26 @@ const SpaceDetail: React.FC = () => {
     const minute = i % 2 === 0 ? '00' : '30';
     return `${hour.toString().padStart(2, '0')}:${minute}`;
   });
+
+  // Build a date -> slots index for the CSV upload preview to flag overlaps
+  // against slots already on the calendar (day view + any week-view cache).
+  const existingSlotIndex: ExistingSlotIndex = useMemo(() => {
+    const index: ExistingSlotIndex = {};
+    const push = (date: string, startTime: string, endTime: string) => {
+      if (!date || !startTime || !endTime) {
+        return;
+      }
+      if (!index[date]) {
+        index[date] = [];
+      }
+      index[date].push({startTime, endTime});
+    };
+    timeSlots.forEach(s => push(s.date, s.startTime, s.endTime));
+    weekSlots.forEach((slots, date) => {
+      slots.forEach(s => push(date, s.startTime, s.endTime));
+    });
+    return index;
+  }, [timeSlots, weekSlots]);
 
   // Themed styles
   const themedStyles = useMemo(
@@ -949,10 +975,14 @@ const SpaceDetail: React.FC = () => {
           color: colors.primary,
         },
         // Admin slot management styles
-        addSlotButton: {
+        adminFabStack: {
           position: 'absolute',
           bottom: 80,
           right: 20,
+          alignItems: 'center',
+          gap: 12,
+        },
+        addSlotButton: {
           backgroundColor: colors.primary,
           width: 56,
           height: 56,
@@ -964,6 +994,21 @@ const SpaceDetail: React.FC = () => {
           shadowOpacity: 0.35,
           shadowRadius: 8,
           elevation: 8,
+        },
+        uploadCsvFab: {
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          backgroundColor: colors.background,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary,
+          justifyContent: 'center',
+          alignItems: 'center',
+          shadowColor: colors.text,
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: 0.15,
+          shadowRadius: 4,
+          elevation: 4,
         },
         slotAdminActions: {
           flexDirection: 'row',
@@ -3886,13 +3931,24 @@ const SpaceDetail: React.FC = () => {
         </View>
       )}
 
-      {/* Admin: Add Slot Button - only visible when admin mode is enabled */}
+      {/* Admin: Floating action buttons - only when admin mode is enabled */}
       {isAdmin && adminModeEnabled && (
-        <TouchableOpacity
-          style={themedStyles.addSlotButton}
-          onPress={handleAddSlot}>
-          <FontAwesomeIcon icon={faPlus} size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={themedStyles.adminFabStack}>
+          <TouchableOpacity
+            style={themedStyles.uploadCsvFab}
+            onPress={() => setShowCsvUploadModal(true)}>
+            <FontAwesomeIcon
+              icon={faFileArrowUp}
+              size={20}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={themedStyles.addSlotButton}
+            onPress={handleAddSlot}>
+            <FontAwesomeIcon icon={faPlus} size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Modals */}
@@ -3901,6 +3957,22 @@ const SpaceDetail: React.FC = () => {
       {renderSlotDetailModal()}
       {isAdmin && renderAddSlotModal()}
       {isAdmin && renderEditSlotModal()}
+      {isAdmin && (
+        <CsvScheduleUpload
+          visible={showCsvUploadModal}
+          venueId={venueId}
+          spaceId={spaceId}
+          existingSlots={existingSlotIndex}
+          onClose={() => setShowCsvUploadModal(false)}
+          onUploadComplete={() => {
+            if (viewMode === 'week') {
+              fetchWeekSlots();
+            } else {
+              fetchTimeSlots();
+            }
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 };
