@@ -587,6 +587,34 @@
       "uploadFailed": "Upload failed",
       "tryAgain": "Try a different file",
       "pickError": "Could not open file"
+    },
+    "slotSignups": {
+      "join": "Join",
+      "leave": "Leave",
+      "joinWaitlist": "Join Waitlist",
+      "leaveWaitlist": "Leave Waitlist",
+      "youreIn": "You're in",
+      "waitlist": "Waitlist",
+      "waiting": "waiting",
+      "ofSpots": "of",
+      "spots": "spots",
+      "signedUp": "signed up",
+      "capacity": "Capacity",
+      "roster": "Roster",
+      "you": "You",
+      "dropInLabel": "Drop-in slot",
+      "walkInLabel": "Walk-in",
+      "walkInBadge": "Walk-in",
+      "blockRentalLabel": "Block rental",
+      "untitledDropIn": "Open slot",
+      "untitledWalkIn": "Time slot",
+      "walkInTitle": "No signup needed",
+      "walkInSubtitle": "Just show up during this window. No roster, no waitlist.",
+      "walkInTagline": "No signup needed — just show up.",
+      "emptyRoster": "Be the first to sign up",
+      "addedToWaitlist": "You're on the waitlist",
+      "waitlistPosition": "You're #{{position}} in line. We'll notify you if a spot opens up.",
+      "signInRequired": "You need to be signed in to join."
     }
   }
 }

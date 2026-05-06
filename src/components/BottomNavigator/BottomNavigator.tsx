@@ -6,7 +6,7 @@ import EventList from '../EventList/EventList';
 import EventRoster from '../EventRoster/EventRoster';
 import Profile from '../Profile/Profile';
 import PublicProfile from '../Profile/PublicProfile';
-import {VenueList, VenueDetail, SpaceDetail} from '../Venues';
+import {VenueList, VenuePlaceDetail, VenueWebView} from '../Venues';
 import {UserSearch} from '../UserSearch';
 import {FriendsList, FriendRequests} from '../Friends';
 import {Notifications} from '../Notifications';
@@ -40,8 +40,7 @@ const TabBarIconPill = ({
   pillColor: string;
 }) => {
   return (
-    <View
-      style={[styles.iconPill, focused && {backgroundColor: pillColor}]}>
+    <View style={[styles.iconPill, focused && {backgroundColor: pillColor}]}>
       <FontAwesomeIcon icon={icon} size={18} color={color} />
     </View>
   );
@@ -144,13 +143,13 @@ const VenueStack = () => {
         options={{headerShown: false}}
       />
       <Stack.Screen
-        name="VenueDetail"
-        component={VenueDetail}
+        name="VenuePlaceDetail"
+        component={VenuePlaceDetail}
         options={{headerShown: false}}
       />
       <Stack.Screen
-        name="SpaceDetail"
-        component={SpaceDetail}
+        name="VenueWebView"
+        component={VenueWebView}
         options={{headerShown: false}}
       />
     </Stack.Navigator>

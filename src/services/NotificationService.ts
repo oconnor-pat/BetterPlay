@@ -526,7 +526,7 @@ class NotificationService {
    * - RootStack: LandingPage, BottomNavigator, Settings, ResetPassword, ...
    *   - Tab.Navigator (inside BottomNavigator): Events, Venues, Profile
    *     - Events (LocalEventsStack): EventList, EventRoster, PublicProfile, UserSearch, Notifications
-   *     - Venues (VenueStack): VenueList, VenueDetail, SpaceDetail
+   *     - Venues (VenueStack): VenueList, VenuePlaceDetail, VenueWebView
    *     - Profile (ProfileStack): ProfileMain, UserSearch, PublicProfile, FriendsList, FriendRequests, Notifications
    */
   private handleNotificationData(data: Record<string, string>): void {
@@ -544,10 +544,7 @@ class NotificationService {
       screen,
       eventId,
       userId,
-      venueId,
-      spaceId,
       accepterId,
-      postId,
       changedFields,
     } = data;
 
@@ -623,23 +620,6 @@ class NotificationService {
         }
         break;
       }
-
-      // Venue-related notifications -> Venues tab
-      case 'venue_update':
-        if (venueId) {
-          navigateToTab('Venues', 'VenueDetail', {venueId});
-        } else {
-          navigateToTab('Venues', 'VenueList');
-        }
-        break;
-
-      case 'space_update':
-        if (spaceId && venueId) {
-          navigateToTab('Venues', 'SpaceDetail', {spaceId, venueId});
-        } else if (venueId) {
-          navigateToTab('Venues', 'VenueDetail', {venueId});
-        }
-        break;
 
       case 'general':
       default:

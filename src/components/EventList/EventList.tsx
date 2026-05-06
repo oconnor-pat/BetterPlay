@@ -96,14 +96,28 @@ import {useNotifications} from '../../Context/NotificationContext';
 import {useSocket} from '../../Context/SocketContext';
 import notificationService from '../../services/NotificationService';
 import locationService, {Coordinates} from '../../services/LocationService';
-import {
-  AvailableMapApp,
-  openDirections,
-} from '../../services/MapLauncher';
+import {AvailableMapApp, openDirections} from '../../services/MapLauncher';
 import MapAppPicker from '../MapAppPicker/MapAppPicker';
 import eventWatchService, {
   EventWatchPreferences,
 } from '../../services/EventWatchService';
+
+// Optional prefill payload sent from the Venues tab via the "Plan event
+// here" bridge. Any subset of these fields is OK — anything missing falls
+// back to the empty-event defaults so the user can still fill it in.
+export interface PrefillEvent {
+  name?: string;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  date?: string;
+  time?: string;
+  eventType?: string;
+  // Venue listing reference (Google Place ID + cached display fields).
+  venueId?: string;
+  venueName?: string;
+  sourceUrl?: string;
+}
 
 export type RootStackParamList = {
   EventList:
@@ -112,6 +126,7 @@ export type RootStackParamList = {
         expandComments?: boolean;
         profileFilter?: 'created' | 'joined';
         userId?: string;
+        prefillEvent?: PrefillEvent;
       }
     | undefined;
   EventRoster: {
@@ -183,7 +198,17 @@ interface Event {
   isRecurring?: boolean;
   recurrenceGroupId?: string;
   recurrenceFrequency?: RecurrenceFrequency;
-  waitlist?: Array<{userId: string; username: string; profilePicUrl?: string; joinedAt: string}>;
+  waitlist?: Array<{
+    userId: string;
+    username: string;
+    profilePicUrl?: string;
+    joinedAt: string;
+  }>;
+  // Optional venue listing reference (set when an event was planned from
+  // the Venues tab). Mirrors the BE Event model fields added in PR 1.
+  venueId?: string;
+  venueName?: string;
+  sourceUrl?: string;
 }
 
 const getDefaultWatchPreferences = (): EventWatchPreferences => ({
@@ -227,6 +252,10 @@ const createEmptyEvent = () => ({
   isRecurring: false,
   recurrenceFrequency: 'weekly' as RecurrenceFrequency,
   recurrenceCount: 4,
+  // Optional venue listing reference set by the Venues-tab bridge.
+  venueId: undefined as string | undefined,
+  venueName: undefined as string | undefined,
+  sourceUrl: undefined as string | undefined,
 });
 
 const rosterSizeOptions: string[] = Array.from({length: 30}, (_, i) =>
@@ -2807,9 +2836,7 @@ const EventList: React.FC = () => {
       new Set(
         eventData
           .map(e => e.createdByUsername)
-          .filter(
-            (u): u is string => typeof u === 'string' && u.length > 0,
-          ),
+          .filter((u): u is string => typeof u === 'string' && u.length > 0),
       ),
     );
     const missing = neededUsernames.filter(u => !(u in creatorInfoMap));
@@ -2829,10 +2856,8 @@ const EventList: React.FC = () => {
           headers: token ? {Authorization: `Bearer ${token}`} : {},
         });
         const allUsers = response.data?.users || response.data || [];
-        const next: Record<
-          string,
-          {profilePicUrl?: string; name?: string}
-        > = {};
+        const next: Record<string, {profilePicUrl?: string; name?: string}> =
+          {};
         for (const u of allUsers) {
           if (u?.username) {
             next[u.username] = {
@@ -3158,6 +3183,45 @@ const EventList: React.FC = () => {
     }
   }, [route.params?.profileFilter, route.params?.userId]);
 
+  // Open the create-event modal prefilled when the Venues tab bridges in
+  // via `navigate('Events', {screen: 'EventList', params: {prefillEvent}})`.
+  // We track which prefill payload we've already consumed so back-navigation
+  // doesn't re-open the modal a second time.
+  const consumedPrefillRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prefill = route.params?.prefillEvent;
+    if (!prefill) {
+      return;
+    }
+    // Cheap signature so we don't re-trigger on harmless re-renders.
+    const sig = JSON.stringify(prefill);
+    if (consumedPrefillRef.current === sig) {
+      return;
+    }
+    consumedPrefillRef.current = sig;
+    setNewEvent({
+      ...createEmptyEvent(),
+      name: prefill.name || '',
+      location: prefill.location || '',
+      latitude: prefill.latitude,
+      longitude: prefill.longitude,
+      date: prefill.date || '',
+      time: prefill.time || '',
+      eventType: prefill.eventType || '',
+      venueId: prefill.venueId,
+      venueName: prefill.venueName,
+      sourceUrl: prefill.sourceUrl,
+    });
+    setTempRosterSize('');
+    setTempEventType(prefill.eventType || '');
+    setIsEditing(false);
+    setEditingEventId(null);
+    setPlacesApiFailed(false);
+    setModalVisible(true);
+    // Clear the param so navigating away and back doesn't re-pop the modal.
+    navigation.setParams({prefillEvent: undefined} as never);
+  }, [route.params?.prefillEvent, navigation]);
+
   // Scroll to highlighted event and optionally expand comments (once per navigation)
   const hasScrolledToHighlight = useRef<string | null>(null);
   useEffect(() => {
@@ -3354,6 +3418,10 @@ const EventList: React.FC = () => {
               : undefined,
             privacy: newEvent.privacy,
             invitedUsers: newEvent.invitedUsers,
+            // Optional venue listing reference (set by the Venues-tab bridge).
+            venueId: newEvent.venueId,
+            venueName: newEvent.venueName,
+            sourceUrl: newEvent.sourceUrl,
           };
 
           if (newEvent.isRecurring) {
@@ -3468,6 +3536,10 @@ const EventList: React.FC = () => {
       isRecurring: event.isRecurring || false,
       recurrenceFrequency: event.recurrenceFrequency || 'weekly',
       recurrenceCount: 4,
+      // Preserve any venue link the event was originally created with.
+      venueId: event.venueId,
+      venueName: event.venueName,
+      sourceUrl: event.sourceUrl,
     });
     setPlacesApiFailed(false);
     setModalVisible(true);
@@ -3659,8 +3731,7 @@ const EventList: React.FC = () => {
       const filteredUsers = allUsers.filter(
         (user: LikedByUser) =>
           (user.username?.toLowerCase().includes(normalizedQuery) ||
-            (user.name &&
-              user.name.toLowerCase().includes(normalizedQuery))) &&
+            (user.name && user.name.toLowerCase().includes(normalizedQuery))) &&
           user._id !== userData?._id &&
           !newEvent.invitedUsers.includes(user._id),
       );
@@ -3874,8 +3945,7 @@ const EventList: React.FC = () => {
       item.createdByProfilePicUrl || creatorInfo?.profilePicUrl;
     const creatorInitials = getCreatorInitials(creatorInfo?.name, username);
     const likeCount = item.likes?.length || 0;
-    const commentCount =
-      localCommentCounts[item._id] ?? item.commentCount ?? 0;
+    const commentCount = localCommentCounts[item._id] ?? item.commentCount ?? 0;
 
     const showOptionsMenu = () => {
       setOptionsMenuEvent(item);
@@ -3900,15 +3970,11 @@ const EventList: React.FC = () => {
                   themedStyles.avatar,
                   {backgroundColor: getAvatarColor(username)},
                 ]}>
-                <Text style={themedStyles.avatarText}>
-                  {creatorInitials}
-                </Text>
+                <Text style={themedStyles.avatarText}>{creatorInitials}</Text>
               </View>
             )}
             <View style={themedStyles.cardHeaderIdentity}>
-              <Text
-                style={themedStyles.cardHeaderUsername}
-                numberOfLines={1}>
+              <Text style={themedStyles.cardHeaderUsername} numberOfLines={1}>
                 {username || t('events.anonymous') || 'Unknown'}
               </Text>
               <View style={themedStyles.cardHeaderMetaRow}>
@@ -4064,11 +4130,7 @@ const EventList: React.FC = () => {
             );
           })()}
           <View style={themedStyles.mapEmbedOverlay}>
-            <FontAwesomeIcon
-              icon={faLocationArrow}
-              size={11}
-              color="#fff"
-            />
+            <FontAwesomeIcon icon={faLocationArrow} size={11} color="#fff" />
             <Text style={themedStyles.mapEmbedOverlayText}>
               {t('events.getDirections')}
             </Text>
@@ -4107,9 +4169,7 @@ const EventList: React.FC = () => {
             <FontAwesomeIcon
               icon={faComments}
               size={16}
-              color={
-                isCommentsExpanded ? colors.primary : colors.secondaryText
-              }
+              color={isCommentsExpanded ? colors.primary : colors.secondaryText}
             />
             {commentCount > 0 && (
               <Text
@@ -4146,10 +4206,7 @@ const EventList: React.FC = () => {
             />
             {isWatching && (
               <Text
-                style={[
-                  themedStyles.engagementCount,
-                  {color: colors.primary},
-                ]}>
+                style={[themedStyles.engagementCount, {color: colors.primary}]}>
                 Watching
               </Text>
             )}
@@ -4597,9 +4654,7 @@ const EventList: React.FC = () => {
             <View style={themedStyles.modalView}>
               <View style={themedStyles.modalHandle} />
               <Text style={themedStyles.modalHeader}>
-                {isEditing
-                  ? t('events.editEvent')
-                  : t('events.createEvent')}
+                {isEditing ? t('events.editEvent') : t('events.createEvent')}
               </Text>
 
               <ScrollView
@@ -5581,7 +5636,11 @@ const EventList: React.FC = () => {
               <TouchableOpacity
                 onPress={() => setShowFilterModal(false)}
                 hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                <FontAwesomeIcon icon={faTimes} size={20} color={colors.secondaryText} />
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={20}
+                  color={colors.secondaryText}
+                />
               </TouchableOpacity>
             </View>
 
@@ -5738,7 +5797,9 @@ const EventList: React.FC = () => {
                         icon={faLocationArrow}
                         size={13}
                         color={
-                          proximityEnabled ? colors.primary : colors.secondaryText
+                          proximityEnabled
+                            ? colors.primary
+                            : colors.secondaryText
                         }
                         style={themedStyles.proximityIconMargin}
                       />
@@ -5831,11 +5892,7 @@ const EventList: React.FC = () => {
             <View style={themedStyles.likesModalHandle} />
             <View style={themedStyles.likesModalHeaderBlock}>
               <View style={themedStyles.likesModalTitleRow}>
-                <FontAwesomeIcon
-                  icon={faHeart}
-                  size={14}
-                  color={'#e74c3c'}
-                />
+                <FontAwesomeIcon icon={faHeart} size={14} color={'#e74c3c'} />
                 <Text style={themedStyles.likesModalTitle}>
                   {likesModalData.title}
                 </Text>
@@ -5844,8 +5901,7 @@ const EventList: React.FC = () => {
                 0 && (
                 <Text style={themedStyles.likesModalCount}>
                   {`${
-                    likesModalData.users.length +
-                    likesModalData.anonymousCount
+                    likesModalData.users.length + likesModalData.anonymousCount
                   } ${
                     likesModalData.users.length +
                       likesModalData.anonymousCount ===

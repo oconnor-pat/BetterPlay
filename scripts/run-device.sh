@@ -54,9 +54,20 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Find the built app dynamically
+# Find the built app dynamically.
+# Exclude Index.noindex (Xcode's indexer stub — has no CFBundleIdentifier and
+# will fail `devicectl install` with "not a valid bundle"). Pick the most
+# recently modified match in case multiple DerivedData folders exist.
 echo "📍 Locating built app..."
-APP_PATH=$(find "$DERIVED_DATA_DIR" -path "*BetterPlay*/Build/Products/Debug-iphoneos/BetterPlay.app" -type d 2>/dev/null | head -1)
+APP_PATH=$(find "$DERIVED_DATA_DIR" \
+    -path "*BetterPlay*/Build/Products/Debug-iphoneos/BetterPlay.app" \
+    -not -path "*/Index.noindex/*" \
+    -type d \
+    -print0 2>/dev/null \
+    | xargs -0 stat -f "%m %N" 2>/dev/null \
+    | sort -rn \
+    | head -1 \
+    | cut -d' ' -f2-)
 
 if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
     echo "❌ Could not find built app in DerivedData"

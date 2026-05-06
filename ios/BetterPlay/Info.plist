@@ -48,6 +48,13 @@
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
+		<!-- Loosens ATS only for content loaded inside WKWebView/WebView so
+		     the in-app browser can render legacy HTTP-only business sites
+		     (many small venues still aren't on HTTPS). All other network
+		     traffic from the app — API calls, image loads, push services —
+		     stays under strict ATS rules. -->
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
 			<key>localhost</key>
