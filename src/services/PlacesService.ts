@@ -328,6 +328,12 @@ const RATE_LIMIT_ERROR =
 const NOT_CONFIGURED_ERROR =
   'Google Places API key is not configured. Set GOOGLE_PLACES_API_KEY in .env.';
 
+// Quality floor for the discovery feed. Tuned conservatively — venues
+// with zero or near-zero ratings are usually mis-tagged businesses,
+// closed locations, or extremely small operations that won't be useful
+// for "find a hangout" browsing. Bump down if real venues get hidden.
+const MIN_USER_RATING_COUNT = 5;
+
 // Nearby Search — list places of given primary types within `radiusMeters`
 // of `(latitude, longitude)`. Used by the Venues tab landing page.
 //
@@ -398,9 +404,16 @@ export const searchNearby = async (params: {
   const json = (await response.json()) as PlacesV1Response;
   // Belt-and-suspenders + catches Table B types Google can't filter on
   // server-side (e.g. `general_contractor`, `summer_camp`).
+  //
+  // Also drop very-low-popularity places (< 5 ratings). For the Nearby
+  // discovery feed this trims dead-end results — places people aren't
+  // actually going to. We deliberately don't apply this to searchText:
+  // when a user types a name they may be looking for somewhere new with
+  // no reviews yet, and silently hiding the match would be confusing.
   return (json.places || [])
     .map(normalizePlace)
-    .filter(p => !p.primaryType || !LOCAL_EXCLUDED_PRIMARY_TYPES.has(p.primaryType));
+    .filter(p => !p.primaryType || !LOCAL_EXCLUDED_PRIMARY_TYPES.has(p.primaryType))
+    .filter(p => (p.userRatingCount ?? 0) >= MIN_USER_RATING_COUNT);
 };
 
 // Text Search — free-text query, optionally biased to a location. Used by

@@ -71,11 +71,21 @@ const INTERESTS_OPTIONS = [
   {id: 'game-nights', emoji: '🎲', label: 'Game Nights'},
   {id: 'karaoke', emoji: '🎤', label: 'Karaoke'},
   {id: 'live-music', emoji: '🎵', label: 'Live Music'},
+  {id: 'brewery', emoji: '🍻', label: 'Brewery'},
+  {id: 'wine', emoji: '🍷', label: 'Wine'},
+  {id: 'coffee', emoji: '☕', label: 'Coffee'},
+  {id: 'sports-bar', emoji: '📺', label: 'Sports Bar'},
   // Outdoor & Fitness
   {id: 'hiking', emoji: '🥾', label: 'Hiking'},
   {id: 'cycling', emoji: '🚴', label: 'Cycling'},
   {id: 'running', emoji: '🏃', label: 'Running'},
   {id: 'yoga', emoji: '🧘', label: 'Yoga'},
+  {id: 'swimming', emoji: '🏊', label: 'Swimming'},
+  // Indoor Games
+  {id: 'bowling', emoji: '🎳', label: 'Bowling'},
+  {id: 'arcade', emoji: '🕹️', label: 'Arcade'},
+  {id: 'gaming', emoji: '🎮', label: 'Gaming'},
+  {id: 'dance', emoji: '💃', label: 'Dance'},
   // Community
   {id: 'book-club', emoji: '📚', label: 'Book Club'},
   {id: 'volunteering', emoji: '💚', label: 'Volunteering'},

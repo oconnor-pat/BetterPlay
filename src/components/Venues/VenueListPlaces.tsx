@@ -8,7 +8,14 @@
 // PR 2 will replace the tap behavior with an in-app WebView + a slim venue
 // detail page that shows "Happening here" Events scoped to the place.
 
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   View,
   Text,
@@ -22,7 +29,7 @@ import {
   Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faSearch,
@@ -30,10 +37,14 @@ import {
   faMapMarkerAlt,
   faGlobe,
   faExclamationTriangle,
+  faStar,
 } from '@fortawesome/free-solid-svg-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 import {useTranslation} from 'react-i18next';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {useTheme} from '../ThemeContext/ThemeContext';
+import UserContext, {UserContextType} from '../UserContext';
 import locationService, {Coordinates} from '../../services/LocationService';
 import {
   PlaceSummary,
@@ -45,6 +56,8 @@ import {
   searchNearby,
   searchText,
 } from '../../services/PlacesService';
+import {primaryTypesForInterests} from '../../utils/interestVenueMapping';
+import {API_BASE_URL} from '../../config/api';
 
 // Default radius for the "near you" feed.
 const DEFAULT_RADIUS_METERS = 8000; // ~5 miles
@@ -54,6 +67,7 @@ const VenueListPlaces: React.FC = () => {
   const {colors, darkMode} = useTheme();
   const {t} = useTranslation();
   const navigation = useNavigation<any>();
+  const {userData} = useContext(UserContext) as UserContextType;
 
   const [coords, setCoords] = useState<Coordinates | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<
@@ -63,6 +77,11 @@ const VenueListPlaces: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // User's saved interests (`favoriteActivities` on the User model). null
+  // means "not loaded yet" — used to suppress the empty-interests banner
+  // until we know the truth, so it doesn't flash on first paint.
+  const [interests, setInterests] = useState<string[] | null>(null);
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
 
@@ -98,9 +117,38 @@ const VenueListPlaces: React.FC = () => {
     }
   }, []);
 
+  // ── Interests fetch ───────────────────────────────────────────────────
+  // Pulls the user's saved interests so the "All" feed can be personalized.
+  // Refetched on tab focus (below) so edits made on the Profile tab are
+  // reflected the next time the user returns here.
+  const fetchInterests = useCallback(async () => {
+    if (!userData?._id) {
+      setInterests([]);
+      return;
+    }
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(
+        `${API_BASE_URL}/user/${userData._id}/favorite-sports`,
+        {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+      );
+      const list: string[] =
+        res.data?.favoriteActivities || res.data?.favoriteSports || [];
+      setInterests(list);
+    } catch {
+      // Don't surface this error to the user — interests just stay empty
+      // and the All feed falls back to the default activity-rich mix.
+      setInterests([]);
+    }
+  }, [userData?._id]);
+
   // ── Nearby fetch ──────────────────────────────────────────────────────
   const fetchNearby = useCallback(
-    async (location: Coordinates, categoryId: string) => {
+    async (
+      location: Coordinates,
+      categoryId: string,
+      userInterests: string[] | null,
+    ) => {
       if (!isPlacesApiConfigured) {
         setErrorMessage(
           'Google Places API key is not configured. Set GOOGLE_PLACES_API_KEY in .env and rebuild.',
@@ -109,8 +157,25 @@ const VenueListPlaces: React.FC = () => {
         return;
       }
       setErrorMessage(null);
-      const cat = VENUE_CATEGORIES.find(c => c.id === categoryId);
-      const primaryTypes = cat ? cat.primaryTypes : undefined;
+
+      let primaryTypes: string[] | undefined;
+      if (categoryId === 'all') {
+        // Personalize the All feed from the user's interests when we have
+        // them. If interests is still loading (null) or contributes no
+        // mapped types, leave primaryTypes undefined so Google returns
+        // its default activity-rich nearby mix (still subject to our
+        // exclusion filters).
+        if (userInterests && userInterests.length > 0) {
+          const mapped = primaryTypesForInterests(userInterests);
+          if (mapped.length > 0) {
+            primaryTypes = mapped;
+          }
+        }
+      } else {
+        const cat = VENUE_CATEGORIES.find(c => c.id === categoryId);
+        primaryTypes = cat ? cat.primaryTypes : undefined;
+      }
+
       try {
         const results = await searchNearby({
           latitude: location.latitude,
@@ -128,17 +193,22 @@ const VenueListPlaces: React.FC = () => {
     [],
   );
 
-  // First load — bootstrap location, then fetch nearby places.
+  // First load — bootstrap location + interests in parallel, then fetch
+  // nearby places. We seed the All feed once interests has resolved (which
+  // may already be `[]`) so personalization kicks in on first paint.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const loc = await ensureLocation();
+      const [loc] = await Promise.all([ensureLocation(), fetchInterests()]);
       if (cancelled) {
         return;
       }
+      // Read the latest interests from state via the function form below;
+      // we pass `null` here because the secondary effect (driven by
+      // `interests` becoming non-null) will refire with personalization.
       if (loc) {
-        await fetchNearby(loc, 'all');
+        await fetchNearby(loc, 'all', null);
       }
       if (!cancelled) {
         setLoading(false);
@@ -147,17 +217,19 @@ const VenueListPlaces: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [ensureLocation, fetchNearby]);
+  }, [ensureLocation, fetchInterests, fetchNearby]);
 
-  // Refetch when category changes.
+  // Refetch when category or interests change. `interests` flipping from
+  // null → array triggers the personalized All feed once data lands;
+  // returning from the Profile tab with new picks also triggers a refresh.
   useEffect(() => {
-    if (!coords) {
+    if (!coords || interests === null) {
       return;
     }
     let cancelled = false;
     (async () => {
       setLoading(true);
-      await fetchNearby(coords, selectedCategoryId);
+      await fetchNearby(coords, selectedCategoryId, interests);
       if (!cancelled) {
         setLoading(false);
       }
@@ -165,7 +237,16 @@ const VenueListPlaces: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedCategoryId, coords, fetchNearby]);
+  }, [selectedCategoryId, coords, interests, fetchNearby]);
+
+  // Refresh interests when the Venues tab regains focus — covers the
+  // common case of the user editing their interests on Profile and
+  // tapping back to Venues.
+  useFocusEffect(
+    useCallback(() => {
+      fetchInterests();
+    }, [fetchInterests]),
+  );
 
   // ── Search (debounced text search) ────────────────────────────────────
   useEffect(() => {
@@ -206,12 +287,22 @@ const VenueListPlaces: React.FC = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const loc = coords || (await ensureLocation());
+    const [loc] = await Promise.all([
+      coords ? Promise.resolve(coords) : ensureLocation(),
+      fetchInterests(),
+    ]);
     if (loc) {
-      await fetchNearby(loc, selectedCategoryId);
+      await fetchNearby(loc, selectedCategoryId, interests);
     }
     setRefreshing(false);
-  }, [coords, ensureLocation, fetchNearby, selectedCategoryId]);
+  }, [
+    coords,
+    ensureLocation,
+    fetchInterests,
+    fetchNearby,
+    interests,
+    selectedCategoryId,
+  ]);
 
   // Card tap → slim venue detail page. The detail page handles the website,
   // Get Directions, call, and "Plan event here" actions. PR 2b will add an
@@ -345,6 +436,39 @@ const VenueListPlaces: React.FC = () => {
           paddingHorizontal: 16,
           paddingTop: 4,
           paddingBottom: 8,
+        },
+        interestsBanner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          marginHorizontal: 16,
+          marginTop: 8,
+          marginBottom: 4,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderRadius: 12,
+          backgroundColor: colors.primary + '12',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '40',
+        },
+        interestsBannerText: {
+          flex: 1,
+        },
+        interestsBannerTitle: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.text,
+          marginBottom: 2,
+        },
+        interestsBannerSubtitle: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          lineHeight: 16,
+        },
+        interestsBannerCta: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.primary,
         },
         list: {
           flex: 1,
@@ -560,7 +684,7 @@ const VenueListPlaces: React.FC = () => {
             onPress={async () => {
               await ensureLocation();
               if (coords) {
-                await fetchNearby(coords, selectedCategoryId);
+                await fetchNearby(coords, selectedCategoryId, interests);
               }
             }}>
             <Text style={styles.emptyActionText}>Retry</Text>
@@ -655,9 +779,42 @@ const VenueListPlaces: React.FC = () => {
         </View>
       )}
 
+      {!searchResults &&
+        selectedCategoryId === 'all' &&
+        interests !== null &&
+        interests.length === 0 && (
+          <TouchableOpacity
+            style={styles.interestsBanner}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Profile')}>
+            <FontAwesomeIcon
+              icon={faStar}
+              size={14}
+              color={colors.primary}
+            />
+            <View style={styles.interestsBannerText}>
+              <Text style={styles.interestsBannerTitle}>
+                Personalize this feed
+              </Text>
+              <Text style={styles.interestsBannerSubtitle}>
+                Set your interests on your profile to see places you'll
+                actually want to go.
+              </Text>
+            </View>
+            <Text style={styles.interestsBannerCta}>Set →</Text>
+          </TouchableOpacity>
+        )}
+
       {!searchResults && (
         <Text style={styles.sectionTitle}>
-          {coords ? 'Near you' : 'Featured'}
+          {coords
+            ? selectedCategoryId === 'all' &&
+              interests &&
+              interests.length > 0 &&
+              primaryTypesForInterests(interests).length > 0
+              ? 'Picked for you'
+              : 'Near you'
+            : 'Featured'}
         </Text>
       )}
 
