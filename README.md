@@ -1,79 +1,89 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# BetterPlay
 
-# Getting Started
+> Hangouts that actually happen.
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+<p align="center">
+  <img src="docs/screenshots/events-feed.png" width="280" alt="Local events feed" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/private-event.png" width="280" alt="Private event with map preview" />
+</p>
 
-## Step 1: Start the Metro Server
+BetterPlay is a cross-platform mobile app for planning local events,
+discovering venues, and keeping recurring social rituals alive — from
+one-off get-togethers to weekly trivia night with the regulars. It's
+built to be the thing that finally replaces the group text that always
+dies after three "we should hang out soon"s.
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+## Features
 
-To start Metro, run the following command from the _root_ of your React Native project:
+- **Plan events at a real place** with a date, a roster, and granular
+  invite controls — public, private, or invite-only.
+- **Discover nearby venues** via the Google Places API, filtered by the
+  categories users actually plan around: bars, breweries, rinks, parks,
+  bowling alleys, courts, coffee shops, and more.
+- **Personalized feed** — pick your interests on your profile and the
+  "All" view surfaces venues that match what you'd actually do, not
+  generic chain restaurants.
+- **In-app browser** — tap any venue to view its real website inside the
+  app, check the live schedule, then plan an event from the page you're
+  looking at with one tap.
+- **Recurring events** for standing plans like Tuesday trivia or Friday
+  pickup hockey, so a missed week doesn't kill the ritual.
+- **Friends, profiles, and rosters** — connect with people, customize
+  your profile, see who's in for each event, and manage waitlists.
+- **Push notifications** for invites, comments, RSVPs, and event
+  changes.
+- **Cross-platform**: iOS and Android from a single codebase.
 
-```bash
-# using npm
-npm start
+## Under the hood
 
-# OR using Yarn
-yarn start
-```
+A few of the more interesting bits beneath the surface:
 
-## Step 2: Start your Application
+- **Interest-based personalization.** The venues feed translates each
+  user's selected interests into a tuned set of Google Places primary
+  types (including the precise post-Feb-2026 categories) and feeds them
+  as the filter. A minimum-ratings floor cuts dead-end results. Pick
+  "Brewery" and you actually see breweries — not the nearest chain bar.
+- **Plan-from-anywhere event creation.** The in-app browser captures
+  the exact URL you're viewing as the event's source link, so a venue's
+  "Trivia Tuesdays" page becomes the canonical link on the event card
+  your friends see.
+- **Defense-in-depth place filtering.** Some Google Places type
+  categories can't be excluded server-side (API limitation), so a
+  client-side post-pass against a superset list cuts the long tail of
+  noise — no pool supply stores in the "Pools" feed.
 
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
+## Built with
 
-### For Android
+- **React Native + TypeScript** on the front end, shipping a single
+  codebase to both iOS and Android.
+- **Node.js + MongoDB** on the back end (separate repository).
+- **Google Places** for venue discovery.
+- **Firebase** for push notifications and analytics; **Sentry** for
+  production crash monitoring.
 
-```bash
-# using npm
-npm run android
+## Status
 
-# OR using Yarn
-yarn android
-```
+Active development, currently in private beta via Firebase App
+Distribution. Pre-release: APIs and data models are still evolving.
 
-### For iOS
+**Want to see it in action?** Happy to share a TestFlight or APK build
+on request — reach out at oconnor-patrick@outlook.com / https://www.linkedin.com/in/patrick-o%E2%80%99connor-445b09172/.
 
-```bash
-# using npm
-npm run ios
+## Roadmap
 
-# OR using Yarn
-yarn ios
-```
+- **Groups & standing plans** — first-class "the trivia crew" /
+  "the hockey guys" objects that own recurring event series, so a
+  group's weekly ritual lives in one place instead of being re-typed
+  every week.
+- **Social proof on venues** — "3 friends have planned events here"
+  badges, friend activity feeds, roster avatar previews on cards.
+- **Group discovery** — surface open spots in nearby groups to users
+  whose interests match, so new users without an existing crew can
+  find one.
+- **Venues feed visual refresh** — tiered layout with hero pick,
+  themed shelves, and friend-driven shelves once social proof exists.
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+---
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
-
-## Step 3: Modifying your App
-
-Now that you have successfully run the app, let's modify it.
-
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
-
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Built solo by Patrick O'Connor.
