@@ -3,7 +3,7 @@
 > Hangouts that actually happen.
 
 <p align="center">
-  <img src="docs/screenshots/events-feed.png" width="280" alt="Local events feed" />
+  <img src="docs/screenshots/login-screen.png" width="280" alt="Local events feed" />
   &nbsp;&nbsp;
   <img src="docs/screenshots/private-event.png" width="280" alt="Private event with map preview" />
 </p>
