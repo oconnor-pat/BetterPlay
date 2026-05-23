@@ -334,6 +334,25 @@ const VenueListPlaces: React.FC = () => {
     });
   }, [places, searchResults, coords]);
 
+  // Split the feed into a "hero" pick + the rest. The hero gets a
+  // photo-forward card at the top to anchor the page; everything else
+  // renders in the standard card list below. We only promote a hero
+  // when there are at least 2 results so the rest of the list isn't
+  // empty under it, and only when we're not in a text-search view (the
+  // search results page stays as a flat list).
+  const {heroPlace, restPlaces} = useMemo(() => {
+    if (!searchResults && visibleList.length >= 2) {
+      return {heroPlace: visibleList[0], restPlaces: visibleList.slice(1)};
+    }
+    return {heroPlace: null as PlaceSummary | null, restPlaces: visibleList};
+  }, [visibleList, searchResults]);
+
+  const isPersonalized =
+    selectedCategoryId === 'all' &&
+    !!interests &&
+    interests.length > 0 &&
+    primaryTypesForInterests(interests).length > 0;
+
   // ── Styles ────────────────────────────────────────────────────────────
   const styles = useMemo(
     () =>
@@ -437,6 +456,106 @@ const VenueListPlaces: React.FC = () => {
           paddingTop: 4,
           paddingBottom: 8,
         },
+        sectionTitleRest: {
+          fontSize: 12,
+          fontWeight: '700',
+          letterSpacing: 0.5,
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 8,
+        },
+        // ── Hero card ─────────────────────────────────────────────
+        heroCard: {
+          marginHorizontal: 16,
+          marginTop: 4,
+          marginBottom: 12,
+          borderRadius: 16,
+          backgroundColor: colors.card,
+          overflow: 'hidden',
+          // Subtle elevation so it pops above the page background.
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 2},
+          shadowOpacity: darkMode ? 0.4 : 0.08,
+          shadowRadius: 8,
+          elevation: 3,
+        },
+        heroPhoto: {
+          width: '100%',
+          height: 180,
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.06)'
+            : 'rgba(0,0,0,0.04)',
+        },
+        heroPhotoFallback: {
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        heroPhotoEmoji: {
+          fontSize: 72,
+        },
+        heroTagPill: {
+          position: 'absolute',
+          top: 12,
+          left: 12,
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 12,
+          backgroundColor: colors.primary,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 5,
+        },
+        heroTagText: {
+          color: '#FFFFFF',
+          fontSize: 10,
+          fontWeight: '800',
+          letterSpacing: 0.6,
+          textTransform: 'uppercase',
+        },
+        heroBody: {
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 14,
+        },
+        heroTitleRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        },
+        heroTitle: {
+          fontSize: 19,
+          fontWeight: '800',
+          color: colors.text,
+          flex: 1,
+        },
+        heroDistance: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.secondaryText,
+        },
+        heroMeta: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          marginTop: 4,
+        },
+        heroStatusRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 8,
+        },
+        statusDot: {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+        },
+        heroStatusText: {
+          fontSize: 12,
+          fontWeight: '700',
+        },
         interestsBanner: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -477,19 +596,28 @@ const VenueListPlaces: React.FC = () => {
           paddingBottom: 24,
           flexGrow: 1,
         },
+        // ── Regular cards ─────────────────────────────────────────
         card: {
           backgroundColor: colors.card,
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          padding: 12,
+          marginHorizontal: 16,
+          marginBottom: 8,
+          borderRadius: 14,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 12,
+          // Light elevation so each card reads as its own object,
+          // not as a list row. Tuned subtle so the page doesn't feel
+          // busy at scale.
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 1},
+          shadowOpacity: darkMode ? 0.25 : 0.05,
+          shadowRadius: 4,
+          elevation: 1,
         },
         cardThumb: {
-          width: 56,
-          height: 56,
+          width: 72,
+          height: 72,
           borderRadius: 12,
           backgroundColor: darkMode
             ? 'rgba(255,255,255,0.06)'
@@ -499,11 +627,11 @@ const VenueListPlaces: React.FC = () => {
           overflow: 'hidden',
         },
         cardThumbImage: {
-          width: 56,
-          height: 56,
+          width: 72,
+          height: 72,
         },
         cardThumbEmoji: {
-          fontSize: 28,
+          fontSize: 34,
         },
         cardBody: {
           flex: 1,
@@ -530,10 +658,15 @@ const VenueListPlaces: React.FC = () => {
           color: colors.secondaryText,
           marginTop: 4,
         },
-        cardStatus: {
-          fontSize: 12,
+        cardStatusRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 5,
+          marginTop: 5,
+        },
+        cardStatusText: {
+          fontSize: 11,
           fontWeight: '700',
-          marginTop: 4,
         },
         statusOpen: {
           color: colors.primary,
@@ -585,14 +718,25 @@ const VenueListPlaces: React.FC = () => {
     );
   };
 
+  // Small helper — converts a Place's distance (in miles, may be null)
+  // into the compact display string used on cards. Returns null when
+  // we don't have coords or a location to measure against.
+  const formatDistance = (item: PlaceSummary): string | null => {
+    if (!coords || !item.location) {
+      return null;
+    }
+    const mi = locationService.haversineDistance(coords, item.location, 'mi');
+    if (mi < 0.1) {
+      return '<0.1 mi';
+    }
+    return `${mi.toFixed(mi < 10 ? 1 : 0)} mi`;
+  };
+
   const renderCard = ({item}: {item: PlaceSummary}) => {
-    const distanceMi =
-      coords && item.location
-        ? locationService.haversineDistance(coords, item.location, 'mi')
-        : null;
+    const distanceLabel = formatDistance(item);
     const photoName = item.photos && item.photos[0]?.name;
     const photoUrl = photoName
-      ? buildPhotoUrl(photoName, {maxWidthPx: 120})
+      ? buildPhotoUrl(photoName, {maxWidthPx: 160})
       : null;
     const openNow = item.currentOpeningHours?.openNow;
     const typeLabel = getFriendlyTypeLabel(item);
@@ -620,12 +764,8 @@ const VenueListPlaces: React.FC = () => {
             <Text style={styles.cardTitle} numberOfLines={1}>
               {item.name || 'Unnamed venue'}
             </Text>
-            {distanceMi !== null && (
-              <Text style={styles.cardDistance}>
-                {distanceMi < 0.1
-                  ? '<0.1 mi'
-                  : `${distanceMi.toFixed(distanceMi < 10 ? 1 : 0)} mi`}
-              </Text>
+            {distanceLabel !== null && (
+              <Text style={styles.cardDistance}>{distanceLabel}</Text>
             )}
           </View>
           <Text style={styles.cardMeta} numberOfLines={1}>
@@ -633,13 +773,94 @@ const VenueListPlaces: React.FC = () => {
             {addressLine ? ` · ${addressLine}` : ''}
           </Text>
           {typeof openNow === 'boolean' && (
-            <Text
-              style={[
-                styles.cardStatus,
-                openNow ? styles.statusOpen : styles.statusClosed,
-              ]}>
-              {openNow ? 'Open now' : 'Closed'}
+            <View style={styles.cardStatusRow}>
+              <View
+                style={[
+                  styles.statusDot,
+                  {backgroundColor: openNow ? colors.primary : colors.border},
+                ]}
+              />
+              <Text
+                style={[
+                  styles.cardStatusText,
+                  openNow ? styles.statusOpen : styles.statusClosed,
+                ]}>
+                {openNow ? 'Open' : 'Closed'}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Hero card — the top pick on the personalized feed. Same data
+  // model as a regular card but rendered photo-forward with a "TOP
+  // PICK FOR YOU" pill over the photo. Falls back to a giant emoji
+  // when the place has no photo on file.
+  const renderHero = (item: PlaceSummary) => {
+    const distanceLabel = formatDistance(item);
+    const photoName = item.photos && item.photos[0]?.name;
+    const photoUrl = photoName
+      ? buildPhotoUrl(photoName, {maxWidthPx: 800})
+      : null;
+    const openNow = item.currentOpeningHours?.openNow;
+    const typeLabel = getFriendlyTypeLabel(item);
+    const addressLine =
+      item.shortFormattedAddress || item.formattedAddress || '';
+    const tagLabel = isPersonalized ? 'Top pick for you' : 'Top pick';
+
+    return (
+      <TouchableOpacity
+        style={styles.heroCard}
+        onPress={() => handlePlacePress(item)}
+        activeOpacity={0.85}>
+        <View>
+          {photoUrl ? (
+            <Image
+              source={{uri: photoUrl}}
+              style={styles.heroPhoto}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.heroPhoto, styles.heroPhotoFallback]}>
+              <Text style={styles.heroPhotoEmoji}>{getEmojiForPlace(item)}</Text>
+            </View>
+          )}
+          <View style={styles.heroTagPill}>
+            <FontAwesomeIcon icon={faStar} size={10} color="#FFFFFF" />
+            <Text style={styles.heroTagText}>{tagLabel}</Text>
+          </View>
+        </View>
+        <View style={styles.heroBody}>
+          <View style={styles.heroTitleRow}>
+            <Text style={styles.heroTitle} numberOfLines={1}>
+              {item.name || 'Unnamed venue'}
             </Text>
+            {distanceLabel !== null && (
+              <Text style={styles.heroDistance}>{distanceLabel}</Text>
+            )}
+          </View>
+          <Text style={styles.heroMeta} numberOfLines={1}>
+            {typeLabel}
+            {addressLine ? ` · ${addressLine}` : ''}
+          </Text>
+          {typeof openNow === 'boolean' && (
+            <View style={styles.heroStatusRow}>
+              <View
+                style={[
+                  styles.statusDot,
+                  {backgroundColor: openNow ? colors.primary : colors.border},
+                ]}
+              />
+              <Text
+                style={[
+                  styles.heroStatusText,
+                  openNow ? styles.statusOpen : styles.statusClosed,
+                ]}>
+                {openNow ? 'Open now' : 'Closed'}
+              </Text>
+            </View>
           )}
         </View>
       </TouchableOpacity>
@@ -805,24 +1026,30 @@ const VenueListPlaces: React.FC = () => {
           </TouchableOpacity>
         )}
 
-      {!searchResults && (
-        <Text style={styles.sectionTitle}>
-          {coords
-            ? selectedCategoryId === 'all' &&
-              interests &&
-              interests.length > 0 &&
-              primaryTypesForInterests(interests).length > 0
-              ? 'Picked for you'
-              : 'Near you'
-            : 'Featured'}
-        </Text>
-      )}
-
       <FlatList
         style={styles.list}
-        data={visibleList}
+        data={restPlaces}
         keyExtractor={item => item.id}
         renderItem={renderCard}
+        ListHeaderComponent={
+          !searchResults ? (
+            <View>
+              {/* Top section label — same logic as before but now
+                  scrolls with the content rather than being pinned. */}
+              <Text style={styles.sectionTitle}>
+                {coords
+                  ? isPersonalized
+                    ? 'Picked for you'
+                    : 'Near you'
+                  : 'Featured'}
+              </Text>
+              {heroPlace ? renderHero(heroPlace) : null}
+              {heroPlace && restPlaces.length > 0 ? (
+                <Text style={styles.sectionTitleRest}>More nearby</Text>
+              ) : null}
+            </View>
+          ) : null
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -835,9 +1062,9 @@ const VenueListPlaces: React.FC = () => {
             <View style={styles.empty}>
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
-          ) : (
+          ) : !heroPlace ? (
             renderEmptyContent()
-          )
+          ) : null
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
