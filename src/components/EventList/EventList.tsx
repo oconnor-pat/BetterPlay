@@ -3666,10 +3666,11 @@ const EventList: React.FC = () => {
     };
 
     // Series delete hits the backend's `/events/series/:recurrenceGroupId`
-    // endpoint, which wipes every event sharing that recurrence id
-    // (past instances included). We cancel local notifications for each
-    // affected card from the FE side using the in-memory event list —
-    // saves a round-trip and the BE doesn't return the id set.
+    // endpoint, which deletes only the future-dated instances in that
+    // series — past events stay as history. We mirror that scope here
+    // so the optimistic local-state update doesn't prune past cards the
+    // BE deliberately kept. Same YYYY-MM-DD string compare the BE uses
+    // (events store `date` as a string in that format).
     const deleteSeries = async () => {
       const recurrenceId = event.recurrenceGroupId;
       if (!recurrenceId) return;
@@ -3680,15 +3681,20 @@ const EventList: React.FC = () => {
           `${API_BASE_URL}/events/series/${recurrenceId}`,
           {headers: token ? {Authorization: `Bearer ${token}`} : {}},
         );
-        eventData
-          .filter(e => e.recurrenceGroupId === recurrenceId)
-          .forEach(e =>
-            notificationService
-              .cancelEventNotifications(e._id)
-              .catch(() => {}),
-          );
+        const d = new Date();
+        const todayStr =
+          `${d.getFullYear()}-` +
+          `${String(d.getMonth() + 1).padStart(2, '0')}-` +
+          `${String(d.getDate()).padStart(2, '0')}`;
+        const isFutureInSeries = (e: Event) =>
+          e.recurrenceGroupId === recurrenceId && e.date >= todayStr;
+        eventData.filter(isFutureInSeries).forEach(e =>
+          notificationService
+            .cancelEventNotifications(e._id)
+            .catch(() => {}),
+        );
         setEventData(prevData =>
-          prevData.filter(e => e.recurrenceGroupId !== recurrenceId),
+          prevData.filter(e => !isFutureInSeries(e)),
         );
       } catch (error) {
         Alert.alert(t('common.error'), t('events.deleteError'));
