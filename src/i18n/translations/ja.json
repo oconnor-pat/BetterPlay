@@ -120,7 +120,12 @@
     "locationUnavailable": "位置情報を利用できません",
     "locationUnavailableMessage": "位置を特定できませんでした。もう一度お試しください。",
     "showEventsWithin": "{{distance}} マイル以内のイベントを表示",
-    "withinDistance": "{{distance}} マイル以内"
+    "withinDistance": "{{distance}} マイル以内",
+    "inviteAGroup": "グループを招待",
+    "deleteRecurringTitle": "繰り返しイベントを削除しますか？",
+    "deleteRecurringMessage": "このイベントは繰り返しシリーズの一部です。何を削除しますか？",
+    "deleteThisEvent": "このイベントのみ",
+    "deleteEntireSeries": "シリーズ全体"
   },
   "profile": {
     "title": "プロフィール",
@@ -155,7 +160,11 @@
     "selectInterests": "興味を選択",
     "addInterests": "興味を追加",
     "nearbyPlayers": "近く",
-    "playersFoundWithin": "{{distance}} マイル以内に{{count}}人のプレイヤーが見つかりました"
+    "playersFoundWithin": "{{distance}} マイル以内に{{count}}人のプレイヤーが見つかりました",
+    "myGroups": "マイグループ",
+    "newGroup": "新規",
+    "startAGroup": "グループを作成",
+    "startAGroupSubtitle": "いつもの仲間とつながり続けよう。"
   },
   "communityNotes": {
     "title": "コミュニティノート",

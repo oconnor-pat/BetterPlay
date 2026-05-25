@@ -76,6 +76,12 @@ type EventRosterRouteProp = RouteProp<
       roster?: Player[];
       jerseyColors?: string[];
       changedFields?: string;
+      // Recurring + Group context for the "live link" banner. When both
+      // `isRecurring` and `groupName` are present, the banner tells the
+      // user that future instances re-pull the group's roster.
+      isRecurring?: boolean;
+      groupId?: string;
+      groupName?: string;
     };
   },
   'EventRoster'
@@ -309,6 +315,8 @@ const EventRoster: React.FC = () => {
     roster: initialRoster,
     jerseyColors: initialJerseyColors,
     changedFields: changedFieldsParam,
+    isRecurring: paramIsRecurring,
+    groupName: paramGroupName,
   } = route.params;
   const {colors} = useTheme();
   const {updateRosterSpots} = useEventContext();
@@ -664,6 +672,26 @@ const EventRoster: React.FC = () => {
           color: colors.text,
           fontSize: 14,
           flex: 1,
+        },
+        groupLinkBanner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          backgroundColor: colors.primary + '15',
+          borderRadius: 10,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          marginTop: 12,
+        },
+        groupLinkBannerText: {
+          flex: 1,
+          color: colors.text,
+          fontSize: 13,
+          lineHeight: 18,
+        },
+        groupLinkBannerName: {
+          color: colors.primary,
+          fontWeight: '700',
         },
         // Progress Bar (lives inside its own flat section)
         progressSection: {
@@ -2123,6 +2151,27 @@ const EventRoster: React.FC = () => {
                 <Text style={themedStyles.eventDetailText}>{location}</Text>
               </Animated.View>
             )}
+
+            {/* Live-link banner — only when this is a recurring event
+                with an attached Group. Tells the user that adding
+                someone to the Group will invite them to future
+                instances automatically. */}
+            {paramIsRecurring && paramGroupName ? (
+              <View style={themedStyles.groupLinkBanner}>
+                <FontAwesomeIcon
+                  icon={faUsers}
+                  size={13}
+                  color={colors.primary}
+                />
+                <Text style={themedStyles.groupLinkBannerText}>
+                  This series invites everyone in{' '}
+                  <Text style={themedStyles.groupLinkBannerName}>
+                    {paramGroupName}
+                  </Text>
+                  .
+                </Text>
+              </View>
+            ) : null}
 
             {/* Progress Bar */}
             <Animated.View

@@ -74,6 +74,7 @@ import {
   faMapMarkerAlt,
   faCalendarAlt,
   faUsers,
+  faUserGroup,
   faCheck,
   faPenToSquare,
   faUserPlus,
@@ -86,6 +87,9 @@ import {
 } from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
+import GroupPickerModal from '../Groups/GroupPickerModal';
+import RosterAvatarStrip from '../shared/RosterAvatarStrip';
+import {Group} from '../../types/group';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
@@ -208,6 +212,20 @@ interface Event {
   // the Venues tab). Mirrors the BE Event model fields added in PR 1.
   venueId?: string;
   venueName?: string;
+  // Optional Group attached at event creation. Drives the group-name
+  // badge on event cards and (for recurring events) the live link that
+  // re-pulls members per instance — see PR 3.
+  groupId?: string;
+  groupName?: string;
+  // Compact member preview (capped at 5) computed server-side for any
+  // event with a groupId. Powers the avatar strip next to the
+  // group-name badge on the event card.
+  groupMembersPreview?: Array<{
+    userId: string;
+    username?: string;
+    name?: string;
+    profilePicUrl?: string;
+  }>;
   sourceUrl?: string;
 }
 
@@ -255,6 +273,12 @@ const createEmptyEvent = () => ({
   // Optional venue listing reference set by the Venues-tab bridge.
   venueId: undefined as string | undefined,
   venueName: undefined as string | undefined,
+  // Optional Group attached via the "Invite a group" picker. The group's
+  // members are snapshotted into `invitedUsers`; `groupId`/`groupName`
+  // travel with the event as origin metadata (and, for recurring events,
+  // as a live link maintained by PR 3 backend logic).
+  groupId: undefined as string | undefined,
+  groupName: undefined as string | undefined,
   sourceUrl: undefined as string | undefined,
 });
 
@@ -2061,6 +2085,72 @@ const EventList: React.FC = () => {
           color: colors.secondaryText,
           marginTop: 4,
         },
+        inviteGroupButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          backgroundColor: colors.primary + '15',
+          borderRadius: 12,
+          paddingVertical: 12,
+          marginTop: 10,
+          marginBottom: 10,
+        },
+        inviteGroupButtonText: {
+          color: colors.primary,
+          fontWeight: '700',
+          fontSize: 14,
+        },
+        attachedGroupPill: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          alignSelf: 'flex-start',
+          backgroundColor: colors.primary + '15',
+          borderRadius: 14,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          marginTop: 10,
+          marginBottom: 10,
+        },
+        attachedGroupText: {
+          color: colors.primary,
+          fontWeight: '700',
+          fontSize: 13,
+        },
+        groupBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          alignSelf: 'flex-start',
+          backgroundColor: colors.primary + '18',
+          borderRadius: 10,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+        },
+        groupBadgeText: {
+          color: colors.primary,
+          fontSize: 11,
+          fontWeight: '700',
+        },
+        cardHeaderGroupRow: {
+          // Dedicated row for group affiliation, sitting just below the
+          // meta row inside the identity column. Gets its own line so
+          // the group name has room to read at a normal size and the
+          // avatar strip can breathe without colliding with the kebab.
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginTop: 6,
+          gap: 6,
+        },
+        cardHeaderGroupName: {
+          fontSize: 13,
+          color: colors.text,
+          fontWeight: '600',
+          // Cap the name so really long group names don't push the
+          // avatar strip off the right edge of the identity column.
+          flexShrink: 1,
+        },
         // Likes modal — bottom-sheet (matches EventComments)
         likesModalOverlay: {
           flex: 1,
@@ -2671,6 +2761,57 @@ const EventList: React.FC = () => {
   const [invitedUserDetails, setInvitedUserDetails] = useState<LikedByUser[]>(
     [],
   );
+  const [groupPickerVisible, setGroupPickerVisible] = useState(false);
+
+  // Attach a Group to the event being created. Snapshots the group's
+  // members into invitedUsers (additive — anyone already picked
+  // individually stays), and stashes groupId/groupName on the event
+  // payload so the BE can cache the display name and (for recurring
+  // series) maintain the live link in PR 3.
+  const handleGroupSelected = useCallback(
+    (group: Group) => {
+      setGroupPickerVisible(false);
+      const currentUserId = userData?._id;
+      const incomingMembers = group.members
+        .filter(m => m.userId && m.userId !== currentUserId)
+        .map(m => ({
+          _id: m.userId,
+          username: m.username || 'member',
+          name: m.name,
+          profilePicUrl: m.profilePicUrl,
+        }));
+      setNewEvent(prev => {
+        const existing = new Set(prev.invitedUsers);
+        const additions: string[] = [];
+        for (const m of incomingMembers) {
+          if (!existing.has(m._id)) {
+            additions.push(m._id);
+            existing.add(m._id);
+          }
+        }
+        return {
+          ...prev,
+          groupId: group._id,
+          groupName: group.name,
+          invitedUsers: [...prev.invitedUsers, ...additions],
+        };
+      });
+      setInvitedUserDetails(prev => {
+        const have = new Set(prev.map(u => u._id));
+        const additions = incomingMembers.filter(u => !have.has(u._id));
+        return [...prev, ...(additions as LikedByUser[])];
+      });
+    },
+    [userData?._id],
+  );
+
+  // Detach the Group from the in-progress event. Doesn't unsnapshot the
+  // already-added members — those become regular individual invitees and
+  // the user can remove them one-by-one if they want (matches the
+  // "metadata about origin, not a live audience filter" rule).
+  const handleGroupCleared = useCallback(() => {
+    setNewEvent(prev => ({...prev, groupId: undefined, groupName: undefined}));
+  }, []);
 
   // Close all pickers except the one being opened (accordion behavior)
   const closeAllPickers = (except?: string) => {
@@ -3421,6 +3562,10 @@ const EventList: React.FC = () => {
             // Optional venue listing reference (set by the Venues-tab bridge).
             venueId: newEvent.venueId,
             venueName: newEvent.venueName,
+            // Optional Group reference (set when the user picked "Invite
+            // a group"). BE re-resolves to snapshot members and cache
+            // the display name for the group-name badge on event cards.
+            groupId: newEvent.groupId,
             sourceUrl: newEvent.sourceUrl,
           };
 
@@ -3482,6 +3627,9 @@ const EventList: React.FC = () => {
       totalSpots: event.totalSpots,
       roster: [],
       jerseyColors: event.jerseyColors,
+      isRecurring: event.isRecurring,
+      groupId: event.groupId,
+      groupName: event.groupName,
     });
   };
 
@@ -3490,6 +3638,91 @@ const EventList: React.FC = () => {
       Alert.alert(t('events.notAuthorized'), t('events.notAuthorizedDelete'));
       return;
     }
+
+    // Both delete paths attach the JWT manually because there's no
+    // global axios interceptor in this codebase — every other authed
+    // call in this file does the same dance. The series endpoint
+    // enforces auth server-side; the single endpoint currently does
+    // not, but we send the header anyway so a future tightening of
+    // that route doesn't silently break this flow.
+    const deleteSingle = async () => {
+      setDeletingEventId(event._id);
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        await axios.delete(`${API_BASE_URL}/events/${event._id}`, {
+          headers: token ? {Authorization: `Bearer ${token}`} : {},
+        });
+        notificationService
+          .cancelEventNotifications(event._id)
+          .catch(() => {});
+        setEventData(prevData =>
+          prevData.filter(e => e._id !== event._id),
+        );
+      } catch (error) {
+        Alert.alert(t('common.error'), t('events.deleteError'));
+      } finally {
+        setDeletingEventId(null);
+      }
+    };
+
+    // Series delete hits the backend's `/events/series/:recurrenceGroupId`
+    // endpoint, which wipes every event sharing that recurrence id
+    // (past instances included). We cancel local notifications for each
+    // affected card from the FE side using the in-memory event list —
+    // saves a round-trip and the BE doesn't return the id set.
+    const deleteSeries = async () => {
+      const recurrenceId = event.recurrenceGroupId;
+      if (!recurrenceId) return;
+      setDeletingEventId(event._id);
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        await axios.delete(
+          `${API_BASE_URL}/events/series/${recurrenceId}`,
+          {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+        );
+        eventData
+          .filter(e => e.recurrenceGroupId === recurrenceId)
+          .forEach(e =>
+            notificationService
+              .cancelEventNotifications(e._id)
+              .catch(() => {}),
+          );
+        setEventData(prevData =>
+          prevData.filter(e => e.recurrenceGroupId !== recurrenceId),
+        );
+      } catch (error) {
+        Alert.alert(t('common.error'), t('events.deleteError'));
+      } finally {
+        setDeletingEventId(null);
+      }
+    };
+
+    // Recurring cards get a three-button prompt so the user can
+    // distinguish "kill this Tuesday" from "stop doing this entirely."
+    // Non-recurring events keep the original single-confirm flow — no
+    // need to surface a scope picker when there's only one card to delete.
+    if (event.isRecurring && event.recurrenceGroupId) {
+      Alert.alert(
+        t('events.deleteRecurringTitle'),
+        t('events.deleteRecurringMessage'),
+        [
+          {text: t('common.cancel'), style: 'cancel'},
+          {
+            text: t('events.deleteThisEvent'),
+            style: 'destructive',
+            onPress: deleteSingle,
+          },
+          {
+            text: t('events.deleteEntireSeries'),
+            style: 'destructive',
+            onPress: deleteSeries,
+          },
+        ],
+        {cancelable: true},
+      );
+      return;
+    }
+
     Alert.alert(
       t('events.deleteConfirm'),
       t('events.deleteConfirmMessage'),
@@ -3498,22 +3731,7 @@ const EventList: React.FC = () => {
         {
           text: t('common.delete'),
           style: 'destructive',
-          onPress: async () => {
-            setDeletingEventId(event._id);
-            try {
-              await axios.delete(`${API_BASE_URL}/events/${event._id}`);
-              notificationService
-                .cancelEventNotifications(event._id)
-                .catch(() => {});
-              setEventData(prevData =>
-                prevData.filter(e => e._id !== event._id),
-              );
-            } catch (error) {
-              Alert.alert(t('common.error'), t('events.deleteError'));
-            } finally {
-              setDeletingEventId(null);
-            }
-          },
+          onPress: deleteSingle,
         },
       ],
       {cancelable: true},
@@ -3539,6 +3757,8 @@ const EventList: React.FC = () => {
       // Preserve any venue link the event was originally created with.
       venueId: event.venueId,
       venueName: event.venueName,
+      groupId: event.groupId,
+      groupName: event.groupName,
       sourceUrl: event.sourceUrl,
     });
     setPlacesApiFailed(false);
@@ -4020,6 +4240,33 @@ const EventList: React.FC = () => {
                   </>
                 )}
               </View>
+              {/* Group affiliation row — promoted out of the meta row
+                  because the group is more than incidental metadata; it
+                  tells you whose crew this event belongs to. Renders
+                  only when the event has a Group attached. */}
+              {item.groupName ? (
+                <View style={themedStyles.cardHeaderGroupRow}>
+                  <FontAwesomeIcon
+                    icon={faUserGroup}
+                    size={11}
+                    color={colors.secondaryText}
+                  />
+                  <Text
+                    style={themedStyles.cardHeaderGroupName}
+                    numberOfLines={1}>
+                    {item.groupName}
+                  </Text>
+                  {item.groupMembersPreview &&
+                  item.groupMembersPreview.length > 0 ? (
+                    <RosterAvatarStrip
+                      members={item.groupMembersPreview}
+                      maxVisible={3}
+                      size={20}
+                      overlap={7}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           </TouchableOpacity>
           {isCreator && (
@@ -5164,6 +5411,43 @@ const EventList: React.FC = () => {
                       {t('events.inviteUsers') || 'Invite Users'}
                     </Text>
 
+                    {/* Group picker affordance — one tap to snapshot the
+                        members of a saved Group into the invite list. */}
+                    {newEvent.groupName ? (
+                      <View style={themedStyles.attachedGroupPill}>
+                        <FontAwesomeIcon
+                          icon={faUserGroup}
+                          size={13}
+                          color={colors.primary}
+                        />
+                        <Text style={themedStyles.attachedGroupText}>
+                          {newEvent.groupName}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={handleGroupCleared}
+                          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                          <FontAwesomeIcon
+                            icon={faTimes}
+                            size={12}
+                            color={colors.primary}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={themedStyles.inviteGroupButton}
+                        onPress={() => setGroupPickerVisible(true)}>
+                        <FontAwesomeIcon
+                          icon={faUserGroup}
+                          size={14}
+                          color={colors.primary}
+                        />
+                        <Text style={themedStyles.inviteGroupButtonText}>
+                          {t('events.inviteAGroup') || 'Invite a group'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
                     {/* Search Input */}
                     <View style={themedStyles.inviteSearchContainer}>
                       <FontAwesomeIcon
@@ -5319,6 +5603,15 @@ const EventList: React.FC = () => {
             </View>
           </View>
         </KeyboardAvoidingView>
+        {/* Nested inside the Create Event modal so iOS presents it on
+            top of the parent modal. Rendering it as a sibling outside
+            the parent <Modal> causes the second modal to be obscured
+            entirely on iOS. */}
+        <GroupPickerModal
+          visible={groupPickerVisible}
+          onClose={() => setGroupPickerVisible(false)}
+          onSelect={handleGroupSelected}
+        />
       </Modal>
       {/* Event Card Options Menu (themed bottom sheet) */}
       <Modal

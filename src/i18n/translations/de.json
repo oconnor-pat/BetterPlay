@@ -129,7 +129,12 @@
     "locationUnavailable": "Standort nicht verfügbar",
     "locationUnavailableMessage": "Ihr Standort konnte nicht ermittelt werden. Bitte versuchen Sie es erneut.",
     "showEventsWithin": "Veranstaltungen innerhalb von {{distance}} mi anzeigen",
-    "withinDistance": "Innerhalb von {{distance}} mi"
+    "withinDistance": "Innerhalb von {{distance}} mi",
+    "inviteAGroup": "Gruppe einladen",
+    "deleteRecurringTitle": "Wiederkehrende Veranstaltung löschen?",
+    "deleteRecurringMessage": "Diese Veranstaltung ist Teil einer wiederkehrenden Serie. Was möchten Sie löschen?",
+    "deleteThisEvent": "Nur diese Veranstaltung",
+    "deleteEntireSeries": "Gesamte Serie"
   },
   "profile": {
     "title": "Profil",
@@ -164,7 +169,11 @@
     "selectInterests": "Wählen Sie Ihre Interessen",
     "addInterests": "Interessen hinzufügen",
     "nearbyPlayers": "In der Nähe",
-    "playersFoundWithin": "{{count}} Spieler gefunden innerhalb von {{distance}} mi"
+    "playersFoundWithin": "{{count}} Spieler gefunden innerhalb von {{distance}} mi",
+    "myGroups": "Meine Gruppen",
+    "newGroup": "Neu",
+    "startAGroup": "Gruppe erstellen",
+    "startAGroupSubtitle": "Halte deine feste Runde zusammen."
   },
   "communityNotes": {
     "title": "Community-Notizen",

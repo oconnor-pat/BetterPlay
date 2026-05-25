@@ -129,7 +129,12 @@
     "locationUnavailable": "Localisation indisponible",
     "locationUnavailableMessage": "Impossible de déterminer votre position. Veuillez réessayer.",
     "showEventsWithin": "Afficher les événements dans un rayon de {{distance}} mi",
-    "withinDistance": "Dans un rayon de {{distance}} mi"
+    "withinDistance": "Dans un rayon de {{distance}} mi",
+    "inviteAGroup": "Inviter un groupe",
+    "deleteRecurringTitle": "Supprimer l'événement récurrent ?",
+    "deleteRecurringMessage": "Cet événement fait partie d'une série récurrente. Que souhaitez-vous supprimer ?",
+    "deleteThisEvent": "Cet événement uniquement",
+    "deleteEntireSeries": "Toute la série"
   },
   "profile": {
     "title": "Profil",
@@ -164,7 +169,11 @@
     "selectInterests": "Sélectionnez Vos Intérêts",
     "addInterests": "Ajouter des intérêts",
     "nearbyPlayers": "À proximité",
-    "playersFoundWithin": "{{count}} joueur(s) trouvé(s) dans un rayon de {{distance}} mi"
+    "playersFoundWithin": "{{count}} joueur(s) trouvé(s) dans un rayon de {{distance}} mi",
+    "myGroups": "Mes groupes",
+    "newGroup": "Nouveau",
+    "startAGroup": "Créer un groupe",
+    "startAGroupSubtitle": "Gardez votre bande habituelle réunie."
   },
   "communityNotes": {
     "title": "Notes Communautaires",

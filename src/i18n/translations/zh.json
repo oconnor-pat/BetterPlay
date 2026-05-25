@@ -120,7 +120,12 @@
     "locationUnavailable": "位置不可用",
     "locationUnavailableMessage": "无法确定您的位置。请重试。",
     "showEventsWithin": "显示 {{distance}} 英里内的活动",
-    "withinDistance": "{{distance}} 英里内"
+    "withinDistance": "{{distance}} 英里内",
+    "inviteAGroup": "邀请群组",
+    "deleteRecurringTitle": "删除重复事件？",
+    "deleteRecurringMessage": "此事件是重复系列的一部分。您要删除什么？",
+    "deleteThisEvent": "仅此事件",
+    "deleteEntireSeries": "整个系列"
   },
   "profile": {
     "title": "个人资料",
@@ -155,7 +160,11 @@
     "selectInterests": "选择您的兴趣爱好",
     "addInterests": "添加兴趣爱好",
     "nearbyPlayers": "附近",
-    "playersFoundWithin": "在 {{distance}} 英里内找到 {{count}} 位玩家"
+    "playersFoundWithin": "在 {{distance}} 英里内找到 {{count}} 位玩家",
+    "myGroups": "我的群组",
+    "newGroup": "新建",
+    "startAGroup": "创建群组",
+    "startAGroupSubtitle": "让你的固定朋友圈聚在一起。"
   },
   "communityNotes": {
     "title": "社区笔记",

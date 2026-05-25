@@ -120,7 +120,12 @@
     "locationUnavailable": "स्थान अनुपलब्ध",
     "locationUnavailableMessage": "आपका स्थान निर्धारित नहीं कर सका। कृपया पुनः प्रयास करें।",
     "showEventsWithin": "{{distance}} मील के भीतर इवेंट दिखाएं",
-    "withinDistance": "{{distance}} मील के भीतर"
+    "withinDistance": "{{distance}} मील के भीतर",
+    "inviteAGroup": "एक समूह को आमंत्रित करें",
+    "deleteRecurringTitle": "आवर्ती ईवेंट हटाएं?",
+    "deleteRecurringMessage": "यह ईवेंट एक आवर्ती शृंखला का हिस्सा है। आप क्या हटाना चाहते हैं?",
+    "deleteThisEvent": "केवल यह ईवेंट",
+    "deleteEntireSeries": "पूरी शृंखला"
   },
   "profile": {
     "title": "प्रोफ़ाइल",
@@ -152,7 +157,11 @@
     "favoriteSports": "रुचियाँ",
     "selectFavoriteSports": "अपनी रुचियाँ चुनें",
     "interests": "रुचियाँ",
-    "selectInterests": "अपनी रुचियाँ चुनें"
+    "selectInterests": "अपनी रुचियाँ चुनें",
+    "myGroups": "मेरे समूह",
+    "newGroup": "नया",
+    "startAGroup": "समूह बनाएँ",
+    "startAGroupSubtitle": "अपने नियमित दोस्तों के समूह को जोड़े रखें।"
   },
   "communityNotes": {
     "title": "सामुदायिक नोट्स",

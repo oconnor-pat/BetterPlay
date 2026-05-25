@@ -10,6 +10,7 @@ import {VenueList, VenuePlaceDetail, VenueWebView} from '../Venues';
 import {UserSearch} from '../UserSearch';
 import {FriendsList, FriendRequests} from '../Friends';
 import {Notifications} from '../Notifications';
+import GroupDetail from '../Groups/GroupDetail';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarAlt,
@@ -194,6 +195,11 @@ const ProfileStack = ({userId}: {userId: string}) => {
       <Stack.Screen
         name="Notifications"
         component={Notifications}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="GroupDetail"
+        component={GroupDetail}
         options={{headerShown: false}}
       />
     </Stack.Navigator>

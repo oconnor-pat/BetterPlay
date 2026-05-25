@@ -120,7 +120,12 @@
     "locationUnavailable": "Местоположение недоступно",
     "locationUnavailableMessage": "Не удалось определить ваше местоположение. Попробуйте ещё раз.",
     "showEventsWithin": "Показать события в радиусе {{distance}} миль",
-    "withinDistance": "В радиусе {{distance}} миль"
+    "withinDistance": "В радиусе {{distance}} миль",
+    "inviteAGroup": "Пригласить группу",
+    "deleteRecurringTitle": "Удалить повторяющееся событие?",
+    "deleteRecurringMessage": "Это событие является частью повторяющейся серии. Что вы хотите удалить?",
+    "deleteThisEvent": "Только это событие",
+    "deleteEntireSeries": "Всю серию"
   },
   "profile": {
     "title": "Профиль",
@@ -155,7 +160,11 @@
     "selectInterests": "Выберите свои интересы",
     "addInterests": "Добавить интересы",
     "nearbyPlayers": "Рядом",
-    "playersFoundWithin": "{{count}} игрок(ов) найдено в радиусе {{distance}} миль"
+    "playersFoundWithin": "{{count}} игрок(ов) найдено в радиусе {{distance}} миль",
+    "myGroups": "Мои группы",
+    "newGroup": "Новая",
+    "startAGroup": "Создать группу",
+    "startAGroupSubtitle": "Сохраняйте свою постоянную компанию вместе."
   },
   "communityNotes": {
     "title": "Заметки сообщества",

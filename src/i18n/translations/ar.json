@@ -120,7 +120,12 @@
     "locationUnavailable": "الموقع غير متاح",
     "locationUnavailableMessage": "تعذّر تحديد موقعك. يرجى المحاولة مرة أخرى.",
     "showEventsWithin": "عرض الفعاليات ضمن {{distance}} ميل",
-    "withinDistance": "ضمن {{distance}} ميل"
+    "withinDistance": "ضمن {{distance}} ميل",
+    "inviteAGroup": "دعوة مجموعة",
+    "deleteRecurringTitle": "حذف الحدث المتكرر؟",
+    "deleteRecurringMessage": "هذا الحدث جزء من سلسلة متكررة. ماذا تريد أن تحذف؟",
+    "deleteThisEvent": "هذا الحدث فقط",
+    "deleteEntireSeries": "السلسلة بأكملها"
   },
   "profile": {
     "title": "الملف الشخصي",
@@ -155,7 +160,11 @@
     "selectInterests": "اختر اهتماماتك",
     "addInterests": "إضافة اهتمامات",
     "nearbyPlayers": "بالقرب",
-    "playersFoundWithin": "{{count}} لاعب(ون) وجدوا ضمن {{distance}} ميل"
+    "playersFoundWithin": "{{count}} لاعب(ون) وجدوا ضمن {{distance}} ميل",
+    "myGroups": "مجموعاتي",
+    "newGroup": "جديد",
+    "startAGroup": "إنشاء مجموعة",
+    "startAGroupSubtitle": "حافظ على تواصل أصدقائك المنتظمين."
   },
   "communityNotes": {
     "title": "ملاحظات المجتمع",
