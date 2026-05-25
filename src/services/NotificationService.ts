@@ -46,7 +46,22 @@ export interface NotificationSettings {
   watchedEventSpotsAvailable: boolean;
   watchedEventGeneralUpdates: boolean;
   watchedEventRosterChanges: boolean;
+  // Group activity. These three are also mirrored to the backend's
+  // NotificationPreferences model so the server respects opt-outs when
+  // deciding whether to push (most older toggles only affect on-device
+  // behavior — that's pre-existing tech debt we're not unwinding here).
+  groupAdded: boolean;
+  groupRoleChanged: boolean;
+  groupEvents: boolean;
 }
+
+// Keys mirrored to the backend preferences endpoint. Listed once so the
+// sync logic stays in step with what the BE knows how to persist.
+const BACKEND_SYNC_KEYS: (keyof NotificationSettings)[] = [
+  'groupAdded',
+  'groupRoleChanged',
+  'groupEvents',
+];
 
 export type NotificationNavigationCallback = (
   screen: string,
@@ -65,6 +80,9 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   watchedEventSpotsAvailable: true,
   watchedEventGeneralUpdates: true,
   watchedEventRosterChanges: true,
+  groupAdded: true,
+  groupRoleChanged: true,
+  groupEvents: true,
 };
 
 class NotificationService {
@@ -653,6 +671,13 @@ class NotificationService {
 
   /**
    * Update notification settings
+   *
+   * Writes to AsyncStorage (source of truth for on-device behavior),
+   * then for the subset of keys the backend knows about, PUTs the
+   * change to /api/notifications/preferences so server-side push gating
+   * respects the user's choice. Best-effort: a failed sync logs but
+   * doesn't throw — the local change still applies, and the next sync
+   * (or a re-toggle) will reconcile.
    */
   async updateNotificationSettings(
     settings: Partial<NotificationSettings>,
@@ -664,6 +689,33 @@ class NotificationService {
         'notificationSettings',
         JSON.stringify(newSettings),
       );
+
+      const backendPayload: Record<string, boolean> = {};
+      for (const key of BACKEND_SYNC_KEYS) {
+        if (key in settings) {
+          backendPayload[key] = settings[key] as boolean;
+        }
+      }
+      if (Object.keys(backendPayload).length > 0) {
+        try {
+          const token = await AsyncStorage.getItem('userToken');
+          if (token) {
+            await fetch(`${API_BASE_URL}/api/notifications/preferences`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(backendPayload),
+            });
+          }
+        } catch (syncErr) {
+          console.warn(
+            'Notification preference sync to backend failed:',
+            syncErr,
+          );
+        }
+      }
 
       // Update backend with new preferences
       await this.syncSettingsWithBackend(newSettings);

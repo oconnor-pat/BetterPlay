@@ -75,6 +75,9 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   watchedEventSpotsAvailable: true,
   watchedEventGeneralUpdates: true,
   watchedEventRosterChanges: true,
+  groupAdded: true,
+  groupRoleChanged: true,
+  groupEvents: true,
 };
 
 /**

@@ -433,6 +433,63 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
+
+          {/* Added to a Group */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Added to a Group</Text>
+              <Text style={styles.settingDescription}>
+                When someone adds you to a group
+              </Text>
+            </View>
+            <Switch
+              value={settings.groupAdded && settings.enabled}
+              onValueChange={value =>
+                handleToggleSetting('groupAdded', value)
+              }
+              disabled={!settings.enabled}
+              trackColor={{false: colors.border, true: colors.primary}}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          {/* Group Role Changes */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Group Role Changes</Text>
+              <Text style={styles.settingDescription}>
+                Promoted to admin or made group creator
+              </Text>
+            </View>
+            <Switch
+              value={settings.groupRoleChanged && settings.enabled}
+              onValueChange={value =>
+                handleToggleSetting('groupRoleChanged', value)
+              }
+              disabled={!settings.enabled}
+              trackColor={{false: colors.border, true: colors.primary}}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          {/* Group Events */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Group Events</Text>
+              <Text style={styles.settingDescription}>
+                New events scheduled in groups you're in
+              </Text>
+            </View>
+            <Switch
+              value={settings.groupEvents && settings.enabled}
+              onValueChange={value =>
+                handleToggleSetting('groupEvents', value)
+              }
+              disabled={!settings.enabled}
+              trackColor={{false: colors.border, true: colors.primary}}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
         </View>
       )}
 
