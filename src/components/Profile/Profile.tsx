@@ -22,12 +22,7 @@ import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
 import UserContext, {UserContextType} from '../UserContext';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {
-  useRoute,
-  RouteProp,
-  useNavigation,
-  useFocusEffect,
-} from '@react-navigation/native';
+import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
@@ -51,14 +46,7 @@ import {
   faUserClock,
   faLocationDot,
   faUserGroup,
-  faUsers,
-  faLock,
-  faGlobe,
 } from '@fortawesome/free-solid-svg-icons';
-import {Group} from '../../types/group';
-import {listMyGroups} from '../../services/GroupsService';
-import CreateGroupModal from '../Groups/CreateGroupModal';
-import RosterAvatarStrip from '../shared/RosterAvatarStrip';
 import {useTranslation} from 'react-i18next';
 
 // Types
@@ -115,9 +103,6 @@ const Profile: React.FC = () => {
   const [pendingRequestsCount, setPendingRequestsCount] = useState<number>(0);
   const [signOutModalVisible, setSignOutModalVisible] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [groupsLoading, setGroupsLoading] = useState(false);
-  const [createGroupVisible, setCreateGroupVisible] = useState(false);
 
   const route = useRoute<ProfileScreenRouteProp>();
   const navigation = useNavigation<any>();
@@ -159,36 +144,16 @@ const Profile: React.FC = () => {
     loadFavoriteSports();
   }, [_id]);
 
-  // Load the groups this user is a member of. Re-runs whenever the
-  // Profile tab gains focus so creating a group elsewhere (or deleting
-  // one from GroupDetail) reflects immediately.
-  const loadGroups = useCallback(async () => {
-    if (!_id) return;
-    setGroupsLoading(true);
-    try {
-      const list = await listMyGroups();
-      setGroups(list);
-    } catch {
-      setGroups([]);
-    } finally {
-      setGroupsLoading(false);
+  // Jump to the Groups tab. Groups used to render as a full section
+  // here; it now has its own tab, so Profile keeps just a shortcut row.
+  const goToGroups = useCallback(() => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Groups');
+    } else {
+      navigation.navigate('Groups');
     }
-  }, [_id]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadGroups();
-    }, [loadGroups]),
-  );
-
-  const handleGroupCreated = useCallback(
-    (group: Group) => {
-      setCreateGroupVisible(false);
-      setGroups(prev => [group, ...prev.filter(g => g._id !== group._id)]);
-      navigation.navigate('GroupDetail', {groupId: group._id});
-    },
-    [navigation],
-  );
+  }, [navigation]);
 
   // Fetch friends count and pending requests count
   useEffect(() => {
@@ -659,51 +624,6 @@ const Profile: React.FC = () => {
           letterSpacing: 0.6,
           paddingHorizontal: 16,
           paddingBottom: 10,
-        },
-        groupsHeaderRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingRight: 16,
-        },
-        groupsHeaderAction: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-          paddingBottom: 10,
-        },
-        groupsHeaderActionText: {
-          color: colors.primary,
-          fontSize: 13,
-          fontWeight: '700',
-        },
-        groupsLoadingRow: {
-          paddingVertical: 16,
-          alignItems: 'center',
-        },
-        groupsEmptyCard: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: colors.border,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
-        },
-        groupRowMetaRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 6,
-          marginTop: 2,
-        },
-        groupRowAvatars: {
-          // Natural-width avatar strip in the leading column. We
-          // intentionally don't fix the width — a 1-member group's
-          // single avatar is fine, a 5-member group's strip is wider,
-          // and the variation gives each row its own visual fingerprint.
-          marginRight: 12,
-          justifyContent: 'center',
         },
         menuRow: {
           flexDirection: 'row',
@@ -1461,99 +1381,37 @@ const Profile: React.FC = () => {
           </View>
         </View>
 
-        {/* ── My Groups Section ── */}
+        {/* ── My Groups (shortcut to the Groups tab) ── */}
         <View style={themedStyles.accountSection}>
-          <View style={themedStyles.groupsHeaderRow}>
-            <Text style={themedStyles.accountSectionLabel}>
-              {t('profile.myGroups') || 'My Groups'}
-            </Text>
-            <TouchableOpacity
-              style={themedStyles.groupsHeaderAction}
-              onPress={() => setCreateGroupVisible(true)}
-              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-              <FontAwesomeIcon icon={faPlus} size={11} color={colors.primary} />
-              <Text style={themedStyles.groupsHeaderActionText}>
-                {t('profile.newGroup') || 'New'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {groupsLoading && groups.length === 0 ? (
-            <View style={themedStyles.groupsLoadingRow}>
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
-          ) : groups.length === 0 ? (
-            <TouchableOpacity
-              style={themedStyles.groupsEmptyCard}
-              onPress={() => setCreateGroupVisible(true)}
-              activeOpacity={0.8}>
-              <View
-                style={[
-                  themedStyles.menuIcon,
-                  {backgroundColor: colors.primary + '15'},
-                ]}>
-                <FontAwesomeIcon icon={faUsers} size={14} color={colors.primary} />
-              </View>
-              <View style={themedStyles.menuContent}>
-                <Text style={themedStyles.menuTitle}>
-                  {t('profile.startAGroup') || 'Start a group'}
-                </Text>
-                <Text style={themedStyles.menuSubtitle}>
-                  {t('profile.startAGroupSubtitle') ||
-                    'Keep the trivia crew (or hockey guys) together.'}
-                </Text>
-              </View>
+          <Text style={themedStyles.accountSectionLabel}>
+            {t('profile.myGroups') || 'My Groups'}
+          </Text>
+          <TouchableOpacity
+            style={[themedStyles.menuRow, themedStyles.menuRowLast]}
+            onPress={goToGroups}>
+            <View
+              style={[
+                themedStyles.menuIcon,
+                {backgroundColor: colors.primary + '15'},
+              ]}>
               <FontAwesomeIcon
-                icon={faChevronRight}
-                size={13}
-                color={colors.secondaryText}
-                style={themedStyles.menuChevron}
+                icon={faUserGroup}
+                size={14}
+                color={colors.primary}
               />
-            </TouchableOpacity>
-          ) : (
-            groups.map((g, idx) => (
-              <TouchableOpacity
-                key={g._id}
-                style={[
-                  themedStyles.menuRow,
-                  idx === groups.length - 1 && themedStyles.menuRowLast,
-                ]}
-                onPress={() =>
-                  navigation.navigate('GroupDetail', {groupId: g._id})
-                }>
-                <View style={themedStyles.groupRowAvatars}>
-                  <RosterAvatarStrip
-                    members={g.members}
-                    maxVisible={3}
-                    size={28}
-                    overlap={10}
-                  />
-                </View>
-                <View style={themedStyles.menuContent}>
-                  <Text style={themedStyles.menuTitle} numberOfLines={1}>
-                    {g.name}
-                  </Text>
-                  <View style={themedStyles.groupRowMetaRow}>
-                    <FontAwesomeIcon
-                      icon={g.privacy === 'public' ? faGlobe : faLock}
-                      size={10}
-                      color={colors.secondaryText}
-                    />
-                    <Text style={themedStyles.menuSubtitle}>
-                      {g.memberCount}{' '}
-                      {g.memberCount === 1 ? 'member' : 'members'}
-                    </Text>
-                  </View>
-                </View>
-                <FontAwesomeIcon
-                  icon={faChevronRight}
-                  size={13}
-                  color={colors.secondaryText}
-                  style={themedStyles.menuChevron}
-                />
-              </TouchableOpacity>
-            ))
-          )}
+            </View>
+            <View style={themedStyles.menuContent}>
+              <Text style={themedStyles.menuTitle}>
+                {t('navigation.groups') || 'Groups'}
+              </Text>
+            </View>
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={13}
+              color={colors.secondaryText}
+              style={themedStyles.menuChevron}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* ── Account Section ── */}
@@ -1611,13 +1469,6 @@ const Profile: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      <CreateGroupModal
-        visible={createGroupVisible}
-        onClose={() => setCreateGroupVisible(false)}
-        onCreated={handleGroupCreated}
-        currentUserId={_id}
-      />
 
       {/* Interests Picker Modal */}
       {showInterestsPicker && (

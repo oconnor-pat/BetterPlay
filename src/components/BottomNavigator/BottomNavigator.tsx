@@ -11,11 +11,13 @@ import {UserSearch} from '../UserSearch';
 import {FriendsList, FriendRequests} from '../Friends';
 import {Notifications} from '../Notifications';
 import GroupDetail from '../Groups/GroupDetail';
+import GroupsList from '../Groups/GroupsList';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarAlt,
   faBuilding,
   faUser,
+  faUserGroup,
   faQuestion,
 } from '@fortawesome/free-solid-svg-icons';
 import {UserContextType} from '../UserContext';
@@ -58,6 +60,7 @@ function createTabBarIcon(colors: {primary: string; secondaryText: string}) {
     const iconMap: Record<string, IconDefinition> = {
       Events: faCalendarAlt,
       Venues: faBuilding,
+      Groups: faUserGroup,
       Profile: faUser,
     };
     const icon = iconMap[route.name] || faQuestion;
@@ -157,6 +160,31 @@ const VenueStack = () => {
   );
 };
 
+// Stack Navigator for Groups screens. GroupDetail is also registered in
+// ProfileStack (the Profile "My Groups" section still links into it), so
+// it lives in both stacks — each tab navigates within its own stack.
+const GroupsStack = () => {
+  const {colors} = useTheme();
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {backgroundColor: colors.card},
+        headerTintColor: colors.text,
+      }}>
+      <Stack.Screen
+        name="GroupsList"
+        component={GroupsList}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="GroupDetail"
+        component={GroupDetail}
+        options={{headerShown: false}}
+      />
+    </Stack.Navigator>
+  );
+};
+
 // Stack Navigator for Profile screens
 const ProfileStack = ({userId}: {userId: string}) => {
   const {colors} = useTheme();
@@ -249,6 +277,7 @@ const BottomNavigator: React.FC = () => {
   const tabLabels: Record<string, string> = {
     Events: t('navigation.events') || 'Events',
     Venues: t('navigation.venues') || 'Venues',
+    Groups: t('navigation.groups') || 'Groups',
     Profile: t('navigation.profile') || 'Profile',
   };
 
@@ -286,6 +315,7 @@ const BottomNavigator: React.FC = () => {
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Events" component={LocalEventsStack} />
       <Tab.Screen name="Venues" component={VenueStack} />
+      <Tab.Screen name="Groups" component={GroupsStack} />
       <Tab.Screen name="Profile">
         {() => <ProfileStack userId={userId} />}
       </Tab.Screen>
