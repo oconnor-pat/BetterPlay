@@ -46,22 +46,15 @@ export interface NotificationSettings {
   watchedEventSpotsAvailable: boolean;
   watchedEventGeneralUpdates: boolean;
   watchedEventRosterChanges: boolean;
-  // Group activity. These three are also mirrored to the backend's
-  // NotificationPreferences model so the server respects opt-outs when
-  // deciding whether to push (most older toggles only affect on-device
-  // behavior — that's pre-existing tech debt we're not unwinding here).
+  // Group activity toggles. Like the other server-relevant settings,
+  // these are mirrored to the backend via syncSettingsWithBackend so the
+  // server respects opt-outs when deciding whether to push. (The
+  // watched* keys above stay on-device — they only drive local
+  // notification scheduling, which the backend has no concept of.)
   groupAdded: boolean;
   groupRoleChanged: boolean;
   groupEvents: boolean;
 }
-
-// Keys mirrored to the backend preferences endpoint. Listed once so the
-// sync logic stays in step with what the BE knows how to persist.
-const BACKEND_SYNC_KEYS: (keyof NotificationSettings)[] = [
-  'groupAdded',
-  'groupRoleChanged',
-  'groupEvents',
-];
 
 export type NotificationNavigationCallback = (
   screen: string,
@@ -690,34 +683,10 @@ class NotificationService {
         JSON.stringify(newSettings),
       );
 
-      const backendPayload: Record<string, boolean> = {};
-      for (const key of BACKEND_SYNC_KEYS) {
-        if (key in settings) {
-          backendPayload[key] = settings[key] as boolean;
-        }
-      }
-      if (Object.keys(backendPayload).length > 0) {
-        try {
-          const token = await AsyncStorage.getItem('userToken');
-          if (token) {
-            await fetch(`${API_BASE_URL}/api/notifications/preferences`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(backendPayload),
-            });
-          }
-        } catch (syncErr) {
-          console.warn(
-            'Notification preference sync to backend failed:',
-            syncErr,
-          );
-        }
-      }
-
-      // Update backend with new preferences
+      // Mirror the full settings to the backend so server-side push
+      // gating respects every toggle. syncSettingsWithBackend handles the
+      // FE→BE field translation (including the group keys), so there's no
+      // separate group-only call anymore.
       await this.syncSettingsWithBackend(newSettings);
     } catch (error) {
       console.error('Error updating notification settings:', error);
@@ -725,7 +694,23 @@ class NotificationService {
   }
 
   /**
-   * Sync notification preferences with backend
+   * Sync notification preferences with backend.
+   *
+   * The FE settings object and the BE NotificationPreferences model use
+   * different field vocabularies, so we translate explicitly here rather
+   * than blindly POSTing the FE shape (which silently dropped several
+   * fields the BE never read). Key mappings:
+   *   - `enabled` (FE master) → `pushEnabled` (BE master). Different
+   *     names; without this the server-side kill switch never flips.
+   *   - `friendRequests` → both `friendRequests` and
+   *     `friendRequestAccepted`, because the single FE toggle is labeled
+   *     "New friend requests and acceptances" and is meant to cover both.
+   *   - `eventUpdates` → both `eventUpdates` and `eventRoster`. The FE
+   *     "Event Updates" toggle ("Changes to events you're attending") is
+   *     the only control we expose for roster changes like being added
+   *     to an event, so it drives both BE gates.
+   * The watched* keys are intentionally omitted — they drive on-device
+   * local-notification scheduling only and the BE has no concept of them.
    */
   private async syncSettingsWithBackend(
     settings: NotificationSettings,
@@ -737,13 +722,27 @@ class NotificationService {
         return;
       }
 
+      const backendPreferences = {
+        pushEnabled: settings.enabled,
+        friendRequests: settings.friendRequests,
+        friendRequestAccepted: settings.friendRequests,
+        eventUpdates: settings.eventUpdates,
+        eventRoster: settings.eventUpdates,
+        eventReminders: settings.eventReminders,
+        eventActivity: settings.eventActivity,
+        communityNotes: settings.communityNotes,
+        groupAdded: settings.groupAdded,
+        groupRoleChanged: settings.groupRoleChanged,
+        groupEvents: settings.groupEvents,
+      };
+
       await fetch(`${API_BASE_URL}/api/notifications/preferences`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${userToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(backendPreferences),
       });
     } catch (error) {
       console.error('Error syncing settings with backend:', error);
