@@ -271,7 +271,7 @@ const AddMembersModal: React.FC<Props> = ({
               style={styles.searchInput}
               value={query}
               onChangeText={setQuery}
-              placeholder="Search by username"
+              placeholder="Search by name or username"
               placeholderTextColor={colors.secondaryText}
               autoCapitalize="none"
               autoCorrect={false}
@@ -296,7 +296,7 @@ const AddMembersModal: React.FC<Props> = ({
               <Text style={styles.emptyHint}>Keep typing…</Text>
             ) : (
               <Text style={styles.emptyHint}>
-                Search by username to add anyone with an account.
+                Search by name or username to add anyone with an account.
               </Text>
             )
           }
