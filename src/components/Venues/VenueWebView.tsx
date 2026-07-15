@@ -39,7 +39,6 @@ import {
   useRoute,
   useFocusEffect,
   RouteProp,
-  CommonActions,
 } from '@react-navigation/native';
 import {useTheme} from '../ThemeContext/ThemeContext';
 
@@ -143,17 +142,9 @@ const VenueWebView: React.FC = () => {
         sourceUrl: currentUrl,
       },
     };
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.dispatch(
-        CommonActions.navigate({
-          name: 'Events',
-          params: {screen: 'EventList', params},
-        }),
-      );
-    } else {
-      navigation.navigate('Events', {screen: 'EventList', params});
-    }
+    // Venue screens live inside the Events stack (Vision A): navigate back to
+    // EventList in this same stack with the venue prefilled.
+    navigation.navigate('EventList', params);
   }, [
     currentUrl,
     venueId,

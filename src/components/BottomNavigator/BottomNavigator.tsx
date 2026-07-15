@@ -15,7 +15,6 @@ import GroupsList from '../Groups/GroupsList';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarAlt,
-  faBuilding,
   faUser,
   faUserGroup,
   faQuestion,
@@ -59,7 +58,6 @@ function createTabBarIcon(colors: {primary: string; secondaryText: string}) {
   }) {
     const iconMap: Record<string, IconDefinition> = {
       Events: faCalendarAlt,
-      Venues: faBuilding,
       Groups: faUserGroup,
       Profile: faUser,
     };
@@ -128,19 +126,10 @@ const LocalEventsStack = () => {
           headerShown: false,
         }}
       />
-    </Stack.Navigator>
-  );
-};
-
-// Stack Navigator for Venue-related screens
-const VenueStack = () => {
-  const {colors} = useTheme();
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {backgroundColor: colors.card},
-        headerTintColor: colors.text,
-      }}>
+      {/* Venue discovery now lives inside the Events flow (Vision A): the
+          venue browser is reached via the "Find a place" entry on the Events
+          screen, and "Plan event" from a venue navigates back to EventList
+          with the venue prefilled — all within this same stack. */}
       <Stack.Screen
         name="VenueList"
         component={VenueList}
@@ -276,7 +265,6 @@ const BottomNavigator: React.FC = () => {
 
   const tabLabels: Record<string, string> = {
     Events: t('navigation.events') || 'Events',
-    Venues: t('navigation.venues') || 'Venues',
     Groups: t('navigation.groups') || 'Groups',
     Profile: t('navigation.profile') || 'Profile',
   };
@@ -314,7 +302,6 @@ const BottomNavigator: React.FC = () => {
   return (
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Events" component={LocalEventsStack} />
-      <Tab.Screen name="Venues" component={VenueStack} />
       <Tab.Screen name="Groups" component={GroupsStack} />
       <Tab.Screen name="Profile">
         {() => <ProfileStack userId={userId} />}

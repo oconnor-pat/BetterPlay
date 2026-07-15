@@ -78,6 +78,7 @@ import {
   faCheck,
   faPenToSquare,
   faUserPlus,
+  faBuilding,
 } from '@fortawesome/free-solid-svg-icons';
 import {
   useNavigation,
@@ -1208,6 +1209,12 @@ const EventList: React.FC = () => {
           alignItems: 'center',
           justifyContent: 'center',
           position: 'relative',
+        },
+        findPlaceButton: {
+          width: 38,
+          height: 38,
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         badge: {
           position: 'absolute',
@@ -3324,10 +3331,10 @@ const EventList: React.FC = () => {
     }
   }, [route.params?.profileFilter, route.params?.userId]);
 
-  // Open the create-event modal prefilled when the Venues tab bridges in
-  // via `navigate('Events', {screen: 'EventList', params: {prefillEvent}})`.
-  // We track which prefill payload we've already consumed so back-navigation
-  // doesn't re-open the modal a second time.
+  // Open the create-event modal prefilled when a venue screen bridges in via
+  // `navigate('EventList', {prefillEvent})` (same Events stack — the "Find a
+  // place" flow). We track which prefill payload we've already consumed so
+  // back-navigation doesn't re-open the modal a second time.
   const consumedPrefillRef = useRef<string | null>(null);
   useEffect(() => {
     const prefill = route.params?.prefillEvent;
@@ -4588,6 +4595,16 @@ const EventList: React.FC = () => {
         </View>
         <Text style={themedStyles.title}>{t('events.title')}</Text>
         <View style={[themedStyles.headerSide, themedStyles.headerRight]}>
+          <TouchableOpacity
+            style={themedStyles.findPlaceButton}
+            onPress={() => navigation.navigate('VenueList' as never)}
+            accessibilityLabel={t('events.findAPlace') || 'Find a place'}>
+            <FontAwesomeIcon
+              icon={faBuilding}
+              size={20}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
           <TouchableOpacity
             style={themedStyles.bellButton}
             onPress={() => navigation.navigate('Notifications' as never)}>

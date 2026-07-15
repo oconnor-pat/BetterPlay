@@ -60,6 +60,7 @@
     "settings": "सेटिंग्स"
   },
   "events": {
+    "findAPlace": "जगह खोजें",
     "title": "इवेंट्स",
     "createEvent": "इवेंट बनाएं",
     "joinEvent": "इवेंट में शामिल हों",

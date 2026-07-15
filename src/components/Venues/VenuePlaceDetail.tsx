@@ -32,12 +32,7 @@ import {
   faClock,
   faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
-import {
-  useNavigation,
-  useRoute,
-  RouteProp,
-  CommonActions,
-} from '@react-navigation/native';
+import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import axios from 'axios';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
@@ -195,19 +190,11 @@ const VenuePlaceDetail: React.FC = () => {
         sourceUrl: place.websiteUri,
       },
     };
-    // Cross-tab navigation: jump to the Events tab and open the create modal
-    // with the venue prefilled. getParent() walks up to the bottom tab nav.
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.dispatch(
-        CommonActions.navigate({
-          name: 'Events',
-          params: {screen: 'EventList', params},
-        }),
-      );
-    } else {
-      navigation.navigate('Events', {screen: 'EventList', params});
-    }
+    // Venue screens live inside the Events stack (Vision A), so we navigate
+    // back to EventList in this same stack with the venue prefilled. This
+    // pops the venue screens and reopens the events list with the create
+    // modal primed.
+    navigation.navigate('EventList', params);
   }, [place, navigation]);
 
   // Navigate into the in-app browser. When the venue has no website on
@@ -509,18 +496,7 @@ const VenuePlaceDetail: React.FC = () => {
         style={styles.eventCard}
         activeOpacity={0.8}
         onPress={() => {
-          const parent = navigation.getParent();
-          const params = {highlightEventId: e._id};
-          if (parent) {
-            parent.dispatch(
-              CommonActions.navigate({
-                name: 'Events',
-                params: {screen: 'EventList', params},
-              }),
-            );
-          } else {
-            navigation.navigate('Events', {screen: 'EventList', params});
-          }
+          navigation.navigate('EventList', {highlightEventId: e._id});
         }}>
         <View style={styles.eventDateBlock}>
           <Text style={styles.eventDateMonth}>{monthAbbr}</Text>

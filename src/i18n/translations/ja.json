@@ -60,6 +60,7 @@
     "settings": "設定"
   },
   "events": {
+    "findAPlace": "場所を探す",
     "title": "イベント",
     "createEvent": "イベント作成",
     "joinEvent": "イベントに参加",

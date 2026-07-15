@@ -60,6 +60,7 @@
     "settings": "Configuración"
   },
   "events": {
+    "findAPlace": "Buscar un lugar",
     "title": "Eventos",
     "createEvent": "Crear Evento",
     "joinEvent": "Unirse al Evento",

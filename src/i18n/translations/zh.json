@@ -60,6 +60,7 @@
     "settings": "设置"
   },
   "events": {
+    "findAPlace": "查找场所",
     "title": "活动",
     "createEvent": "创建活动",
     "joinEvent": "加入活动",

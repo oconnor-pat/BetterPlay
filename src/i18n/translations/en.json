@@ -66,6 +66,7 @@
     "settings": "Settings"
   },
   "events": {
+    "findAPlace": "Find a place",
     "title": "Local Events",
     "subtitle": "User-organized activities",
     "createEvent": "Create Event",

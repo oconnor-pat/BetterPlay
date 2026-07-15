@@ -60,6 +60,7 @@
     "settings": "الإعدادات"
   },
   "events": {
+    "findAPlace": "ابحث عن مكان",
     "title": "الفعاليات",
     "createEvent": "إنشاء فعالية",
     "joinEvent": "الانضمام للفعالية",

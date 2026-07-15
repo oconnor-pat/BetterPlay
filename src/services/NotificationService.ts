@@ -531,14 +531,14 @@ class NotificationService {
   /**
    * Process notification data and navigate accordingly
    * Navigation uses nested structure:
-   *   RootStack -> BottomNavigator -> Tab (Events|Venues|Profile) -> Screen
+   *   RootStack -> BottomNavigator -> Tab (Events|Groups|Profile) -> Screen
    *
    * Actual Navigator Structure:
    * - RootStack: LandingPage, BottomNavigator, Settings, ResetPassword, ...
-   *   - Tab.Navigator (inside BottomNavigator): Events, Venues, Profile
-   *     - Events (LocalEventsStack): EventList, EventRoster, PublicProfile, UserSearch, Notifications
-   *     - Venues (VenueStack): VenueList, VenuePlaceDetail, VenueWebView
-   *     - Profile (ProfileStack): ProfileMain, UserSearch, PublicProfile, FriendsList, FriendRequests, Notifications
+   *   - Tab.Navigator (inside BottomNavigator): Events, Groups, Profile
+   *     - Events (LocalEventsStack): EventList, EventRoster, PublicProfile, UserSearch, Notifications, VenueList, VenuePlaceDetail, VenueWebView
+   *     - Groups (GroupsStack): GroupsList, GroupDetail
+   *     - Profile (ProfileStack): ProfileMain, UserSearch, PublicProfile, FriendsList, FriendRequests, Notifications, GroupDetail
    */
   private handleNotificationData(data: Record<string, string>): void {
     if (!this.navigationCallback) {

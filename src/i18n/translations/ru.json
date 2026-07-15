@@ -60,6 +60,7 @@
     "settings": "Настройки"
   },
   "events": {
+    "findAPlace": "Найти место",
     "title": "События",
     "createEvent": "Создать событие",
     "joinEvent": "Присоединиться",

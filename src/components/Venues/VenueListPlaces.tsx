@@ -10,7 +10,6 @@
 
 import React, {
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -29,7 +28,7 @@ import {
   Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faSearch,
@@ -37,14 +36,10 @@ import {
   faMapMarkerAlt,
   faGlobe,
   faExclamationTriangle,
-  faStar,
+  faChevronLeft,
 } from '@fortawesome/free-solid-svg-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 import {useTranslation} from 'react-i18next';
-import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {useTheme} from '../ThemeContext/ThemeContext';
-import UserContext, {UserContextType} from '../UserContext';
 import locationService, {Coordinates} from '../../services/LocationService';
 import {
   PlaceSummary,
@@ -56,8 +51,6 @@ import {
   searchNearby,
   searchText,
 } from '../../services/PlacesService';
-import {primaryTypesForInterests} from '../../utils/interestVenueMapping';
-import {API_BASE_URL} from '../../config/api';
 
 // Default radius for the "near you" feed.
 const DEFAULT_RADIUS_METERS = 8000; // ~5 miles
@@ -67,25 +60,24 @@ const VenueListPlaces: React.FC = () => {
   const {colors, darkMode} = useTheme();
   const {t} = useTranslation();
   const navigation = useNavigation<any>();
-  const {userData} = useContext(UserContext) as UserContextType;
 
   const [coords, setCoords] = useState<Coordinates | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<
     'unknown' | 'granted' | 'denied'
   >('unknown');
   const [places, setPlaces] = useState<PlaceSummary[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // User's saved interests (`favoriteActivities` on the User model). null
-  // means "not loaded yet" — used to suppress the empty-interests banner
-  // until we know the truth, so it doesn't flash on first paint.
-  const [interests, setInterests] = useState<string[] | null>(null);
+  // Search-first: no category is selected on load (null), so the landing
+  // shows a prompt + activity chips instead of auto-fetching a feed of
+  // whatever happens to be nearby. We only fetch once the user expresses
+  // intent — taps an activity chip or types a name to search.
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null,
+  );
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
-
-  const [searchOpen, setSearchOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchResults, setSearchResults] = useState<PlaceSummary[] | null>(
     null,
@@ -117,38 +109,12 @@ const VenueListPlaces: React.FC = () => {
     }
   }, []);
 
-  // ── Interests fetch ───────────────────────────────────────────────────
-  // Pulls the user's saved interests so the "All" feed can be personalized.
-  // Refetched on tab focus (below) so edits made on the Profile tab are
-  // reflected the next time the user returns here.
-  const fetchInterests = useCallback(async () => {
-    if (!userData?._id) {
-      setInterests([]);
-      return;
-    }
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      const res = await axios.get(
-        `${API_BASE_URL}/user/${userData._id}/favorite-sports`,
-        {headers: token ? {Authorization: `Bearer ${token}`} : {}},
-      );
-      const list: string[] =
-        res.data?.favoriteActivities || res.data?.favoriteSports || [];
-      setInterests(list);
-    } catch {
-      // Don't surface this error to the user — interests just stay empty
-      // and the All feed falls back to the default activity-rich mix.
-      setInterests([]);
-    }
-  }, [userData?._id]);
-
   // ── Nearby fetch ──────────────────────────────────────────────────────
+  // Always typed by the chosen activity category. There is no untyped
+  // "everything nearby" fetch anymore — that's what surfaced random dining
+  // chains on an activity/meetups app.
   const fetchNearby = useCallback(
-    async (
-      location: Coordinates,
-      categoryId: string,
-      userInterests: string[] | null,
-    ) => {
+    async (location: Coordinates, categoryId: string) => {
       if (!isPlacesApiConfigured) {
         setErrorMessage(
           'Google Places API key is not configured. Set GOOGLE_PLACES_API_KEY in .env and rebuild.',
@@ -158,23 +124,8 @@ const VenueListPlaces: React.FC = () => {
       }
       setErrorMessage(null);
 
-      let primaryTypes: string[] | undefined;
-      if (categoryId === 'all') {
-        // Personalize the All feed from the user's interests when we have
-        // them. If interests is still loading (null) or contributes no
-        // mapped types, leave primaryTypes undefined so Google returns
-        // its default activity-rich nearby mix (still subject to our
-        // exclusion filters).
-        if (userInterests && userInterests.length > 0) {
-          const mapped = primaryTypesForInterests(userInterests);
-          if (mapped.length > 0) {
-            primaryTypes = mapped;
-          }
-        }
-      } else {
-        const cat = VENUE_CATEGORIES.find(c => c.id === categoryId);
-        primaryTypes = cat ? cat.primaryTypes : undefined;
-      }
+      const cat = VENUE_CATEGORIES.find(c => c.id === categoryId);
+      const primaryTypes = cat ? cat.primaryTypes : undefined;
 
       try {
         const results = await searchNearby({
@@ -193,43 +144,23 @@ const VenueListPlaces: React.FC = () => {
     [],
   );
 
-  // First load — bootstrap location + interests in parallel, then fetch
-  // nearby places. We seed the All feed once interests has resolved (which
-  // may already be `[]`) so personalization kicks in on first paint.
+  // Bootstrap location once on mount so distances + nearby searches are
+  // ready the moment the user taps a category. No places are fetched here —
+  // the landing stays a prompt until the user expresses intent.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const [loc] = await Promise.all([ensureLocation(), fetchInterests()]);
-      if (cancelled) {
-        return;
-      }
-      // Read the latest interests from state via the function form below;
-      // we pass `null` here because the secondary effect (driven by
-      // `interests` becoming non-null) will refire with personalization.
-      if (loc) {
-        await fetchNearby(loc, 'all', null);
-      }
-      if (!cancelled) {
-        setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [ensureLocation, fetchInterests, fetchNearby]);
+    ensureLocation();
+  }, [ensureLocation]);
 
-  // Refetch when category or interests change. `interests` flipping from
-  // null → array triggers the personalized All feed once data lands;
-  // returning from the Profile tab with new picks also triggers a refresh.
+  // Fetch whenever an activity category is selected (and we have a location).
+  // Selecting nothing (null) keeps the landing prompt visible.
   useEffect(() => {
-    if (!coords || interests === null) {
+    if (!coords || !selectedCategoryId) {
       return;
     }
     let cancelled = false;
     (async () => {
       setLoading(true);
-      await fetchNearby(coords, selectedCategoryId, interests);
+      await fetchNearby(coords, selectedCategoryId);
       if (!cancelled) {
         setLoading(false);
       }
@@ -237,16 +168,7 @@ const VenueListPlaces: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedCategoryId, coords, interests, fetchNearby]);
-
-  // Refresh interests when the Venues tab regains focus — covers the
-  // common case of the user editing their interests on Profile and
-  // tapping back to Venues.
-  useFocusEffect(
-    useCallback(() => {
-      fetchInterests();
-    }, [fetchInterests]),
-  );
+  }, [selectedCategoryId, coords, fetchNearby]);
 
   // ── Search (debounced text search) ────────────────────────────────────
   useEffect(() => {
@@ -286,23 +208,16 @@ const VenueListPlaces: React.FC = () => {
   }, [searchQuery, coords]);
 
   const onRefresh = useCallback(async () => {
+    if (!selectedCategoryId) {
+      return;
+    }
     setRefreshing(true);
-    const [loc] = await Promise.all([
-      coords ? Promise.resolve(coords) : ensureLocation(),
-      fetchInterests(),
-    ]);
+    const loc = coords || (await ensureLocation());
     if (loc) {
-      await fetchNearby(loc, selectedCategoryId, interests);
+      await fetchNearby(loc, selectedCategoryId);
     }
     setRefreshing(false);
-  }, [
-    coords,
-    ensureLocation,
-    fetchInterests,
-    fetchNearby,
-    interests,
-    selectedCategoryId,
-  ]);
+  }, [coords, ensureLocation, fetchNearby, selectedCategoryId]);
 
   // Card tap → slim venue detail page. The detail page handles the website,
   // Get Directions, call, and "Plan event here" actions. PR 2b will add an
@@ -334,24 +249,9 @@ const VenueListPlaces: React.FC = () => {
     });
   }, [places, searchResults, coords]);
 
-  // Split the feed into a "hero" pick + the rest. The hero gets a
-  // photo-forward card at the top to anchor the page; everything else
-  // renders in the standard card list below. We only promote a hero
-  // when there are at least 2 results so the rest of the list isn't
-  // empty under it, and only when we're not in a text-search view (the
-  // search results page stays as a flat list).
-  const {heroPlace, restPlaces} = useMemo(() => {
-    if (!searchResults && visibleList.length >= 2) {
-      return {heroPlace: visibleList[0], restPlaces: visibleList.slice(1)};
-    }
-    return {heroPlace: null as PlaceSummary | null, restPlaces: visibleList};
-  }, [visibleList, searchResults]);
-
-  const isPersonalized =
-    selectedCategoryId === 'all' &&
-    !!interests &&
-    interests.length > 0 &&
-    primaryTypesForInterests(interests).length > 0;
+  // True once the user has expressed intent (picked a category or searched).
+  // Until then the screen shows the landing prompt instead of a results list.
+  const hasIntent = !!selectedCategoryId || searchResults !== null;
 
   // ── Styles ────────────────────────────────────────────────────────────
   const styles = useMemo(
@@ -446,148 +346,10 @@ const VenueListPlaces: React.FC = () => {
         chipTextActive: {
           color: colors.primary,
         },
-        sectionTitle: {
-          fontSize: 12,
-          fontWeight: '700',
-          letterSpacing: 0.5,
-          color: colors.secondaryText,
-          textTransform: 'uppercase',
-          paddingHorizontal: 16,
-          paddingTop: 4,
-          paddingBottom: 8,
-        },
-        sectionTitleRest: {
-          fontSize: 12,
-          fontWeight: '700',
-          letterSpacing: 0.5,
-          color: colors.secondaryText,
-          textTransform: 'uppercase',
-          paddingHorizontal: 16,
-          paddingTop: 8,
-          paddingBottom: 8,
-        },
-        // ── Hero card ─────────────────────────────────────────────
-        heroCard: {
-          marginHorizontal: 16,
-          marginTop: 4,
-          marginBottom: 12,
-          borderRadius: 16,
-          backgroundColor: colors.card,
-          overflow: 'hidden',
-          // Subtle elevation so it pops above the page background.
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: 2},
-          shadowOpacity: darkMode ? 0.4 : 0.08,
-          shadowRadius: 8,
-          elevation: 3,
-        },
-        heroPhoto: {
-          width: '100%',
-          height: 180,
-          backgroundColor: darkMode
-            ? 'rgba(255,255,255,0.06)'
-            : 'rgba(0,0,0,0.04)',
-        },
-        heroPhotoFallback: {
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        heroPhotoEmoji: {
-          fontSize: 72,
-        },
-        heroTagPill: {
-          position: 'absolute',
-          top: 12,
-          left: 12,
-          paddingHorizontal: 10,
-          paddingVertical: 5,
-          borderRadius: 12,
-          backgroundColor: colors.primary,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 5,
-        },
-        heroTagText: {
-          color: '#FFFFFF',
-          fontSize: 10,
-          fontWeight: '800',
-          letterSpacing: 0.6,
-          textTransform: 'uppercase',
-        },
-        heroBody: {
-          paddingHorizontal: 16,
-          paddingTop: 12,
-          paddingBottom: 14,
-        },
-        heroTitleRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 8,
-        },
-        heroTitle: {
-          fontSize: 19,
-          fontWeight: '800',
-          color: colors.text,
-          flex: 1,
-        },
-        heroDistance: {
-          fontSize: 13,
-          fontWeight: '700',
-          color: colors.secondaryText,
-        },
-        heroMeta: {
-          fontSize: 13,
-          color: colors.secondaryText,
-          marginTop: 4,
-        },
-        heroStatusRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 6,
-          marginTop: 8,
-        },
         statusDot: {
           width: 8,
           height: 8,
           borderRadius: 4,
-        },
-        heroStatusText: {
-          fontSize: 12,
-          fontWeight: '700',
-        },
-        interestsBanner: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 12,
-          marginHorizontal: 16,
-          marginTop: 8,
-          marginBottom: 4,
-          paddingVertical: 12,
-          paddingHorizontal: 14,
-          borderRadius: 12,
-          backgroundColor: colors.primary + '12',
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.primary + '40',
-        },
-        interestsBannerText: {
-          flex: 1,
-        },
-        interestsBannerTitle: {
-          fontSize: 13,
-          fontWeight: '700',
-          color: colors.text,
-          marginBottom: 2,
-        },
-        interestsBannerSubtitle: {
-          fontSize: 12,
-          color: colors.secondaryText,
-          lineHeight: 16,
-        },
-        interestsBannerCta: {
-          fontSize: 13,
-          fontWeight: '700',
-          color: colors.primary,
         },
         list: {
           flex: 1,
@@ -709,7 +471,9 @@ const VenueListPlaces: React.FC = () => {
       <TouchableOpacity
         key={cat.id}
         style={[styles.chip, isActive && styles.chipActive]}
-        onPress={() => setSelectedCategoryId(cat.id)}>
+        onPress={() =>
+          setSelectedCategoryId(prev => (prev === cat.id ? null : cat.id))
+        }>
         {cat.emoji ? <Text style={styles.chipEmoji}>{cat.emoji}</Text> : null}
         <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
           {cat.label}
@@ -794,79 +558,6 @@ const VenueListPlaces: React.FC = () => {
     );
   };
 
-  // Hero card — the top pick on the personalized feed. Same data
-  // model as a regular card but rendered photo-forward with a "TOP
-  // PICK FOR YOU" pill over the photo. Falls back to a giant emoji
-  // when the place has no photo on file.
-  const renderHero = (item: PlaceSummary) => {
-    const distanceLabel = formatDistance(item);
-    const photoName = item.photos && item.photos[0]?.name;
-    const photoUrl = photoName
-      ? buildPhotoUrl(photoName, {maxWidthPx: 800})
-      : null;
-    const openNow = item.currentOpeningHours?.openNow;
-    const typeLabel = getFriendlyTypeLabel(item);
-    const addressLine =
-      item.shortFormattedAddress || item.formattedAddress || '';
-    const tagLabel = isPersonalized ? 'Top pick for you' : 'Top pick';
-
-    return (
-      <TouchableOpacity
-        style={styles.heroCard}
-        onPress={() => handlePlacePress(item)}
-        activeOpacity={0.85}>
-        <View>
-          {photoUrl ? (
-            <Image
-              source={{uri: photoUrl}}
-              style={styles.heroPhoto}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.heroPhoto, styles.heroPhotoFallback]}>
-              <Text style={styles.heroPhotoEmoji}>{getEmojiForPlace(item)}</Text>
-            </View>
-          )}
-          <View style={styles.heroTagPill}>
-            <FontAwesomeIcon icon={faStar} size={10} color="#FFFFFF" />
-            <Text style={styles.heroTagText}>{tagLabel}</Text>
-          </View>
-        </View>
-        <View style={styles.heroBody}>
-          <View style={styles.heroTitleRow}>
-            <Text style={styles.heroTitle} numberOfLines={1}>
-              {item.name || 'Unnamed venue'}
-            </Text>
-            {distanceLabel !== null && (
-              <Text style={styles.heroDistance}>{distanceLabel}</Text>
-            )}
-          </View>
-          <Text style={styles.heroMeta} numberOfLines={1}>
-            {typeLabel}
-            {addressLine ? ` · ${addressLine}` : ''}
-          </Text>
-          {typeof openNow === 'boolean' && (
-            <View style={styles.heroStatusRow}>
-              <View
-                style={[
-                  styles.statusDot,
-                  {backgroundColor: openNow ? colors.primary : colors.border},
-                ]}
-              />
-              <Text
-                style={[
-                  styles.heroStatusText,
-                  openNow ? styles.statusOpen : styles.statusClosed,
-                ]}>
-                {openNow ? 'Open now' : 'Closed'}
-              </Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   // ── Empty / error states ──────────────────────────────────────────────
   const renderEmptyContent = () => {
     if (errorMessage) {
@@ -903,13 +594,32 @@ const VenueListPlaces: React.FC = () => {
           <TouchableOpacity
             style={styles.emptyActionButton}
             onPress={async () => {
-              await ensureLocation();
-              if (coords) {
-                await fetchNearby(coords, selectedCategoryId, interests);
+              const loc = await ensureLocation();
+              if (loc && selectedCategoryId) {
+                await fetchNearby(loc, selectedCategoryId);
               }
             }}>
             <Text style={styles.emptyActionText}>Retry</Text>
           </TouchableOpacity>
+        </View>
+      );
+    }
+    // Landing prompt — shown before the user has picked a category or
+    // searched. The screen is intentionally a tool, not a feed: nothing is
+    // surfaced until the user says what kind of place they're after.
+    if (!hasIntent) {
+      return (
+        <View style={styles.empty}>
+          <FontAwesomeIcon
+            icon={faMapMarkerAlt}
+            size={32}
+            color={colors.secondaryText}
+            style={styles.emptyIcon}
+          />
+          <Text style={styles.emptyText}>
+            Find a place to plan at. Pick an activity above, or search for a
+            venue by name.
+          </Text>
         </View>
       );
     }
@@ -924,7 +634,7 @@ const VenueListPlaces: React.FC = () => {
         <Text style={styles.emptyText}>
           {searchResults
             ? 'No matches. Try a different search.'
-            : 'No places found nearby. Try a different filter.'}
+            : 'No places found nearby. Try another activity.'}
         </Text>
       </View>
     );
@@ -934,54 +644,42 @@ const VenueListPlaces: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <HamburgerMenu />
-        <Text style={styles.title}>{t('venues.title') || 'Venues'}</Text>
         <TouchableOpacity
           style={styles.headerIcon}
-          onPress={() => {
-            const next = !searchOpen;
-            setSearchOpen(next);
-            if (!next) {
-              setSearchQuery('');
-            }
-          }}>
+          onPress={() => navigation.goBack()}>
           <FontAwesomeIcon
-            icon={searchOpen ? faTimes : faSearch}
+            icon={faChevronLeft}
             size={20}
             color={colors.text}
           />
         </TouchableOpacity>
+        <Text style={styles.title}>{t('venues.title') || 'Venues'}</Text>
+        <View style={styles.headerIcon} />
       </View>
 
-      {searchOpen && (
-        <View style={styles.searchBar}>
-          <FontAwesomeIcon
-            icon={faSearch}
-            size={16}
-            color={colors.secondaryText}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search venues by name"
-            placeholderTextColor={colors.secondaryText}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus
-            returnKeyType="search"
-          />
-          {searching ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : searchQuery.length > 0 ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <FontAwesomeIcon
-                icon={faTimes}
-                size={16}
-                color={colors.secondaryText}
-              />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      )}
+      {/* Search is always visible — this screen is search-first. */}
+      <View style={styles.searchBar}>
+        <FontAwesomeIcon icon={faSearch} size={16} color={colors.secondaryText} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search venues by name"
+          placeholderTextColor={colors.secondaryText}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+        />
+        {searching ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : searchQuery.length > 0 ? (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <FontAwesomeIcon
+              icon={faTimes}
+              size={16}
+              color={colors.secondaryText}
+            />
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       {!searchResults && (
         <View style={styles.chipStripWrapper}>
@@ -994,62 +692,16 @@ const VenueListPlaces: React.FC = () => {
             directionalLockEnabled
             style={styles.chipStrip}
             contentContainerStyle={styles.chipStripContent}>
-            {renderChip({id: 'all', label: 'All'})}
             {VENUE_CATEGORIES.map(c => renderChip(c))}
           </ScrollView>
         </View>
       )}
 
-      {!searchResults &&
-        selectedCategoryId === 'all' &&
-        interests !== null &&
-        interests.length === 0 && (
-          <TouchableOpacity
-            style={styles.interestsBanner}
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate('Profile')}>
-            <FontAwesomeIcon
-              icon={faStar}
-              size={14}
-              color={colors.primary}
-            />
-            <View style={styles.interestsBannerText}>
-              <Text style={styles.interestsBannerTitle}>
-                Personalize this feed
-              </Text>
-              <Text style={styles.interestsBannerSubtitle}>
-                Set your interests on your profile to see places you'll
-                actually want to go.
-              </Text>
-            </View>
-            <Text style={styles.interestsBannerCta}>Set →</Text>
-          </TouchableOpacity>
-        )}
-
       <FlatList
         style={styles.list}
-        data={restPlaces}
+        data={hasIntent ? visibleList : []}
         keyExtractor={item => item.id}
         renderItem={renderCard}
-        ListHeaderComponent={
-          !searchResults ? (
-            <View>
-              {/* Top section label — same logic as before but now
-                  scrolls with the content rather than being pinned. */}
-              <Text style={styles.sectionTitle}>
-                {coords
-                  ? isPersonalized
-                    ? 'Picked for you'
-                    : 'Near you'
-                  : 'Featured'}
-              </Text>
-              {heroPlace ? renderHero(heroPlace) : null}
-              {heroPlace && restPlaces.length > 0 ? (
-                <Text style={styles.sectionTitleRest}>More nearby</Text>
-              ) : null}
-            </View>
-          ) : null
-        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1058,13 +710,13 @@ const VenueListPlaces: React.FC = () => {
           />
         }
         ListEmptyComponent={
-          loading ? (
+          loading || searching ? (
             <View style={styles.empty}>
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
-          ) : !heroPlace ? (
+          ) : (
             renderEmptyContent()
-          ) : null
+          )
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
