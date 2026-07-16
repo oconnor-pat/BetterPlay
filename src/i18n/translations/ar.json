@@ -127,7 +127,16 @@
     "deleteRecurringTitle": "حذف الحدث المتكرر؟",
     "deleteRecurringMessage": "هذا الحدث جزء من سلسلة متكررة. ماذا تريد أن تحذف؟",
     "deleteThisEvent": "هذا الحدث فقط",
-    "deleteEntireSeries": "السلسلة بأكملها"
+    "deleteEntireSeries": "السلسلة بأكملها",
+    "rsvpGoing": "سأحضر",
+    "rsvpMaybe": "ربما",
+    "rsvpCant": "لا أستطيع الحضور",
+    "eventFull": "الفعالية ممتلئة",
+    "eventFullMessage": "هذه الفعالية ممتلئة حالياً. يمكنك الانضمام إلى قائمة الانتظار من صفحة الفعالية.",
+    "requestToJoin": "طلب الانضمام",
+    "requested": "تم الطلب",
+    "approvalRequired": "يتطلب موافقة",
+    "gatedHint": "يتم كشف الموقع والتفاصيل عندما يوافق المضيف عليك."
   },
   "profile": {
     "title": "الملف الشخصي",
@@ -263,6 +272,8 @@
     "noPlayersYet": "لم ينضم أحد بعد. كن الأول!",
     "editYourInfo": "تعديل معلوماتك",
     "saveChanges": "حفظ التغييرات",
-    "invitePlayers": "دعوة أشخاص"
+    "invitePlayers": "دعوة أشخاص",
+    "noReply": "مدعو · لا يوجد رد",
+    "joinRequests": "الطلبات"
   }
 }

@@ -127,7 +127,16 @@
     "deleteRecurringTitle": "删除重复事件？",
     "deleteRecurringMessage": "此事件是重复系列的一部分。您要删除什么？",
     "deleteThisEvent": "仅此事件",
-    "deleteEntireSeries": "整个系列"
+    "deleteEntireSeries": "整个系列",
+    "rsvpGoing": "参加",
+    "rsvpMaybe": "可能",
+    "rsvpCant": "无法参加",
+    "eventFull": "活动已满",
+    "eventFullMessage": "该活动目前已满。你可以在活动页面加入等候名单。",
+    "requestToJoin": "申请加入",
+    "requested": "已申请",
+    "approvalRequired": "需要批准",
+    "gatedHint": "主办方批准后即可查看地点和详情。"
   },
   "profile": {
     "title": "个人资料",
@@ -263,6 +272,8 @@
     "noPlayersYet": "还没有人加入。成为第一个！",
     "editYourInfo": "编辑您的信息",
     "saveChanges": "保存更改",
-    "invitePlayers": "邀请他人"
+    "invitePlayers": "邀请他人",
+    "noReply": "已邀请 · 未回复",
+    "joinRequests": "申请"
   }
 }

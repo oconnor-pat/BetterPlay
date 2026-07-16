@@ -127,7 +127,16 @@
     "deleteRecurringTitle": "Eliminare evento ricorrente?",
     "deleteRecurringMessage": "Questo evento fa parte di una serie ricorrente. Cosa vuoi eliminare?",
     "deleteThisEvent": "Solo questo evento",
-    "deleteEntireSeries": "Intera serie"
+    "deleteEntireSeries": "Intera serie",
+    "rsvpGoing": "Presente",
+    "rsvpMaybe": "Forse",
+    "rsvpCant": "Non posso",
+    "eventFull": "Evento pieno",
+    "eventFullMessage": "Questo evento è al completo. Puoi unirti alla lista d’attesa dalla pagina dell’evento.",
+    "requestToJoin": "Richiedi di partecipare",
+    "requested": "Richiesto",
+    "approvalRequired": "Approvazione richiesta",
+    "gatedHint": "Luogo e dettagli si sbloccano quando l’organizzatore ti approva."
   },
   "profile": {
     "title": "Profilo",
@@ -263,6 +272,8 @@
     "noPlayersYet": "Nessuno si è ancora iscritto. Sii il primo!",
     "editYourInfo": "Modifica le Tue Info",
     "saveChanges": "Salva Modifiche",
-    "invitePlayers": "Invita Persone"
+    "invitePlayers": "Invita Persone",
+    "noReply": "Invitato · nessuna risposta",
+    "joinRequests": "Richieste"
   }
 }

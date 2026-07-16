@@ -127,7 +127,16 @@
     "deleteRecurringTitle": "आवर्ती ईवेंट हटाएं?",
     "deleteRecurringMessage": "यह ईवेंट एक आवर्ती शृंखला का हिस्सा है। आप क्या हटाना चाहते हैं?",
     "deleteThisEvent": "केवल यह ईवेंट",
-    "deleteEntireSeries": "पूरी शृंखला"
+    "deleteEntireSeries": "पूरी शृंखला",
+    "rsvpGoing": "जा रहे हैं",
+    "rsvpMaybe": "शायद",
+    "rsvpCant": "नहीं आ सकते",
+    "eventFull": "इवेंट भरा है",
+    "eventFullMessage": "यह इवेंट अभी भरा हुआ है। आप इवेंट पेज से प्रतीक्षा सूची में शामिल हो सकते हैं।",
+    "requestToJoin": "शामिल होने का अनुरोध करें",
+    "requested": "अनुरोध किया गया",
+    "approvalRequired": "अनुमोदन आवश्यक",
+    "gatedHint": "मेज़बान द्वारा स्वीकृति मिलने पर स्थान और विवरण दिखेंगे।"
   },
   "profile": {
     "title": "प्रोफ़ाइल",
@@ -257,6 +266,8 @@
     "noPlayersYet": "अभी तक कोई शामिल नहीं हुआ। पहले बनें!",
     "editYourInfo": "अपनी जानकारी संपादित करें",
     "saveChanges": "परिवर्तन सहेजें",
-    "invitePlayers": "लोगों को आमंत्रित करें"
+    "invitePlayers": "लोगों को आमंत्रित करें",
+    "noReply": "आमंत्रित · कोई जवाब नहीं",
+    "joinRequests": "अनुरोध"
   }
 }

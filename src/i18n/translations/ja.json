@@ -127,7 +127,16 @@
     "deleteRecurringTitle": "繰り返しイベントを削除しますか？",
     "deleteRecurringMessage": "このイベントは繰り返しシリーズの一部です。何を削除しますか？",
     "deleteThisEvent": "このイベントのみ",
-    "deleteEntireSeries": "シリーズ全体"
+    "deleteEntireSeries": "シリーズ全体",
+    "rsvpGoing": "参加",
+    "rsvpMaybe": "たぶん",
+    "rsvpCant": "不参加",
+    "eventFull": "満員です",
+    "eventFullMessage": "このイベントは現在満員です。イベントページからキャンセル待ちに登録できます。",
+    "requestToJoin": "参加をリクエスト",
+    "requested": "リクエスト済み",
+    "approvalRequired": "承認が必要",
+    "gatedHint": "主催者が承認すると場所と詳細が表示されます。"
   },
   "profile": {
     "title": "プロフィール",
@@ -263,6 +272,8 @@
     "noPlayersYet": "まだ誰も参加していません。最初に参加しましょう！",
     "editYourInfo": "情報を編集",
     "saveChanges": "変更を保存",
-    "invitePlayers": "人を招待"
+    "invitePlayers": "人を招待",
+    "noReply": "招待済み · 返信なし",
+    "joinRequests": "リクエスト"
   }
 }

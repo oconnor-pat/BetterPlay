@@ -390,6 +390,21 @@ const EventRoster: React.FC = () => {
   >('public');
   const [eventCreatedBy, setEventCreatedBy] = useState<string>('');
   const [invitedUsers, setInvitedUsers] = useState<string[]>([]);
+  // "Maybe"/"can't make it" replies. "Going" is roster membership, so this
+  // only holds the other two states.
+  const [rsvps, setRsvps] = useState<
+    Array<{
+      userId: string;
+      username: string;
+      profilePicUrl?: string;
+      status: 'maybe' | 'cant';
+    }>
+  >([]);
+  // Pending requests to join a gated public event (only returned to the
+  // creator). Approving adds them to the roster; denying drops the request.
+  const [joinRequests, setJoinRequests] = useState<
+    Array<{userId: string; username: string; profilePicUrl?: string}>
+  >([]);
   const [inviteExpanded, setInviteExpanded] = useState(false);
   const [inviteSearchQuery, setInviteSearchQuery] = useState('');
   const [inviteSearchResults, setInviteSearchResults] = useState<
@@ -1006,6 +1021,77 @@ const EventRoster: React.FC = () => {
         rosterSection: {
           paddingTop: 4,
         },
+        rsvpSectionWrap: {
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 4,
+        },
+        rsvpResponseSection: {
+          marginTop: 12,
+        },
+        rsvpSectionTitle: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          marginBottom: 8,
+        },
+        rsvpPersonRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 6,
+        },
+        rsvpPersonAvatar: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          marginRight: 10,
+        },
+        rsvpPersonAvatarFallback: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.primary,
+        },
+        rsvpPersonAvatarText: {
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: '700',
+        },
+        rsvpPersonName: {
+          flex: 1,
+          fontSize: 15,
+          color: colors.text,
+        },
+        rsvpDot: {
+          width: 10,
+          height: 10,
+          borderRadius: 5,
+          marginLeft: 8,
+        },
+        requestRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 6,
+        },
+        requestApproveBtn: {
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#2ecc71',
+          marginLeft: 8,
+        },
+        requestDenyBtn: {
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#e74c3c',
+          marginLeft: 8,
+        },
         sectionHeader: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -1494,6 +1580,8 @@ const EventRoster: React.FC = () => {
       setEventPrivacy(response.data.privacy || 'public');
       setEventCreatedBy(response.data.createdBy || '');
       setInvitedUsers(response.data.invitedUsers || []);
+      setRsvps(response.data.rsvps || []);
+      setJoinRequests(response.data.joinRequests || []);
       setWaitlist(response.data.waitlist || []);
       setSpotReservation(response.data.spotReservation || null);
 
@@ -1521,6 +1609,42 @@ const EventRoster: React.FC = () => {
     }
   }, [eventId]);
 
+  const handleApproveRequest = useCallback(
+    async (requesterId: string) => {
+      setJoinRequests(prev => prev.filter(r => r.userId !== requesterId));
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        await axios.post(
+          `${API_BASE_URL}/events/${eventId}/join-request/${requesterId}/approve`,
+          {},
+          {headers: {Authorization: `Bearer ${token}`}},
+        );
+      } catch (error) {
+        // Roll back to server truth (e.g. event became full).
+      } finally {
+        fetchEventData();
+      }
+    },
+    [eventId, fetchEventData],
+  );
+
+  const handleDenyRequest = useCallback(
+    async (requesterId: string) => {
+      setJoinRequests(prev => prev.filter(r => r.userId !== requesterId));
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        await axios.post(
+          `${API_BASE_URL}/events/${eventId}/join-request/${requesterId}/deny`,
+          {},
+          {headers: {Authorization: `Bearer ${token}`}},
+        );
+      } catch (error) {
+        fetchEventData();
+      }
+    },
+    [eventId, fetchEventData],
+  );
+
   // Auto-refresh when screen comes into focus (e.g., navigating back)
   useFocusEffect(
     useCallback(() => {
@@ -1545,6 +1669,7 @@ const EventRoster: React.FC = () => {
         rosterSpotsFilled: number;
         waitlist?: any[];
         spotReservation?: any;
+        rsvps?: any[];
       }) => {
         if (data.eventId === eventId) {
           setRoster(data.roster);
@@ -1555,6 +1680,9 @@ const EventRoster: React.FC = () => {
           }
           if (data.spotReservation !== undefined) {
             setSpotReservation(data.spotReservation);
+          }
+          if (data.rsvps !== undefined) {
+            setRsvps(data.rsvps);
           }
         }
       },
@@ -1602,6 +1730,18 @@ const EventRoster: React.FC = () => {
       },
     );
 
+    // Join requests (and gating transitions) come through as a lightweight
+    // "events:refresh" nudge — refetch this event so the creator's pending
+    // list stays current while they're on the roster screen.
+    const unsubEventsRefresh = socketSubscribe(
+      'events:refresh',
+      (data: {eventId?: string}) => {
+        if (!data?.eventId || data.eventId === eventId) {
+          fetchEventData();
+        }
+      },
+    );
+
     // Fallback: refresh when app returns to foreground
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active') {
@@ -1614,6 +1754,7 @@ const EventRoster: React.FC = () => {
       unsubRoster();
       unsubWaitlist();
       unsubEvent();
+      unsubEventsRefresh();
       subscription.remove();
     };
   }, [
@@ -3053,6 +3194,156 @@ const EventRoster: React.FC = () => {
               </>
             )}
           </View>
+
+          {/* Pending join requests (creator-only — the API only returns these
+              to the owner). Approve to add them to the roster, deny to drop
+              the request. */}
+          {joinRequests.length > 0 && (
+            <View style={themedStyles.rsvpSectionWrap}>
+              <View style={themedStyles.rsvpResponseSection}>
+                <Text style={themedStyles.rsvpSectionTitle}>
+                  {t('roster.joinRequests') || 'Requests'} (
+                  {joinRequests.length})
+                </Text>
+                {joinRequests.map(r => (
+                  <View key={`req-${r.userId}`} style={themedStyles.requestRow}>
+                    {r.profilePicUrl ? (
+                      <Image
+                        source={{uri: r.profilePicUrl}}
+                        style={themedStyles.rsvpPersonAvatar}
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          themedStyles.rsvpPersonAvatar,
+                          themedStyles.rsvpPersonAvatarFallback,
+                        ]}>
+                        <Text style={themedStyles.rsvpPersonAvatarText}>
+                          {getInitials(r.username)}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={themedStyles.rsvpPersonName} numberOfLines={1}>
+                      {r.username}
+                    </Text>
+                    <TouchableOpacity
+                      style={themedStyles.requestApproveBtn}
+                      onPress={() => handleApproveRequest(r.userId)}
+                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                      <FontAwesomeIcon icon={faCheck} size={14} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={themedStyles.requestDenyBtn}
+                      onPress={() => handleDenyRequest(r.userId)}
+                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                      <FontAwesomeIcon icon={faTimes} size={14} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* RSVP responses beyond "going": who replied Maybe or Can't make
+              it, plus invited people who haven't replied yet. Colored dots
+              differentiate the states (amber = maybe, red = can't). */}
+          {(() => {
+            const maybeList = rsvps.filter(r => r.status === 'maybe');
+            const cantList = rsvps.filter(r => r.status === 'cant');
+            const noReplyList = invitedUserDetails.filter(
+              u =>
+                !roster.some(
+                  p => p.userId === u._id || p.username === u.username,
+                ) && !rsvps.some(r => r.userId === u._id),
+            );
+            if (
+              maybeList.length === 0 &&
+              cantList.length === 0 &&
+              noReplyList.length === 0
+            ) {
+              return null;
+            }
+            const renderPerson = (
+              key: string,
+              name: string,
+              profilePicUrl: string | undefined,
+              tint: string,
+            ) => (
+              <View key={key} style={themedStyles.rsvpPersonRow}>
+                {profilePicUrl ? (
+                  <Image
+                    source={{uri: profilePicUrl}}
+                    style={themedStyles.rsvpPersonAvatar}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      themedStyles.rsvpPersonAvatar,
+                      themedStyles.rsvpPersonAvatarFallback,
+                    ]}>
+                    <Text style={themedStyles.rsvpPersonAvatarText}>
+                      {getInitials(name)}
+                    </Text>
+                  </View>
+                )}
+                <Text style={themedStyles.rsvpPersonName} numberOfLines={1}>
+                  {name}
+                </Text>
+                <View style={[themedStyles.rsvpDot, {backgroundColor: tint}]} />
+              </View>
+            );
+            return (
+              <View style={themedStyles.rsvpSectionWrap}>
+                {maybeList.length > 0 && (
+                  <View style={themedStyles.rsvpResponseSection}>
+                    <Text style={themedStyles.rsvpSectionTitle}>
+                      {t('events.rsvpMaybe') || 'Maybe'} ({maybeList.length})
+                    </Text>
+                    {maybeList.map(r =>
+                      renderPerson(
+                        `maybe-${r.userId}`,
+                        r.username,
+                        r.profilePicUrl,
+                        '#f1c40f',
+                      ),
+                    )}
+                  </View>
+                )}
+                {cantList.length > 0 && (
+                  <View style={themedStyles.rsvpResponseSection}>
+                    <Text style={themedStyles.rsvpSectionTitle}>
+                      {t('events.rsvpCant') || "Can't make it"} (
+                      {cantList.length})
+                    </Text>
+                    {cantList.map(r =>
+                      renderPerson(
+                        `cant-${r.userId}`,
+                        r.username,
+                        r.profilePicUrl,
+                        '#e74c3c',
+                      ),
+                    )}
+                  </View>
+                )}
+                {noReplyList.length > 0 && (
+                  <View style={themedStyles.rsvpResponseSection}>
+                    <Text style={themedStyles.rsvpSectionTitle}>
+                      {t('roster.noReply') || 'Invited · no reply'} (
+                      {noReplyList.length})
+                    </Text>
+                    {noReplyList.map(u =>
+                      renderPerson(
+                        `noreply-${u._id}`,
+                        u.name || u.username,
+                        u.profilePicUrl,
+                        colors.secondaryText,
+                      ),
+                    )}
+                  </View>
+                )}
+              </View>
+            );
+          })()}
 
           {/* Paid Status Modal */}
           <Modal

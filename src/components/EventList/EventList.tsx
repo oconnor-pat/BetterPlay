@@ -79,6 +79,7 @@ import {
   faPenToSquare,
   faUserPlus,
   faBuilding,
+  faQuestion,
 } from '@fortawesome/free-solid-svg-icons';
 import {
   useNavigation,
@@ -161,7 +162,7 @@ const privacyOptions: {
     value: 'public',
     label: 'Public',
     icon: faGlobe,
-    description: 'Anyone can see and join',
+    description: 'Anyone can find it; you approve who joins',
   },
   {
     value: 'private',
@@ -209,6 +210,35 @@ interface Event {
     profilePicUrl?: string;
     joinedAt: string;
   }>;
+  // People who are "going" (on the roster). Present on list responses so the
+  // card can show the current user's RSVP state and the going count.
+  roster?: Array<{
+    userId?: string;
+    username: string;
+    profilePicUrl?: string;
+    paidStatus?: string;
+  }>;
+  // "Maybe"/"can't make it" replies. "Going" is represented by roster
+  // membership, so this only ever holds the other two states.
+  rsvps?: Array<{
+    userId: string;
+    username: string;
+    profilePicUrl?: string;
+    status: 'maybe' | 'cant';
+    respondedAt?: string;
+  }>;
+  // Pending requests to join a gated public event (only sent to the creator).
+  joinRequests?: Array<{
+    userId: string;
+    username: string;
+    profilePicUrl?: string;
+    requestedAt?: string;
+  }>;
+  // True when the server redacted this public event's details because the
+  // viewer hasn't been approved yet — the card renders a locked teaser.
+  isGated?: boolean;
+  // The viewer's own request state on a gated public event.
+  myJoinRequestStatus?: 'none' | 'pending';
   // Optional venue listing reference (set when an event was planned from
   // the Venues tab). Mirrors the BE Event model fields added in PR 1.
   venueId?: string;
@@ -995,6 +1025,101 @@ const EventList: React.FC = () => {
         },
         engagementSpacer: {
           flex: 1,
+        },
+        rsvpContainer: {
+          paddingTop: 10,
+          paddingBottom: 2,
+        },
+        rsvpButtonsRow: {
+          flexDirection: 'row',
+          gap: 8,
+        },
+        rsvpButton: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          paddingVertical: 8,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border || 'rgba(128,128,128,0.3)',
+          backgroundColor: colors.card,
+        },
+        rsvpButtonGoingActive: {
+          backgroundColor: '#2ecc71',
+          borderColor: '#2ecc71',
+        },
+        rsvpButtonMaybeActive: {
+          backgroundColor: '#f1c40f',
+          borderColor: '#f1c40f',
+        },
+        rsvpButtonCantActive: {
+          backgroundColor: '#e74c3c',
+          borderColor: '#e74c3c',
+        },
+        rsvpButtonText: {
+          color: colors.secondaryText,
+          fontSize: 13,
+          fontWeight: '600',
+        },
+        rsvpButtonTextActive: {
+          color: '#fff',
+          fontWeight: '700',
+        },
+        rsvpSummary: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          marginTop: 6,
+          marginLeft: 2,
+        },
+        publicJoinButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          alignSelf: 'flex-start',
+          gap: 7,
+          paddingVertical: 9,
+          paddingHorizontal: 22,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: colors.border || 'rgba(128,128,128,0.3)',
+          backgroundColor: colors.card,
+        },
+        gatedHintRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 8,
+        },
+        gatedHintText: {
+          flex: 1,
+          color: colors.secondaryText,
+          fontSize: 12,
+          fontStyle: 'italic',
+        },
+        requestButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          paddingVertical: 12,
+          borderRadius: 10,
+          backgroundColor: colors.primary,
+          marginTop: 12,
+        },
+        requestButtonPending: {
+          backgroundColor: colors.card,
+          borderWidth: 1,
+          borderColor: colors.border || 'rgba(128,128,128,0.3)',
+        },
+        requestButtonText: {
+          color: '#fff',
+          fontSize: 15,
+          fontWeight: '700',
+        },
+        requestButtonTextPending: {
+          color: colors.secondaryText,
         },
         pastEventCard: {
           opacity: 0.6,
@@ -3107,6 +3232,36 @@ const EventList: React.FC = () => {
       fetchLatestEvents();
     });
 
+    // Targeted, instant patch for roster/RSVP changes on a single event.
+    // The events list isn't a member of any event's socket room, so this
+    // broadcast is how observers (e.g. the organizer) update their card in
+    // real time without waiting on a full refetch.
+    const unsubRosterChanged = socketSubscribe(
+      'event:rosterChanged',
+      (data: {
+        eventId: string;
+        roster?: any[];
+        rsvps?: any[];
+        rosterSpotsFilled?: number;
+      }) => {
+        setEventData(prev =>
+          prev.map(ev =>
+            ev._id === data.eventId
+              ? {
+                  ...ev,
+                  roster: Array.isArray(data.roster) ? data.roster : ev.roster,
+                  rsvps: Array.isArray(data.rsvps) ? data.rsvps : ev.rsvps,
+                  rosterSpotsFilled:
+                    typeof data.rosterSpotsFilled === 'number'
+                      ? data.rosterSpotsFilled
+                      : ev.rosterSpotsFilled,
+                }
+              : ev,
+          ),
+        );
+      },
+    );
+
     const unsubLiked = socketSubscribe(
       'event:liked',
       (data: {
@@ -3137,6 +3292,7 @@ const EventList: React.FC = () => {
 
     return () => {
       unsubRefresh();
+      unsubRosterChanged();
       unsubLiked();
       subscription.remove();
     };
@@ -4107,6 +4263,149 @@ const EventList: React.FC = () => {
     }
   };
 
+  // --- RSVP (Going / Maybe / Can't make it) --------------------------------
+  // "Going" is represented by roster membership (which owns the spot count);
+  // "maybe"/"cant" live in the event's rsvps array. A user is only ever in
+  // one place, and tapping the currently-active state clears it.
+  const getMyRsvp = (event: Event): 'going' | 'maybe' | 'cant' | 'none' => {
+    const uid = userData?._id;
+    if (!uid) {
+      return 'none';
+    }
+    if ((event.roster || []).some(p => p.userId === uid)) {
+      return 'going';
+    }
+    const mine = (event.rsvps || []).find(r => r.userId === uid);
+    return mine ? mine.status : 'none';
+  };
+
+  const applyRsvpOptimistic = (
+    eventId: string,
+    next: 'going' | 'maybe' | 'cant' | 'none',
+  ) => {
+    if (!userData) {
+      return;
+    }
+    const uid = userData._id;
+    setEventData(prev =>
+      prev.map(e => {
+        if (e._id !== eventId) {
+          return e;
+        }
+        const roster = (e.roster || []).filter(p => p.userId !== uid);
+        const rsvps = (e.rsvps || []).filter(r => r.userId !== uid);
+        if (next === 'going') {
+          roster.push({
+            userId: uid,
+            username: userData.username || '',
+            profilePicUrl: userData.profilePicUrl,
+            paidStatus: 'Unpaid',
+          });
+        } else if (next === 'maybe' || next === 'cant') {
+          rsvps.push({
+            userId: uid,
+            username: userData.username || '',
+            profilePicUrl: userData.profilePicUrl,
+            status: next,
+          });
+        }
+        return {
+          ...e,
+          roster,
+          rsvps,
+          rosterSpotsFilled: roster.length,
+        };
+      }),
+    );
+  };
+
+  const handleRsvp = async (
+    event: Event,
+    status: 'going' | 'maybe' | 'cant',
+  ) => {
+    if (!userData) {
+      return;
+    }
+    const current = getMyRsvp(event);
+    const next = current === status ? 'none' : status;
+
+    // Instant feedback; the socket "events:refresh" reconciles with server
+    // truth (and rolls us back on failure below).
+    applyRsvpOptimistic(event._id, next);
+
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const headers = {Authorization: `Bearer ${token}`};
+      if (next === 'none') {
+        if (current === 'going') {
+          await axios.delete(
+            `${API_BASE_URL}/events/${event._id}/roster/${encodeURIComponent(
+              userData.username || '',
+            )}`,
+            {headers},
+          );
+        } else {
+          await axios.delete(
+            `${API_BASE_URL}/events/${event._id}/rsvp/${userData._id}`,
+            {headers},
+          );
+        }
+      } else {
+        await axios.put(
+          `${API_BASE_URL}/events/${event._id}/rsvp`,
+          {
+            userId: userData._id,
+            username: userData.username,
+            profilePicUrl: userData.profilePicUrl,
+            status: next,
+          },
+          {headers},
+        );
+      }
+    } catch (error: any) {
+      if (error?.response?.data?.full) {
+        Alert.alert(
+          t('events.eventFull') || 'Event full',
+          t('events.eventFullMessage') ||
+            'This event is full right now. You can join the waitlist from the event page.',
+        );
+      }
+      // Reconcile with server truth after any failure.
+      fetchLatestEvents();
+    }
+  };
+
+  // Ask the owner of a gated public event for access. Optimistically flips the
+  // card to "Requested…"; the details unlock (via refetch) once approved.
+  const handleJoinRequest = async (event: Event) => {
+    if (!userData) {
+      return;
+    }
+    setEventData(prev =>
+      prev.map(e =>
+        e._id === event._id ? {...e, myJoinRequestStatus: 'pending'} : e,
+      ),
+    );
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(
+        `${API_BASE_URL}/events/${event._id}/join-request`,
+        {
+          username: userData.username,
+          profilePicUrl: userData.profilePicUrl,
+        },
+        {headers: {Authorization: `Bearer ${token}`}},
+      );
+    } catch (error) {
+      setEventData(prev =>
+        prev.map(e =>
+          e._id === event._id ? {...e, myJoinRequestStatus: 'none'} : e,
+        ),
+      );
+      fetchLatestEvents();
+    }
+  };
+
   const handleCancelModal = () => {
     setModalVisible(false);
     setNewEvent(createEmptyEvent());
@@ -4183,6 +4482,120 @@ const EventList: React.FC = () => {
     const showOptionsMenu = () => {
       setOptionsMenuEvent(item);
     };
+
+    // Locked teaser for gated public events the viewer hasn't been approved
+    // for. Shows just enough to decide (name, type, organizer, when, spots)
+    // and a request-to-join CTA — no address, map, roster, or discussion.
+    if (item.isGated) {
+      const isPending = item.myJoinRequestStatus === 'pending';
+      return (
+        <View style={themedStyles.card}>
+          <View style={themedStyles.cardHeader}>
+            <View style={themedStyles.cardHeaderLeft}>
+              {creatorProfilePicUrl ? (
+                <Image
+                  source={{uri: creatorProfilePicUrl}}
+                  style={themedStyles.avatar}
+                />
+              ) : (
+                <View
+                  style={[
+                    themedStyles.avatar,
+                    {backgroundColor: getAvatarColor(username)},
+                  ]}>
+                  <Text style={themedStyles.avatarText}>{creatorInitials}</Text>
+                </View>
+              )}
+              <View style={themedStyles.cardHeaderIdentity}>
+                <Text style={themedStyles.cardHeaderUsername} numberOfLines={1}>
+                  {username || t('events.anonymous') || 'Unknown'}
+                </Text>
+                <View style={themedStyles.cardHeaderMetaRow}>
+                  <FontAwesomeIcon
+                    icon={faLock}
+                    size={10}
+                    color={colors.secondaryText}
+                  />
+                  <Text style={themedStyles.cardHeaderMeta}>
+                    {t('events.approvalRequired') || 'Approval required'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <View style={themedStyles.cardBody}>
+            <View style={themedStyles.cardTitleRow}>
+              <Text style={themedStyles.cardEventEmoji}>
+                {getEventTypeEmoji(item.eventType)}
+              </Text>
+              <Text style={themedStyles.cardEventTitle} numberOfLines={2}>
+                {item.name}
+              </Text>
+            </View>
+
+            <View style={themedStyles.detailRow}>
+              <FontAwesomeIcon
+                icon={faCalendarAlt}
+                size={12}
+                color={colors.secondaryText}
+              />
+              <Text style={themedStyles.detailText}>
+                {item.date} · {formatDisplayTime(item.time)}
+              </Text>
+            </View>
+
+            <View style={themedStyles.detailRow}>
+              <FontAwesomeIcon
+                icon={faUsers}
+                size={12}
+                color={colors.secondaryText}
+              />
+              <Text style={themedStyles.detailText}>
+                {item.rosterSpotsFilled}/{item.totalSpots}{' '}
+                {t('events.playersJoined')}
+              </Text>
+            </View>
+
+            <View style={themedStyles.gatedHintRow}>
+              <FontAwesomeIcon
+                icon={faLock}
+                size={11}
+                color={colors.secondaryText}
+              />
+              <Text style={themedStyles.gatedHintText}>
+                {t('events.gatedHint') ||
+                  'Location and details unlock when the host approves you.'}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              themedStyles.requestButton,
+              isPending && themedStyles.requestButtonPending,
+            ]}
+            onPress={() => !isPending && handleJoinRequest(item)}
+            disabled={isPending}
+            activeOpacity={0.8}>
+            <FontAwesomeIcon
+              icon={isPending ? faCheck : faUserPlus}
+              size={14}
+              color={isPending ? colors.secondaryText : '#fff'}
+            />
+            <Text
+              style={[
+                themedStyles.requestButtonText,
+                isPending && themedStyles.requestButtonTextPending,
+              ]}>
+              {isPending
+                ? t('events.requested') || 'Requested'
+                : t('events.requestToJoin') || 'Request to join'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
 
     return (
       <View style={[themedStyles.card, isPast && themedStyles.pastEventCard]}>
@@ -4396,6 +4809,152 @@ const EventList: React.FC = () => {
             </Text>
           </View>
         </TouchableOpacity>
+
+        {/* RSVP control — Going / Maybe / Can't make it. Only invite-only
+            events use the 3-way RSVP: you were invited, so you reply. Public
+            events use a single Join toggle (below) and private events have no
+            one to RSVP. "Going" adds you to the roster; the other two record a
+            reply without taking a spot. */}
+        {!isPast && item.privacy === 'invite-only'
+          ? (() => {
+              const myRsvp = getMyRsvp(item);
+              const goingCount =
+                typeof item.rosterSpotsFilled === 'number'
+                  ? item.rosterSpotsFilled
+                  : (item.roster || []).length;
+              const maybeCount = (item.rsvps || []).filter(
+                r => r.status === 'maybe',
+              ).length;
+              const cantCount = (item.rsvps || []).filter(
+                r => r.status === 'cant',
+              ).length;
+              const summaryParts = [
+                goingCount > 0
+                  ? `${goingCount} ${t('events.rsvpGoing') || 'Going'}`
+                  : '',
+                maybeCount > 0
+                  ? `${maybeCount} ${t('events.rsvpMaybe') || 'Maybe'}`
+                  : '',
+                cantCount > 0
+                  ? `${cantCount} ${t('events.rsvpCant') || "Can't make it"}`
+                  : '',
+              ].filter(Boolean);
+              return (
+                <View style={themedStyles.rsvpContainer}>
+                  <View style={themedStyles.rsvpButtonsRow}>
+                    <TouchableOpacity
+                      style={[
+                        themedStyles.rsvpButton,
+                        myRsvp === 'going' && themedStyles.rsvpButtonGoingActive,
+                      ]}
+                      onPress={() => handleRsvp(item, 'going')}
+                      activeOpacity={0.8}>
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={13}
+                        color={myRsvp === 'going' ? '#fff' : colors.secondaryText}
+                      />
+                      <Text
+                        style={[
+                          themedStyles.rsvpButtonText,
+                          myRsvp === 'going' && themedStyles.rsvpButtonTextActive,
+                        ]}>
+                        {t('events.rsvpGoing') || 'Going'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        themedStyles.rsvpButton,
+                        myRsvp === 'maybe' && themedStyles.rsvpButtonMaybeActive,
+                      ]}
+                      onPress={() => handleRsvp(item, 'maybe')}
+                      activeOpacity={0.8}>
+                      <FontAwesomeIcon
+                        icon={faQuestion}
+                        size={13}
+                        color={myRsvp === 'maybe' ? '#fff' : colors.secondaryText}
+                      />
+                      <Text
+                        style={[
+                          themedStyles.rsvpButtonText,
+                          myRsvp === 'maybe' && themedStyles.rsvpButtonTextActive,
+                        ]}>
+                        {t('events.rsvpMaybe') || 'Maybe'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        themedStyles.rsvpButton,
+                        myRsvp === 'cant' && themedStyles.rsvpButtonCantActive,
+                      ]}
+                      onPress={() => handleRsvp(item, 'cant')}
+                      activeOpacity={0.8}>
+                      <FontAwesomeIcon
+                        icon={faTimes}
+                        size={13}
+                        color={myRsvp === 'cant' ? '#fff' : colors.secondaryText}
+                      />
+                      <Text
+                        style={[
+                          themedStyles.rsvpButtonText,
+                          myRsvp === 'cant' && themedStyles.rsvpButtonTextActive,
+                        ]}>
+                        {t('events.rsvpCant') || "Can't make it"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {summaryParts.length > 0 ? (
+                    <Text style={themedStyles.rsvpSummary}>
+                      {summaryParts.join(' · ')}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })()
+          : null}
+
+        {/* Public (ungated — you're the creator or already approved): a single
+            Join/Going toggle. Requesters see the locked teaser instead. */}
+        {!isPast && item.privacy === 'public'
+          ? (() => {
+              const isGoing = getMyRsvp(item) === 'going';
+              const goingCount =
+                typeof item.rosterSpotsFilled === 'number'
+                  ? item.rosterSpotsFilled
+                  : (item.roster || []).length;
+              return (
+                <View style={themedStyles.rsvpContainer}>
+                  <TouchableOpacity
+                    style={[
+                      themedStyles.publicJoinButton,
+                      isGoing && themedStyles.rsvpButtonGoingActive,
+                    ]}
+                    onPress={() => handleRsvp(item, 'going')}
+                    activeOpacity={0.8}>
+                    <FontAwesomeIcon
+                      icon={faCheck}
+                      size={14}
+                      color={isGoing ? '#fff' : colors.secondaryText}
+                    />
+                    <Text
+                      style={[
+                        themedStyles.rsvpButtonText,
+                        isGoing && themedStyles.rsvpButtonTextActive,
+                      ]}>
+                      {isGoing
+                        ? t('events.rsvpGoing') || 'Going'
+                        : t('events.joinEvent') || 'Join'}
+                    </Text>
+                  </TouchableOpacity>
+                  {goingCount > 0 ? (
+                    <Text style={themedStyles.rsvpSummary}>
+                      {`${goingCount} ${t('events.rsvpGoing') || 'Going'}`}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })()
+          : null}
 
         {/* Engagement Footer */}
         <View style={themedStyles.engagementRow}>
