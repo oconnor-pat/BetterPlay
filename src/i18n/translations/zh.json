@@ -275,5 +275,14 @@
     "invitePlayers": "邀请他人",
     "noReply": "已邀请 · 未回复",
     "joinRequests": "申请"
+  },
+  "groupChat": {
+    "tabMembers": "成员",
+    "tabChat": "聊天",
+    "upcoming": "即将开始",
+    "viewEvent": "查看活动",
+    "emptyTitle": "还没有消息",
+    "emptySubtitle": "打个招呼，分享计划，或安排下次聚会。",
+    "placeholder": "给群组发消息"
   }
 }

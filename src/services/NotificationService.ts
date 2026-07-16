@@ -54,6 +54,7 @@ export interface NotificationSettings {
   groupAdded: boolean;
   groupRoleChanged: boolean;
   groupEvents: boolean;
+  groupMessages: boolean;
 }
 
 export type NotificationNavigationCallback = (
@@ -76,6 +77,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   groupAdded: true,
   groupRoleChanged: true,
   groupEvents: true,
+  groupMessages: true,
 };
 
 class NotificationService {
@@ -734,6 +736,7 @@ class NotificationService {
         groupAdded: settings.groupAdded,
         groupRoleChanged: settings.groupRoleChanged,
         groupEvents: settings.groupEvents,
+        groupMessages: settings.groupMessages,
       };
 
       await fetch(`${API_BASE_URL}/api/notifications/preferences`, {

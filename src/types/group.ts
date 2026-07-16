@@ -22,6 +22,28 @@ export interface GroupMember {
   profilePicUrl?: string;
 }
 
+// Compact preview of the most recent chat message, returned on the
+// Groups list so each row can show a one-line preview + unread badge.
+export interface GroupLastMessage {
+  text: string;
+  kind: 'text' | 'system';
+  username?: string;
+  senderId: string;
+  createdAt: string;
+}
+
+// Minimal event shape surfaced on GroupDetail's "upcoming" strip.
+export interface GroupUpcomingEvent {
+  _id: string;
+  name: string;
+  date: string;
+  time?: string;
+  location?: string;
+  eventType?: string;
+  rosterSpotsFilled?: number;
+  totalSpots?: number;
+}
+
 export interface Group {
   _id: string;
   name: string;
@@ -31,6 +53,29 @@ export interface Group {
   memberCount: number;
   createdAt: string;
   updatedAt: string;
+  // Chat enrichment (present on GET /groups/mine).
+  unreadCount?: number;
+  lastMessage?: GroupLastMessage | null;
+  // Hub enrichment (present on GET /groups/:id).
+  upcomingEvents?: GroupUpcomingEvent[];
+}
+
+export interface GroupMessageEventRef {
+  eventId: string;
+  eventName?: string;
+  eventDate?: string;
+}
+
+export interface GroupMessage {
+  _id: string;
+  groupId: string;
+  userId: string;
+  username?: string;
+  profilePicUrl?: string;
+  text: string;
+  kind: 'text' | 'system';
+  eventRef?: GroupMessageEventRef;
+  createdAt: string;
 }
 
 export interface CreateGroupPayload {

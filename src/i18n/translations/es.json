@@ -284,5 +284,14 @@
     "invitePlayers": "Invitar Personas",
     "noReply": "Invitado · sin respuesta",
     "joinRequests": "Solicitudes"
+  },
+  "groupChat": {
+    "tabMembers": "Miembros",
+    "tabChat": "Chat",
+    "upcoming": "Próximos",
+    "viewEvent": "Ver evento",
+    "emptyTitle": "Aún no hay mensajes",
+    "emptySubtitle": "Saluda, comparte un plan o organiza el próximo encuentro.",
+    "placeholder": "Mensaje al grupo"
   }
 }

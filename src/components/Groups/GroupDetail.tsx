@@ -34,8 +34,13 @@ import {
   faUserPlus,
   faEllipsisH,
   faRightFromBracket,
+  faUsers,
+  faComments,
+  faCalendarDay,
+  faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {useTranslation} from 'react-i18next';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {
   deleteGroup,
@@ -43,14 +48,16 @@ import {
   removeGroupMember,
   setGroupMemberRole,
 } from '../../services/GroupsService';
-import {Group, GroupMember} from '../../types/group';
+import {Group, GroupMember, GroupUpcomingEvent} from '../../types/group';
 import UserContext, {UserContextType} from '../UserContext';
 import EditGroupModal from './EditGroupModal';
 import AddMembersModal from './AddMembersModal';
 import TransferOwnershipModal from './TransferOwnershipModal';
+import GroupChat from './GroupChat';
 
 const GroupDetail: React.FC = () => {
   const {colors, darkMode} = useTheme();
+  const {t} = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {userData} = useContext(UserContext) as UserContextType;
@@ -63,6 +70,19 @@ const GroupDetail: React.FC = () => {
   const [editVisible, setEditVisible] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
   const [transferVisible, setTransferVisible] = useState(false);
+  const [tab, setTab] = useState<'members' | 'chat'>(
+    route.params?.initialTab === 'chat' ? 'chat' : 'members',
+  );
+
+  const openEvent = useCallback(
+    (eventId: string) => {
+      navigation.navigate('Events', {
+        screen: 'EventRoster',
+        params: {eventId},
+      });
+    },
+    [navigation],
+  );
 
   const refresh = useCallback(async () => {
     if (!groupId) return;
@@ -379,6 +399,63 @@ const GroupDetail: React.FC = () => {
           color: colors.secondaryText,
           fontWeight: '600',
         },
+        segment: {
+          flexDirection: 'row',
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.07)'
+            : 'rgba(0,0,0,0.05)',
+          borderRadius: 12,
+          padding: 3,
+          marginHorizontal: 16,
+          marginTop: 12,
+          marginBottom: 4,
+        },
+        segmentBtn: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          paddingVertical: 8,
+          borderRadius: 9,
+        },
+        segmentBtnActive: {
+          backgroundColor: colors.card,
+        },
+        segmentText: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.secondaryText,
+        },
+        segmentTextActive: {
+          color: colors.text,
+        },
+        upcomingStrip: {
+          paddingTop: 6,
+          paddingBottom: 2,
+        },
+        upcomingRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          paddingVertical: 8,
+          paddingHorizontal: 16,
+        },
+        upcomingIcon: {
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: colors.primary + '18',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        upcomingBody: {flex: 1},
+        upcomingName: {fontSize: 14, fontWeight: '600', color: colors.text},
+        upcomingMeta: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          marginTop: 1,
+        },
         sectionRow: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -601,81 +678,166 @@ const GroupDetail: React.FC = () => {
         ) : null}
       </View>
 
-      <FlatList
-        data={sortedMembers}
-        keyExtractor={item => item.userId}
-        renderItem={renderMember}
-        ListHeaderComponent={
-          <View>
-            <View style={styles.hero}>
-              <Text style={styles.groupName}>{group.name}</Text>
-              <View style={styles.metaRow}>
-                <View style={styles.privacyPill}>
-                  <FontAwesomeIcon
-                    icon={group.privacy === 'public' ? faGlobe : faLock}
-                    size={11}
-                    color={colors.secondaryText}
-                  />
-                  <Text style={styles.privacyText}>
-                    {group.privacy === 'public' ? 'Public' : 'Private'}
-                  </Text>
-                </View>
-                <Text style={styles.memberCountText}>
-                  {group.memberCount}{' '}
-                  {group.memberCount === 1 ? 'member' : 'members'}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>Members</Text>
-              {isAdmin ? (
-                <TouchableOpacity
-                  style={styles.sectionAction}
-                  onPress={() => setAddVisible(true)}
-                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                  <FontAwesomeIcon
-                    icon={faUserPlus}
-                    size={12}
-                    color={colors.primary}
-                  />
-                  <Text style={styles.sectionActionText}>Add</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
+      <View style={styles.hero}>
+        <Text style={styles.groupName}>{group.name}</Text>
+        <View style={styles.metaRow}>
+          <View style={styles.privacyPill}>
+            <FontAwesomeIcon
+              icon={group.privacy === 'public' ? faGlobe : faLock}
+              size={11}
+              color={colors.secondaryText}
+            />
+            <Text style={styles.privacyText}>
+              {group.privacy === 'public' ? 'Public' : 'Private'}
+            </Text>
           </View>
-        }
-      />
-
-      <View style={styles.footer}>
-        {myMembership ? (
-          <TouchableOpacity
-            style={styles.leaveBtn}
-            onPress={handleLeave}
-            disabled={busy}>
-            {busy ? (
-              <ActivityIndicator size="small" color={colors.text} />
-            ) : (
-              <>
-                <FontAwesomeIcon
-                  icon={faRightFromBracket}
-                  size={14}
-                  color={colors.text}
-                />
-                <Text style={styles.leaveBtnText}>Leave group</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        ) : null}
-        {isCreator ? (
-          <TouchableOpacity
-            style={styles.destructiveBtn}
-            onPress={handleDelete}
-            disabled={busy}>
-            <FontAwesomeIcon icon={faTrash} size={14} color={colors.error} />
-            <Text style={styles.destructiveBtnText}>Delete group</Text>
-          </TouchableOpacity>
-        ) : null}
+          <Text style={styles.memberCountText}>
+            {group.memberCount}{' '}
+            {group.memberCount === 1 ? 'member' : 'members'}
+          </Text>
+        </View>
       </View>
+
+      <View style={styles.segment}>
+        <TouchableOpacity
+          style={[styles.segmentBtn, tab === 'members' && styles.segmentBtnActive]}
+          activeOpacity={0.8}
+          onPress={() => setTab('members')}>
+          <FontAwesomeIcon
+            icon={faUsers}
+            size={13}
+            color={tab === 'members' ? colors.text : colors.secondaryText}
+          />
+          <Text
+            style={[
+              styles.segmentText,
+              tab === 'members' && styles.segmentTextActive,
+            ]}>
+            {t('groupChat.tabMembers') || 'Members'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.segmentBtn, tab === 'chat' && styles.segmentBtnActive]}
+          activeOpacity={0.8}
+          onPress={() => setTab('chat')}>
+          <FontAwesomeIcon
+            icon={faComments}
+            size={13}
+            color={tab === 'chat' ? colors.text : colors.secondaryText}
+          />
+          <Text
+            style={[
+              styles.segmentText,
+              tab === 'chat' && styles.segmentTextActive,
+            ]}>
+            {t('groupChat.tabChat') || 'Chat'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {tab === 'chat' ? (
+        <GroupChat groupId={group._id} />
+      ) : (
+        <>
+          <FlatList
+            data={sortedMembers}
+            keyExtractor={item => item.userId}
+            renderItem={renderMember}
+            ListHeaderComponent={
+              <View>
+                {group.upcomingEvents && group.upcomingEvents.length > 0 ? (
+                  <View style={styles.upcomingStrip}>
+                    <View style={styles.sectionRow}>
+                      <Text style={styles.sectionTitle}>
+                        {t('groupChat.upcoming') || 'Upcoming'}
+                      </Text>
+                    </View>
+                    {group.upcomingEvents.map((ev: GroupUpcomingEvent) => (
+                      <TouchableOpacity
+                        key={ev._id}
+                        style={styles.upcomingRow}
+                        activeOpacity={0.7}
+                        onPress={() => openEvent(ev._id)}>
+                        <View style={styles.upcomingIcon}>
+                          <FontAwesomeIcon
+                            icon={faCalendarDay}
+                            size={15}
+                            color={colors.primary}
+                          />
+                        </View>
+                        <View style={styles.upcomingBody}>
+                          <Text style={styles.upcomingName} numberOfLines={1}>
+                            {ev.name}
+                          </Text>
+                          <Text style={styles.upcomingMeta} numberOfLines={1}>
+                            {ev.date}
+                            {ev.time ? ` · ${ev.time}` : ''}
+                            {ev.location ? ` · ${ev.location}` : ''}
+                          </Text>
+                        </View>
+                        <FontAwesomeIcon
+                          icon={faChevronRight}
+                          size={13}
+                          color={colors.secondaryText}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
+                <View style={styles.sectionRow}>
+                  <Text style={styles.sectionTitle}>
+                    {t('groupChat.tabMembers') || 'Members'}
+                  </Text>
+                  {isAdmin ? (
+                    <TouchableOpacity
+                      style={styles.sectionAction}
+                      onPress={() => setAddVisible(true)}
+                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                      <FontAwesomeIcon
+                        icon={faUserPlus}
+                        size={12}
+                        color={colors.primary}
+                      />
+                      <Text style={styles.sectionActionText}>Add</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+            }
+          />
+
+          <View style={styles.footer}>
+            {myMembership ? (
+              <TouchableOpacity
+                style={styles.leaveBtn}
+                onPress={handleLeave}
+                disabled={busy}>
+                {busy ? (
+                  <ActivityIndicator size="small" color={colors.text} />
+                ) : (
+                  <>
+                    <FontAwesomeIcon
+                      icon={faRightFromBracket}
+                      size={14}
+                      color={colors.text}
+                    />
+                    <Text style={styles.leaveBtnText}>Leave group</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : null}
+            {isCreator ? (
+              <TouchableOpacity
+                style={styles.destructiveBtn}
+                onPress={handleDelete}
+                disabled={busy}>
+                <FontAwesomeIcon icon={faTrash} size={14} color={colors.error} />
+                <Text style={styles.destructiveBtnText}>Delete group</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </>
+      )}
 
       <EditGroupModal
         visible={editVisible}

@@ -269,5 +269,14 @@
     "invitePlayers": "लोगों को आमंत्रित करें",
     "noReply": "आमंत्रित · कोई जवाब नहीं",
     "joinRequests": "अनुरोध"
+  },
+  "groupChat": {
+    "tabMembers": "सदस्य",
+    "tabChat": "चैट",
+    "upcoming": "आगामी",
+    "viewEvent": "इवेंट देखें",
+    "emptyTitle": "अभी कोई संदेश नहीं",
+    "emptySubtitle": "नमस्ते कहें, कोई योजना साझा करें, या अगली मुलाकात तय करें।",
+    "placeholder": "समूह को संदेश भेजें"
   }
 }

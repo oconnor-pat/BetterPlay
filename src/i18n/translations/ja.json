@@ -275,5 +275,14 @@
     "invitePlayers": "人を招待",
     "noReply": "招待済み · 返信なし",
     "joinRequests": "リクエスト"
+  },
+  "groupChat": {
+    "tabMembers": "メンバー",
+    "tabChat": "チャット",
+    "upcoming": "予定",
+    "viewEvent": "イベントを見る",
+    "emptyTitle": "まだメッセージがありません",
+    "emptySubtitle": "あいさつしたり、予定を共有したり、次の集まりを決めましょう。",
+    "placeholder": "グループにメッセージ"
   }
 }

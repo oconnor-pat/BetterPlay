@@ -78,6 +78,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   groupAdded: true,
   groupRoleChanged: true,
   groupEvents: true,
+  groupMessages: true,
 };
 
 /**

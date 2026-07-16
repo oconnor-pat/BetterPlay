@@ -275,5 +275,14 @@
     "invitePlayers": "사람 초대",
     "noReply": "초대됨 · 응답 없음",
     "joinRequests": "요청"
+  },
+  "groupChat": {
+    "tabMembers": "멤버",
+    "tabChat": "채팅",
+    "upcoming": "예정",
+    "viewEvent": "이벤트 보기",
+    "emptyTitle": "아직 메시지가 없습니다",
+    "emptySubtitle": "인사하거나 계획을 공유하고 다음 모임을 정해보세요.",
+    "placeholder": "그룹에 메시지 보내기"
   }
 }

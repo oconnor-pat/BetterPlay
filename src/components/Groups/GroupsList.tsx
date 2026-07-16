@@ -8,7 +8,13 @@
 // Creating a group opens GroupDetail for the new group immediately so
 // the user lands on the management surface to add members.
 
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -29,8 +35,10 @@ import {
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useTranslation} from 'react-i18next';
 import {useTheme} from '../ThemeContext/ThemeContext';
-import {Group} from '../../types/group';
+import {Group, GroupLastMessage} from '../../types/group';
 import {listMyGroups} from '../../services/GroupsService';
+import {useSocket} from '../../Context/SocketContext';
+import UserContext, {UserContextType} from '../UserContext';
 import CreateGroupModal from './CreateGroupModal';
 import RosterAvatarStrip from '../shared/RosterAvatarStrip';
 
@@ -38,6 +46,9 @@ const GroupsList: React.FC = () => {
   const {colors} = useTheme();
   const {t} = useTranslation();
   const navigation = useNavigation<any>();
+  const {subscribe} = useSocket();
+  const {userData} = useContext(UserContext) as UserContextType;
+  const currentUserId = userData?._id;
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,6 +73,71 @@ const GroupsList: React.FC = () => {
       loadGroups();
     }, [loadGroups]),
   );
+
+  // Live updates so the tab reads like a hub: bump unread + refresh the
+  // preview when a message lands, and clear the badge when the thread is
+  // read on any device.
+  useEffect(() => {
+    const unsubActivity = subscribe(
+      'group:activity',
+      (payload: {
+        groupId: string;
+        senderId: string;
+        lastMessage: GroupLastMessage;
+      }) => {
+        if (!payload?.groupId) return;
+        setGroups(prev => {
+          const idx = prev.findIndex(g => g._id === payload.groupId);
+          if (idx === -1) return prev;
+          const fromMe = payload.senderId === currentUserId;
+          const updated: Group = {
+            ...prev[idx],
+            lastMessage: payload.lastMessage,
+            unreadCount: fromMe
+              ? prev[idx].unreadCount || 0
+              : (prev[idx].unreadCount || 0) + 1,
+          };
+          // Float the active conversation to the top.
+          const rest = prev.filter(g => g._id !== payload.groupId);
+          return [updated, ...rest];
+        });
+      },
+    );
+    const unsubRead = subscribe('group:read', (payload: {groupId: string}) => {
+      if (!payload?.groupId) return;
+      setGroups(prev =>
+        prev.map(g =>
+          g._id === payload.groupId ? {...g, unreadCount: 0} : g,
+        ),
+      );
+    });
+    return () => {
+      unsubActivity();
+      unsubRead();
+    };
+  }, [subscribe, currentUserId]);
+
+  // Optimistically clear a group's badge when opening it — the detail
+  // screen marks it read on mount, and the socket `group:read` will
+  // confirm; this just avoids a stale badge flash on the way in.
+  const openGroup = useCallback(
+    (groupId: string) => {
+      setGroups(prev =>
+        prev.map(g => (g._id === groupId ? {...g, unreadCount: 0} : g)),
+      );
+      navigation.navigate('GroupDetail', {groupId});
+    },
+    [navigation],
+  );
+
+  const previewText = useCallback((g: Group): string | null => {
+    const lm = g.lastMessage;
+    if (!lm) return null;
+    if (lm.kind === 'system') return lm.text;
+    const who =
+      lm.senderId === currentUserId ? 'You' : lm.username || 'Someone';
+    return `${who}: ${lm.text}`;
+  }, [currentUserId]);
 
   const handleGroupCreated = useCallback(
     (group: Group) => {
@@ -183,45 +259,89 @@ const GroupsList: React.FC = () => {
           fontSize: 12,
           color: colors.secondaryText,
         },
+        rowPreview: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          marginTop: 3,
+        },
+        rowPreviewUnread: {
+          color: colors.text,
+          fontWeight: '600',
+        },
+        unreadBadge: {
+          minWidth: 20,
+          height: 20,
+          borderRadius: 10,
+          paddingHorizontal: 6,
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginLeft: 8,
+        },
+        unreadBadgeText: {
+          color: '#FFFFFF',
+          fontSize: 11,
+          fontWeight: '800',
+        },
       }),
     [colors],
   );
 
-  const renderRow = ({item: g}: {item: Group}) => (
-    <TouchableOpacity
-      style={styles.row}
-      activeOpacity={0.7}
-      onPress={() => navigation.navigate('GroupDetail', {groupId: g._id})}>
-      <View style={styles.rowAvatars}>
-        <RosterAvatarStrip
-          members={g.members}
-          maxVisible={3}
-          size={28}
-          overlap={10}
-        />
-      </View>
-      <View style={styles.rowContent}>
-        <Text style={styles.rowTitle} numberOfLines={1}>
-          {g.name}
-        </Text>
-        <View style={styles.rowMetaRow}>
+  const renderRow = ({item: g}: {item: Group}) => {
+    const preview = previewText(g);
+    const unread = g.unreadCount || 0;
+    return (
+      <TouchableOpacity
+        style={styles.row}
+        activeOpacity={0.7}
+        onPress={() => openGroup(g._id)}>
+        <View style={styles.rowAvatars}>
+          <RosterAvatarStrip
+            members={g.members}
+            maxVisible={3}
+            size={28}
+            overlap={10}
+          />
+        </View>
+        <View style={styles.rowContent}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {g.name}
+          </Text>
+          {preview ? (
+            <Text
+              style={[styles.rowPreview, unread > 0 && styles.rowPreviewUnread]}
+              numberOfLines={1}>
+              {preview}
+            </Text>
+          ) : (
+            <View style={styles.rowMetaRow}>
+              <FontAwesomeIcon
+                icon={g.privacy === 'public' ? faGlobe : faLock}
+                size={10}
+                color={colors.secondaryText}
+              />
+              <Text style={styles.rowSubtitle}>
+                {g.memberCount} {g.memberCount === 1 ? 'member' : 'members'}
+              </Text>
+            </View>
+          )}
+        </View>
+        {unread > 0 ? (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadBadgeText}>
+              {unread > 99 ? '99+' : unread}
+            </Text>
+          </View>
+        ) : (
           <FontAwesomeIcon
-            icon={g.privacy === 'public' ? faGlobe : faLock}
-            size={10}
+            icon={faChevronRight}
+            size={13}
             color={colors.secondaryText}
           />
-          <Text style={styles.rowSubtitle}>
-            {g.memberCount} {g.memberCount === 1 ? 'member' : 'members'}
-          </Text>
-        </View>
-      </View>
-      <FontAwesomeIcon
-        icon={faChevronRight}
-        size={13}
-        color={colors.secondaryText}
-      />
-    </TouchableOpacity>
-  );
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const renderEmpty = () => {
     if (loading) {
@@ -282,6 +402,7 @@ const GroupsList: React.FC = () => {
         visible={createVisible}
         onClose={() => setCreateVisible(false)}
         onCreated={handleGroupCreated}
+        currentUserId={currentUserId || ''}
       />
     </SafeAreaView>
   );

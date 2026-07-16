@@ -638,5 +638,14 @@
       "waitlistPosition": "You're #{{position}} in line. We'll notify you if a spot opens up.",
       "signInRequired": "You need to be signed in to join."
     }
+  },
+  "groupChat": {
+    "tabMembers": "Members",
+    "tabChat": "Chat",
+    "upcoming": "Upcoming",
+    "viewEvent": "View event",
+    "emptyTitle": "No messages yet",
+    "emptySubtitle": "Say hi, share a plan, or lock in the next meetup.",
+    "placeholder": "Message the group"
   }
 }

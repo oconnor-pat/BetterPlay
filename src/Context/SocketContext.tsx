@@ -19,6 +19,8 @@ interface SocketContextType {
   isConnected: boolean;
   joinEvent: (eventId: string) => void;
   leaveEvent: (eventId: string) => void;
+  joinGroup: (groupId: string) => void;
+  leaveGroup: (groupId: string) => void;
   subscribe: (event: string, handler: SocketEventHandler) => () => void;
 }
 
@@ -26,6 +28,8 @@ const SocketContext = createContext<SocketContextType>({
   isConnected: false,
   joinEvent: () => {},
   leaveEvent: () => {},
+  joinGroup: () => {},
+  leaveGroup: () => {},
   subscribe: () => () => {},
 });
 
@@ -35,6 +39,7 @@ export const SocketProvider: React.FC<{children: ReactNode}> = ({
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const joinedEventsRef = useRef<Set<string>>(new Set());
+  const joinedGroupsRef = useRef<Set<string>>(new Set());
   const listenersRef = useRef<Map<string, Set<SocketEventHandler>>>(new Map());
   const userCtx = useContext(UserContext);
   const userData = userCtx?.userData ?? null;
@@ -74,6 +79,9 @@ export const SocketProvider: React.FC<{children: ReactNode}> = ({
         setIsConnected(true);
         joinedEventsRef.current.forEach(eventId => {
           socket?.emit('join:event', eventId);
+        });
+        joinedGroupsRef.current.forEach(groupId => {
+          socket?.emit('join:group', groupId);
         });
       });
 
@@ -140,6 +148,20 @@ export const SocketProvider: React.FC<{children: ReactNode}> = ({
     }
   }, []);
 
+  const joinGroup = useCallback((groupId: string) => {
+    joinedGroupsRef.current.add(groupId);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('join:group', groupId);
+    }
+  }, []);
+
+  const leaveGroup = useCallback((groupId: string) => {
+    joinedGroupsRef.current.delete(groupId);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('leave:group', groupId);
+    }
+  }, []);
+
   const subscribe = useCallback(
     (event: string, handler: SocketEventHandler): (() => void) => {
       if (!listenersRef.current.has(event)) {
@@ -167,6 +189,8 @@ export const SocketProvider: React.FC<{children: ReactNode}> = ({
         isConnected,
         joinEvent,
         leaveEvent,
+        joinGroup,
+        leaveGroup,
         subscribe,
       }}>
       {children}

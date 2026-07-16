@@ -490,6 +490,25 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
+
+          {/* Group Messages */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Group Messages</Text>
+              <Text style={styles.settingDescription}>
+                New chat messages in your groups
+              </Text>
+            </View>
+            <Switch
+              value={settings.groupMessages && settings.enabled}
+              onValueChange={value =>
+                handleToggleSetting('groupMessages', value)
+              }
+              disabled={!settings.enabled}
+              trackColor={{false: colors.border, true: colors.primary}}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
         </View>
       )}
 

@@ -275,5 +275,14 @@
     "invitePlayers": "دعوة أشخاص",
     "noReply": "مدعو · لا يوجد رد",
     "joinRequests": "الطلبات"
+  },
+  "groupChat": {
+    "tabMembers": "الأعضاء",
+    "tabChat": "الدردشة",
+    "upcoming": "القادمة",
+    "viewEvent": "عرض الحدث",
+    "emptyTitle": "لا توجد رسائل بعد",
+    "emptySubtitle": "ألقِ التحية، شارك خطة، أو حدد اللقاء القادم.",
+    "placeholder": "رسالة إلى المجموعة"
   }
 }
