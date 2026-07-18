@@ -40,6 +40,7 @@ import {useTranslation} from 'react-i18next';
 import {RosterListSkeleton} from '../Skeleton';
 import {
   faChevronDown,
+  faChevronRight,
   faChevronUp,
   faUserPlus,
   faUsers,
@@ -316,6 +317,7 @@ const EventRoster: React.FC = () => {
     jerseyColors: initialJerseyColors,
     changedFields: changedFieldsParam,
     isRecurring: paramIsRecurring,
+    groupId: paramGroupId,
     groupName: paramGroupName,
   } = route.params;
   const {colors} = useTheme();
@@ -323,6 +325,17 @@ const EventRoster: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {t} = useTranslation();
   const {subscribe: socketSubscribe, joinEvent, leaveEvent} = useSocket();
+
+  // Jump to the event's Group (lives under a sibling bottom tab).
+  const openGroup = (groupId?: string) => {
+    if (!groupId) {
+      return;
+    }
+    navigation.navigate('Groups', {
+      screen: 'GroupDetail',
+      params: {groupId},
+    });
+  };
 
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(
@@ -2293,25 +2306,47 @@ const EventRoster: React.FC = () => {
               </Animated.View>
             )}
 
-            {/* Live-link banner — only when this is a recurring event
-                with an attached Group. Tells the user that adding
-                someone to the Group will invite them to future
-                instances automatically. */}
-            {paramIsRecurring && paramGroupName ? (
-              <View style={themedStyles.groupLinkBanner}>
+            {/* Group banner — shown whenever an event belongs to a Group.
+                Tappable to jump straight to the group. For recurring series
+                it also explains the live-link (adding a member invites them
+                to future instances automatically). */}
+            {paramGroupName ? (
+              <TouchableOpacity
+                style={themedStyles.groupLinkBanner}
+                activeOpacity={0.7}
+                onPress={() => openGroup(paramGroupId)}
+                disabled={!paramGroupId}>
                 <FontAwesomeIcon
                   icon={faUsers}
                   size={13}
                   color={colors.primary}
                 />
                 <Text style={themedStyles.groupLinkBannerText}>
-                  This series invites everyone in{' '}
-                  <Text style={themedStyles.groupLinkBannerName}>
-                    {paramGroupName}
-                  </Text>
-                  .
+                  {paramIsRecurring ? (
+                    <>
+                      This series invites everyone in{' '}
+                      <Text style={themedStyles.groupLinkBannerName}>
+                        {paramGroupName}
+                      </Text>
+                      .
+                    </>
+                  ) : (
+                    <>
+                      Part of{' '}
+                      <Text style={themedStyles.groupLinkBannerName}>
+                        {paramGroupName}
+                      </Text>
+                    </>
+                  )}
                 </Text>
-              </View>
+                {paramGroupId ? (
+                  <FontAwesomeIcon
+                    icon={faChevronRight}
+                    size={12}
+                    color={colors.primary}
+                  />
+                ) : null}
+              </TouchableOpacity>
             ) : null}
 
             {/* Progress Bar */}

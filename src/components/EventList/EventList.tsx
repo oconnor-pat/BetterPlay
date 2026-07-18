@@ -165,12 +165,6 @@ const privacyOptions: {
     description: 'Anyone can find it; you approve who joins',
   },
   {
-    value: 'private',
-    label: 'Private',
-    icon: faLock,
-    description: 'Only you can see this event',
-  },
-  {
     value: 'invite-only',
     label: 'Invite Only',
     icon: faEnvelope,
@@ -200,6 +194,12 @@ interface Event {
   description?: string;
   privacy?: EventPrivacy;
   invitedUsers?: string[];
+  // Public-event creator controls. When `allowJoinRequests` is false the card
+  // shows "not accepting requests" instead of the join button; when
+  // `showLocationPublicly` is true the location/map is revealed on the gated
+  // public teaser instead of being hidden until approval.
+  allowJoinRequests?: boolean;
+  showLocationPublicly?: boolean;
   commentCount?: number;
   isRecurring?: boolean;
   recurrenceGroupId?: string;
@@ -298,6 +298,8 @@ const createEmptyEvent = () => ({
   jerseyColors: [] as string[],
   privacy: 'public' as EventPrivacy,
   invitedUsers: [] as string[],
+  allowJoinRequests: true,
+  showLocationPublicly: false,
   isRecurring: false,
   recurrenceFrequency: 'weekly' as RecurrenceFrequency,
   recurrenceCount: 4,
@@ -1144,6 +1146,23 @@ const EventList: React.FC = () => {
         },
         requestButtonTextPending: {
           color: colors.secondaryText,
+        },
+        requestsClosedBar: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          paddingVertical: 12,
+          borderRadius: 10,
+          backgroundColor: colors.inputBackground || colors.background,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          marginTop: 12,
+        },
+        requestsClosedText: {
+          color: colors.secondaryText,
+          fontSize: 14,
+          fontWeight: '600',
         },
         pastEventCard: {
           opacity: 0.6,
@@ -2114,6 +2133,32 @@ const EventList: React.FC = () => {
           textAlign: 'center',
           lineHeight: 14,
         },
+        // Public-event creator control rows (toggles)
+        publicControlsContainer: {
+          marginBottom: 12,
+          gap: 4,
+        },
+        publicControlRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: 8,
+          gap: 12,
+        },
+        publicControlText: {
+          flex: 1,
+        },
+        publicControlLabel: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        publicControlDesc: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          marginTop: 2,
+          lineHeight: 16,
+        },
         // Privacy badge on event cards
         privacyBadge: {
           flexDirection: 'row',
@@ -2301,7 +2346,7 @@ const EventList: React.FC = () => {
         },
         cardHeaderGroupName: {
           fontSize: 13,
-          color: colors.text,
+          color: colors.primary,
           fontWeight: '600',
           // Cap the name so really long group names don't push the
           // avatar strip off the right edge of the identity column.
@@ -3707,6 +3752,8 @@ const EventList: React.FC = () => {
                 : undefined,
               privacy: newEvent.privacy,
               invitedUsers: newEvent.invitedUsers,
+              allowJoinRequests: newEvent.allowJoinRequests,
+              showLocationPublicly: newEvent.showLocationPublicly,
               // Recurrence intent — lets the backend convert single↔recurring
               // or re-shape the series. `recurrenceCount` is the number of
               // occurrences from this event forward (set in handleEditEvent).
@@ -3752,6 +3799,8 @@ const EventList: React.FC = () => {
               : undefined,
             privacy: newEvent.privacy,
             invitedUsers: newEvent.invitedUsers,
+            allowJoinRequests: newEvent.allowJoinRequests,
+            showLocationPublicly: newEvent.showLocationPublicly,
             // Optional venue listing reference (set by the Venues-tab bridge).
             venueId: newEvent.venueId,
             venueName: newEvent.venueName,
@@ -3807,6 +3856,18 @@ const EventList: React.FC = () => {
     } else {
       Alert.alert(t('events.missingFields'), t('events.missingFieldsMessage'));
     }
+  };
+
+  // Jump to the event's associated Group. The Groups stack lives under a
+  // sibling bottom tab, so we navigate to the tab and target its detail screen.
+  const openGroup = (groupId?: string) => {
+    if (!groupId) {
+      return;
+    }
+    navigation.navigate('Groups', {
+      screen: 'GroupDetail',
+      params: {groupId},
+    });
   };
 
   const handleEventPress = (event: Event) => {
@@ -3960,7 +4021,11 @@ const EventList: React.FC = () => {
       latitude: event.latitude,
       longitude: event.longitude,
       jerseyColors: event.jerseyColors || [],
-      privacy: event.privacy || 'public',
+      // 'private' is deprecated (redundant with invite-only); migrate legacy
+      // private events to invite-only when they're edited.
+      privacy: event.privacy === 'private' ? 'invite-only' : event.privacy || 'public',
+      allowJoinRequests: event.allowJoinRequests !== false,
+      showLocationPublicly: event.showLocationPublicly === true,
       invitedUsers: event.invitedUsers || [],
       isRecurring: event.isRecurring || false,
       recurrenceFrequency: event.recurrenceFrequency || 'weekly',
@@ -4599,6 +4664,19 @@ const EventList: React.FC = () => {
               </Text>
             </View>
 
+            {item.showLocationPublicly && item.location ? (
+              <View style={themedStyles.detailRow}>
+                <FontAwesomeIcon
+                  icon={faMapMarkerAlt}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+                <Text style={themedStyles.detailText} numberOfLines={2}>
+                  {item.location}
+                </Text>
+              </View>
+            ) : null}
+
             <View style={themedStyles.gatedHintRow}>
               <FontAwesomeIcon
                 icon={faLock}
@@ -4606,35 +4684,52 @@ const EventList: React.FC = () => {
                 color={colors.secondaryText}
               />
               <Text style={themedStyles.gatedHintText}>
-                {t('events.gatedHint') ||
-                  'Location and details unlock when the host approves you.'}
+                {item.showLocationPublicly
+                  ? t('events.gatedHintDetails') ||
+                    'Full details unlock when the host approves you.'
+                  : t('events.gatedHint') ||
+                    'Location and details unlock when the host approves you.'}
               </Text>
             </View>
           </View>
 
-          <TouchableOpacity
-            style={[
-              themedStyles.requestButton,
-              isPending && themedStyles.requestButtonPending,
-            ]}
-            onPress={() => !isPending && handleJoinRequest(item)}
-            disabled={isPending}
-            activeOpacity={0.8}>
-            <FontAwesomeIcon
-              icon={isPending ? faCheck : faUserPlus}
-              size={14}
-              color={isPending ? colors.secondaryText : '#fff'}
-            />
-            <Text
+          {item.allowJoinRequests === false ? (
+            <View style={themedStyles.requestsClosedBar}>
+              <FontAwesomeIcon
+                icon={faLock}
+                size={13}
+                color={colors.secondaryText}
+              />
+              <Text style={themedStyles.requestsClosedText}>
+                {t('events.notAcceptingRequests') ||
+                  'Not accepting join requests'}
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
               style={[
-                themedStyles.requestButtonText,
-                isPending && themedStyles.requestButtonTextPending,
-              ]}>
-              {isPending
-                ? t('events.requested') || 'Requested'
-                : t('events.requestToJoin') || 'Request to join'}
-            </Text>
-          </TouchableOpacity>
+                themedStyles.requestButton,
+                isPending && themedStyles.requestButtonPending,
+              ]}
+              onPress={() => !isPending && handleJoinRequest(item)}
+              disabled={isPending}
+              activeOpacity={0.8}>
+              <FontAwesomeIcon
+                icon={isPending ? faCheck : faUserPlus}
+                size={14}
+                color={isPending ? colors.secondaryText : '#fff'}
+              />
+              <Text
+                style={[
+                  themedStyles.requestButtonText,
+                  isPending && themedStyles.requestButtonTextPending,
+                ]}>
+                {isPending
+                  ? t('events.requested') || 'Requested'
+                  : t('events.requestToJoin') || 'Request to join'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       );
     }
@@ -4713,11 +4808,16 @@ const EventList: React.FC = () => {
                   tells you whose crew this event belongs to. Renders
                   only when the event has a Group attached. */}
               {item.groupName ? (
-                <View style={themedStyles.cardHeaderGroupRow}>
+                <TouchableOpacity
+                  style={themedStyles.cardHeaderGroupRow}
+                  activeOpacity={0.6}
+                  onPress={() => openGroup(item.groupId)}
+                  disabled={!item.groupId}
+                  hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}>
                   <FontAwesomeIcon
                     icon={faUserGroup}
                     size={11}
-                    color={colors.secondaryText}
+                    color={colors.primary}
                   />
                   <Text
                     style={themedStyles.cardHeaderGroupName}
@@ -4733,7 +4833,7 @@ const EventList: React.FC = () => {
                       overlap={7}
                     />
                   ) : null}
-                </View>
+                </TouchableOpacity>
               ) : null}
             </View>
           </TouchableOpacity>
@@ -5989,6 +6089,54 @@ const EventList: React.FC = () => {
                     ))}
                   </View>
                 </View>
+
+                {/* Public-event creator controls */}
+                {newEvent.privacy === 'public' && (
+                  <View style={themedStyles.publicControlsContainer}>
+                    <View style={themedStyles.publicControlRow}>
+                      <View style={themedStyles.publicControlText}>
+                        <Text style={themedStyles.publicControlLabel}>
+                          {t('events.acceptJoinRequests') ||
+                            'Accept join requests'}
+                        </Text>
+                        <Text style={themedStyles.publicControlDesc}>
+                          {t('events.acceptJoinRequestsDesc') ||
+                            'Let people request to join. Turn off to stop new requests.'}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={newEvent.allowJoinRequests}
+                        onValueChange={value =>
+                          setNewEvent({...newEvent, allowJoinRequests: value})
+                        }
+                        trackColor={{false: colors.border, true: colors.primary}}
+                      />
+                    </View>
+
+                    <View style={themedStyles.publicControlRow}>
+                      <View style={themedStyles.publicControlText}>
+                        <Text style={themedStyles.publicControlLabel}>
+                          {t('events.showLocationPublicly') ||
+                            'Show location publicly'}
+                        </Text>
+                        <Text style={themedStyles.publicControlDesc}>
+                          {t('events.showLocationPubliclyDesc') ||
+                            'Reveal the address and map before people are approved.'}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={newEvent.showLocationPublicly}
+                        onValueChange={value =>
+                          setNewEvent({
+                            ...newEvent,
+                            showLocationPublicly: value,
+                          })
+                        }
+                        trackColor={{false: colors.border, true: colors.primary}}
+                      />
+                    </View>
+                  </View>
+                )}
 
                 {/* Invite Users Section - only for invite-only events */}
                 {newEvent.privacy === 'invite-only' && (

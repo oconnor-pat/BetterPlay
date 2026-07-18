@@ -58,7 +58,16 @@ export interface AppNotification {
     | 'event_spot_available'
     | 'event_waitlist_join'
     | 'event_roster_change'
+    | 'event_rsvp'
+    | 'event_join_request'
+    | 'event_join_approved'
+    | 'event_join_denied'
     | 'community_note'
+    | 'group_added'
+    | 'group_event_created'
+    | 'group_admin_promoted'
+    | 'group_ownership_transferred'
+    | 'group_message'
     | 'general';
   title: string;
   body: string;
@@ -69,6 +78,8 @@ export interface AppNotification {
     username?: string;
     eventId?: string;
     eventName?: string;
+    groupId?: string;
+    groupName?: string;
     profilePicUrl?: string;
     [key: string]: string | undefined;
   };
@@ -314,10 +325,42 @@ const Notifications: React.FC = () => {
       case 'event_spot_available':
       case 'event_waitlist_join':
       case 'event_roster_change':
+      case 'event_rsvp':
+      case 'event_join_request':
+      case 'event_join_approved':
+      case 'group_event_created':
         if (notification.data?.eventId) {
           navigation.navigate('Events', {
             screen: 'EventRoster',
             params: {eventId: notification.data.eventId},
+          });
+        }
+        break;
+      case 'event_join_denied':
+        // The requester can no longer see the event's roster, so land them on
+        // the list with the (now re-gated) card highlighted.
+        if (notification.data?.eventId) {
+          navigation.navigate('Events', {
+            screen: 'EventList',
+            params: {highlightEventId: notification.data.eventId},
+          });
+        }
+        break;
+      case 'group_message':
+        if (notification.data?.groupId) {
+          navigation.navigate('Groups', {
+            screen: 'GroupDetail',
+            params: {groupId: notification.data.groupId, initialTab: 'chat'},
+          });
+        }
+        break;
+      case 'group_added':
+      case 'group_admin_promoted':
+      case 'group_ownership_transferred':
+        if (notification.data?.groupId) {
+          navigation.navigate('Groups', {
+            screen: 'GroupDetail',
+            params: {groupId: notification.data.groupId},
           });
         }
         break;
@@ -375,6 +418,21 @@ const Notifications: React.FC = () => {
         return faEye;
       case 'event_waitlist_join':
         return faUsers;
+      case 'event_rsvp':
+        return faCalendarCheck;
+      case 'event_join_request':
+        return faUserPlus;
+      case 'event_join_approved':
+        return faCheck;
+      case 'group_message':
+        return faComments;
+      case 'group_event_created':
+        return faCalendarPlus;
+      case 'group_added':
+      case 'group_ownership_transferred':
+        return faUsers;
+      case 'group_admin_promoted':
+        return faUserCheck;
       default:
         return faBell;
     }
@@ -406,6 +464,17 @@ const Notifications: React.FC = () => {
       case 'event_spot_opened':
       case 'event_spot_available':
         return '#FF9800';
+      case 'event_rsvp':
+      case 'event_join_request':
+      case 'event_join_approved':
+      case 'group_message':
+      case 'group_event_created':
+      case 'group_added':
+      case 'group_admin_promoted':
+      case 'group_ownership_transferred':
+        return colors.primary;
+      case 'event_join_denied':
+        return '#e74c3c';
       default:
         return colors.text;
     }

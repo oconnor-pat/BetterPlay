@@ -556,6 +556,7 @@ class NotificationService {
       id,
       screen,
       eventId,
+      groupId,
       userId,
       accepterId,
       changedFields,
@@ -604,7 +605,11 @@ class NotificationService {
       case 'event_invitation':
       case 'event_roster':
       case 'event_join':
-      case 'event_leave': {
+      case 'event_leave':
+      case 'event_rsvp':
+      case 'event_join_request':
+      case 'event_join_approved':
+      case 'group_event_created': {
         const targetEventId = eventId || id;
         if (targetEventId) {
           const params: Record<string, unknown> = {eventId: targetEventId};
@@ -617,6 +622,42 @@ class NotificationService {
         }
         break;
       }
+
+      // Denied requester can't see the roster; land on the (re-gated) card.
+      case 'event_join_denied': {
+        const deniedEventId = eventId || id;
+        if (deniedEventId) {
+          navigateToTab('Events', 'EventList', {
+            highlightEventId: deniedEventId,
+          });
+        } else {
+          navigateToTab('Events', 'EventList');
+        }
+        break;
+      }
+
+      // Group chat message -> open the group's Chat tab
+      case 'group_message':
+        if (groupId) {
+          navigateToTab('Groups', 'GroupDetail', {
+            groupId,
+            initialTab: 'chat',
+          });
+        } else {
+          navigateToTab('Groups', 'GroupsList');
+        }
+        break;
+
+      // Other group notifications -> open the group (Members)
+      case 'group_added':
+      case 'group_admin_promoted':
+      case 'group_ownership_transferred':
+        if (groupId) {
+          navigateToTab('Groups', 'GroupDetail', {groupId});
+        } else {
+          navigateToTab('Groups', 'GroupsList');
+        }
+        break;
 
       // Like/comment notifications -> EventList, scroll to card and expand comments
       case 'event_like':

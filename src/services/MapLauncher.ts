@@ -30,10 +30,15 @@ const iosMapApps: MapApp[] = [
   {
     name: 'Apple Maps',
     scheme: 'maps://',
-    getUrl: ({address, name, lat, lng}) => {
+    getUrl: ({address, lat, lng}) => {
+      // Navigate straight to the coordinates when we have them. We must NOT
+      // add a `q=` label here: without an `ll`/`sll` param Apple Maps treats
+      // `q` as a *search query* and routes to a text search for that string
+      // (e.g. the event name), ignoring `daddr` — which is exactly why the
+      // wrong destination was opening. Falling back to the address string
+      // lets Apple Maps geocode the real location.
       if (lat && lng) {
-        const label = encodeURIComponent(name || address);
-        return `http://maps.apple.com/?daddr=${lat},${lng}&q=${label}`;
+        return `http://maps.apple.com/?daddr=${lat},${lng}`;
       }
       return `http://maps.apple.com/?daddr=${encodeURIComponent(address)}`;
     },
