@@ -3688,6 +3688,14 @@ const EventList: React.FC = () => {
     proximityEnabled,
   ]);
 
+  // Whether to show the removable-tag row under the chips. Activity types are
+  // deliberately excluded: they're already shown as highlighted chips, so
+  // echoing them as tags just duplicates the selection and adds an empty-ish
+  // extra row. Only the filters that have no other on-screen affordance
+  // (date range, available-only, proximity) get a tag here.
+  const hasTagRowFilters =
+    selectedDateFilter !== 'all' || showAvailableOnly || proximityEnabled;
+
   // Toggle event type selection
   const toggleEventType = (type: string) => {
     setSelectedEventTypes(prev =>
@@ -5419,24 +5427,11 @@ const EventList: React.FC = () => {
             </TouchableOpacity>
           </View>
         )}
-        {/* Active Filters Display */}
-        {activeFilterCount > 0 && (
+        {/* Active Filters Display — activity types are omitted here because
+            the chip bar above already shows them selected; only modal-driven
+            filters (date/available/proximity) surface as removable tags. */}
+        {hasTagRowFilters && (
           <View style={themedStyles.activeFiltersContainer}>
-            {selectedEventTypes.map(type => (
-              <TouchableOpacity
-                key={type}
-                style={themedStyles.activeFilterTag}
-                onPress={() => toggleEventType(type)}>
-                <Text style={themedStyles.activeFilterTagText}>
-                  {getEventTypeEmoji(type)} {type}
-                </Text>
-                <FontAwesomeIcon
-                  icon={faTimes}
-                  size={10}
-                  color={colors.primary}
-                />
-              </TouchableOpacity>
-            ))}
             {selectedDateFilter !== 'all' && (
               <TouchableOpacity
                 style={themedStyles.activeFilterTag}
