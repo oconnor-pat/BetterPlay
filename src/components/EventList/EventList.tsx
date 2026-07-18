@@ -326,6 +326,7 @@ const activityOptions = [
   {label: 'Soccer', emoji: '⚽', category: 'sports'},
   {label: 'Figure Skating', emoji: '⛸️', category: 'sports'},
   {label: 'Tennis', emoji: '🎾', category: 'sports'},
+  {label: 'Pickleball', emoji: '🥒', category: 'sports'},
   {label: 'Golf', emoji: '⛳', category: 'sports'},
   {label: 'Football', emoji: '🏈', category: 'sports'},
   {label: 'Rugby', emoji: '🏉', category: 'sports'},
@@ -333,6 +334,13 @@ const activityOptions = [
   {label: 'Softball', emoji: '🥎', category: 'sports'},
   {label: 'Lacrosse', emoji: '🥍', category: 'sports'},
   {label: 'Volleyball', emoji: '🏐', category: 'sports'},
+  {label: 'Badminton', emoji: '🏸', category: 'sports'},
+  {label: 'Table Tennis', emoji: '🏓', category: 'sports'},
+  {label: 'Bowling', emoji: '🎳', category: 'sports'},
+  {label: 'Disc Golf', emoji: '🥏', category: 'sports'},
+  {label: 'Ultimate Frisbee', emoji: '🥏', category: 'sports'},
+  {label: 'Boxing', emoji: '🥊', category: 'sports'},
+  {label: 'Martial Arts', emoji: '🥋', category: 'sports'},
   // Social & Entertainment
   {label: 'Trivia Night', emoji: '🧠', category: 'social'},
   {label: 'Game Night', emoji: '🎲', category: 'social'},
@@ -340,20 +348,40 @@ const activityOptions = [
   {label: 'Open Mic', emoji: '🎙️', category: 'social'},
   {label: 'Watch Party', emoji: '📺', category: 'social'},
   {label: 'Live Music', emoji: '🎵', category: 'social'},
+  {label: 'Comedy Show', emoji: '😂', category: 'social'},
+  {label: 'Happy Hour', emoji: '🍻', category: 'social'},
+  {label: 'Dinner', emoji: '🍽️', category: 'social'},
+  {label: 'Brewery Visit', emoji: '🍺', category: 'social'},
+  {label: 'Wine Tasting', emoji: '🍷', category: 'social'},
+  {label: 'Dancing', emoji: '💃', category: 'social'},
+  {label: 'Movie Night', emoji: '🎬', category: 'social'},
+  {label: 'Paint Night', emoji: '🎨', category: 'social'},
   // Outdoor & Fitness
   {label: 'Hiking', emoji: '🥾', category: 'outdoor'},
   {label: 'Cycling', emoji: '🚴', category: 'outdoor'},
   {label: 'Running', emoji: '🏃', category: 'outdoor'},
   {label: 'Yoga', emoji: '🧘', category: 'outdoor'},
+  {label: 'Gym Session', emoji: '🏋️', category: 'outdoor'},
+  {label: 'Rock Climbing', emoji: '🧗', category: 'outdoor'},
+  {label: 'Swimming', emoji: '🏊', category: 'outdoor'},
+  {label: 'Kayaking', emoji: '🛶', category: 'outdoor'},
+  {label: 'Skiing', emoji: '⛷️', category: 'outdoor'},
+  {label: 'Snowboarding', emoji: '🏂', category: 'outdoor'},
   {label: 'Fishing', emoji: '🎣', category: 'outdoor'},
   {label: 'Camping', emoji: '🏕️', category: 'outdoor'},
+  {label: 'Picnic', emoji: '🧺', category: 'outdoor'},
+  {label: 'Beach Day', emoji: '🏖️', category: 'outdoor'},
   // Community & Learning
   {label: 'Book Club', emoji: '📚', category: 'community'},
   {label: 'Workshop', emoji: '🛠️', category: 'community'},
   {label: 'Meetup', emoji: '🤝', category: 'community'},
   {label: 'Potluck', emoji: '🍲', category: 'community'},
   {label: 'Volunteer', emoji: '💚', category: 'community'},
+  {label: 'Study Group', emoji: '📖', category: 'community'},
+  {label: 'Networking', emoji: '💼', category: 'community'},
+  {label: 'Fundraiser', emoji: '🎗️', category: 'community'},
   // Other
+  {label: 'Custom', emoji: '✏️', category: 'other'},
   {label: 'Other', emoji: '🎯', category: 'other'},
 ];
 
@@ -2949,6 +2977,8 @@ const EventList: React.FC = () => {
   );
   const [showEventTypePicker, setShowEventTypePicker] = useState(false);
   const [tempEventType, setTempEventType] = useState(newEvent.eventType || '');
+  // Free-text value when the "Custom" event style is chosen.
+  const [customEventType, setCustomEventType] = useState('');
 
   // Jersey color picker state for team sports
   const [showJerseyColorPicker, setShowJerseyColorPicker] = useState(false);
@@ -3578,7 +3608,10 @@ const EventList: React.FC = () => {
       location: prefill.location || '',
       latitude: prefill.latitude,
       longitude: prefill.longitude,
-      date: prefill.date || '',
+      // Default to today when a venue bridges in without a date, so the form
+      // is one tap from done. Matches the date picker's toDateString() format
+      // and stays fully editable.
+      date: prefill.date || new Date().toDateString(),
       time: prefill.time || '',
       eventType: prefill.eventType || '',
       venueId: prefill.venueId,
@@ -5905,7 +5938,19 @@ const EventList: React.FC = () => {
                   onPress={() => {
                     closeAllPickers('eventType');
                     setShowEventTypePicker(true);
-                    setTempEventType(newEvent.eventType || '');
+                    // If the event already has a type that isn't a preset
+                    // (e.g. a previously entered custom one), open on "Custom"
+                    // with the text prefilled so it stays editable.
+                    const isPreset = activityOptions.some(
+                      o => o.label === newEvent.eventType,
+                    );
+                    if (newEvent.eventType && !isPreset) {
+                      setTempEventType('Custom');
+                      setCustomEventType(newEvent.eventType);
+                    } else {
+                      setTempEventType(newEvent.eventType || '');
+                      setCustomEventType('');
+                    }
                   }}>
                   <Text
                     style={{
@@ -5936,12 +5981,30 @@ const EventList: React.FC = () => {
                         ))}
                       </Picker>
                     </View>
+                    {tempEventType === 'Custom' && (
+                      <TextInput
+                        style={themedStyles.modalInput}
+                        value={customEventType}
+                        onChangeText={setCustomEventType}
+                        placeholder={
+                          t('events.customEventTypePlaceholder') ||
+                          'Enter a custom activity'
+                        }
+                        placeholderTextColor={colors.placeholder}
+                        maxLength={40}
+                      />
+                    )}
                     <TouchableOpacity
                       onPress={() => {
-                        // Reset jersey colors when changing event type
+                        // Resolve "Custom" to the typed value (falling back to
+                        // "Other" if left blank). Reset jersey colors on change.
+                        const resolvedType =
+                          tempEventType === 'Custom'
+                            ? customEventType.trim() || 'Other'
+                            : tempEventType;
                         setNewEvent({
                           ...newEvent,
-                          eventType: tempEventType,
+                          eventType: resolvedType,
                           jerseyColors: [],
                         });
                         setShowEventTypePicker(false);

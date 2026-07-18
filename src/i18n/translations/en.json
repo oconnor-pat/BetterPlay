@@ -82,6 +82,7 @@
     "acceptJoinRequestsDesc": "Let people request to join. Turn off to stop new requests.",
     "showLocationPublicly": "Show location publicly",
     "showLocationPubliclyDesc": "Reveal the address and map before people are approved.",
+    "customEventTypePlaceholder": "Enter a custom activity",
     "title": "Local Events",
     "subtitle": "User-organized activities",
     "createEvent": "Create Event",
@@ -472,6 +473,7 @@
   },
   "venues": {
     "title": "Venues",
+    "within": "Within",
     "addVenue": "Add Venue",
     "venueName": "Venue Name",
     "venueNamePlaceholder": "e.g., Frosty Palace Ice Arena, O'Malley's Pub",

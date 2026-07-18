@@ -28,6 +28,7 @@ import {
   Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
@@ -52,9 +53,14 @@ import {
   searchText,
 } from '../../services/PlacesService';
 
-// Default radius for the "near you" feed.
-const DEFAULT_RADIUS_METERS = 8000; // ~5 miles
 const SEARCH_DEBOUNCE_MS = 350;
+
+// User-selectable search radius for the nearby category feed. Persisted so
+// the choice sticks across sessions.
+const VENUE_RADIUS_KEY = '@venue_radius_miles';
+const RADIUS_OPTIONS_MILES = [2, 5, 10, 25];
+const DEFAULT_RADIUS_MILES = 5;
+const MILES_TO_METERS = 1609;
 
 const VenueListPlaces: React.FC = () => {
   const {colors, darkMode} = useTheme();
@@ -84,6 +90,23 @@ const VenueListPlaces: React.FC = () => {
   );
   const [searching, setSearching] = useState<boolean>(false);
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Persisted "near you" search radius (in miles).
+  const [radiusMiles, setRadiusMiles] = useState<number>(DEFAULT_RADIUS_MILES);
+
+  useEffect(() => {
+    AsyncStorage.getItem(VENUE_RADIUS_KEY).then(saved => {
+      const parsed = saved ? parseInt(saved, 10) : NaN;
+      if (RADIUS_OPTIONS_MILES.includes(parsed)) {
+        setRadiusMiles(parsed);
+      }
+    });
+  }, []);
+
+  const handleRadiusChange = useCallback((miles: number) => {
+    setRadiusMiles(miles);
+    AsyncStorage.setItem(VENUE_RADIUS_KEY, String(miles)).catch(() => {});
+  }, []);
 
   // ── Location bootstrap ────────────────────────────────────────────────
   const ensureLocation = useCallback(async (): Promise<Coordinates | null> => {
@@ -131,7 +154,7 @@ const VenueListPlaces: React.FC = () => {
         const results = await searchNearby({
           latitude: location.latitude,
           longitude: location.longitude,
-          radiusMeters: DEFAULT_RADIUS_METERS,
+          radiusMeters: radiusMiles * MILES_TO_METERS,
           primaryTypes,
           maxResultCount: 20,
         });
@@ -141,7 +164,7 @@ const VenueListPlaces: React.FC = () => {
         setPlaces([]);
       }
     },
-    [],
+    [radiusMiles],
   );
 
   // Bootstrap location once on mount so distances + nearby searches are
@@ -300,6 +323,41 @@ const VenueListPlaces: React.FC = () => {
           marginLeft: 8,
           color: colors.text,
           fontSize: 15,
+        },
+        radiusRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          marginBottom: 8,
+          gap: 6,
+        },
+        radiusLabel: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
+          marginRight: 2,
+        },
+        radiusPill: {
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 13,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.04)'
+            : 'rgba(0,0,0,0.03)',
+        },
+        radiusPillActive: {
+          borderColor: colors.primary,
+          backgroundColor: colors.primary + '22',
+        },
+        radiusPillText: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        radiusPillTextActive: {
+          color: colors.primary,
         },
         chipStripWrapper: {
           height: 44,
@@ -680,6 +738,32 @@ const VenueListPlaces: React.FC = () => {
           </TouchableOpacity>
         ) : null}
       </View>
+
+      {!searchResults && (
+        <View style={styles.radiusRow}>
+          <Text style={styles.radiusLabel}>
+            {t('venues.within') || 'Within'}
+          </Text>
+          {RADIUS_OPTIONS_MILES.map(m => (
+            <TouchableOpacity
+              key={m}
+              style={[
+                styles.radiusPill,
+                radiusMiles === m && styles.radiusPillActive,
+              ]}
+              onPress={() => handleRadiusChange(m)}
+              activeOpacity={0.7}>
+              <Text
+                style={[
+                  styles.radiusPillText,
+                  radiusMiles === m && styles.radiusPillTextActive,
+                ]}>
+                {m} mi
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {!searchResults && (
         <View style={styles.chipStripWrapper}>
