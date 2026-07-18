@@ -513,6 +513,21 @@ interface LikedByUser {
   profilePicUrl?: string;
 }
 
+// Parse an event's stored date into a *local* Date at midnight. Stored
+// dates are "YYYY-MM-DD"; `new Date("2026-07-17")` would parse as UTC
+// midnight and shift back a calendar day in negative-offset timezones,
+// so build from local components when we recognize that format.
+const parseEventDateLocal = (dateString: string): Date => {
+  const isoMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const [, y, mo, d] = isoMatch;
+    return new Date(Number(y), Number(mo) - 1, Number(d));
+  }
+  const parsed = new Date(dateString);
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+};
+
 // Helper function to check if an event date/time has passed
 const isEventPast = (eventDate: string, eventTime: string): boolean => {
   const now = new Date();
@@ -524,11 +539,20 @@ const isEventPast = (eventDate: string, eventTime: string): boolean => {
   // Try to parse the date with multiple approaches
   let eventDateTime: Date | null = null;
 
+  // Approach 0: ISO calendar date "2026-07-17". `new Date("2026-07-17")`
+  // parses as UTC midnight, which in any negative-offset timezone (e.g.
+  // US Eastern) rolls back to the *previous* calendar day locally — so an
+  // event dated tomorrow gets judged as today and hidden as "past". Build
+  // it from local components instead so the day is preserved.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+    eventDateTime = parseEventDateLocal(cleanDate);
+  }
+
   // Approach 1: Parse "Jan 23 2026" or "Jan 23, 2026" format
   const monthDayYearMatch = cleanDate.match(
     /([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/,
   );
-  if (monthDayYearMatch) {
+  if ((!eventDateTime || isNaN(eventDateTime.getTime())) && monthDayYearMatch) {
     const [, month, day, year] = monthDayYearMatch;
     eventDateTime = new Date(`${month} ${day}, ${year}`);
   }
@@ -669,7 +693,6 @@ interface RecurringDeckProps {
 
 const SWIPE_THRESHOLD = 60;
 const STACK_OFFSET = 8;
-const STACK_SCALE_STEP = 0.035;
 
 const RecurringDeck: React.FC<RecurringDeckProps> = ({
   groupId,
@@ -779,24 +802,25 @@ const RecurringDeck: React.FC<RecurringDeckProps> = ({
               }
 
               const offset = i * STACK_OFFSET;
-              const scale = 1 - i * STACK_SCALE_STEP;
               const horizontalInset = i * 6;
+              // Placeholder layer only — rendering full event cards here made
+              // taller siblings poke their content through whenever the front
+              // card was shorter (e.g. the first instance with no countdown).
               return (
                 <View
                   key={`deck-bg-${i}`}
                   style={[
-                    themedStyles.deckBgCardBase,
+                    themedStyles.deckBgPlaceholder,
                     {
-                      top: offset,
+                      top: 0,
+                      bottom: -offset,
                       left: horizontalInset,
                       right: horizontalInset,
                       opacity: 1 - i * 0.2,
                       zIndex: visibleCount - i,
-                      transform: [{scaleY: scale}],
                     },
-                  ]}>
-                  {renderEventCard({item: evt})}
-                </View>
+                  ]}
+                />
               );
             })}
         </View>
@@ -2640,7 +2664,7 @@ const EventList: React.FC = () => {
           paddingVertical: 10,
           paddingHorizontal: 16,
           marginHorizontal: 16,
-          marginTop: -8,
+          marginTop: 10,
           marginBottom: 12,
           backgroundColor: colors.primary + '10',
           borderRadius: 10,
@@ -2727,13 +2751,13 @@ const EventList: React.FC = () => {
         positionRelative: {
           position: 'relative',
         },
-        deckBgCardBase: {
+        deckBgPlaceholder: {
           position: 'absolute',
-          left: 0,
-          right: 0,
-        },
-        zIndexTop: {
-          zIndex: 10,
+          backgroundColor: colors.card,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+          borderBottomLeftRadius: 12,
+          borderBottomRightRadius: 12,
         },
         flexOne: {
           flex: 1,
@@ -3334,7 +3358,7 @@ const EventList: React.FC = () => {
       today.setHours(0, 0, 0, 0);
 
       filtered = filtered.filter(event => {
-        const eventDate = new Date(event.date);
+        const eventDate = parseEventDateLocal(event.date);
         eventDate.setHours(0, 0, 0, 0);
 
         switch (selectedDateFilter) {
@@ -3683,6 +3707,12 @@ const EventList: React.FC = () => {
                 : undefined,
               privacy: newEvent.privacy,
               invitedUsers: newEvent.invitedUsers,
+              // Recurrence intent — lets the backend convert single↔recurring
+              // or re-shape the series. `recurrenceCount` is the number of
+              // occurrences from this event forward (set in handleEditEvent).
+              isRecurring: newEvent.isRecurring,
+              recurrenceFrequency: newEvent.recurrenceFrequency,
+              recurrenceCount: newEvent.recurrenceCount,
             },
           );
           // Merge the response with local privacy settings in case backend doesn't return them
@@ -3908,6 +3938,18 @@ const EventList: React.FC = () => {
   };
 
   const handleEditEvent = async (event: Event) => {
+    // For a recurring event, the modal's count reflects how many occurrences
+    // remain from this one forward (inclusive), so leaving it untouched is a
+    // no-op on the backend. Single events default to 4 if turned recurring.
+    const forwardCount =
+      event.isRecurring && event.recurrenceGroupId
+        ? eventData.filter(
+            e =>
+              e.recurrenceGroupId === event.recurrenceGroupId &&
+              parseEventDateLocal(e.date).getTime() >=
+                parseEventDateLocal(event.date).getTime(),
+          ).length
+        : 4;
     setNewEvent({
       name: event.name,
       location: event.location,
@@ -3922,7 +3964,7 @@ const EventList: React.FC = () => {
       invitedUsers: event.invitedUsers || [],
       isRecurring: event.isRecurring || false,
       recurrenceFrequency: event.recurrenceFrequency || 'weekly',
-      recurrenceCount: 4,
+      recurrenceCount: forwardCount,
       // Preserve any venue link the event was originally created with.
       venueId: event.venueId,
       venueName: event.venueName,
@@ -5054,49 +5096,9 @@ const EventList: React.FC = () => {
     const previewEvent = events[activeIdx] || events[0];
 
     if (!isExpanded) {
-      const stackCards = Math.min(events.length, 3);
       return (
         <View key={groupId}>
-          <TouchableOpacity
-            activeOpacity={0.95}
-            onPress={() => {
-              LayoutAnimation.configureNext(
-                LayoutAnimation.Presets.easeInEaseOut,
-              );
-              setExpandedRecurringGroup(groupId);
-            }}
-            style={{marginBottom: (stackCards - 1) * 4 + 8}}>
-            <View style={themedStyles.positionRelative}>
-              {Array.from({length: stackCards})
-                .map((_, i) => i)
-                .reverse()
-                .map(i => {
-                  if (i === 0) {
-                    return null;
-                  }
-                  const offset = i * 6;
-                  const scale = 1 - i * 0.03;
-                  return (
-                    <View
-                      key={`shadow-${i}`}
-                      style={[
-                        themedStyles.deckBgCardBase,
-                        {
-                          top: offset,
-                          transform: [{scale}],
-                          opacity: 1 - i * 0.2,
-                          zIndex: -i,
-                        },
-                      ]}>
-                      {renderEventCard({item: events[i] || previewEvent})}
-                    </View>
-                  );
-                })}
-              <View style={themedStyles.zIndexTop}>
-                {renderEventCard({item: previewEvent})}
-              </View>
-            </View>
-          </TouchableOpacity>
+          {renderEventCard({item: previewEvent})}
           <TouchableOpacity
             style={themedStyles.recurringStackIndicator}
             onPress={() => {
@@ -5641,15 +5643,16 @@ const EventList: React.FC = () => {
                 )}
 
                 {/* Recurring Event toggle */}
-                {!isEditing && (
-                  <View style={themedStyles.recurrenceSection}>
+                <View style={themedStyles.recurrenceSection}>
                     <View style={themedStyles.recurrenceToggleRow}>
                       <View style={themedStyles.flexOne}>
                         <Text style={themedStyles.recurrenceLabel}>
                           Recurring Event
                         </Text>
                         <Text style={themedStyles.recurrenceDescription}>
-                          Automatically create multiple events on a schedule
+                          {isEditing
+                            ? 'Turn on to repeat this event on a schedule, or off to make it a single event'
+                            : 'Automatically create multiple events on a schedule'}
                         </Text>
                       </View>
                       <Switch
@@ -5702,7 +5705,9 @@ const EventList: React.FC = () => {
                             themedStyles.recurrenceSubLabel,
                             themedStyles.recurrenceCountSubLabel,
                           ]}>
-                          Number of Events
+                          {isEditing
+                            ? 'Occurrences (from this one forward)'
+                            : 'Number of Events'}
                         </Text>
                         <ScrollView
                           horizontal
@@ -5742,7 +5747,6 @@ const EventList: React.FC = () => {
                       </View>
                     )}
                   </View>
-                )}
 
                 {/* Roster Size selector */}
                 <TouchableOpacity
