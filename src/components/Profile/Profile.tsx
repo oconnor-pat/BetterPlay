@@ -249,7 +249,7 @@ const Profile: React.FC = () => {
       .filter(
         ({event, when}) =>
           when != null &&
-          isEventActive(event.date, event.time) &&
+          isEventActive(event.date, event.time, event.durationMinutes) &&
           when.getTime() <= oneWeekFromNow,
       )
       .sort((a, b) => a.when!.getTime() - b.when!.getTime());
@@ -261,7 +261,11 @@ const Profile: React.FC = () => {
   const isNextEventLive = useMemo(
     () =>
       nextUpcomingEvent
-        ? isEventLive(nextUpcomingEvent.date, nextUpcomingEvent.time)
+        ? isEventLive(
+            nextUpcomingEvent.date,
+            nextUpcomingEvent.time,
+            nextUpcomingEvent.durationMinutes,
+          )
         : false,
     [nextUpcomingEvent],
   );

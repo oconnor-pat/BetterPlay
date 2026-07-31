@@ -1,56 +1,13 @@
 import React, {useState, useEffect, useRef} from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import {useTheme, ThemeColors} from '../ThemeContext/ThemeContext';
+import {getEventDateTime, isEventLive} from '../../utils/eventDateTime';
 
 interface CountdownTimerProps {
   eventDate: string;
   eventTime: string;
+  durationMinutes?: number;
 }
-
-const parseEventDateTime = (
-  eventDate: string,
-  eventTime: string,
-): Date | null => {
-  let cleanDate = eventDate.replace(/^[A-Za-z]{3}\s+/, '');
-  let eventDateTime: Date | null = null;
-
-  const monthDayYearMatch = cleanDate.match(
-    /([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/,
-  );
-  if (monthDayYearMatch) {
-    const [, month, day, year] = monthDayYearMatch;
-    eventDateTime = new Date(`${month} ${day}, ${year}`);
-  }
-
-  if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-    eventDateTime = new Date(cleanDate);
-  }
-
-  if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-    eventDateTime = new Date(eventDate);
-  }
-
-  if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-    return null;
-  }
-
-  let hours = 0;
-  let minutes = 0;
-  const timeMatch = eventTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-  if (timeMatch) {
-    hours = parseInt(timeMatch[1], 10);
-    minutes = parseInt(timeMatch[2], 10);
-    const period = timeMatch[3]?.toUpperCase();
-    if (period === 'PM' && hours !== 12) {
-      hours += 12;
-    } else if (period === 'AM' && hours === 12) {
-      hours = 0;
-    }
-  }
-
-  eventDateTime.setHours(hours, minutes, 0, 0);
-  return eventDateTime;
-};
 
 type CountdownState =
   | {status: 'upcoming'; days: number; hours: number; minutes: number; seconds: number; urgent: boolean}
@@ -58,8 +15,12 @@ type CountdownState =
   | {status: 'past'}
   | {status: 'invalid'};
 
-const getCountdown = (eventDate: string, eventTime: string): CountdownState => {
-  const target = parseEventDateTime(eventDate, eventTime);
+const getCountdown = (
+  eventDate: string,
+  eventTime: string,
+  durationMinutes?: number,
+): CountdownState => {
+  const target = getEventDateTime(eventDate, eventTime);
   if (!target) {
     return {status: 'invalid'};
   }
@@ -68,11 +29,11 @@ const getCountdown = (eventDate: string, eventTime: string): CountdownState => {
   const diffMs = target.getTime() - now.getTime();
 
   if (diffMs < 0) {
-    const hoursPast = Math.abs(diffMs) / (1000 * 60 * 60);
-    if (hoursPast < 3) {
-      return {status: 'live'};
-    }
-    return {status: 'past'};
+    // Once started, the event stays "live" for its recorded duration (or the
+    // shared fallback window when no duration was set).
+    return isEventLive(eventDate, eventTime, durationMinutes)
+      ? {status: 'live'}
+      : {status: 'past'};
   }
 
   const totalSeconds = Math.floor(diffMs / 1000);
@@ -88,19 +49,20 @@ const getCountdown = (eventDate: string, eventTime: string): CountdownState => {
 const CountdownTimer: React.FC<CountdownTimerProps> = ({
   eventDate,
   eventTime,
+  durationMinutes,
 }) => {
   const {colors} = useTheme();
   const styles = themedStyles(colors);
   const [countdown, setCountdown] = useState<CountdownState>(() =>
-    getCountdown(eventDate, eventTime),
+    getCountdown(eventDate, eventTime, durationMinutes),
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    setCountdown(getCountdown(eventDate, eventTime));
+    setCountdown(getCountdown(eventDate, eventTime, durationMinutes));
 
     intervalRef.current = setInterval(() => {
-      const next = getCountdown(eventDate, eventTime);
+      const next = getCountdown(eventDate, eventTime, durationMinutes);
       setCountdown(next);
       if (next.status === 'past') {
         if (intervalRef.current) {
@@ -114,7 +76,7 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({
         clearInterval(intervalRef.current);
       }
     };
-  }, [eventDate, eventTime]);
+  }, [eventDate, eventTime, durationMinutes]);
 
   if (countdown.status === 'invalid' || countdown.status === 'past') {
     return null;
@@ -209,5 +171,4 @@ const themedStyles = (colors: ThemeColors) =>
     },
   });
 
-export {parseEventDateTime};
 export default CountdownTimer;

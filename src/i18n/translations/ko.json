@@ -136,7 +136,9 @@
     "requestToJoin": "참가 요청",
     "requested": "요청됨",
     "approvalRequired": "승인 필요",
-    "gatedHint": "주최자가 승인하면 위치와 세부정보가 공개됩니다."
+    "gatedHint": "주최자가 승인하면 위치와 세부정보가 공개됩니다.",
+    "duration": "소요 시간",
+    "endsAt": "{{time}} 종료"
   },
   "profile": {
     "title": "프로필",

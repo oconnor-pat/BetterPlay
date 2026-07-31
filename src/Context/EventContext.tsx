@@ -15,6 +15,7 @@ export interface Event {
   name: string;
   location: string;
   time: string;
+  durationMinutes?: number;
   date: string;
   rosterSpotsFilled: number;
   totalSpots: number;

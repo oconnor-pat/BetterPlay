@@ -136,7 +136,9 @@
     "requestToJoin": "Solicitar entrada",
     "requested": "Solicitado",
     "approvalRequired": "Aprovação necessária",
-    "gatedHint": "O local e os detalhes são revelados quando o anfitrião aprova você."
+    "gatedHint": "O local e os detalhes são revelados quando o anfitrião aprova você.",
+    "duration": "Duração",
+    "endsAt": "Termina às {{time}}"
   },
   "profile": {
     "title": "Perfil",

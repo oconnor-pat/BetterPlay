@@ -103,6 +103,7 @@ import {useSocket} from '../../Context/SocketContext';
 import notificationService from '../../services/NotificationService';
 import locationService, {Coordinates} from '../../services/LocationService';
 import {
+  formatEventTimeRange,
   getEventDateTime,
   isEventPast,
   parseEventDateLocal,
@@ -188,6 +189,9 @@ interface Event {
   // possibly-absent anywhere an event might be gated.
   location?: string;
   time: string;
+  // How long the event runs. Absent on events created before durations
+  // existed, in which case only a start time is shown.
+  durationMinutes?: number;
   date: string;
   rosterSpotsFilled: number;
   totalSpots: number;
@@ -295,10 +299,20 @@ const recurrenceOptions: {
 
 const recurrenceCountOptions = [2, 3, 4, 5, 6, 8, 10, 12];
 
+const DURATION_OPTIONS = [
+  {label: '30m', minutes: 30},
+  {label: '1h', minutes: 60},
+  {label: '90m', minutes: 90},
+  {label: '2h', minutes: 120},
+  {label: '3h', minutes: 180},
+];
+const DEFAULT_DURATION_MINUTES = 60;
+
 const createEmptyEvent = () => ({
   name: '',
   location: '',
   time: '',
+  durationMinutes: DEFAULT_DURATION_MINUTES,
   date: '',
   totalSpots: '',
   eventType: '',
@@ -2560,6 +2574,54 @@ const EventList: React.FC = () => {
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
+        durationSection: {
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 12,
+          padding: 14,
+          marginBottom: 10,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        durationHeaderRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+        },
+        durationLabel: {
+          color: colors.text,
+          fontSize: 14,
+          fontWeight: '700',
+        },
+        durationEndHint: {
+          color: colors.secondaryText,
+          fontSize: 12,
+        },
+        durationRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+        },
+        durationPill: {
+          paddingHorizontal: 14,
+          paddingVertical: 7,
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        durationPillSelected: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        durationPillText: {
+          color: colors.secondaryText,
+          fontSize: 13,
+          fontWeight: '600',
+        },
+        durationPillTextSelected: {
+          color: '#fff',
+          fontWeight: '700',
+        },
         recurrenceToggleRow: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -3729,6 +3791,7 @@ const EventList: React.FC = () => {
               name: newEvent.name,
               location: newEvent.location,
               time: newEvent.time,
+              durationMinutes: newEvent.durationMinutes,
               date: newEvent.date,
               totalSpots: parseInt(newEvent.totalSpots, 10),
               eventType: newEvent.eventType,
@@ -3775,6 +3838,7 @@ const EventList: React.FC = () => {
             name: newEvent.name,
             location: newEvent.location,
             time: newEvent.time,
+            durationMinutes: newEvent.durationMinutes,
             date: newEvent.date,
             totalSpots: parseInt(newEvent.totalSpots, 10),
             eventType: newEvent.eventType,
@@ -4003,6 +4067,7 @@ const EventList: React.FC = () => {
       name: event.name,
       location: event.location || '',
       time: event.time,
+      durationMinutes: event.durationMinutes ?? DEFAULT_DURATION_MINUTES,
       date: event.date,
       totalSpots: event.totalSpots.toString(),
       eventType: event.eventType,
@@ -4636,7 +4701,12 @@ const EventList: React.FC = () => {
                 color={colors.secondaryText}
               />
               <Text style={themedStyles.detailText}>
-                {item.date} · {formatDisplayTime(item.time)}
+                {item.date} ·{' '}
+                {formatEventTimeRange(
+                  item.date,
+                  item.time,
+                  item.durationMinutes,
+                )}
               </Text>
             </View>
 
@@ -4871,7 +4941,12 @@ const EventList: React.FC = () => {
                 color={colors.secondaryText}
               />
               <Text style={themedStyles.detailText}>
-                {item.date} · {formatDisplayTime(item.time)}
+                {item.date} ·{' '}
+                {formatEventTimeRange(
+                  item.date,
+                  item.time,
+                  item.durationMinutes,
+                )}
               </Text>
             </View>
 
@@ -4891,7 +4966,11 @@ const EventList: React.FC = () => {
             </View>
 
             {!isPast && (
-              <CountdownTimer eventDate={item.date} eventTime={item.time} />
+              <CountdownTimer
+                eventDate={item.date}
+                eventTime={item.time}
+                durationMinutes={item.durationMinutes}
+              />
             )}
           </View>
         </TouchableOpacity>
@@ -5716,6 +5795,56 @@ const EventList: React.FC = () => {
                     )}
                   </View>
                 )}
+
+                {/* How long the event runs. Stored as a duration; the end time
+                    shown here is derived so the organizer can sanity-check it. */}
+                <View style={themedStyles.durationSection}>
+                  <View style={themedStyles.durationHeaderRow}>
+                    <Text style={themedStyles.durationLabel}>
+                      {t('events.duration')}
+                    </Text>
+                    {newEvent.time ? (
+                      <Text style={themedStyles.durationEndHint}>
+                        {t('events.endsAt', {
+                          time: formatEventTimeRange(
+                            newEvent.date || new Date().toDateString(),
+                            newEvent.time,
+                            newEvent.durationMinutes,
+                          ).split(' – ')[1],
+                        })}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={themedStyles.durationRow}>
+                    {DURATION_OPTIONS.map(option => {
+                      const selected =
+                        newEvent.durationMinutes === option.minutes;
+                      return (
+                        <TouchableOpacity
+                          key={option.minutes}
+                          style={[
+                            themedStyles.durationPill,
+                            selected && themedStyles.durationPillSelected,
+                          ]}
+                          onPress={() =>
+                            setNewEvent(prev => ({
+                              ...prev,
+                              durationMinutes: option.minutes,
+                            }))
+                          }
+                          activeOpacity={0.7}>
+                          <Text
+                            style={[
+                              themedStyles.durationPillText,
+                              selected && themedStyles.durationPillTextSelected,
+                            ]}>
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
 
                 {/* Recurring Event toggle */}
                 <View style={themedStyles.recurrenceSection}>

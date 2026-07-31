@@ -136,7 +136,9 @@
     "requestToJoin": "申请加入",
     "requested": "已申请",
     "approvalRequired": "需要批准",
-    "gatedHint": "主办方批准后即可查看地点和详情。"
+    "gatedHint": "主办方批准后即可查看地点和详情。",
+    "duration": "时长",
+    "endsAt": "{{time}} 结束"
   },
   "profile": {
     "title": "个人资料",

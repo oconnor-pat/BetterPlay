@@ -187,7 +187,9 @@
     "locationUnavailable": "Location Unavailable",
     "locationUnavailableMessage": "Could not determine your location. Please try again.",
     "showEventsWithin": "Show events within {{distance}} mi",
-    "withinDistance": "Within {{distance}} mi"
+    "withinDistance": "Within {{distance}} mi",
+    "duration": "Duration",
+    "endsAt": "Ends {{time}}"
   },
   "profile": {
     "title": "Profile",

@@ -136,7 +136,9 @@
     "requestToJoin": "Richiedi di partecipare",
     "requested": "Richiesto",
     "approvalRequired": "Approvazione richiesta",
-    "gatedHint": "Luogo e dettagli si sbloccano quando l’organizzatore ti approva."
+    "gatedHint": "Luogo e dettagli si sbloccano quando l’organizzatore ti approva.",
+    "duration": "Durata",
+    "endsAt": "Termina alle {{time}}"
   },
   "profile": {
     "title": "Profilo",

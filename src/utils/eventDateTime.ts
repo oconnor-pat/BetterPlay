@@ -94,10 +94,70 @@ export const getEventDateTime = (
 };
 
 /**
- * How long an event is assumed to run when it has no explicit end time. Used to
- * decide whether a started event is still "happening now" rather than over.
+ * How long an event is assumed to run when no duration was recorded. Events
+ * created before durations existed have none, so they still need a window in
+ * which they count as underway rather than immediately over.
  */
 export const ASSUMED_EVENT_DURATION_MS = 3 * 60 * 60 * 1000;
+
+const durationToMs = (durationMinutes?: number): number =>
+  typeof durationMinutes === 'number' && durationMinutes > 0
+    ? durationMinutes * 60 * 1000
+    : ASSUMED_EVENT_DURATION_MS;
+
+/**
+ * The moment an event ends, derived from its start plus recorded duration.
+ * Returns null when the start can't be parsed or no duration was set — callers
+ * should render just the start time in that case rather than inventing an end.
+ */
+export const getEventEndDateTime = (
+  eventDate?: string,
+  eventTime?: string,
+  durationMinutes?: number,
+): Date | null => {
+  const start = getEventDateTime(eventDate, eventTime);
+  if (!start || !durationMinutes || durationMinutes <= 0) {
+    return null;
+  }
+  return new Date(start.getTime() + durationMinutes * 60 * 1000);
+};
+
+/**
+ * Format an event's time as a range ("6:30 PM – 8:30 PM") when its duration is
+ * known, falling back to the stored start time alone when it isn't.
+ */
+export const formatEventTimeRange = (
+  eventDate?: string,
+  eventTime?: string,
+  durationMinutes?: number,
+): string => {
+  const start = getEventDateTime(eventDate, eventTime);
+  const end = getEventEndDateTime(eventDate, eventTime, durationMinutes);
+  if (!start) {
+    return eventTime || '';
+  }
+  const fmt = (d: Date) =>
+    d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+  return end ? `${fmt(start)} – ${fmt(end)}` : fmt(start);
+};
+
+/**
+ * Human-readable duration, e.g. "1h", "90m", "2h 30m". Empty when unknown.
+ */
+export const formatEventDuration = (durationMinutes?: number): string => {
+  if (!durationMinutes || durationMinutes <= 0) {
+    return '';
+  }
+  const hours = Math.floor(durationMinutes / 60);
+  const minutes = durationMinutes % 60;
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${minutes}m`;
+};
 
 /**
  * True once an event's start time has passed. An unparseable date is treated as
@@ -109,16 +169,20 @@ export const isEventPast = (eventDate?: string, eventTime?: string): boolean => 
 };
 
 /**
- * True while an event is underway — it has started but is still within its
- * assumed duration. Matches the "Happening Now" window used on event cards.
+ * True while an event is underway — started, but not yet past its duration.
+ * Matches the "Happening Now" window used on event cards.
  */
-export const isEventLive = (eventDate?: string, eventTime?: string): boolean => {
+export const isEventLive = (
+  eventDate?: string,
+  eventTime?: string,
+  durationMinutes?: number,
+): boolean => {
   const eventDateTime = getEventDateTime(eventDate, eventTime);
   if (!eventDateTime) {
     return false;
   }
   const elapsed = Date.now() - eventDateTime.getTime();
-  return elapsed >= 0 && elapsed < ASSUMED_EVENT_DURATION_MS;
+  return elapsed >= 0 && elapsed < durationToMs(durationMinutes);
 };
 
 /**
@@ -128,10 +192,11 @@ export const isEventLive = (eventDate?: string, eventTime?: string): boolean => 
 export const isEventActive = (
   eventDate?: string,
   eventTime?: string,
+  durationMinutes?: number,
 ): boolean => {
   const eventDateTime = getEventDateTime(eventDate, eventTime);
   if (!eventDateTime) {
     return false;
   }
-  return Date.now() - eventDateTime.getTime() < ASSUMED_EVENT_DURATION_MS;
+  return Date.now() - eventDateTime.getTime() < durationToMs(durationMinutes);
 };
