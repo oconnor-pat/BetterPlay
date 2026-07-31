@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, CommonActions} from '@react-navigation/native';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -106,6 +106,7 @@ const Settings: React.FC = () => {
   const {darkMode, themeMode, setThemeMode, colors} = useTheme();
   const {setUserData} = useContext(UserContext) as UserContextType;
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [proximityVisibility, setProximityVisibility] =
     useState<ProximityVisibility>('private');
@@ -512,6 +513,11 @@ const Settings: React.FC = () => {
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
           justifyContent: 'flex-end',
         },
+        // Fills the area behind the sheet so tapping outside dismisses, without
+        // wrapping (and stealing gestures from) the sheet itself.
+        modalBackdrop: {
+          ...StyleSheet.absoluteFillObject,
+        },
         modalContent: {
           backgroundColor: colors.background,
           borderTopLeftRadius: 18,
@@ -520,6 +526,14 @@ const Settings: React.FC = () => {
           paddingBottom: 24,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
+          // Cap every sheet so a long list scrolls inside it instead of running
+          // off the top of the screen and under the status bar.
+          maxHeight: '85%',
+        },
+        // Keeps the final row clear of the home indicator when a sheet's
+        // content is long enough to scroll to the very bottom.
+        modalScrollContent: {
+          paddingBottom: insets.bottom + 16,
         },
         modalHandle: {
           alignSelf: 'center',
@@ -808,7 +822,7 @@ const Settings: React.FC = () => {
           color: colors.secondaryText,
         },
       }),
-    [colors],
+    [colors, insets.bottom],
   );
 
   if (loading) {
@@ -1201,13 +1215,13 @@ const Settings: React.FC = () => {
         transparent
         animationType="slide"
         onRequestClose={() => setLanguageModalVisible(false)}>
-        <TouchableOpacity
-          style={themedStyles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setLanguageModalVisible(false)}>
-          <View
-            style={themedStyles.modalContent}
-            onStartShouldSetResponder={() => true}>
+        <View style={themedStyles.modalOverlay}>
+          <TouchableOpacity
+            style={themedStyles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setLanguageModalVisible(false)}
+          />
+          <View style={themedStyles.modalContent}>
             <View style={themedStyles.modalHandle} />
             <View style={themedStyles.modalHeader}>
               <Text style={themedStyles.modalTitle}>
@@ -1219,7 +1233,9 @@ const Settings: React.FC = () => {
                 <FontAwesomeIcon icon={faXmark} size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
-            <ScrollView style={themedStyles.languageList}>
+            <ScrollView
+              style={themedStyles.languageList}
+              contentContainerStyle={themedStyles.modalScrollContent}>
               {LANGUAGES.map(language => {
                 const isSelected = selectedLanguage.code === language.code;
                 return (
@@ -1257,7 +1273,7 @@ const Settings: React.FC = () => {
               })}
             </ScrollView>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Default Map App Modal */}
@@ -1266,13 +1282,13 @@ const Settings: React.FC = () => {
         transparent
         animationType="slide"
         onRequestClose={() => setMapModalVisible(false)}>
-        <TouchableOpacity
-          style={themedStyles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setMapModalVisible(false)}>
-          <View
-            style={themedStyles.modalContent}
-            onStartShouldSetResponder={() => true}>
+        <View style={themedStyles.modalOverlay}>
+          <TouchableOpacity
+            style={themedStyles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setMapModalVisible(false)}
+          />
+          <View style={themedStyles.modalContent}>
             <View style={themedStyles.modalHandle} />
             <View style={themedStyles.modalHeader}>
               <Text style={themedStyles.modalTitle}>
@@ -1284,7 +1300,9 @@ const Settings: React.FC = () => {
                 <FontAwesomeIcon icon={faXmark} size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
-            <ScrollView style={themedStyles.languageList}>
+            <ScrollView
+              style={themedStyles.languageList}
+              contentContainerStyle={themedStyles.modalScrollContent}>
               {MAP_OPTIONS.map(option => {
                 const isSelected = defaultMapApp === option.value;
                 return (
@@ -1319,7 +1337,7 @@ const Settings: React.FC = () => {
               })}
             </ScrollView>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Delete Account Modal */}
@@ -1421,13 +1439,16 @@ const Settings: React.FC = () => {
         transparent
         animationType="slide"
         onRequestClose={() => setNotificationSettingsModalVisible(false)}>
-        <TouchableOpacity
-          style={themedStyles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setNotificationSettingsModalVisible(false)}>
-          <View
-            style={[themedStyles.modalContent, {maxHeight: '85%'}]}
-            onStartShouldSetResponder={() => true}>
+        {/* Backdrop is a sibling of the sheet, not its parent: a wrapping
+            touchable competes with the sheet's ScrollView for the touch
+            responder, which can leave the lower preferences unscrollable. */}
+        <View style={themedStyles.modalOverlay}>
+          <TouchableOpacity
+            style={themedStyles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setNotificationSettingsModalVisible(false)}
+          />
+          <View style={themedStyles.modalContent}>
             <View style={themedStyles.modalHandle} />
             <View style={themedStyles.modalHeader}>
               <Text style={themedStyles.modalTitle}>
@@ -1439,13 +1460,16 @@ const Settings: React.FC = () => {
                 <FontAwesomeIcon icon={faXmark} size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} bounces={true}>
+            <ScrollView
+              showsVerticalScrollIndicator={true}
+              bounces={true}
+              contentContainerStyle={themedStyles.modalScrollContent}>
               <NotificationSettings
                 onClose={() => setNotificationSettingsModalVisible(false)}
               />
             </ScrollView>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* About Modal */}
