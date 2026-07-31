@@ -30,6 +30,11 @@ import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL, IMAGE_UPLOAD_URL} from '../../config/api';
 import analyticsService from '../../services/AnalyticsService';
 import {useEventContext, Event} from '../../Context/EventContext';
+import {
+  getEventDateTime,
+  isEventActive,
+  isEventLive,
+} from '../../utils/eventDateTime';
 
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
@@ -110,7 +115,7 @@ const Profile: React.FC = () => {
 
   const {userData, setUserData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
-  const {events} = useEventContext();
+  const {events, fetchEvents} = useEventContext();
 
   const {t} = useTranslation();
 
@@ -225,10 +230,12 @@ const Profile: React.FC = () => {
     return {eventsCreated, eventsJoined};
   }, [events, _id]);
 
-  // Find next upcoming event for this user
+  // Find the next event this user is involved in. "Involved" means they either
+  // created it or are on the roster. An event that's already underway still
+  // counts as active (see isEventActive) so a game in progress isn't dropped
+  // the moment it starts.
   const nextUpcomingEvent = useMemo(() => {
-    const now = new Date();
-    const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const oneWeekFromNow = Date.now() + 7 * 24 * 60 * 60 * 1000;
     const userEvents = events
       .filter(e => {
         const isCreator = e.createdBy === _id;
@@ -238,57 +245,66 @@ const Profile: React.FC = () => {
         );
         return isCreator || isInRoster;
       })
-      .filter(e => {
-        try {
-          const eventDate = new Date(`${e.date}T${e.time || '00:00'}`);
-          return eventDate > now && eventDate <= oneWeekFromNow;
-        } catch {
-          return false;
-        }
-      })
-      .sort((a, b) => {
-        const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
-        const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
-        return dateA.getTime() - dateB.getTime();
-      });
-    return userEvents[0] || null;
+      .map(e => ({event: e, when: getEventDateTime(e.date, e.time)}))
+      .filter(
+        ({event, when}) =>
+          when != null &&
+          isEventActive(event.date, event.time) &&
+          when.getTime() <= oneWeekFromNow,
+      )
+      .sort((a, b) => a.when!.getTime() - b.when!.getTime());
+    return userEvents[0]?.event || null;
   }, [events, _id]);
 
-  // Format upcoming event date nicely
+  // Whether the "Up Next" event is currently underway, so the card can show a
+  // live indicator rather than a countdown that's already elapsed.
+  const isNextEventLive = useMemo(
+    () =>
+      nextUpcomingEvent
+        ? isEventLive(nextUpcomingEvent.date, nextUpcomingEvent.time)
+        : false,
+    [nextUpcomingEvent],
+  );
+
+  // Format upcoming event date nicely. Compare calendar days rather than
+  // subtracting timestamps: an event 20 hours out can still be "Tomorrow".
   const formatEventDate = (event: Event) => {
-    try {
-      const date = new Date(`${event.date}T${event.time || '00:00'}`);
-      const now = new Date();
-      const diffMs = date.getTime() - now.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDays === 0) {
-        return t('profile.today') || 'Today';
-      }
-      if (diffDays === 1) {
-        return t('profile.tomorrow') || 'Tomorrow';
-      }
-      if (diffDays < 7) {
-        return date.toLocaleDateString(undefined, {weekday: 'long'});
-      }
-      return date.toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-      });
-    } catch {
+    const date = getEventDateTime(event.date, event.time);
+    if (!date) {
       return event.date;
     }
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfEventDay = new Date(date);
+    startOfEventDay.setHours(0, 0, 0, 0);
+    const diffDays = Math.round(
+      (startOfEventDay.getTime() - startOfToday.getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+    if (diffDays <= 0) {
+      return t('profile.today') || 'Today';
+    }
+    if (diffDays === 1) {
+      return t('profile.tomorrow') || 'Tomorrow';
+    }
+    if (diffDays < 7) {
+      return date.toLocaleDateString(undefined, {weekday: 'long'});
+    }
+    return date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   const formatEventTime = (event: Event) => {
-    try {
-      const date = new Date(`${event.date}T${event.time || '00:00'}`);
-      return date.toLocaleTimeString(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-      });
-    } catch {
+    const date = getEventDateTime(event.date, event.time);
+    if (!date) {
       return event.time;
     }
+    return date.toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   };
 
   // Get member since year from user data
@@ -518,6 +534,22 @@ const Profile: React.FC = () => {
           fontSize: 13,
           color: colors.secondaryText,
           flexShrink: 1,
+        },
+        liveBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 5,
+        },
+        liveDot: {
+          width: 7,
+          height: 7,
+          borderRadius: 4,
+          backgroundColor: '#4CAF50',
+        },
+        liveBadgeText: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: '#4CAF50',
         },
         upcomingEmptyText: {
           fontSize: 14,
@@ -893,13 +925,26 @@ const Profile: React.FC = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchUserData();
+    // Stats and "Up Next" are derived from the shared events list, so it has to
+    // be refreshed too or a pull-to-refresh reports the same stale counts.
+    await Promise.all([fetchUserData(), fetchEvents()]);
     setRefreshing(false);
-  }, [fetchUserData]);
+  }, [fetchUserData, fetchEvents]);
 
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
+
+  // Refresh the events list whenever this screen comes into focus. The provider
+  // only fetches once on mount — which happens before login, so without this
+  // the counts and "Up Next" would stay empty for the whole session and would
+  // never pick up events created or deleted elsewhere in the app.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchEvents();
+    });
+    return unsubscribe;
+  }, [navigation, fetchEvents]);
 
   const handleChoosePhoto = () => {
     const options: ImagePicker.ImageLibraryOptions = {
@@ -1278,18 +1323,27 @@ const Profile: React.FC = () => {
                   numberOfLines={1}>
                   {nextUpcomingEvent.name}
                 </Text>
-                <View style={themedStyles.upcomingEventMeta}>
-                  <FontAwesomeIcon
-                    icon={faLocationDot}
-                    size={11}
-                    color={colors.secondaryText}
-                  />
-                  <Text
-                    style={themedStyles.upcomingEventMetaText}
-                    numberOfLines={1}>
-                    {nextUpcomingEvent.location}
-                  </Text>
-                </View>
+                {isNextEventLive ? (
+                  <View style={themedStyles.liveBadge}>
+                    <View style={themedStyles.liveDot} />
+                    <Text style={themedStyles.liveBadgeText}>
+                      {t('events.happeningNow') || 'Happening Now'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={themedStyles.upcomingEventMeta}>
+                    <FontAwesomeIcon
+                      icon={faLocationDot}
+                      size={11}
+                      color={colors.secondaryText}
+                    />
+                    <Text
+                      style={themedStyles.upcomingEventMetaText}
+                      numberOfLines={1}>
+                      {nextUpcomingEvent.location}
+                    </Text>
+                  </View>
+                )}
               </View>
               <FontAwesomeIcon
                 icon={faChevronRight}

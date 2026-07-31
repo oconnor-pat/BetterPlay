@@ -102,6 +102,11 @@ import {useNotifications} from '../../Context/NotificationContext';
 import {useSocket} from '../../Context/SocketContext';
 import notificationService from '../../services/NotificationService';
 import locationService, {Coordinates} from '../../services/LocationService';
+import {
+  getEventDateTime,
+  isEventPast,
+  parseEventDateLocal,
+} from '../../utils/eventDateTime';
 import {AvailableMapApp, openDirections} from '../../services/MapLauncher';
 import MapAppPicker from '../MapAppPicker/MapAppPicker';
 import eventWatchService, {
@@ -546,96 +551,6 @@ interface LikedByUser {
   name?: string;
   profilePicUrl?: string;
 }
-
-// Parse an event's stored date into a *local* Date at midnight. Stored
-// dates are "YYYY-MM-DD"; `new Date("2026-07-17")` would parse as UTC
-// midnight and shift back a calendar day in negative-offset timezones,
-// so build from local components when we recognize that format.
-const parseEventDateLocal = (dateString: string): Date => {
-  const isoMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoMatch) {
-    const [, y, mo, d] = isoMatch;
-    return new Date(Number(y), Number(mo) - 1, Number(d));
-  }
-  const parsed = new Date(dateString);
-  parsed.setHours(0, 0, 0, 0);
-  return parsed;
-};
-
-// Resolve an event's stored date + time into a single local Date, or null when
-// neither is parseable. Stored dates arrive in two shapes ("YYYY-MM-DD" for
-// recurring series, `toDateString()` from the picker) and times as either
-// "6:30 PM" or "18:30", so naive `new Date(\`${date} ${time}\`)` yields an
-// Invalid Date for many combinations. Anything that needs to compare or order
-// events by when they happen must go through here.
-const getEventDateTime = (
-  eventDate: string,
-  eventTime: string,
-): Date | null => {
-  // Parse the date - handle formats like "Fri Jan 23 2026" or "Jan 23, 2026"
-  // Remove day name if present (e.g., "Fri ", "Mon ", etc.)
-  let cleanDate = eventDate.replace(/^[A-Za-z]{3}\s+/, '');
-
-  // Try to parse the date with multiple approaches
-  let eventDateTime: Date | null = null;
-
-  // Approach 0: ISO calendar date "2026-07-17". `new Date("2026-07-17")`
-  // parses as UTC midnight, which in any negative-offset timezone (e.g.
-  // US Eastern) rolls back to the *previous* calendar day locally — so an
-  // event dated tomorrow gets judged as today and hidden as "past". Build
-  // it from local components instead so the day is preserved.
-  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
-    eventDateTime = parseEventDateLocal(cleanDate);
-  }
-
-  // Approach 1: Parse "Jan 23 2026" or "Jan 23, 2026" format
-  const monthDayYearMatch = cleanDate.match(
-    /([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/,
-  );
-  if ((!eventDateTime || isNaN(eventDateTime.getTime())) && monthDayYearMatch) {
-    const [, month, day, year] = monthDayYearMatch;
-    eventDateTime = new Date(`${month} ${day}, ${year}`);
-  }
-
-  // Approach 2: If first approach failed, try direct parsing
-  if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-    eventDateTime = new Date(cleanDate);
-  }
-
-  // Approach 3: Try the original date string
-  if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-    eventDateTime = new Date(eventDate);
-  }
-
-  if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-    return null;
-  }
-
-  // Parse time - handle formats like "6:30 PM" or "18:30"
-  let hours = 0;
-  let minutes = 0;
-  const timeMatch = eventTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-  if (timeMatch) {
-    hours = parseInt(timeMatch[1], 10);
-    minutes = parseInt(timeMatch[2], 10);
-    const period = timeMatch[3]?.toUpperCase();
-    if (period === 'PM' && hours !== 12) {
-      hours += 12;
-    } else if (period === 'AM' && hours === 12) {
-      hours = 0;
-    }
-  }
-
-  eventDateTime.setHours(hours, minutes, 0, 0);
-  return eventDateTime;
-};
-
-// Helper function to check if an event date/time has passed. An unparseable
-// date is treated as not past so a bad record never silently disappears.
-const isEventPast = (eventDate: string, eventTime: string): boolean => {
-  const eventDateTime = getEventDateTime(eventDate, eventTime);
-  return eventDateTime ? eventDateTime < new Date() : false;
-};
 
 const dateFilterOptions = [
   {label: 'All Dates', value: 'all'},

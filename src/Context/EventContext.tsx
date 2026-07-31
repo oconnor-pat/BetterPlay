@@ -1,5 +1,6 @@
 import React, {
   createContext,
+  useCallback,
   useContext,
   useState,
   useEffect,
@@ -41,16 +42,27 @@ const EventContext = createContext<EventContextType | undefined>(undefined);
 export const EventProvider = ({children}: {children: ReactNode}) => {
   const [events, setEvents] = useState<Event[]>([]);
 
-  const fetchEvents = async () => {
+  // Memoized so consumers can safely use it as an effect dependency (e.g. a
+  // refetch-on-focus listener) without re-subscribing on every render.
+  const fetchEvents = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/events`);
+      // Send the JWT: `GET /events` is privacy-scoped server-side, so an
+      // anonymous request silently drops the caller's private/invite-only
+      // events and returns public ones redacted (empty roster). Anything
+      // counting or listing "my events" from this array would be wrong.
+      // There's no global axios interceptor in this codebase, so attach it
+      // here the same way the other authed calls do.
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(`${API_BASE_URL}/events`, {
+        headers: token ? {Authorization: `Bearer ${token}`} : {},
+      });
       setEvents(response.data);
       // Cache for faster startup
       AsyncStorage.setItem('cachedEvents', JSON.stringify(response.data));
     } catch (error) {
       // Optionally handle error (e.g., set error state)
     }
-  };
+  }, []);
 
   // Load cached events immediately, fetch fresh in background
   useEffect(() => {
@@ -71,7 +83,7 @@ export const EventProvider = ({children}: {children: ReactNode}) => {
       fetchEvents();
     };
     loadEvents();
-  }, []);
+  }, [fetchEvents]);
 
   const updateRosterSpots = (eventId: string, newRosterCount: number) => {
     setEvents(prev =>
