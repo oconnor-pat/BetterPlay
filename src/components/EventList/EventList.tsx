@@ -177,7 +177,11 @@ type RecurrenceFrequency = 'weekly' | 'biweekly' | 'monthly';
 interface Event {
   _id: string;
   name: string;
-  location: string; // human-readable address
+  // Human-readable address. Optional because a gated public event is served
+  // redacted: the backend withholds the address (and coordinates) until the
+  // host approves you, unless they enabled `showLocationPublicly`. Treat it as
+  // possibly-absent anywhere an event might be gated.
+  location?: string;
   time: string;
   date: string;
   rosterSpotsFilled: number;
@@ -558,10 +562,16 @@ const parseEventDateLocal = (dateString: string): Date => {
   return parsed;
 };
 
-// Helper function to check if an event date/time has passed
-const isEventPast = (eventDate: string, eventTime: string): boolean => {
-  const now = new Date();
-
+// Resolve an event's stored date + time into a single local Date, or null when
+// neither is parseable. Stored dates arrive in two shapes ("YYYY-MM-DD" for
+// recurring series, `toDateString()` from the picker) and times as either
+// "6:30 PM" or "18:30", so naive `new Date(\`${date} ${time}\`)` yields an
+// Invalid Date for many combinations. Anything that needs to compare or order
+// events by when they happen must go through here.
+const getEventDateTime = (
+  eventDate: string,
+  eventTime: string,
+): Date | null => {
   // Parse the date - handle formats like "Fri Jan 23 2026" or "Jan 23, 2026"
   // Remove day name if present (e.g., "Fri ", "Mon ", etc.)
   let cleanDate = eventDate.replace(/^[A-Za-z]{3}\s+/, '');
@@ -597,9 +607,8 @@ const isEventPast = (eventDate: string, eventTime: string): boolean => {
     eventDateTime = new Date(eventDate);
   }
 
-  // If we still don't have a valid date, return false (treat as not past)
   if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-    return false;
+    return null;
   }
 
   // Parse time - handle formats like "6:30 PM" or "18:30"
@@ -618,7 +627,14 @@ const isEventPast = (eventDate: string, eventTime: string): boolean => {
   }
 
   eventDateTime.setHours(hours, minutes, 0, 0);
-  return eventDateTime < now;
+  return eventDateTime;
+};
+
+// Helper function to check if an event date/time has passed. An unparseable
+// date is treated as not past so a bad record never silently disappears.
+const isEventPast = (eventDate: string, eventTime: string): boolean => {
+  const eventDateTime = getEventDateTime(eventDate, eventTime);
+  return eventDateTime ? eventDateTime < new Date() : false;
 };
 
 const dateFilterOptions = [
@@ -3401,21 +3417,22 @@ const EventList: React.FC = () => {
   const filteredEvents = useMemo(() => {
     let filtered = eventData;
 
-    // Text search filter
+    // Text search filter. Every field is read defensively: a gated public
+    // event arrives redacted (no location until the host approves you), so
+    // assuming any of these is a string crashes the screen on the first
+    // keystroke.
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(event => {
-        const nameMatch = event.name.toLowerCase().includes(query);
-        const locationMatch = event.location.toLowerCase().includes(query);
-        const dateMatch = event.date.toLowerCase().includes(query);
-        const typeMatch = event.eventType.toLowerCase().includes(query);
-        const creatorMatch = event.createdByUsername
-          ?.toLowerCase()
-          .includes(query);
-        return (
-          nameMatch || locationMatch || dateMatch || typeMatch || creatorMatch
-        );
-      });
+      const matches = (value?: string) =>
+        !!value && value.toLowerCase().includes(query);
+      filtered = filtered.filter(
+        event =>
+          matches(event.name) ||
+          matches(event.location) ||
+          matches(event.date) ||
+          matches(event.eventType) ||
+          matches(event.createdByUsername),
+      );
     }
 
     // Event type filter
@@ -3499,12 +3516,27 @@ const EventList: React.FC = () => {
       });
     }
 
-    // Sort by date (soonest first) so new events appear in chronological order
-    filtered = [...filtered].sort((a, b) => {
-      const dateA = new Date(`${a.date} ${a.time}`);
-      const dateB = new Date(`${b.date} ${b.time}`);
-      return dateA.getTime() - dateB.getTime();
-    });
+    // Order the list: upcoming events first (soonest first), then any past
+    // events after them (most recent first). Past events are only present when
+    // the user opted into them, and keeping them below the upcoming ones stops
+    // history from burying what's actually actionable. Unparseable dates sort
+    // last rather than returning NaN, which would scramble the whole list.
+    const nowMs = Date.now();
+    filtered = [...filtered]
+      .map(event => {
+        const when = getEventDateTime(event.date, event.time)?.getTime();
+        return {event, when, isPast: when != null && when < nowMs};
+      })
+      .sort((a, b) => {
+        if (a.when == null || b.when == null) {
+          return a.when == null ? (b.when == null ? 0 : 1) : -1;
+        }
+        if (a.isPast !== b.isPast) {
+          return a.isPast ? 1 : -1;
+        }
+        return a.isPast ? b.when - a.when : a.when - b.when;
+      })
+      .map(entry => entry.event);
 
     return filtered;
   }, [
@@ -4054,7 +4086,7 @@ const EventList: React.FC = () => {
         : 4;
     setNewEvent({
       name: event.name,
-      location: event.location,
+      location: event.location || '',
       time: event.time,
       date: event.date,
       totalSpots: event.totalSpots.toString(),
@@ -4958,7 +4990,7 @@ const EventList: React.FC = () => {
             const coords =
               item.latitude && item.longitude
                 ? {latitude: item.latitude, longitude: item.longitude}
-                : getCoordinatesFromLocation(item.location);
+                : getCoordinatesFromLocation(item.location || '');
 
             return (
               <MapView
