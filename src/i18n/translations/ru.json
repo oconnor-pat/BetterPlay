@@ -138,7 +138,13 @@
     "approvalRequired": "Требуется одобрение",
     "gatedHint": "Место и детали откроются, когда организатор вас одобрит.",
     "duration": "Длительность",
-    "endsAt": "Заканчивается в {{time}}"
+    "endsAt": "Заканчивается в {{time}}",
+    "myEvents": "Мои события",
+    "myEventsOnly": "Мои события",
+    "myEventsOnlyDescription": "Показывать только события, которые я организую или посещаю",
+    "reactions": "Реакции",
+    "reactedToThis": "отреагировали на это",
+    "noReactionsYet": "Пока нет реакций"
   },
   "profile": {
     "title": "Профиль",

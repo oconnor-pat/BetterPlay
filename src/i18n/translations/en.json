@@ -136,6 +136,9 @@
     "dateRange": "Date",
     "availability": "Availability",
     "availableOnly": "Show only events with available spots",
+    "myEvents": "My Events",
+    "myEventsOnly": "My events",
+    "myEventsOnlyDescription": "Show only events I'm hosting or attending",
     "pastEvents": "Past Events",
     "showPastEvents": "Show past events",
     "past": "Past",
@@ -189,7 +192,10 @@
     "showEventsWithin": "Show events within {{distance}} mi",
     "withinDistance": "Within {{distance}} mi",
     "duration": "Duration",
-    "endsAt": "Ends {{time}}"
+    "endsAt": "Ends {{time}}",
+    "reactions": "Reactions",
+    "reactedToThis": "reacted to this",
+    "noReactionsYet": "No reactions yet"
   },
   "profile": {
     "title": "Profile",

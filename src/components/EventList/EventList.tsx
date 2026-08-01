@@ -63,7 +63,6 @@ import {
   faShareAlt,
   faLocationArrow,
   faComments,
-  faHeart,
   faGlobe,
   faLock,
   faEnvelope,
@@ -113,6 +112,7 @@ import MapAppPicker from '../MapAppPicker/MapAppPicker';
 import eventWatchService, {
   EventWatchPreferences,
 } from '../../services/EventWatchService';
+import EmojiPicker, {type EmojiType} from 'rn-emoji-keyboard';
 
 // Optional prefill payload sent from the Venues tab via the "Plan event
 // here" bridge. Any subset of these fields is OK — anything missing falls
@@ -200,7 +200,10 @@ interface Event {
   createdByUsername?: string;
   createdByProfilePicUrl?: string;
   createdAt?: string;
+  // Superseded by `reactions`; the server still sends it so clients older than
+  // the reactions release keep working. Read `reactions` instead.
   likes?: string[];
+  reactions?: Array<{userId: string; emoji: string}>;
   latitude?: number;
   longitude?: number;
   jerseyColors?: string[];
@@ -610,6 +613,38 @@ const matchesEventTypeFilter = (
     ? !!eventType?.trim() && !isPresetEventType(eventType)
     : selectedType.toLowerCase() === (eventType || '').toLowerCase();
 
+// The emoji a legacy "like" maps to. The server keeps the deprecated `likes`
+// array in sync with these so older clients still see hearts.
+const LIKE_EMOJI = '❤️';
+
+// Collapse reactions into one pill per distinct emoji. Ordered by first
+// appearance (the server appends, so that's first-reacted-first, same as
+// Discord) rather than by count, so pills don't jump around as votes land.
+const summarizeReactions = (
+  event: Event,
+  userId?: string,
+): {emoji: string; count: number; mine: boolean}[] => {
+  const order: string[] = [];
+  const counts = new Map<string, number>();
+  const mine = new Set<string>();
+
+  (event.reactions || []).forEach(r => {
+    if (!counts.has(r.emoji)) {
+      order.push(r.emoji);
+    }
+    counts.set(r.emoji, (counts.get(r.emoji) || 0) + 1);
+    if (userId && r.userId === userId) {
+      mine.add(r.emoji);
+    }
+  });
+
+  return order.map(emoji => ({
+    emoji,
+    count: counts.get(emoji) as number,
+    mine: mine.has(emoji),
+  }));
+};
+
 // Open maps for an event — delegates to shared MapLauncher
 const openMapsForEvent = async (
   event: Partial<Event>,
@@ -860,6 +895,7 @@ const RecurringDeck: React.FC<RecurringDeckProps> = ({
 
 const EventList: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
+  const myUserId = userData?._id;
   const {colors, darkMode} = useTheme();
   const {t} = useTranslation();
   const {badgeCount, hasPermission, requestPermission, settings} =
@@ -2347,6 +2383,48 @@ const EventList: React.FC = () => {
           // avatar strip off the right edge of the identity column.
           flexShrink: 1,
         },
+        // Reaction pills — Discord-style row under the card body.
+        reactionRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 6,
+          paddingTop: 10,
+        },
+        reactionPill: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          paddingHorizontal: 8,
+          height: 26,
+          borderRadius: 13,
+          backgroundColor: colors.secondaryText + '14',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: 'transparent',
+        },
+        reactionPillMine: {
+          backgroundColor: colors.primary + '1F',
+          borderColor: colors.primary,
+        },
+        reactionPillEmoji: {
+          fontSize: 13,
+        },
+        reactionPillCount: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
+        },
+        reactionPillCountMine: {
+          color: colors.primary,
+        },
+        reactionAddButton: {
+          width: 28,
+          height: 26,
+          borderRadius: 13,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.secondaryText + '14',
+        },
         // Likes modal — bottom-sheet (matches EventComments)
         likesModalOverlay: {
           flex: 1,
@@ -2436,6 +2514,10 @@ const EventList: React.FC = () => {
         likesModalUsernameClickable: {
           color: colors.primary,
           fontWeight: '600',
+        },
+        likesModalEmoji: {
+          fontSize: 16,
+          marginLeft: 8,
         },
         likesModalChevron: {
           marginLeft: 8,
@@ -2960,6 +3042,7 @@ const EventList: React.FC = () => {
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
   const [selectedDateFilter, setSelectedDateFilter] = useState('all');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+  const [showMyEventsOnly, setShowMyEventsOnly] = useState(false);
   const [hidePastEvents, setHidePastEvents] = useState(true);
   const [profileFilter, setProfileFilter] = useState<
     'created' | 'joined' | null
@@ -3083,8 +3166,10 @@ const EventList: React.FC = () => {
     string | null
   >(null);
 
-  // Liked events state
-  const [likedEvents, setLikedEvents] = useState<Set<string>>(new Set());
+  // Which event the reaction picker is open for, if any.
+  const [reactionPickerEvent, setReactionPickerEvent] = useState<Event | null>(
+    null,
+  );
 
   // Local comment count overrides (updated when user adds/removes comments)
   const [localCommentCounts, setLocalCommentCounts] = useState<{
@@ -3098,11 +3183,11 @@ const EventList: React.FC = () => {
   >({});
   const lastCreatorFetchRef = useRef<number>(0);
 
-  // Likes modal state
+  // "Who reacted" modal state. Each entry carries the emoji that user picked.
   const [likesModalVisible, setLikesModalVisible] = useState(false);
   const [likesModalData, setLikesModalData] = useState<{
     title: string;
-    users: LikedByUser[];
+    users: Array<LikedByUser & {emoji?: string}>;
     anonymousCount: number;
   }>({title: '', users: [], anonymousCount: 0});
 
@@ -3178,16 +3263,6 @@ const EventList: React.FC = () => {
       }
     });
   }, [fetchEvents]);
-
-  // Initialize liked events from event data
-  useEffect(() => {
-    if (userData && eventData.length > 0) {
-      const userLikedEvents = eventData
-        .filter(event => event.likes?.includes(userData._id))
-        .map(event => event._id);
-      setLikedEvents(new Set(userLikedEvents));
-    }
-  }, [eventData, userData]);
 
   // Pre-seed creator cache with the current user so events they create
   // optimistically render with their avatar before /users resolves.
@@ -3377,9 +3452,10 @@ const EventList: React.FC = () => {
     );
 
     const unsubLiked = socketSubscribe(
-      'event:liked',
+      'event:reacted',
       (data: {
         eventId: string;
+        reactions: Array<{userId: string; emoji: string}>;
         likes: string[];
         likedByUsernames: string[];
       }) => {
@@ -3388,6 +3464,7 @@ const EventList: React.FC = () => {
             ev._id === data.eventId
               ? {
                   ...ev,
+                  reactions: data.reactions,
                   likes: data.likes,
                   likedByUsernames: data.likedByUsernames,
                 }
@@ -3480,6 +3557,19 @@ const EventList: React.FC = () => {
       );
     }
 
+    // "My events only" filter. Counts anything the user has a stake in, not
+    // just what they created: hosting, going, replying maybe/can't, and being
+    // invited all make an event theirs for decluttering purposes.
+    if (showMyEventsOnly && myUserId) {
+      filtered = filtered.filter(
+        event =>
+          event.createdBy === myUserId ||
+          (event.roster || []).some(r => r.userId === myUserId) ||
+          (event.rsvps || []).some(r => r.userId === myUserId) ||
+          (event.invitedUsers || []).includes(myUserId),
+      );
+    }
+
     // Hide past events filter
     if (hidePastEvents) {
       filtered = filtered.filter(event => !isEventPast(event.date, event.time));
@@ -3544,6 +3634,8 @@ const EventList: React.FC = () => {
     selectedEventTypes,
     selectedDateFilter,
     showAvailableOnly,
+    showMyEventsOnly,
+    myUserId,
     hidePastEvents,
     profileFilter,
     profileFilterUserId,
@@ -3708,6 +3800,9 @@ const EventList: React.FC = () => {
     if (showAvailableOnly) {
       count++;
     }
+    if (showMyEventsOnly) {
+      count++;
+    }
     if (proximityEnabled) {
       count++;
     }
@@ -3716,6 +3811,7 @@ const EventList: React.FC = () => {
     selectedEventTypes,
     selectedDateFilter,
     showAvailableOnly,
+    showMyEventsOnly,
     proximityEnabled,
   ]);
 
@@ -3725,7 +3821,10 @@ const EventList: React.FC = () => {
   // extra row. Only the filters that have no other on-screen affordance
   // (date range, available-only, proximity) get a tag here.
   const hasTagRowFilters =
-    selectedDateFilter !== 'all' || showAvailableOnly || proximityEnabled;
+    selectedDateFilter !== 'all' ||
+    showAvailableOnly ||
+    showMyEventsOnly ||
+    proximityEnabled;
 
   // Toggle event type selection
   const toggleEventType = (type: string) => {
@@ -3779,6 +3878,7 @@ const EventList: React.FC = () => {
     setSelectedEventTypes([]);
     setSelectedDateFilter('all');
     setShowAvailableOnly(false);
+    setShowMyEventsOnly(false);
     setHidePastEvents(true);
     setProfileFilter(null);
     setProfileFilterUserId(null);
@@ -4340,22 +4440,28 @@ const EventList: React.FC = () => {
     setInvitedUserDetails(prev => prev.filter(u => u._id !== userId));
   };
 
-  // Show who liked the event
-  const showEventLikedBy = async (event: Event) => {
-    const likes = event.likes || [];
-    if (likes.length === 0) {
+  // Show who reacted to the event, and with what.
+  const showEventReactedBy = async (event: Event) => {
+    const reactions = event.reactions || [];
+    if (reactions.length === 0) {
       return;
     }
 
-    // Fetch user details for the user IDs
-    const users = await fetchUsersByIds(likes);
+    const userIds = reactions.map(r => r.userId);
+    const users = await fetchUsersByIds(userIds);
 
-    // Calculate how many likes don't have user info attached
-    const anonymousCount = Math.max(0, likes.length - users.length);
+    const emojiByUserId = new Map(reactions.map(r => [r.userId, r.emoji]));
+    const usersWithEmoji = users.map(user => ({
+      ...user,
+      emoji: user._id ? emojiByUserId.get(user._id) : undefined,
+    }));
+
+    // Reactors we couldn't resolve to a profile still get counted.
+    const anonymousCount = Math.max(0, reactions.length - users.length);
 
     setLikesModalData({
-      title: 'Liked by',
-      users,
+      title: t('events.reactions') || 'Reactions',
+      users: usersWithEmoji,
       anonymousCount,
     });
     setLikesModalVisible(true);
@@ -4374,74 +4480,51 @@ const EventList: React.FC = () => {
     });
   };
 
-  // Toggle like on event
-  const toggleEventLike = async (event: Event) => {
+  // Add or remove one emoji for the current user. A user can hold several
+  // different reactions at once, so only the exact (user, emoji) pair toggles
+  // — mirroring the server so the optimistic state matches the reply.
+  const toggleEventReaction = async (event: Event, emoji: string) => {
     if (!userData) {
       return;
     }
 
-    const isLiked = likedEvents.has(event._id);
+    const myUid = userData._id;
+    const hadIt = (event.reactions || []).some(
+      r => r.userId === myUid && r.emoji === emoji,
+    );
 
-    // Optimistic update
-    setLikedEvents(prev => {
-      const newSet = new Set(prev);
-      if (isLiked) {
-        newSet.delete(event._id);
-      } else {
-        newSet.add(event._id);
-      }
-      return newSet;
-    });
+    const withPair = (target: Event, shouldHave: boolean): Event => {
+      const others = (target.reactions || []).filter(
+        r => !(r.userId === myUid && r.emoji === emoji),
+      );
+      const reactions = shouldHave
+        ? [...others, {userId: myUid, emoji}]
+        : others;
+      return {
+        ...target,
+        reactions,
+        likes: reactions
+          .filter(r => r.emoji === LIKE_EMOJI)
+          .map(r => r.userId),
+      };
+    };
 
-    // Update event data optimistically
     setEventData(prev =>
-      prev.map(e =>
-        e._id === event._id
-          ? {
-              ...e,
-              likes: isLiked
-                ? (e.likes || []).filter(id => id !== userData._id)
-                : [...(e.likes || []), userData._id],
-            }
-          : e,
-      ),
+      prev.map(e => (e._id === event._id ? withPair(e, !hadIt) : e)),
     );
 
     try {
       const token = await AsyncStorage.getItem('userToken');
       await axios.post(
-        `${API_BASE_URL}/events/${event._id}/like`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
+        `${API_BASE_URL}/events/${event._id}/react`,
+        {emoji},
+        {headers: {Authorization: `Bearer ${token}`}},
       );
     } catch (error) {
-      // Revert on error
-      setLikedEvents(prev => {
-        const newSet = new Set(prev);
-        if (isLiked) {
-          newSet.add(event._id);
-        } else {
-          newSet.delete(event._id);
-        }
-        return newSet;
-      });
       setEventData(prev =>
-        prev.map(e =>
-          e._id === event._id
-            ? {
-                ...e,
-                likes: isLiked
-                  ? [...(e.likes || []), userData._id]
-                  : (e.likes || []).filter(id => id !== userData._id),
-              }
-            : e,
-        ),
+        prev.map(e => (e._id === event._id ? withPair(e, hadIt) : e)),
       );
-      console.error('Failed to toggle event like:', error);
+      console.error('Failed to toggle event reaction:', error);
     }
   };
 
@@ -4658,7 +4741,7 @@ const EventList: React.FC = () => {
     const creatorProfilePicUrl =
       item.createdByProfilePicUrl || creatorInfo?.profilePicUrl;
     const creatorInitials = getCreatorInitials(creatorInfo?.name, username);
-    const likeCount = item.likes?.length || 0;
+    const reactionSummary = summarizeReactions(item, myUserId);
     const commentCount = localCommentCounts[item._id] ?? item.commentCount ?? 0;
 
     const showOptionsMenu = () => {
@@ -5187,31 +5270,44 @@ const EventList: React.FC = () => {
             })()
           : null}
 
-        {/* Engagement Footer */}
-        <View style={themedStyles.engagementRow}>
-          <TouchableOpacity
-            style={themedStyles.engagementButton}
-            onPress={() => toggleEventLike(item)}
-            onLongPress={() => likeCount > 0 && showEventLikedBy(item)}
-            hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
-            <FontAwesomeIcon
-              icon={faHeart}
-              size={16}
-              color={
-                likedEvents.has(item._id) ? '#e74c3c' : colors.secondaryText
-              }
-            />
-            {likeCount > 0 && (
+        {/* Reactions. One pill per distinct emoji: tap to add or remove your
+            own, long-press to see who reacted. The "+" is always present so
+            there's an entry point on a card nobody has reacted to yet. */}
+        <View style={themedStyles.reactionRow}>
+          {reactionSummary.map(entry => (
+            <TouchableOpacity
+              key={entry.emoji}
+              style={[
+                themedStyles.reactionPill,
+                entry.mine && themedStyles.reactionPillMine,
+              ]}
+              onPress={() => toggleEventReaction(item, entry.emoji)}
+              onLongPress={() => showEventReactedBy(item)}
+              hitSlop={{top: 6, bottom: 6, left: 2, right: 2}}>
+              <Text style={themedStyles.reactionPillEmoji}>{entry.emoji}</Text>
               <Text
                 style={[
-                  themedStyles.engagementCount,
-                  likedEvents.has(item._id) && {color: '#e74c3c'},
+                  themedStyles.reactionPillCount,
+                  entry.mine && themedStyles.reactionPillCountMine,
                 ]}>
-                {likeCount}
+                {entry.count}
               </Text>
-            )}
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={themedStyles.reactionAddButton}
+            onPress={() => setReactionPickerEvent(item)}
+            hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
+            <FontAwesomeIcon
+              icon={faPlus}
+              size={11}
+              color={colors.secondaryText}
+            />
           </TouchableOpacity>
+        </View>
 
+        {/* Engagement Footer */}
+        <View style={themedStyles.engagementRow}>
           <TouchableOpacity
             style={themedStyles.engagementButton}
             onPress={() => handleDiscussEvent(item)}
@@ -5504,6 +5600,20 @@ const EventList: React.FC = () => {
                 onPress={() => setShowAvailableOnly(false)}>
                 <Text style={themedStyles.activeFilterTagText}>
                   ✅ {t('events.availableOnly') || 'Available spots'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={10}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            )}
+            {showMyEventsOnly && (
+              <TouchableOpacity
+                style={themedStyles.activeFilterTag}
+                onPress={() => setShowMyEventsOnly(false)}>
+                <Text style={themedStyles.activeFilterTagText}>
+                  👤 {t('events.myEventsOnly') || 'My events'}
                 </Text>
                 <FontAwesomeIcon
                   icon={faTimes}
@@ -6928,6 +7038,39 @@ const EventList: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
+              {/* My Events Filter */}
+              <View style={themedStyles.filterSection}>
+                <Text style={themedStyles.filterSectionTitle}>
+                  {t('events.myEvents') || 'My Events'}
+                </Text>
+                <TouchableOpacity
+                  style={themedStyles.toggleOption}
+                  onPress={() => setShowMyEventsOnly(!showMyEventsOnly)}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      themedStyles.toggleOptionText,
+                      showMyEventsOnly && themedStyles.toggleOptionTextSelected,
+                    ]}>
+                    {t('events.myEventsOnlyDescription') ||
+                      "Show only events I'm hosting or attending"}
+                  </Text>
+                  <View
+                    style={[
+                      themedStyles.toggleCheck,
+                      showMyEventsOnly && themedStyles.toggleCheckActive,
+                    ]}>
+                    {showMyEventsOnly && (
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={12}
+                        color={colors.buttonText || '#fff'}
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </View>
+
               {/* Past Events Filter */}
               <View style={themedStyles.filterSection}>
                 <Text style={themedStyles.filterSectionTitle}>
@@ -7059,7 +7202,50 @@ const EventList: React.FC = () => {
         </TouchableOpacity>
       </Modal>
 
-      {/* Likes Modal */}
+      {/* Full emoji picker (pure-JS, no native module) */}
+      <EmojiPicker
+        open={!!reactionPickerEvent}
+        onClose={() => setReactionPickerEvent(null)}
+        onEmojiSelected={(picked: EmojiType) => {
+          if (reactionPickerEvent) {
+            toggleEventReaction(reactionPickerEvent, picked.emoji);
+          }
+          setReactionPickerEvent(null);
+        }}
+        enableSearchBar
+        enableRecentlyUsed
+        // Must not be "top": that flips the sheet with column-reverse, which
+        // pushes the search field to the bottom where the keyboard covers it.
+        categoryPosition="bottom"
+        // The search results live in a category at the end of a horizontal
+        // paging list, so the first keystroke otherwise animates a scroll
+        // across every category in between. Both flags are needed: the
+        // library ANDs enableCategoryChangeAnimation into the scroll directly,
+        // while enableSearchAnimation is applied a render too late to stop
+        // that first jump.
+        enableCategoryChangeAnimation={false}
+        enableSearchAnimation={false}
+        theme={{
+          backdrop: '#00000066',
+          knob: colors.primary,
+          container: colors.card || colors.background,
+          header: colors.text,
+          category: {
+            icon: colors.secondaryText,
+            iconActive: colors.buttonText || '#fff',
+            container: colors.background,
+            containerActive: colors.primary,
+          },
+          search: {
+            text: colors.text,
+            placeholder: colors.secondaryText,
+            icon: colors.secondaryText,
+            background: colors.background,
+          },
+        }}
+      />
+
+      {/* Reactions Modal */}
       <Modal
         visible={likesModalVisible}
         transparent
@@ -7075,7 +7261,6 @@ const EventList: React.FC = () => {
             <View style={themedStyles.likesModalHandle} />
             <View style={themedStyles.likesModalHeaderBlock}>
               <View style={themedStyles.likesModalTitleRow}>
-                <FontAwesomeIcon icon={faHeart} size={14} color={'#e74c3c'} />
                 <Text style={themedStyles.likesModalTitle}>
                   {likesModalData.title}
                 </Text>
@@ -7136,6 +7321,11 @@ const EventList: React.FC = () => {
                         ]}>
                         {user.username}
                       </Text>
+                      {!!user.emoji && (
+                        <Text style={themedStyles.likesModalEmoji}>
+                          {user.emoji}
+                        </Text>
+                      )}
                       {!!user._id && (
                         <FontAwesomeIcon
                           icon={faChevronRight}
@@ -7158,10 +7348,12 @@ const EventList: React.FC = () => {
                 <Text style={themedStyles.likesModalAnonymous}>
                   {`${likesModalData.anonymousCount} ${
                     likesModalData.anonymousCount === 1 ? 'person' : 'people'
-                  } liked this`}
+                  } ${t('events.reactedToThis') || 'reacted to this'}`}
                 </Text>
               ) : (
-                <Text style={themedStyles.likesModalEmpty}>No likes yet</Text>
+                <Text style={themedStyles.likesModalEmpty}>
+                  {t('events.noReactionsYet') || 'No reactions yet'}
+                </Text>
               )}
             </ScrollView>
             <TouchableOpacity

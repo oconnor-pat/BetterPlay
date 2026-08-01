@@ -138,7 +138,13 @@
     "approvalRequired": "Aprovação necessária",
     "gatedHint": "O local e os detalhes são revelados quando o anfitrião aprova você.",
     "duration": "Duração",
-    "endsAt": "Termina às {{time}}"
+    "endsAt": "Termina às {{time}}",
+    "myEvents": "Meus eventos",
+    "myEventsOnly": "Meus eventos",
+    "myEventsOnlyDescription": "Mostrar apenas eventos que eu organizo ou participo",
+    "reactions": "Reações",
+    "reactedToThis": "reagiram a isto",
+    "noReactionsYet": "Ainda não há reações"
   },
   "profile": {
     "title": "Perfil",

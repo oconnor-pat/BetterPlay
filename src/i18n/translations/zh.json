@@ -138,7 +138,13 @@
     "approvalRequired": "需要批准",
     "gatedHint": "主办方批准后即可查看地点和详情。",
     "duration": "时长",
-    "endsAt": "{{time}} 结束"
+    "endsAt": "{{time}} 结束",
+    "myEvents": "我的活动",
+    "myEventsOnly": "我的活动",
+    "myEventsOnlyDescription": "仅显示我主办或参加的活动",
+    "reactions": "反应",
+    "reactedToThis": "人做出了反应",
+    "noReactionsYet": "还没有反应"
   },
   "profile": {
     "title": "个人资料",

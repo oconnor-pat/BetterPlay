@@ -138,7 +138,13 @@
     "approvalRequired": "يتطلب موافقة",
     "gatedHint": "يتم كشف الموقع والتفاصيل عندما يوافق المضيف عليك.",
     "duration": "المدة",
-    "endsAt": "ينتهي في {{time}}"
+    "endsAt": "ينتهي في {{time}}",
+    "myEvents": "فعالياتي",
+    "myEventsOnly": "فعالياتي",
+    "myEventsOnlyDescription": "إظهار الفعاليات التي أستضيفها أو أحضرها فقط",
+    "reactions": "التفاعلات",
+    "reactedToThis": "تفاعلوا مع هذا",
+    "noReactionsYet": "لا توجد تفاعلات بعد"
   },
   "profile": {
     "title": "الملف الشخصي",

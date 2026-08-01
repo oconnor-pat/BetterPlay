@@ -138,7 +138,13 @@
     "approvalRequired": "Approvazione richiesta",
     "gatedHint": "Luogo e dettagli si sbloccano quando l’organizzatore ti approva.",
     "duration": "Durata",
-    "endsAt": "Termina alle {{time}}"
+    "endsAt": "Termina alle {{time}}",
+    "myEvents": "I miei eventi",
+    "myEventsOnly": "I miei eventi",
+    "myEventsOnlyDescription": "Mostra solo gli eventi che organizzo o a cui partecipo",
+    "reactions": "Reazioni",
+    "reactedToThis": "hanno reagito a questo",
+    "noReactionsYet": "Ancora nessuna reazione"
   },
   "profile": {
     "title": "Profilo",

@@ -138,7 +138,13 @@
     "approvalRequired": "अनुमोदन आवश्यक",
     "gatedHint": "मेज़बान द्वारा स्वीकृति मिलने पर स्थान और विवरण दिखेंगे।",
     "duration": "अवधि",
-    "endsAt": "{{time}} पर समाप्त"
+    "endsAt": "{{time}} पर समाप्त",
+    "myEvents": "मेरे इवेंट",
+    "myEventsOnly": "मेरे इवेंट",
+    "myEventsOnlyDescription": "केवल वे इवेंट दिखाएं जिनकी मैं मेज़बानी कर रहा हूं या जिनमें शामिल हूं",
+    "reactions": "प्रतिक्रियाएं",
+    "reactedToThis": "ने इस पर प्रतिक्रिया दी",
+    "noReactionsYet": "अभी तक कोई प्रतिक्रिया नहीं"
   },
   "profile": {
     "title": "प्रोफ़ाइल",

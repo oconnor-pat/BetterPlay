@@ -112,6 +112,9 @@
     "dateRange": "Datum",
     "availability": "Verfügbarkeit",
     "availableOnly": "Nur Events mit freien Plätzen anzeigen",
+    "myEvents": "Meine Events",
+    "myEventsOnly": "Meine Events",
+    "myEventsOnlyDescription": "Nur Events anzeigen, die ich veranstalte oder besuche",
     "clearFilters": "Alles löschen",
     "applyFilters": "Filter anwenden",
     "shareEvent": "Event teilen",
@@ -147,7 +150,10 @@
     "approvalRequired": "Freigabe erforderlich",
     "gatedHint": "Ort und Details werden freigeschaltet, sobald der Gastgeber dich bestätigt.",
     "duration": "Dauer",
-    "endsAt": "Endet um {{time}}"
+    "endsAt": "Endet um {{time}}",
+    "reactions": "Reaktionen",
+    "reactedToThis": "haben darauf reagiert",
+    "noReactionsYet": "Noch keine Reaktionen"
   },
   "profile": {
     "title": "Profil",

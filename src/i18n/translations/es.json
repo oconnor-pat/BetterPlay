@@ -112,6 +112,9 @@
     "dateRange": "Fecha",
     "availability": "Disponibilidad",
     "availableOnly": "Mostrar solo eventos con cupos disponibles",
+    "myEvents": "Mis eventos",
+    "myEventsOnly": "Mis eventos",
+    "myEventsOnlyDescription": "Mostrar solo los eventos que organizo o a los que asisto",
     "clearFilters": "Limpiar Todo",
     "applyFilters": "Aplicar Filtros",
     "shareEvent": "Compartir Evento",
@@ -147,7 +150,10 @@
     "approvalRequired": "Requiere aprobación",
     "gatedHint": "La ubicación y los detalles se desbloquean cuando el anfitrión te aprueba.",
     "duration": "Duración",
-    "endsAt": "Termina a las {{time}}"
+    "endsAt": "Termina a las {{time}}",
+    "reactions": "Reacciones",
+    "reactedToThis": "reaccionaron a esto",
+    "noReactionsYet": "Aún no hay reacciones"
   },
   "profile": {
     "title": "Perfil",

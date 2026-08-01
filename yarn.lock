@@ -6751,6 +6751,11 @@ rimraf@~2.6.2:
   dependencies:
     glob "^7.1.3"
 
+rn-emoji-keyboard@^1.7.0:
+  version "1.7.0"
+  resolved "https://registry.npmjs.org/rn-emoji-keyboard/-/rn-emoji-keyboard-1.7.0.tgz"
+  integrity sha512-Yo5yJB+joYqSgvZx7WX/DMAC6rHUEJOQFYNjevd+jzhON23SSg/8kq2r9MH/kIdkNGdQWwIVBPowWqZwRQdfOA==
+
 run-parallel@^1.1.9:
   version "1.2.0"
   resolved "https://registry.npmjs.org/run-parallel/-/run-parallel-1.2.0.tgz"

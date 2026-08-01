@@ -138,7 +138,13 @@
     "approvalRequired": "승인 필요",
     "gatedHint": "주최자가 승인하면 위치와 세부정보가 공개됩니다.",
     "duration": "소요 시간",
-    "endsAt": "{{time}} 종료"
+    "endsAt": "{{time}} 종료",
+    "myEvents": "내 이벤트",
+    "myEventsOnly": "내 이벤트",
+    "myEventsOnlyDescription": "내가 주최하거나 참여하는 이벤트만 표시",
+    "reactions": "반응",
+    "reactedToThis": "명이 반응했습니다",
+    "noReactionsYet": "아직 반응이 없습니다"
   },
   "profile": {
     "title": "프로필",

@@ -138,7 +138,13 @@
     "approvalRequired": "承認が必要",
     "gatedHint": "主催者が承認すると場所と詳細が表示されます。",
     "duration": "所要時間",
-    "endsAt": "{{time}} 終了"
+    "endsAt": "{{time}} 終了",
+    "myEvents": "マイイベント",
+    "myEventsOnly": "マイイベント",
+    "myEventsOnlyDescription": "主催または参加するイベントのみ表示",
+    "reactions": "リアクション",
+    "reactedToThis": "人がリアクションしました",
+    "noReactionsYet": "まだリアクションがありません"
   },
   "profile": {
     "title": "プロフィール",
