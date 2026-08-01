@@ -588,6 +588,28 @@ const getEventTypeEmoji = (eventType: string) => {
   return found ? found.emoji : '🎯';
 };
 
+// "Custom" is a picker-only sentinel: choosing it in the create/edit form
+// swaps in whatever free text was typed, so no saved event ever has
+// eventType === "Custom". As a *filter* it therefore has to mean "any event
+// whose type isn't one of the presets", otherwise it matches nothing.
+const CUSTOM_EVENT_TYPE = 'Custom';
+
+const isPresetEventType = (eventType?: string): boolean =>
+  !!eventType &&
+  activityOptions.some(
+    opt =>
+      opt.label !== CUSTOM_EVENT_TYPE &&
+      opt.label.toLowerCase() === eventType.toLowerCase(),
+  );
+
+const matchesEventTypeFilter = (
+  eventType: string | undefined,
+  selectedType: string,
+): boolean =>
+  selectedType === CUSTOM_EVENT_TYPE
+    ? !!eventType?.trim() && !isPresetEventType(eventType)
+    : selectedType.toLowerCase() === (eventType || '').toLowerCase();
+
 // Open maps for an event — delegates to shared MapLauncher
 const openMapsForEvent = async (
   event: Partial<Event>,
@@ -3415,8 +3437,8 @@ const EventList: React.FC = () => {
     // Event type filter
     if (selectedEventTypes.length > 0) {
       filtered = filtered.filter(event =>
-        selectedEventTypes.some(
-          type => type.toLowerCase() === event.eventType.toLowerCase(),
+        selectedEventTypes.some(type =>
+          matchesEventTypeFilter(event.eventType, type),
         ),
       );
     }

@@ -230,6 +230,24 @@ const Profile: React.FC = () => {
     return {eventsCreated, eventsJoined};
   }, [events, _id]);
 
+  // Events live in a sibling tab's stack, so jumping to one has to address the
+  // tab first — a bare navigate() looks only in this stack and silently does
+  // nothing. Name and type are passed so the roster header renders immediately
+  // instead of blank until the fetch lands.
+  const openEvent = useCallback(
+    (event: Event) => {
+      navigation.navigate('Events', {
+        screen: 'EventRoster',
+        params: {
+          eventId: event._id,
+          eventName: event.name,
+          eventType: event.eventType,
+        },
+      });
+    },
+    [navigation],
+  );
+
   // Find the next event this user is involved in. "Involved" means they either
   // created it or are on the roster. An event that's already underway still
   // counts as active (see isEventActive) so a game in progress isn't dropped
@@ -1209,9 +1227,9 @@ const Profile: React.FC = () => {
             <TouchableOpacity
               style={themedStyles.statCell}
               onPress={() =>
-                navigation.navigate('EventList', {
-                  profileFilter: 'created',
-                  userId: _id,
+                navigation.navigate('Events', {
+                  screen: 'EventList',
+                  params: {profileFilter: 'created', userId: _id},
                 })
               }>
               <View style={themedStyles.statCellIconRow}>
@@ -1232,9 +1250,9 @@ const Profile: React.FC = () => {
             <TouchableOpacity
               style={themedStyles.statCell}
               onPress={() =>
-                navigation.navigate('EventList', {
-                  profileFilter: 'joined',
-                  userId: _id,
+                navigation.navigate('Events', {
+                  screen: 'EventList',
+                  params: {profileFilter: 'joined', userId: _id},
                 })
               }>
               <View style={themedStyles.statCellIconRow}>
@@ -1294,9 +1312,9 @@ const Profile: React.FC = () => {
             </Text>
             <TouchableOpacity
               onPress={() =>
-                navigation.navigate('EventList', {
-                  profileFilter: 'joined',
-                  userId: _id,
+                navigation.navigate('Events', {
+                  screen: 'EventList',
+                  params: {profileFilter: 'joined', userId: _id},
                 })
               }>
               <Text style={themedStyles.sectionAction}>
@@ -1308,11 +1326,7 @@ const Profile: React.FC = () => {
           {nextUpcomingEvent ? (
             <TouchableOpacity
               style={themedStyles.upcomingEventCard}
-              onPress={() =>
-                navigation.navigate('EventComments', {
-                  eventId: nextUpcomingEvent._id,
-                })
-              }>
+              onPress={() => openEvent(nextUpcomingEvent)}>
               <View style={themedStyles.upcomingDateBadge}>
                 <Text style={themedStyles.upcomingDateDay}>
                   {formatEventDate(nextUpcomingEvent)}
