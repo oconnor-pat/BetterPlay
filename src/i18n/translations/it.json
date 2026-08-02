@@ -291,6 +291,20 @@
     "viewEvent": "Vedi evento",
     "emptyTitle": "Ancora nessun messaggio",
     "emptySubtitle": "Saluta, condividi un piano o fissa il prossimo incontro.",
-    "placeholder": "Messaggio al gruppo"
+    "placeholder": "Messaggio al gruppo",
+    "react": "Reagisci",
+    "copy": "Copia testo",
+    "messageActions": "Messaggio",
+    "messageDeleted": "Questo messaggio è stato eliminato",
+    "deleteTitle": "Eliminare il messaggio?",
+    "deleteMessage": "Verrà rimosso per tutti nel gruppo.",
+    "deleteFailed": "Impossibile eliminare il messaggio",
+    "attachPhoto": "Allega foto",
+    "imageFailed": "Impossibile allegare la foto",
+    "imageFailedMessage": "Prova con un'altra foto.",
+    "photo": "📷 Foto",
+    "caption": "Aggiungi una didascalia",
+    "reactions": "Reazioni",
+    "noReactionsYet": "Ancora nessuna reazione"
   }
 }

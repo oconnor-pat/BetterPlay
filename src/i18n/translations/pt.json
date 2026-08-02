@@ -291,6 +291,20 @@
     "viewEvent": "Ver evento",
     "emptyTitle": "Ainda não há mensagens",
     "emptySubtitle": "Diga oi, compartilhe um plano ou marque o próximo encontro.",
-    "placeholder": "Mensagem para o grupo"
+    "placeholder": "Mensagem para o grupo",
+    "react": "Reagir",
+    "copy": "Copiar texto",
+    "messageActions": "Mensagem",
+    "messageDeleted": "Esta mensagem foi apagada",
+    "deleteTitle": "Apagar mensagem?",
+    "deleteMessage": "Ela será removida para todos no grupo.",
+    "deleteFailed": "Não foi possível apagar a mensagem",
+    "attachPhoto": "Anexar foto",
+    "imageFailed": "Não foi possível anexar a foto",
+    "imageFailedMessage": "Tente outra foto.",
+    "photo": "📷 Foto",
+    "caption": "Adicione uma legenda",
+    "reactions": "Reações",
+    "noReactionsYet": "Ainda não há reações"
   }
 }

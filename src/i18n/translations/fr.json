@@ -300,6 +300,20 @@
     "viewEvent": "Voir l’événement",
     "emptyTitle": "Aucun message pour le moment",
     "emptySubtitle": "Dites bonjour, partagez un plan ou organisez la prochaine sortie.",
-    "placeholder": "Message au groupe"
+    "placeholder": "Message au groupe",
+    "react": "Réagir",
+    "copy": "Copier le texte",
+    "messageActions": "Message",
+    "messageDeleted": "Ce message a été supprimé",
+    "deleteTitle": "Supprimer le message ?",
+    "deleteMessage": "Il sera supprimé pour tout le groupe.",
+    "deleteFailed": "Impossible de supprimer le message",
+    "attachPhoto": "Joindre une photo",
+    "imageFailed": "Impossible de joindre la photo",
+    "imageFailedMessage": "Essayez une autre photo.",
+    "photo": "📷 Photo",
+    "caption": "Ajouter une légende",
+    "reactions": "Réactions",
+    "noReactionsYet": "Pas encore de réactions"
   }
 }

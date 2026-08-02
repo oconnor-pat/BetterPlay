@@ -662,6 +662,20 @@
     "viewEvent": "View event",
     "emptyTitle": "No messages yet",
     "emptySubtitle": "Say hi, share a plan, or lock in the next meetup.",
-    "placeholder": "Message the group"
+    "placeholder": "Message the group",
+    "react": "React",
+    "copy": "Copy text",
+    "messageActions": "Message",
+    "messageDeleted": "This message was deleted",
+    "deleteTitle": "Delete message?",
+    "deleteMessage": "This removes it for everyone in the group.",
+    "deleteFailed": "Could not delete message",
+    "attachPhoto": "Attach photo",
+    "imageFailed": "Could not attach photo",
+    "imageFailedMessage": "Please try another photo.",
+    "photo": "📷 Photo",
+    "caption": "Add a caption",
+    "reactions": "Reactions",
+    "noReactionsYet": "No reactions yet"
   }
 }

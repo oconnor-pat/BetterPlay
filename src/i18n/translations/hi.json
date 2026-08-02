@@ -285,6 +285,20 @@
     "viewEvent": "इवेंट देखें",
     "emptyTitle": "अभी कोई संदेश नहीं",
     "emptySubtitle": "नमस्ते कहें, कोई योजना साझा करें, या अगली मुलाकात तय करें।",
-    "placeholder": "समूह को संदेश भेजें"
+    "placeholder": "समूह को संदेश भेजें",
+    "react": "प्रतिक्रिया",
+    "copy": "टेक्स्ट कॉपी करें",
+    "messageActions": "संदेश",
+    "messageDeleted": "यह संदेश हटा दिया गया",
+    "deleteTitle": "संदेश हटाएं?",
+    "deleteMessage": "यह ग्रुप के सभी लोगों के लिए हट जाएगा।",
+    "deleteFailed": "संदेश हटाया नहीं जा सका",
+    "attachPhoto": "फ़ोटो जोड़ें",
+    "imageFailed": "फ़ोटो नहीं जोड़ी जा सकी",
+    "imageFailedMessage": "कोई दूसरी फ़ोटो आज़माएं।",
+    "photo": "📷 फ़ोटो",
+    "caption": "कैप्शन जोड़ें",
+    "reactions": "प्रतिक्रियाएं",
+    "noReactionsYet": "अभी तक कोई प्रतिक्रिया नहीं"
   }
 }

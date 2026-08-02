@@ -17,11 +17,16 @@ import React, {
   useState,
 } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
+  Alert,
+  Animated,
   FlatList,
   Image,
   Keyboard,
+  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -32,23 +37,54 @@ import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarDay,
   faChevronRight,
+  faImage,
   faPaperPlane,
+  faXmark,
 } from '@fortawesome/free-solid-svg-icons';
+import Clipboard from '@react-native-clipboard/clipboard';
+import * as ImagePicker from 'react-native-image-picker';
+import EmojiPicker, {type EmojiType} from 'rn-emoji-keyboard';
 import {useNavigation} from '@react-navigation/native';
 import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import {useTranslation} from 'react-i18next';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {useSocket} from '../../Context/SocketContext';
 import UserContext, {UserContextType} from '../UserContext';
-import {GroupMessage} from '../../types/group';
+import {GroupMessage, GroupMessageReaction} from '../../types/group';
 import {
+  deleteGroupMessage,
   fetchGroupMessages,
+  fetchMessageReactions,
   markGroupRead,
+  type MessageReactor,
+  reactToGroupMessage,
   sendGroupMessage,
+  uploadChatImage,
 } from '../../services/GroupChatService';
 
 interface GroupChatProps {
   groupId: string;
+  // Set when arriving from a reaction notification: the thread scrolls to
+  // this message and flashes it. The nonce lets a repeat notification for
+  // the same message re-run the effect.
+  highlightMessageId?: string;
+  highlightNonce?: number;
+}
+
+interface MessageAction {
+  label: string;
+  destructive?: boolean;
+  onPress: () => void;
+}
+
+// A photo staged in the composer but not yet sent. Held locally (the
+// upload only happens on send) so backing out costs nothing.
+interface PendingImage {
+  uri: string;
+  base64: string;
+  fileName?: string;
+  width?: number;
+  height?: number;
 }
 
 // Short relative timestamp for message metadata ("now", "5m", "3h",
@@ -67,7 +103,54 @@ const relativeTime = (iso: string): string => {
   return new Date(iso).toLocaleDateString();
 };
 
-const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
+// Collapse the raw (user, emoji) rows into one pill per distinct emoji,
+// kept in first-reacted order so pills don't reshuffle as counts change.
+const summarizeReactions = (
+  reactions: GroupMessageReaction[] | undefined,
+  userId?: string,
+): {emoji: string; count: number; mine: boolean}[] => {
+  const order: string[] = [];
+  const counts = new Map<string, number>();
+  const mine = new Set<string>();
+
+  (reactions || []).forEach(r => {
+    if (!counts.has(r.emoji)) order.push(r.emoji);
+    counts.set(r.emoji, (counts.get(r.emoji) || 0) + 1);
+    if (userId && r.userId === userId) mine.add(r.emoji);
+  });
+
+  return order.map(emoji => ({
+    emoji,
+    count: counts.get(emoji) as number,
+    mine: mine.has(emoji),
+  }));
+};
+
+// Widest an attached image renders in the thread.
+const IMAGE_MAX_WIDTH = 230;
+
+// Reserve the right space before the image loads so the thread doesn't
+// jump. Very tall images are clamped so a screenshot can't take over the
+// whole view; falls back to 4:3 when the sender's client sent no size.
+const imageDisplaySize = (
+  width?: number,
+  height?: number,
+): {width: number; height: number} => {
+  if (!width || !height || width <= 0 || height <= 0) {
+    return {width: IMAGE_MAX_WIDTH, height: (IMAGE_MAX_WIDTH * 3) / 4};
+  }
+  const ratio = height / width;
+  return {
+    width: IMAGE_MAX_WIDTH,
+    height: Math.round(IMAGE_MAX_WIDTH * Math.min(ratio, 1.6)),
+  };
+};
+
+const GroupChat: React.FC<GroupChatProps> = ({
+  groupId,
+  highlightMessageId,
+  highlightNonce,
+}) => {
   const {colors, darkMode} = useTheme();
   const {t} = useTranslation();
   const navigation = useNavigation<any>();
@@ -87,6 +170,21 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // Message the emoji picker is currently reacting to.
+  const [reactionTarget, setReactionTarget] = useState<GroupMessage | null>(
+    null,
+  );
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
+  // Android-only: message whose action sheet is open (see openMessageActions).
+  const [actionTarget, setActionTarget] = useState<GroupMessage | null>(null);
+  // Non-null while the "who reacted" sheet is open.
+  const [reactedBy, setReactedBy] = useState<MessageReactor[] | null>(null);
+  const [loadingReactedBy, setLoadingReactedBy] = useState(false);
+  // Message currently flashing after arriving from a notification.
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightAnim = useRef(new Animated.Value(0)).current;
+  const listRef = useRef<FlatList<GroupMessage>>(null);
 
   // Deterministic keyboard handling. KeyboardAvoidingView mis-measures
   // its own position inside the nested tab→stack navigator, so instead we
@@ -166,6 +264,54 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
     return unsub;
   }, [groupId, subscribe, prependMessage]);
 
+  // Someone retracted a message. Keep the row but strip it, matching what
+  // the server now serves, so the thread doesn't shift under the reader.
+  useEffect(() => {
+    const unsub = subscribe(
+      'group:message:deleted',
+      (data: {groupId: string; messageId: string}) => {
+        if (!data || data.groupId !== groupId) return;
+        setMessages(prev =>
+          prev.map(m =>
+            m._id === data.messageId
+              ? {
+                  ...m,
+                  text: '',
+                  imageUrl: undefined,
+                  reactions: [],
+                  deletedAt: new Date().toISOString(),
+                }
+              : m,
+          ),
+        );
+        // If it was open in the viewer, there's nothing left to look at.
+        setViewerImage(null);
+      },
+    );
+    return unsub;
+  }, [groupId, subscribe]);
+
+  useEffect(() => {
+    const unsub = subscribe(
+      'group:message:reacted',
+      (data: {
+        groupId: string;
+        messageId: string;
+        reactions: GroupMessageReaction[];
+      }) => {
+        if (!data || data.groupId !== groupId) return;
+        setMessages(prev =>
+          prev.map(m =>
+            m._id === data.messageId
+              ? {...m, reactions: data.reactions || []}
+              : m,
+          ),
+        );
+      },
+    );
+    return unsub;
+  }, [groupId, subscribe]);
+
   const loadOlder = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return;
     setLoadingMore(true);
@@ -188,21 +334,329 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
     }
   }, [groupId, hasMore, loadingMore, messages]);
 
+  // Stage a photo in the composer. Nothing is uploaded or sent yet — that
+  // waits for the send button, so the photo can be captioned or dropped.
+  const handlePickImage = useCallback(async () => {
+    if (sending) return;
+
+    const result = await ImagePicker.launchImageLibrary({
+      mediaType: 'photo',
+      includeBase64: true,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      quality: 0.7,
+    });
+    if (result.didCancel) return;
+
+    const asset = result.assets?.[0];
+    if (!asset?.base64 || !asset.uri) {
+      Alert.alert(
+        t('groupChat.imageFailed') || 'Could not attach photo',
+        t('groupChat.imageFailedMessage') || 'Please try another photo.',
+      );
+      return;
+    }
+
+    setPendingImage({
+      uri: asset.uri,
+      base64: asset.base64,
+      fileName: asset.fileName,
+      width: asset.width,
+      height: asset.height,
+    });
+  }, [sending, t]);
+
+  // Sends text, a staged photo, or a photo with the text as its caption.
+  // The upload happens here rather than at pick time so a photo the user
+  // backs out of never costs a round trip.
+  // Arriving from a reaction notification: bring the reacted-to message
+  // into view and flash it. It may be older than the first page, so page
+  // backwards a bounded number of times looking for it — bounded because
+  // the message could also have been deleted, and we don't want to walk
+  // the entire history to discover that.
+  useEffect(() => {
+    if (!highlightMessageId || loading) return;
+
+    let cancelled = false;
+
+    const flash = (index: number) => {
+      listRef.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.5,
+      });
+      setHighlightedId(highlightMessageId);
+      highlightAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(highlightAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.delay(1300),
+        Animated.timing(highlightAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(({finished}) => {
+        if (finished && !cancelled) setHighlightedId(null);
+      });
+    };
+
+    const locate = async () => {
+      let pool = messages;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        if (cancelled) return;
+        const index = pool.findIndex(m => m._id === highlightMessageId);
+        if (index >= 0) {
+          flash(index);
+          return;
+        }
+        const oldest = pool[pool.length - 1];
+        if (!oldest) return;
+        let page;
+        try {
+          page = await fetchGroupMessages(groupId, {
+            before: oldest.createdAt,
+            limit: 30,
+          });
+        } catch {
+          return;
+        }
+        if (cancelled || page.messages.length === 0) return;
+        const seen = new Set(pool.map(m => m._id));
+        pool = [...pool, ...page.messages.filter(m => !seen.has(m._id))];
+        setMessages(pool);
+        setHasMore(page.hasMore);
+        if (!page.hasMore) {
+          const finalIndex = pool.findIndex(m => m._id === highlightMessageId);
+          if (finalIndex >= 0) flash(finalIndex);
+          return;
+        }
+      }
+    };
+
+    locate();
+    return () => {
+      cancelled = true;
+    };
+    // `messages` is deliberately excluded: this should run when a
+    // notification points us at a message, not on every new message.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightMessageId, highlightNonce, loading, groupId, highlightAnim]);
+
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || sending) return;
+    const image = pendingImage;
+    if ((!text && !image) || sending) return;
+
     setInput('');
+    setPendingImage(null);
     setSending(true);
     try {
-      const msg = await sendGroupMessage(groupId, text);
+      const imageUrl = image
+        ? await uploadChatImage(image.base64, image.fileName)
+        : undefined;
+      const msg = await sendGroupMessage(groupId, {
+        text,
+        imageUrl,
+        imageWidth: image?.width,
+        imageHeight: image?.height,
+      });
       prependMessage(msg);
     } catch {
-      // Restore the draft so the user doesn't lose their text.
+      // Put the draft back so nothing is lost to a failed send.
       setInput(text);
+      setPendingImage(image);
+      if (image) {
+        Alert.alert(
+          t('groupChat.imageFailed') || 'Could not attach photo',
+          t('groupChat.imageFailedMessage') || 'Please try another photo.',
+        );
+      }
     } finally {
       setSending(false);
     }
-  }, [groupId, input, sending, prependMessage]);
+  }, [groupId, input, pendingImage, sending, prependMessage, t]);
+
+  // Optimistic toggle: flip the pill immediately, then reconcile with the
+  // server's authoritative list (the socket echo also lands for everyone
+  // else in the room). On failure we restore the previous list.
+  const handleReact = useCallback(
+    async (message: GroupMessage, emoji: string) => {
+      const previous = message.reactions || [];
+      const alreadyMine = previous.some(
+        r => r.userId === currentUserId && r.emoji === emoji,
+      );
+      const optimistic = alreadyMine
+        ? previous.filter(
+            r => !(r.userId === currentUserId && r.emoji === emoji),
+          )
+        : [...previous, {userId: currentUserId as string, emoji}];
+
+      setMessages(prev =>
+        prev.map(m =>
+          m._id === message._id ? {...m, reactions: optimistic} : m,
+        ),
+      );
+
+      try {
+        const reactions = await reactToGroupMessage(
+          groupId,
+          message._id,
+          emoji,
+        );
+        setMessages(prev =>
+          prev.map(m => (m._id === message._id ? {...m, reactions} : m)),
+        );
+      } catch {
+        setMessages(prev =>
+          prev.map(m =>
+            m._id === message._id ? {...m, reactions: previous} : m,
+          ),
+        );
+      }
+    },
+    [groupId, currentUserId],
+  );
+
+  // Long-pressing a pill answers "who reacted?" — the same affordance the
+  // event cards use for their reaction pills.
+  const showReactedBy = useCallback(
+    async (message: GroupMessage) => {
+      setReactedBy([]);
+      setLoadingReactedBy(true);
+      try {
+        setReactedBy(await fetchMessageReactions(groupId, message._id));
+      } catch {
+        setReactedBy([]);
+      } finally {
+        setLoadingReactedBy(false);
+      }
+    },
+    [groupId],
+  );
+
+  const openReactorProfile = useCallback(
+    (reactor: MessageReactor) => {
+      setReactedBy(null);
+      // PublicProfile isn't registered in the Groups stack, so this has to
+      // hop to the Profile tab's copy of it.
+      navigation.navigate('Profile', {
+        screen: 'PublicProfile',
+        params: {
+          userId: reactor.userId,
+          username: reactor.username,
+          profilePicUrl: reactor.profilePicUrl,
+        },
+      });
+    },
+    [navigation],
+  );
+
+  const handleDelete = useCallback(
+    (message: GroupMessage) => {
+      Alert.alert(
+        t('groupChat.deleteTitle') || 'Delete message?',
+        t('groupChat.deleteMessage') ||
+          'This removes it for everyone in the group.',
+        [
+          {text: t('common.cancel') || 'Cancel', style: 'cancel'},
+          {
+            text: t('common.delete') || 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              const snapshot = message;
+              // Optimistic tombstone; the socket echo confirms it.
+              setMessages(prev =>
+                prev.map(m =>
+                  m._id === message._id
+                    ? {
+                        ...m,
+                        text: '',
+                        imageUrl: undefined,
+                        reactions: [],
+                        deletedAt: new Date().toISOString(),
+                      }
+                    : m,
+                ),
+              );
+              try {
+                await deleteGroupMessage(groupId, message._id);
+              } catch {
+                setMessages(prev =>
+                  prev.map(m => (m._id === snapshot._id ? snapshot : m)),
+                );
+                Alert.alert(
+                  t('groupChat.deleteFailed') || 'Could not delete message',
+                  t('common.tryAgain') || 'Please try again',
+                );
+              }
+            },
+          },
+        ],
+      );
+    },
+    [groupId, t],
+  );
+
+  // Actions offered on long-press, in menu order.
+  const buildActions = useCallback(
+    (message: GroupMessage): MessageAction[] => {
+      const actions: MessageAction[] = [
+        {
+          label: t('groupChat.react') || 'React',
+          onPress: () => setReactionTarget(message),
+        },
+      ];
+      if (message.text) {
+        actions.push({
+          label: t('groupChat.copy') || 'Copy text',
+          onPress: () => Clipboard.setString(message.text),
+        });
+      }
+      if (message.userId === currentUserId) {
+        actions.push({
+          label: t('common.delete') || 'Delete',
+          destructive: true,
+          onPress: () => handleDelete(message),
+        });
+      }
+      return actions;
+    },
+    [currentUserId, handleDelete, t],
+  );
+
+  // iOS gets the native sheet, matching GroupDetail's member menu. Android
+  // can't: its Alert is backed by AlertDialog, which supports at most three
+  // buttons, and this menu can reach four with the cancel row — so it gets
+  // a themed sheet of its own instead.
+  const openMessageActions = useCallback(
+    (message: GroupMessage) => {
+      if (message.kind === 'system' || message.deletedAt) return;
+
+      if (Platform.OS !== 'ios') {
+        setActionTarget(message);
+        return;
+      }
+
+      const actions = buildActions(message);
+      const labels = [
+        ...actions.map(a => a.label),
+        t('common.cancel') || 'Cancel',
+      ];
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: labels,
+          cancelButtonIndex: labels.length - 1,
+          destructiveButtonIndex: actions.findIndex(a => a.destructive),
+        },
+        idx => actions[idx]?.onPress?.(),
+      );
+    },
+    [buildActions, t],
+  );
 
   const styles = useMemo(
     () =>
@@ -256,6 +710,17 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
         avatarImage: {width: 30, height: 30},
         avatarInitials: {color: colors.text, fontWeight: '700', fontSize: 11},
         bubbleWrap: {maxWidth: '78%'},
+        // Sits behind the bubble and fades out, so a message arrived at
+        // from a notification is obvious without shifting the layout.
+        highlightOverlay: {
+          position: 'absolute',
+          top: -6,
+          bottom: -6,
+          left: -8,
+          right: -8,
+          borderRadius: 16,
+          backgroundColor: colors.primary + '40',
+        },
         senderName: {
           fontSize: 11,
           fontWeight: '700',
@@ -281,6 +746,139 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
         },
         bubbleTextMine: {color: '#FFFFFF', fontSize: 15, lineHeight: 20},
         bubbleTextTheirs: {color: colors.text, fontSize: 15, lineHeight: 20},
+        // A retracted message keeps its slot so the thread doesn't shift,
+        // but reads as clearly absent rather than empty.
+        bubbleDeleted: {
+          backgroundColor: 'transparent',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          borderRadius: 16,
+          paddingHorizontal: 13,
+          paddingVertical: 9,
+        },
+        bubbleTextDeleted: {
+          color: colors.secondaryText,
+          fontSize: 14,
+          fontStyle: 'italic',
+        },
+        // ── Image attachments ──
+        // The photo is its own block with no bubble behind it, so nothing
+        // frames or overlaps it; the caption is a separate bubble sitting
+        // below, matched to the photo's width.
+        imageStack: {gap: 4},
+        imageBubble: {
+          borderRadius: 16,
+          overflow: 'hidden',
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.06)'
+            : 'rgba(0,0,0,0.05)',
+        },
+        // Matched to the photo's width; the corner radii (including the
+        // tail) come from the normal bubble styles so a caption looks like
+        // any other message in the thread.
+        captionBubble: {alignSelf: 'stretch'},
+        // ── Reaction pills ──
+        reactionRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 4,
+          marginTop: 4,
+        },
+        reactionRowMine: {justifyContent: 'flex-end'},
+        reactionPill: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 3,
+          paddingHorizontal: 7,
+          paddingVertical: 3,
+          borderRadius: 11,
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        reactionPillMine: {
+          backgroundColor: colors.primary + '22',
+          borderColor: colors.primary,
+        },
+        reactionEmoji: {fontSize: 12},
+        reactionCount: {
+          fontSize: 11,
+          fontWeight: '700',
+          color: colors.secondaryText,
+        },
+        reactionCountMine: {color: colors.primary},
+        // ── Full-screen image viewer ──
+        viewerBackdrop: {
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.94)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        viewerImage: {width: '100%', height: '80%'},
+        viewerClose: {
+          position: 'absolute',
+          top: 50,
+          right: 20,
+          width: 38,
+          height: 38,
+          borderRadius: 19,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(255,255,255,0.15)',
+        },
+        // ── Android long-press sheet ──
+        sheetBackdrop: {
+          flex: 1,
+          backgroundColor: '#00000066',
+          justifyContent: 'flex-end',
+        },
+        sheet: {
+          backgroundColor: colors.card,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          paddingTop: 8,
+          paddingBottom: 24,
+        },
+        sheetHandle: {
+          alignSelf: 'center',
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
+          marginBottom: 6,
+        },
+        sheetRow: {paddingVertical: 15, paddingHorizontal: 22},
+        sheetLabel: {fontSize: 16, color: colors.text, fontWeight: '600'},
+        sheetLabelDestructive: {color: '#E5484D'},
+        sheetTitle: {
+          fontSize: 15,
+          fontWeight: '700',
+          color: colors.text,
+          paddingHorizontal: 22,
+          paddingTop: 6,
+          paddingBottom: 10,
+        },
+        sheetLoading: {paddingVertical: 22},
+        sheetEmpty: {
+          fontSize: 14,
+          color: colors.secondaryText,
+          paddingHorizontal: 22,
+          paddingVertical: 18,
+        },
+        reactorRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          paddingHorizontal: 22,
+          paddingVertical: 9,
+        },
+        reactorName: {
+          flex: 1,
+          fontSize: 15,
+          color: colors.text,
+          fontWeight: '600',
+        },
+        reactorEmoji: {fontSize: 18},
         metaMine: {
           fontSize: 10,
           color: colors.secondaryText,
@@ -328,15 +926,45 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
         eventName: {fontSize: 14, fontWeight: '700', color: colors.text},
         eventDate: {fontSize: 12, color: colors.secondaryText, marginTop: 1},
         // ── Composer ──
+        // The border and background live on the wrapper so a staged photo
+        // reads as part of the composer rather than floating above it.
+        composerWrap: {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          backgroundColor: colors.card,
+        },
         composer: {
           flexDirection: 'row',
           alignItems: 'flex-end',
           gap: 8,
           paddingHorizontal: 12,
           paddingVertical: 8,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: colors.border,
-          backgroundColor: colors.card,
+        },
+        pendingRow: {
+          flexDirection: 'row',
+          paddingHorizontal: 12,
+          paddingTop: 10,
+        },
+        pendingImage: {
+          width: 62,
+          height: 62,
+          borderRadius: 10,
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.06)'
+            : 'rgba(0,0,0,0.05)',
+        },
+        pendingRemove: {
+          position: 'absolute',
+          top: -6,
+          right: -6,
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#000000CC',
+          borderWidth: 1,
+          borderColor: colors.card,
         },
         textInput: {
           flex: 1,
@@ -361,6 +989,16 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
           backgroundColor: colors.primary,
         },
         sendBtnDisabled: {opacity: 0.4},
+        attachBtn: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.07)'
+            : 'rgba(0,0,0,0.05)',
+        },
       }),
     [colors, darkMode],
   );
@@ -384,10 +1022,14 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
               </View>
               <View style={styles.eventBody}>
                 <Text style={styles.eventName} numberOfLines={1}>
-                  {item.eventRef.eventName || t('groupChat.viewEvent') || 'View event'}
+                  {item.eventRef.eventName ||
+                    t('groupChat.viewEvent') ||
+                    'View event'}
                 </Text>
                 {item.eventRef.eventDate ? (
-                  <Text style={styles.eventDate}>{item.eventRef.eventDate}</Text>
+                  <Text style={styles.eventDate}>
+                    {item.eventRef.eventDate}
+                  </Text>
                 ) : null}
               </View>
               <FontAwesomeIcon
@@ -402,13 +1044,102 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
     }
 
     const isMine = item.userId === currentUserId;
+    const isDeleted = !!item.deletedAt;
+    const pills = summarizeReactions(item.reactions, currentUserId);
+
+    // The bubble's interior: an image, text, or an image with a caption.
+    const body = isDeleted ? (
+      <View style={styles.bubbleDeleted}>
+        <Text style={styles.bubbleTextDeleted}>
+          {t('groupChat.messageDeleted') || 'This message was deleted'}
+        </Text>
+      </View>
+    ) : item.imageUrl ? (
+      // Photo and caption are separate stacked blocks, so the caption
+      // reads as sitting under a complete photo rather than covering the
+      // bottom of one.
+      <View style={styles.imageStack}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setViewerImage(item.imageUrl as string)}
+          onLongPress={() => openMessageActions(item)}>
+          <Image
+            source={{uri: item.imageUrl}}
+            style={[
+              styles.imageBubble,
+              imageDisplaySize(item.imageWidth, item.imageHeight),
+            ]}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+        {item.text ? (
+          <View
+            style={[
+              isMine ? styles.bubbleMine : styles.bubbleTheirs,
+              styles.captionBubble,
+            ]}>
+            <Text
+              style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}>
+              {item.text}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    ) : (
+      <View style={isMine ? styles.bubbleMine : styles.bubbleTheirs}>
+        <Text style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}>
+          {item.text}
+        </Text>
+      </View>
+    );
+
+    const reactionRow =
+      pills.length > 0 ? (
+        <View style={[styles.reactionRow, isMine && styles.reactionRowMine]}>
+          {pills.map(pill => (
+            <TouchableOpacity
+              key={pill.emoji}
+              style={[
+                styles.reactionPill,
+                pill.mine && styles.reactionPillMine,
+              ]}
+              activeOpacity={0.7}
+              onPress={() => handleReact(item, pill.emoji)}
+              onLongPress={() => showReactedBy(item)}
+              delayLongPress={300}
+              hitSlop={{top: 6, bottom: 6, left: 2, right: 2}}>
+              <Text style={styles.reactionEmoji}>{pill.emoji}</Text>
+              <Text
+                style={[
+                  styles.reactionCount,
+                  pill.mine && styles.reactionCountMine,
+                ]}>
+                {pill.count}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null;
+
+    const highlight =
+      highlightedId === item._id ? (
+        <Animated.View
+          style={[styles.highlightOverlay, {opacity: highlightAnim}]}
+          pointerEvents="none"
+        />
+      ) : null;
+
     if (isMine) {
       return (
         <View style={styles.rowMine}>
           <View style={styles.bubbleWrap}>
-            <View style={styles.bubbleMine}>
-              <Text style={styles.bubbleTextMine}>{item.text}</Text>
-            </View>
+            {highlight}
+            <Pressable
+              onLongPress={() => openMessageActions(item)}
+              delayLongPress={300}>
+              {body}
+            </Pressable>
+            {reactionRow}
             <Text style={styles.metaMine}>{relativeTime(item.createdAt)}</Text>
           </View>
         </View>
@@ -418,7 +1149,10 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
       <View style={styles.rowTheirs}>
         <View style={styles.avatar}>
           {item.profilePicUrl ? (
-            <Image source={{uri: item.profilePicUrl}} style={styles.avatarImage} />
+            <Image
+              source={{uri: item.profilePicUrl}}
+              style={styles.avatarImage}
+            />
           ) : (
             <Text style={styles.avatarInitials}>
               {(item.username || '?').slice(0, 2).toUpperCase()}
@@ -426,10 +1160,14 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
           )}
         </View>
         <View style={styles.bubbleWrap}>
+          {highlight}
           <Text style={styles.senderName}>{item.username || 'Member'}</Text>
-          <View style={styles.bubbleTheirs}>
-            <Text style={styles.bubbleTextTheirs}>{item.text}</Text>
-          </View>
+          <Pressable
+            onLongPress={() => openMessageActions(item)}
+            delayLongPress={300}>
+            {body}
+          </Pressable>
+          {reactionRow}
           <Text style={styles.metaTheirs}>{relativeTime(item.createdAt)}</Text>
         </View>
       </View>
@@ -447,11 +1185,29 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
   return (
     <View style={[styles.flex, {paddingBottom: bottomInset}]}>
       <FlatList
+        ref={listRef}
         style={styles.flex}
         data={messages}
         inverted={messages.length > 0}
         keyExtractor={m => m._id}
         renderItem={renderItem}
+        // Rows are variable height, so a far-off index may not be measured
+        // yet. Nudge the list toward it and retry once it has been.
+        onScrollToIndexFailed={info => {
+          listRef.current?.scrollToOffset({
+            offset: info.averageItemLength * info.index,
+            animated: true,
+          });
+          setTimeout(() => {
+            if (messages.length > info.index) {
+              listRef.current?.scrollToIndex({
+                index: info.index,
+                animated: true,
+                viewPosition: 0.5,
+              });
+            }
+          }, 350);
+        }}
         contentContainerStyle={
           messages.length === 0 ? styles.flex : styles.listContent
         }
@@ -478,27 +1234,216 @@ const GroupChat: React.FC<GroupChatProps> = ({groupId}) => {
           </View>
         }
       />
-      <View style={styles.composer}>
-        <TextInput
-          style={styles.textInput}
-          value={input}
-          onChangeText={setInput}
-          placeholder={t('groupChat.placeholder') || 'Message the group'}
-          placeholderTextColor={colors.secondaryText}
-          multiline
-          maxLength={2000}
-        />
-        <TouchableOpacity
-          style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
-          onPress={handleSend}
-          disabled={!input.trim() || sending}>
-          {sending ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <FontAwesomeIcon icon={faPaperPlane} size={16} color="#FFFFFF" />
-          )}
-        </TouchableOpacity>
+      <View style={styles.composerWrap}>
+        {pendingImage ? (
+          <View style={styles.pendingRow}>
+            <View>
+              <Image
+                source={{uri: pendingImage.uri}}
+                style={styles.pendingImage}
+              />
+              <TouchableOpacity
+                style={styles.pendingRemove}
+                onPress={() => setPendingImage(null)}
+                disabled={sending}
+                accessibilityLabel={t('common.cancel') || 'Cancel'}>
+                <FontAwesomeIcon icon={faXmark} size={10} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+        <View style={styles.composer}>
+          <TouchableOpacity
+            style={[styles.attachBtn, sending && styles.sendBtnDisabled]}
+            onPress={handlePickImage}
+            disabled={sending}
+            accessibilityLabel={t('groupChat.attachPhoto') || 'Attach photo'}>
+            <FontAwesomeIcon
+              icon={faImage}
+              size={17}
+              color={colors.secondaryText}
+            />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.textInput}
+            value={input}
+            onChangeText={setInput}
+            placeholder={
+              pendingImage
+                ? t('groupChat.caption') || 'Add a caption'
+                : t('groupChat.placeholder') || 'Message the group'
+            }
+            placeholderTextColor={colors.secondaryText}
+            multiline
+            maxLength={2000}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendBtn,
+              ((!input.trim() && !pendingImage) || sending) &&
+                styles.sendBtnDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={(!input.trim() && !pendingImage) || sending}>
+            {sending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <FontAwesomeIcon icon={faPaperPlane} size={16} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
+
+      <EmojiPicker
+        open={!!reactionTarget}
+        onClose={() => setReactionTarget(null)}
+        onEmojiSelected={(picked: EmojiType) => {
+          const target = reactionTarget;
+          setReactionTarget(null);
+          if (target && picked?.emoji) handleReact(target, picked.emoji);
+        }}
+        enableSearchBar
+        enableRecentlyUsed
+        // Must not be "top": that flips the sheet with column-reverse and
+        // pushes the search field under the keyboard.
+        categoryPosition="bottom"
+        // Stops the first keystroke animating a scroll across every
+        // category to reach the search results page.
+        enableCategoryChangeAnimation={false}
+        enableSearchAnimation={false}
+        theme={{
+          backdrop: '#00000066',
+          knob: colors.primary,
+          container: colors.card,
+          header: colors.text,
+          category: {
+            icon: colors.secondaryText,
+            iconActive: '#FFFFFF',
+            container: darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+            containerActive: colors.primary,
+          },
+          search: {
+            text: colors.text,
+            placeholder: colors.secondaryText,
+            icon: colors.secondaryText,
+            background: darkMode
+              ? 'rgba(255,255,255,0.07)'
+              : 'rgba(0,0,0,0.05)',
+          },
+        }}
+      />
+
+      <Modal
+        visible={!!actionTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionTarget(null)}>
+        <Pressable
+          style={styles.sheetBackdrop}
+          onPress={() => setActionTarget(null)}>
+          <Pressable style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            {(actionTarget ? buildActions(actionTarget) : []).map(action => (
+              <TouchableOpacity
+                key={action.label}
+                style={styles.sheetRow}
+                onPress={() => {
+                  setActionTarget(null);
+                  // "React" opens the emoji picker, itself a Modal —
+                  // mounting it in the same frame this sheet unmounts can
+                  // leave Android with neither showing. Let the dismiss
+                  // land first.
+                  setTimeout(() => action.onPress(), 150);
+                }}>
+                <Text
+                  style={[
+                    styles.sheetLabel,
+                    action.destructive && styles.sheetLabelDestructive,
+                  ]}>
+                  {action.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={reactedBy !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReactedBy(null)}>
+        <Pressable
+          style={styles.sheetBackdrop}
+          onPress={() => setReactedBy(null)}>
+          <Pressable style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>
+              {t('groupChat.reactions') || 'Reactions'}
+            </Text>
+            {loadingReactedBy ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.primary}
+                style={styles.sheetLoading}
+              />
+            ) : reactedBy && reactedBy.length > 0 ? (
+              reactedBy.map((reactor, index) => (
+                <TouchableOpacity
+                  key={`${reactor.userId}-${reactor.emoji}-${index}`}
+                  style={styles.reactorRow}
+                  onPress={() => openReactorProfile(reactor)}>
+                  <View style={styles.avatar}>
+                    {reactor.profilePicUrl ? (
+                      <Image
+                        source={{uri: reactor.profilePicUrl}}
+                        style={styles.avatarImage}
+                      />
+                    ) : (
+                      <Text style={styles.avatarInitials}>
+                        {(reactor.username || reactor.name || '?')
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={styles.reactorName} numberOfLines={1}>
+                    {reactor.name || reactor.username || 'Member'}
+                  </Text>
+                  <Text style={styles.reactorEmoji}>{reactor.emoji}</Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.sheetEmpty}>
+                {t('groupChat.noReactionsYet') || 'No reactions yet'}
+              </Text>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={!!viewerImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerImage(null)}>
+        <Pressable
+          style={styles.viewerBackdrop}
+          onPress={() => setViewerImage(null)}>
+          {viewerImage ? (
+            <Image
+              source={{uri: viewerImage}}
+              style={styles.viewerImage}
+              resizeMode="contain"
+            />
+          ) : null}
+          <TouchableOpacity
+            style={styles.viewerClose}
+            onPress={() => setViewerImage(null)}>
+            <FontAwesomeIcon icon={faXmark} size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Pressable>
+      </Modal>
     </View>
   );
 };

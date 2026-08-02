@@ -68,6 +68,7 @@ export interface AppNotification {
     | 'group_admin_promoted'
     | 'group_ownership_transferred'
     | 'group_message'
+    | 'group_reaction'
     | 'general';
   title: string;
   body: string;
@@ -80,6 +81,7 @@ export interface AppNotification {
     eventName?: string;
     groupId?: string;
     groupName?: string;
+    messageId?: string;
     profilePicUrl?: string;
     [key: string]: string | undefined;
   };
@@ -347,10 +349,20 @@ const Notifications: React.FC = () => {
         }
         break;
       case 'group_message':
+      case 'group_reaction':
         if (notification.data?.groupId) {
           navigation.navigate('Groups', {
             screen: 'GroupDetail',
-            params: {groupId: notification.data.groupId, initialTab: 'chat'},
+            params: {
+              groupId: notification.data.groupId,
+              initialTab: 'chat',
+              // Present on reaction notifications: scrolls the thread to
+              // the message that was reacted to and flashes it.
+              highlightMessageId: notification.data.messageId,
+              // Re-asserts the chat tab if GroupDetail is already open on
+              // Members for this group.
+              tabRequestId: Date.now(),
+            },
           });
         }
         break;
@@ -425,6 +437,7 @@ const Notifications: React.FC = () => {
       case 'event_join_approved':
         return faCheck;
       case 'group_message':
+      case 'group_reaction':
         return faComments;
       case 'group_event_created':
         return faCalendarPlus;
@@ -468,6 +481,7 @@ const Notifications: React.FC = () => {
       case 'event_join_request':
       case 'event_join_approved':
       case 'group_message':
+      case 'group_reaction':
       case 'group_event_created':
       case 'group_added':
       case 'group_admin_promoted':
@@ -843,7 +857,9 @@ const Notifications: React.FC = () => {
 
     // Disable swipe-to-delete while in select mode
     if (selectMode) {
-      return <View style={themedStyles.notificationRowWrapper}>{rowContent}</View>;
+      return (
+        <View style={themedStyles.notificationRowWrapper}>{rowContent}</View>
+      );
     }
 
     return (

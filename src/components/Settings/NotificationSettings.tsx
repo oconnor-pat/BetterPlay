@@ -444,9 +444,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
             </View>
             <Switch
               value={settings.groupAdded && settings.enabled}
-              onValueChange={value =>
-                handleToggleSetting('groupAdded', value)
-              }
+              onValueChange={value => handleToggleSetting('groupAdded', value)}
               disabled={!settings.enabled}
               trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
@@ -482,9 +480,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
             </View>
             <Switch
               value={settings.groupEvents && settings.enabled}
-              onValueChange={value =>
-                handleToggleSetting('groupEvents', value)
-              }
+              onValueChange={value => handleToggleSetting('groupEvents', value)}
               disabled={!settings.enabled}
               trackColor={{false: colors.border, true: colors.primary}}
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
@@ -503,6 +499,25 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
               value={settings.groupMessages && settings.enabled}
               onValueChange={value =>
                 handleToggleSetting('groupMessages', value)
+              }
+              disabled={!settings.enabled}
+              trackColor={{false: colors.border, true: colors.primary}}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          {/* Group Reactions */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Message Reactions</Text>
+              <Text style={styles.settingDescription}>
+                When someone reacts to your group chat messages
+              </Text>
+            </View>
+            <Switch
+              value={settings.groupReactions && settings.enabled}
+              onValueChange={value =>
+                handleToggleSetting('groupReactions', value)
               }
               disabled={!settings.enabled}
               trackColor={{false: colors.border, true: colors.primary}}

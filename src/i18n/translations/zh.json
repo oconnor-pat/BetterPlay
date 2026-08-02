@@ -291,6 +291,20 @@
     "viewEvent": "查看活动",
     "emptyTitle": "还没有消息",
     "emptySubtitle": "打个招呼，分享计划，或安排下次聚会。",
-    "placeholder": "给群组发消息"
+    "placeholder": "给群组发消息",
+    "react": "回应",
+    "copy": "复制文本",
+    "messageActions": "消息",
+    "messageDeleted": "此消息已被删除",
+    "deleteTitle": "删除消息？",
+    "deleteMessage": "群组中的所有人都将看不到该消息。",
+    "deleteFailed": "无法删除消息",
+    "attachPhoto": "添加照片",
+    "imageFailed": "无法添加照片",
+    "imageFailedMessage": "请尝试其他照片。",
+    "photo": "📷 照片",
+    "caption": "添加说明",
+    "reactions": "回应",
+    "noReactionsYet": "暂无回应"
   }
 }

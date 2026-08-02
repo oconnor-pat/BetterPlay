@@ -300,6 +300,20 @@
     "viewEvent": "Ver evento",
     "emptyTitle": "Aún no hay mensajes",
     "emptySubtitle": "Saluda, comparte un plan o organiza el próximo encuentro.",
-    "placeholder": "Mensaje al grupo"
+    "placeholder": "Mensaje al grupo",
+    "react": "Reaccionar",
+    "copy": "Copiar texto",
+    "messageActions": "Mensaje",
+    "messageDeleted": "Este mensaje fue eliminado",
+    "deleteTitle": "¿Eliminar mensaje?",
+    "deleteMessage": "Se eliminará para todos en el grupo.",
+    "deleteFailed": "No se pudo eliminar el mensaje",
+    "attachPhoto": "Adjuntar foto",
+    "imageFailed": "No se pudo adjuntar la foto",
+    "imageFailedMessage": "Prueba con otra foto.",
+    "photo": "📷 Foto",
+    "caption": "Añade un comentario",
+    "reactions": "Reacciones",
+    "noReactionsYet": "Aún no hay reacciones"
   }
 }

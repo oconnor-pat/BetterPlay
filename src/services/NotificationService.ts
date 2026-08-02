@@ -55,6 +55,7 @@ export interface NotificationSettings {
   groupRoleChanged: boolean;
   groupEvents: boolean;
   groupMessages: boolean;
+  groupReactions: boolean;
 }
 
 export type NotificationNavigationCallback = (
@@ -78,6 +79,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   groupRoleChanged: true,
   groupEvents: true,
   groupMessages: true,
+  groupReactions: true,
 };
 
 class NotificationService {
@@ -557,6 +559,7 @@ class NotificationService {
       screen,
       eventId,
       groupId,
+      messageId,
       userId,
       accepterId,
       changedFields,
@@ -636,12 +639,19 @@ class NotificationService {
         break;
       }
 
-      // Group chat message -> open the group's Chat tab
+      // Group chat message or a reaction to one -> open the group's Chat tab
       case 'group_message':
+      case 'group_reaction':
         if (groupId) {
           navigateToTab('Groups', 'GroupDetail', {
             groupId,
             initialTab: 'chat',
+            // Present on reaction notifications: scrolls the thread to the
+            // message that was reacted to and flashes it.
+            highlightMessageId: messageId,
+            // Forces the tab switch even when GroupDetail is already open
+            // on Members for this same group.
+            tabRequestId: Date.now(),
           });
         } else {
           navigateToTab('Groups', 'GroupsList');
@@ -778,6 +788,7 @@ class NotificationService {
         groupRoleChanged: settings.groupRoleChanged,
         groupEvents: settings.groupEvents,
         groupMessages: settings.groupMessages,
+        groupReactions: settings.groupReactions,
       };
 
       await fetch(`${API_BASE_URL}/api/notifications/preferences`, {

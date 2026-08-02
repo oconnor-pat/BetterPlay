@@ -9,7 +9,13 @@
 //   anyone except the creator.
 // - Member: read-only, plus the right to leave.
 
-import React, {useCallback, useContext, useEffect, useMemo, useState} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -73,6 +79,20 @@ const GroupDetail: React.FC = () => {
   const [tab, setTab] = useState<'members' | 'chat'>(
     route.params?.initialTab === 'chat' ? 'chat' : 'members',
   );
+
+  // The initializer above only runs on first mount. Notifications route
+  // here with initialTab: 'chat', and this screen is often already in the
+  // stack by then — without this, tapping a chat notification would leave
+  // the user staring at the Members tab.
+  const requestedTab = route.params?.initialTab;
+  const tabRequestId = route.params?.tabRequestId;
+  useEffect(() => {
+    if (requestedTab === 'chat' || requestedTab === 'members') {
+      setTab(requestedTab);
+    }
+    // tabRequestId lets a repeat notification for the same group re-assert
+    // the chat tab even if the user has since switched to Members.
+  }, [requestedTab, tabRequestId]);
 
   const openEvent = useCallback(
     (eventId: string) => {
@@ -205,22 +225,18 @@ const GroupDetail: React.FC = () => {
       // Immediately follow up with self-remove now that the user is no
       // longer the creator. Confirm before kicking the user out so they
       // realize the leave wasn't aborted.
-      Alert.alert(
-        'Handoff complete',
-        'Leave the group now?',
-        [
-          {
-            text: 'Stay',
-            style: 'cancel',
-            onPress: () => {
-              // Stay in the group; just refresh local state so role
-              // changes (now plain admin, not creator) reflect.
-              refresh();
-            },
+      Alert.alert('Handoff complete', 'Leave the group now?', [
+        {
+          text: 'Stay',
+          style: 'cancel',
+          onPress: () => {
+            // Stay in the group; just refresh local state so role
+            // changes (now plain admin, not creator) reflect.
+            refresh();
           },
-          {text: 'Leave', style: 'destructive', onPress: performSelfRemove},
-        ],
-      );
+        },
+        {text: 'Leave', style: 'destructive', onPress: performSelfRemove},
+      ]);
     },
     [performSelfRemove, refresh],
   );
@@ -268,7 +284,9 @@ const GroupDetail: React.FC = () => {
           onPress: () => {
             Alert.alert(
               'Remove member?',
-              `${member.name || member.username || 'This member'} will be removed from "${group.name}".`,
+              `${
+                member.name || member.username || 'This member'
+              } will be removed from "${group.name}".`,
               [
                 {text: 'Cancel', style: 'cancel'},
                 {
@@ -587,7 +605,10 @@ const GroupDetail: React.FC = () => {
       <View style={styles.memberRow}>
         <View style={styles.avatar}>
           {item.profilePicUrl ? (
-            <Image source={{uri: item.profilePicUrl}} style={styles.avatarImage} />
+            <Image
+              source={{uri: item.profilePicUrl}}
+              style={styles.avatarImage}
+            />
           ) : (
             <Text style={styles.avatarInitials}>
               {(item.username || item.name || '?').slice(0, 2).toUpperCase()}
@@ -634,7 +655,9 @@ const GroupDetail: React.FC = () => {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}>
             <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Group</Text>
@@ -650,7 +673,9 @@ const GroupDetail: React.FC = () => {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}>
             <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Group</Text>
@@ -662,7 +687,9 @@ const GroupDetail: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}>
           <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -673,7 +700,11 @@ const GroupDetail: React.FC = () => {
             style={styles.headerAction}
             onPress={() => setEditVisible(true)}
             hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <FontAwesomeIcon icon={faPenToSquare} size={18} color={colors.primary} />
+            <FontAwesomeIcon
+              icon={faPenToSquare}
+              size={18}
+              color={colors.primary}
+            />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -692,15 +723,17 @@ const GroupDetail: React.FC = () => {
             </Text>
           </View>
           <Text style={styles.memberCountText}>
-            {group.memberCount}{' '}
-            {group.memberCount === 1 ? 'member' : 'members'}
+            {group.memberCount} {group.memberCount === 1 ? 'member' : 'members'}
           </Text>
         </View>
       </View>
 
       <View style={styles.segment}>
         <TouchableOpacity
-          style={[styles.segmentBtn, tab === 'members' && styles.segmentBtnActive]}
+          style={[
+            styles.segmentBtn,
+            tab === 'members' && styles.segmentBtnActive,
+          ]}
           activeOpacity={0.8}
           onPress={() => setTab('members')}>
           <FontAwesomeIcon
@@ -736,7 +769,11 @@ const GroupDetail: React.FC = () => {
       </View>
 
       {tab === 'chat' ? (
-        <GroupChat groupId={group._id} />
+        <GroupChat
+          groupId={group._id}
+          highlightMessageId={route.params?.highlightMessageId}
+          highlightNonce={tabRequestId}
+        />
       ) : (
         <>
           <FlatList
@@ -831,7 +868,11 @@ const GroupDetail: React.FC = () => {
                 style={styles.destructiveBtn}
                 onPress={handleDelete}
                 disabled={busy}>
-                <FontAwesomeIcon icon={faTrash} size={14} color={colors.error} />
+                <FontAwesomeIcon
+                  icon={faTrash}
+                  size={14}
+                  color={colors.error}
+                />
                 <Text style={styles.destructiveBtnText}>Delete group</Text>
               </TouchableOpacity>
             ) : null}

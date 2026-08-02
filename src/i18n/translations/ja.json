@@ -291,6 +291,20 @@
     "viewEvent": "イベントを見る",
     "emptyTitle": "まだメッセージがありません",
     "emptySubtitle": "あいさつしたり、予定を共有したり、次の集まりを決めましょう。",
-    "placeholder": "グループにメッセージ"
+    "placeholder": "グループにメッセージ",
+    "react": "リアクション",
+    "copy": "テキストをコピー",
+    "messageActions": "メッセージ",
+    "messageDeleted": "このメッセージは削除されました",
+    "deleteTitle": "メッセージを削除しますか？",
+    "deleteMessage": "グループ全員から削除されます。",
+    "deleteFailed": "メッセージを削除できませんでした",
+    "attachPhoto": "写真を添付",
+    "imageFailed": "写真を添付できませんでした",
+    "imageFailedMessage": "別の写真をお試しください。",
+    "photo": "📷 写真",
+    "caption": "キャプションを追加",
+    "reactions": "リアクション",
+    "noReactionsYet": "リアクションはまだありません"
   }
 }

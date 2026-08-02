@@ -291,6 +291,20 @@
     "viewEvent": "이벤트 보기",
     "emptyTitle": "아직 메시지가 없습니다",
     "emptySubtitle": "인사하거나 계획을 공유하고 다음 모임을 정해보세요.",
-    "placeholder": "그룹에 메시지 보내기"
+    "placeholder": "그룹에 메시지 보내기",
+    "react": "반응",
+    "copy": "텍스트 복사",
+    "messageActions": "메시지",
+    "messageDeleted": "삭제된 메시지입니다",
+    "deleteTitle": "메시지를 삭제할까요?",
+    "deleteMessage": "그룹의 모든 사람에게서 삭제됩니다.",
+    "deleteFailed": "메시지를 삭제할 수 없습니다",
+    "attachPhoto": "사진 첨부",
+    "imageFailed": "사진을 첨부할 수 없습니다",
+    "imageFailedMessage": "다른 사진을 사용해 보세요.",
+    "photo": "📷 사진",
+    "caption": "캡션 추가",
+    "reactions": "반응",
+    "noReactionsYet": "아직 반응이 없습니다"
   }
 }

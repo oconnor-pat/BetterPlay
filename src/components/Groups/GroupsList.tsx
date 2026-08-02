@@ -106,9 +106,7 @@ const GroupsList: React.FC = () => {
     const unsubRead = subscribe('group:read', (payload: {groupId: string}) => {
       if (!payload?.groupId) return;
       setGroups(prev =>
-        prev.map(g =>
-          g._id === payload.groupId ? {...g, unreadCount: 0} : g,
-        ),
+        prev.map(g => (g._id === payload.groupId ? {...g, unreadCount: 0} : g)),
       );
     });
     return () => {
@@ -130,14 +128,22 @@ const GroupsList: React.FC = () => {
     [navigation],
   );
 
-  const previewText = useCallback((g: Group): string | null => {
-    const lm = g.lastMessage;
-    if (!lm) return null;
-    if (lm.kind === 'system') return lm.text;
-    const who =
-      lm.senderId === currentUserId ? 'You' : lm.username || 'Someone';
-    return `${who}: ${lm.text}`;
-  }, [currentUserId]);
+  const previewText = useCallback(
+    (g: Group): string | null => {
+      const lm = g.lastMessage;
+      if (!lm) return null;
+      if (lm.kind === 'system') return lm.text;
+      const who =
+        lm.senderId === currentUserId ? 'You' : lm.username || 'Someone';
+      // The server sends empty text for photo-only and retracted messages,
+      // flagging which so the stand-in wording can be localized here.
+      const body = lm.deleted
+        ? t('groupChat.messageDeleted') || 'This message was deleted'
+        : lm.text || (lm.hasImage ? t('groupChat.photo') || '📷 Photo' : '');
+      return `${who}: ${body}`;
+    },
+    [currentUserId, t],
+  );
 
   const handleGroupCreated = useCallback(
     (group: Group) => {

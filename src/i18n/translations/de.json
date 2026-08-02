@@ -300,6 +300,20 @@
     "viewEvent": "Event ansehen",
     "emptyTitle": "Noch keine Nachrichten",
     "emptySubtitle": "Sag Hallo, teile einen Plan oder legt das nächste Treffen fest.",
-    "placeholder": "Nachricht an die Gruppe"
+    "placeholder": "Nachricht an die Gruppe",
+    "react": "Reagieren",
+    "copy": "Text kopieren",
+    "messageActions": "Nachricht",
+    "messageDeleted": "Diese Nachricht wurde gelöscht",
+    "deleteTitle": "Nachricht löschen?",
+    "deleteMessage": "Sie wird für alle in der Gruppe entfernt.",
+    "deleteFailed": "Nachricht konnte nicht gelöscht werden",
+    "attachPhoto": "Foto anhängen",
+    "imageFailed": "Foto konnte nicht angehängt werden",
+    "imageFailedMessage": "Bitte versuche ein anderes Foto.",
+    "photo": "📷 Foto",
+    "caption": "Bildunterschrift hinzufügen",
+    "reactions": "Reaktionen",
+    "noReactionsYet": "Noch keine Reaktionen"
   }
 }

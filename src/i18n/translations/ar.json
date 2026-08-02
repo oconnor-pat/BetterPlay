@@ -291,6 +291,20 @@
     "viewEvent": "عرض الحدث",
     "emptyTitle": "لا توجد رسائل بعد",
     "emptySubtitle": "ألقِ التحية، شارك خطة، أو حدد اللقاء القادم.",
-    "placeholder": "رسالة إلى المجموعة"
+    "placeholder": "رسالة إلى المجموعة",
+    "react": "تفاعل",
+    "copy": "نسخ النص",
+    "messageActions": "رسالة",
+    "messageDeleted": "تم حذف هذه الرسالة",
+    "deleteTitle": "حذف الرسالة؟",
+    "deleteMessage": "سيتم حذفها لدى جميع أعضاء المجموعة.",
+    "deleteFailed": "تعذّر حذف الرسالة",
+    "attachPhoto": "إرفاق صورة",
+    "imageFailed": "تعذّر إرفاق الصورة",
+    "imageFailedMessage": "جرّب صورة أخرى.",
+    "photo": "📷 صورة",
+    "caption": "أضف تعليقًا",
+    "reactions": "التفاعلات",
+    "noReactionsYet": "لا توجد تفاعلات بعد"
   }
 }

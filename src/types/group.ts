@@ -29,6 +29,10 @@ export interface GroupLastMessage {
   kind: 'text' | 'system';
   username?: string;
   senderId: string;
+  // `text` is empty for an image-only or deleted message; these say which,
+  // so the preview can be localized here rather than on the server.
+  hasImage?: boolean;
+  deleted?: boolean;
   createdAt: string;
 }
 
@@ -66,6 +70,11 @@ export interface GroupMessageEventRef {
   eventDate?: string;
 }
 
+export interface GroupMessageReaction {
+  userId: string;
+  emoji: string;
+}
+
 export interface GroupMessage {
   _id: string;
   groupId: string;
@@ -75,6 +84,15 @@ export interface GroupMessage {
   text: string;
   kind: 'text' | 'system';
   eventRef?: GroupMessageEventRef;
+  // Attachment. Dimensions are the intrinsic size, used to reserve the
+  // right space so the thread doesn't reflow once the image loads.
+  imageUrl?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  reactions?: GroupMessageReaction[];
+  // Soft-deleted messages keep their slot in the thread but arrive with
+  // their content stripped; the FE renders a placeholder.
+  deletedAt?: string;
   createdAt: string;
 }
 
