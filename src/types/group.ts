@@ -93,6 +93,10 @@ export interface GroupMessage {
   // Soft-deleted messages keep their slot in the thread but arrive with
   // their content stripped; the FE renders a placeholder.
   deletedAt?: string;
+  // Set when the sender is blocked by the viewer. Content is stripped
+  // the same way, but the placeholder wording differs — and unlike a
+  // deletion this is one-sided, since it depends on who's looking.
+  blocked?: boolean;
   createdAt: string;
 }
 

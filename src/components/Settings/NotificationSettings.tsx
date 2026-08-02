@@ -524,6 +524,61 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
               thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
             />
           </View>
+
+          {/* Direct Messages */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Direct Messages</Text>
+              <Text style={styles.settingDescription}>
+                New messages in your conversations
+              </Text>
+            </View>
+            <Switch
+              value={settings.directMessages && settings.enabled}
+              onValueChange={value =>
+                handleToggleSetting('directMessages', value)
+              }
+              disabled={!settings.enabled}
+              trackColor={{false: colors.border, true: colors.primary}}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          {/* Message Requests */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Message Requests</Text>
+              <Text style={styles.settingDescription}>
+                When someone new wants to message you
+              </Text>
+            </View>
+            <Switch
+              value={settings.messageRequests && settings.enabled}
+              onValueChange={value =>
+                handleToggleSetting('messageRequests', value)
+              }
+              disabled={!settings.enabled}
+              trackColor={{false: colors.border, true: colors.primary}}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
+
+          {/* Message Reactions */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Message Reactions</Text>
+              <Text style={styles.settingDescription}>
+                When someone reacts to your message
+              </Text>
+            </View>
+            <Switch
+              value={settings.dmReactions && settings.enabled}
+              onValueChange={value => handleToggleSetting('dmReactions', value)}
+              disabled={!settings.enabled}
+              trackColor={{false: colors.border, true: colors.primary}}
+              thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+            />
+          </View>
         </View>
       )}
 

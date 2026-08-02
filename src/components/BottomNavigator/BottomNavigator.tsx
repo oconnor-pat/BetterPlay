@@ -12,9 +12,11 @@ import {FriendsList, FriendRequests} from '../Friends';
 import {Notifications} from '../Notifications';
 import GroupDetail from '../Groups/GroupDetail';
 import GroupsList from '../Groups/GroupsList';
+import {MessagesList, DmThread} from '../Messages';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarAlt,
+  faComment,
   faUser,
   faUserGroup,
   faQuestion,
@@ -24,6 +26,7 @@ import UserContext from '../UserContext';
 import {IconDefinition} from '@fortawesome/fontawesome-svg-core';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {useNotifications} from '../../Context/NotificationContext';
+import {useDmBadge} from '../../hooks/useDmBadge';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTranslation} from 'react-i18next';
 
@@ -59,6 +62,7 @@ function createTabBarIcon(colors: {primary: string; secondaryText: string}) {
     const iconMap: Record<string, IconDefinition> = {
       Events: faCalendarAlt,
       Groups: faUserGroup,
+      Messages: faComment,
       Profile: faUser,
     };
     const icon = iconMap[route.name] || faQuestion;
@@ -174,6 +178,42 @@ const GroupsStack = () => {
   );
 };
 
+// Stack Navigator for direct messages. UserSearch and PublicProfile are
+// registered here as well as in the Events/Profile stacks so the "start a
+// new conversation" path (search → profile → Message) stays inside this
+// tab instead of throwing the user into another one mid-flow.
+const MessagesStack = () => {
+  const {colors} = useTheme();
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {backgroundColor: colors.card},
+        headerTintColor: colors.text,
+      }}>
+      <Stack.Screen
+        name="MessagesList"
+        component={MessagesList}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="DmThread"
+        component={DmThread}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="UserSearch"
+        component={UserSearch}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="PublicProfile"
+        component={PublicProfile}
+        options={{headerShown: false}}
+      />
+    </Stack.Navigator>
+  );
+};
+
 // Stack Navigator for Profile screens
 const ProfileStack = ({userId}: {userId: string}) => {
   const {colors} = useTheme();
@@ -230,6 +270,9 @@ const BottomNavigator: React.FC = () => {
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
   const hasPromptedRef = useRef(false);
+  // Counts threads waiting on the user (unread conversations + pending
+  // message requests), so the tab can say how many people need a reply.
+  const dmBadge = useDmBadge(!!userData);
 
   // Request notification permission after login (once per session)
   useEffect(() => {
@@ -266,6 +309,7 @@ const BottomNavigator: React.FC = () => {
   const tabLabels: Record<string, string> = {
     Events: t('navigation.events') || 'Events',
     Groups: t('navigation.groups') || 'Groups',
+    Messages: t('navigation.messages') || 'Messages',
     Profile: t('navigation.profile') || 'Profile',
   };
 
@@ -297,12 +341,25 @@ const BottomNavigator: React.FC = () => {
       themedTabBarIcon({route, focused: props.focused}),
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: colors.secondaryText,
+    tabBarBadge:
+      route.name === 'Messages' && dmBadge > 0
+        ? dmBadge > 99
+          ? '99+'
+          : dmBadge
+        : undefined,
+    tabBarBadgeStyle: {
+      backgroundColor: '#FF3B30',
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '700' as const,
+    },
   });
 
   return (
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Events" component={LocalEventsStack} />
       <Tab.Screen name="Groups" component={GroupsStack} />
+      <Tab.Screen name="Messages" component={MessagesStack} />
       <Tab.Screen name="Profile">
         {() => <ProfileStack userId={userId} />}
       </Tab.Screen>

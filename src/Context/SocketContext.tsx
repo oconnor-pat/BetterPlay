@@ -21,6 +21,8 @@ interface SocketContextType {
   leaveEvent: (eventId: string) => void;
   joinGroup: (groupId: string) => void;
   leaveGroup: (groupId: string) => void;
+  joinConversation: (conversationId: string) => void;
+  leaveConversation: (conversationId: string) => void;
   subscribe: (event: string, handler: SocketEventHandler) => () => void;
 }
 
@@ -30,6 +32,8 @@ const SocketContext = createContext<SocketContextType>({
   leaveEvent: () => {},
   joinGroup: () => {},
   leaveGroup: () => {},
+  joinConversation: () => {},
+  leaveConversation: () => {},
   subscribe: () => () => {},
 });
 
@@ -40,6 +44,7 @@ export const SocketProvider: React.FC<{children: ReactNode}> = ({
   const [isConnected, setIsConnected] = useState(false);
   const joinedEventsRef = useRef<Set<string>>(new Set());
   const joinedGroupsRef = useRef<Set<string>>(new Set());
+  const joinedConversationsRef = useRef<Set<string>>(new Set());
   const listenersRef = useRef<Map<string, Set<SocketEventHandler>>>(new Map());
   const userCtx = useContext(UserContext);
   const userData = userCtx?.userData ?? null;
@@ -82,6 +87,9 @@ export const SocketProvider: React.FC<{children: ReactNode}> = ({
         });
         joinedGroupsRef.current.forEach(groupId => {
           socket?.emit('join:group', groupId);
+        });
+        joinedConversationsRef.current.forEach(conversationId => {
+          socket?.emit('join:conversation', conversationId);
         });
       });
 
@@ -162,6 +170,20 @@ export const SocketProvider: React.FC<{children: ReactNode}> = ({
     }
   }, []);
 
+  const joinConversation = useCallback((conversationId: string) => {
+    joinedConversationsRef.current.add(conversationId);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('join:conversation', conversationId);
+    }
+  }, []);
+
+  const leaveConversation = useCallback((conversationId: string) => {
+    joinedConversationsRef.current.delete(conversationId);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('leave:conversation', conversationId);
+    }
+  }, []);
+
   const subscribe = useCallback(
     (event: string, handler: SocketEventHandler): (() => void) => {
       if (!listenersRef.current.has(event)) {
@@ -191,6 +213,8 @@ export const SocketProvider: React.FC<{children: ReactNode}> = ({
         leaveEvent,
         joinGroup,
         leaveGroup,
+        joinConversation,
+        leaveConversation,
         subscribe,
       }}>
       {children}

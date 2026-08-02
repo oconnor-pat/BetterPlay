@@ -1,12 +1,18 @@
-// Group chat thread. Rendered inside GroupDetail under the "Chat" tab.
-// Rounds out the Groups feature so a crew's conversation lives next to
-// its roster and the events it schedules — event creation drops a
-// tappable system message in here (see BE postGroupEventSystemMessage).
+// A 1-to-1 direct message thread. Mirrors GroupChat's mechanics — an
+// inverted FlatList holding messages newest-first, a createdAt cursor for
+// paging backwards, and a live socket room — but stands alone as a full
+// screen with its own header instead of living inside a tab.
 //
-// Real-time via the `group:{id}` socket room: on mount we join the room,
-// mark the thread read, and prepend any `group:message:new` events. The
-// list is an inverted FlatList (newest at the bottom, like every chat
-// app); messages are held newest-first so index 0 sits at the bottom.
+// Two things are specific to DMs. First, a thread opened by someone who
+// isn't your friend arrives as a *request*: until you accept it, a bar
+// above the composer offers Accept / Decline, and simply writing back
+// counts as accepting. Second, a declined thread stays readable but its
+// composer is closed, since the whole point of declining is that the
+// sender can't reach you again.
+//
+// Can be entered two ways: with a conversationId (from the inbox or a
+// notification) or with just a userId (from someone's profile), in which
+// case the thread is opened — or found, if it already exists — on mount.
 
 import React, {
   useCallback,
@@ -33,43 +39,50 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
-  faCalendarDay,
-  faChevronRight,
+  faChevronLeft,
   faImage,
   faPaperPlane,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import Clipboard from '@react-native-clipboard/clipboard';
-import * as ImagePicker from 'react-native-image-picker';
 import EmojiPicker, {type EmojiType} from 'rn-emoji-keyboard';
-import {useNavigation} from '@react-navigation/native';
+import * as ImagePicker from 'react-native-image-picker';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import {useTranslation} from 'react-i18next';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {useSocket} from '../../Context/SocketContext';
 import UserContext, {UserContextType} from '../UserContext';
-import ReportSheet from '../Moderation/ReportSheet';
-import {GroupMessage, GroupMessageReaction} from '../../types/group';
 import {
-  deleteGroupMessage,
-  fetchGroupMessages,
-  fetchMessageReactions,
-  markGroupRead,
-  type MessageReactor,
-  reactToGroupMessage,
-  sendGroupMessage,
-  uploadChatImage,
-} from '../../services/GroupChatService';
+  Conversation,
+  DirectMessage,
+  DirectMessageReaction,
+} from '../../types/dm';
+import {MessageReactor} from '../../services/GroupChatService';
+import ReportSheet from '../Moderation/ReportSheet';
+import {
+  acceptConversation,
+  declineConversation,
+  deleteDirectMessage,
+  fetchConversation,
+  fetchDirectMessages,
+  fetchDmMessageReactions,
+  markConversationRead,
+  openConversation,
+  reactToDirectMessage,
+  sendDirectMessage,
+  uploadDmImage,
+} from '../../services/DirectMessageService';
 
-interface GroupChatProps {
-  groupId: string;
-  // Set when arriving from a reaction notification: the thread scrolls to
-  // this message and flashes it. The nonce lets a repeat notification for
-  // the same message re-run the effect.
-  highlightMessageId?: string;
-  highlightNonce?: number;
+interface PendingImage {
+  uri: string;
+  base64: string;
+  fileName?: string;
+  width?: number;
+  height?: number;
 }
 
 interface MessageAction {
@@ -78,15 +91,32 @@ interface MessageAction {
   onPress: () => void;
 }
 
-// A photo staged in the composer but not yet sent. Held locally (the
-// upload only happens on send) so backing out costs nothing.
-interface PendingImage {
-  uri: string;
-  base64: string;
-  fileName?: string;
-  width?: number;
-  height?: number;
-}
+// Collapse the raw (user, emoji) rows into one pill per distinct emoji,
+// kept in first-reacted order so pills don't reshuffle as counts change.
+const summarizeReactions = (
+  reactions: DirectMessageReaction[] | undefined,
+  userId?: string,
+): {emoji: string; count: number; mine: boolean}[] => {
+  const order: string[] = [];
+  const counts = new Map<string, number>();
+  const mine = new Set<string>();
+
+  (reactions || []).forEach(r => {
+    if (!counts.has(r.emoji)) {
+      order.push(r.emoji);
+    }
+    counts.set(r.emoji, (counts.get(r.emoji) || 0) + 1);
+    if (userId && r.userId === userId) {
+      mine.add(r.emoji);
+    }
+  });
+
+  return order.map(emoji => ({
+    emoji,
+    count: counts.get(emoji) as number,
+    mine: mine.has(emoji),
+  }));
+};
 
 // Short relative timestamp for message metadata ("now", "5m", "3h",
 // "2d"), falling back to a date once it's a week old.
@@ -114,34 +144,6 @@ const relativeTime = (iso: string): string => {
   return new Date(iso).toLocaleDateString();
 };
 
-// Collapse the raw (user, emoji) rows into one pill per distinct emoji,
-// kept in first-reacted order so pills don't reshuffle as counts change.
-const summarizeReactions = (
-  reactions: GroupMessageReaction[] | undefined,
-  userId?: string,
-): {emoji: string; count: number; mine: boolean}[] => {
-  const order: string[] = [];
-  const counts = new Map<string, number>();
-  const mine = new Set<string>();
-
-  (reactions || []).forEach(r => {
-    if (!counts.has(r.emoji)) {
-      order.push(r.emoji);
-    }
-    counts.set(r.emoji, (counts.get(r.emoji) || 0) + 1);
-    if (userId && r.userId === userId) {
-      mine.add(r.emoji);
-    }
-  });
-
-  return order.map(emoji => ({
-    emoji,
-    count: counts.get(emoji) as number,
-    mine: mine.has(emoji),
-  }));
-};
-
-// Widest an attached image renders in the thread.
 const IMAGE_MAX_WIDTH = 230;
 
 // Reserve the right space before the image loads so the thread doesn't
@@ -161,53 +163,69 @@ const imageDisplaySize = (
   };
 };
 
-const GroupChat: React.FC<GroupChatProps> = ({
-  groupId,
-  highlightMessageId,
-  highlightNonce,
-}) => {
+const DmThread: React.FC = () => {
   const {colors, darkMode} = useTheme();
   const {t} = useTranslation();
   const navigation = useNavigation<any>();
-  // GroupDetail always lives under the bottom tab navigator (Groups and
-  // Profile stacks both register it), so the keyboard needs to clear the
-  // tab bar height — otherwise the composer floats above the keyboard by
-  // exactly that gap.
+  const route = useRoute<any>();
   const tabBarHeight = useBottomTabBarHeight();
-  const {joinGroup, leaveGroup, subscribe} = useSocket();
+  const {joinConversation, leaveConversation, subscribe} = useSocket();
   const {userData} = useContext(UserContext) as UserContextType;
   const currentUserId = userData?._id;
 
-  const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const routeConversationId: string | undefined = route.params?.conversationId;
+  const routeUserId: string | undefined = route.params?.userId;
+  // Set when arriving from a reaction notification: the thread scrolls to
+  // that message and flashes it. The nonce lets a repeat tap re-run the
+  // flash even though the id hasn't changed.
+  const highlightMessageId: string | undefined =
+    route.params?.highlightMessageId;
+  const highlightNonce: number | undefined = route.params?.highlightNonce;
+
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [conversationId, setConversationId] = useState<string | undefined>(
+    routeConversationId,
+  );
+  const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [deciding, setDeciding] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  // Message the emoji picker is currently reacting to.
-  const [reactionTarget, setReactionTarget] = useState<GroupMessage | null>(
-    null,
-  );
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Message whose emoji picker is open.
+  const [reactionTarget, setReactionTarget] = useState<DirectMessage | null>(
+    null,
+  );
   // Android-only: message whose action sheet is open (see openMessageActions).
-  const [actionTarget, setActionTarget] = useState<GroupMessage | null>(null);
-  // Non-null while the "who reacted" sheet is open.
+  const [actionTarget, setActionTarget] = useState<DirectMessage | null>(null);
   const [reactedBy, setReactedBy] = useState<MessageReactor[] | null>(null);
   const [loadingReactedBy, setLoadingReactedBy] = useState(false);
-  const [reportTarget, setReportTarget] = useState<GroupMessage | null>(null);
-  // Message currently flashing after arriving from a notification.
+  const [reportTarget, setReportTarget] = useState<DirectMessage | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const highlightAnim = useRef(new Animated.Value(0)).current;
-  const listRef = useRef<FlatList<GroupMessage>>(null);
+  const listRef = useRef<FlatList<DirectMessage>>(null);
 
-  // Deterministic keyboard handling. KeyboardAvoidingView mis-measures
-  // its own position inside the nested tab→stack navigator, so instead we
-  // read the keyboard height directly and lift the composer by exactly
-  // (keyboardHeight − tabBarHeight): the tab bar sits below this view and
-  // is covered by the keyboard, so only the remainder needs padding.
-  // iOS only — Android resizes the window natively (adjustResize).
+  // Header details can come in on the route so the screen has something
+  // to show while the thread itself is still loading.
+  const headerName =
+    conversation?.otherUser.name ||
+    conversation?.otherUser.username ||
+    route.params?.name ||
+    route.params?.username ||
+    '';
+  const headerAvatar =
+    conversation?.otherUser.profilePicUrl || route.params?.profilePicUrl;
+  const otherUserId = conversation?.otherUser.userId || routeUserId;
+
+  // Same deterministic keyboard handling as group chat:
+  // KeyboardAvoidingView mis-measures inside the nested tab→stack
+  // navigator, so lift the composer by exactly (keyboard − tab bar).
+  // iOS only; Android resizes the window natively.
   useEffect(() => {
     if (Platform.OS !== 'ios') {
       return;
@@ -229,74 +247,87 @@ const GroupChat: React.FC<GroupChatProps> = ({
 
   // Dedupe-aware prepend so the socket echo of our own sent message
   // doesn't double up with the POST response (both carry the same _id).
-  const prependMessage = useCallback((msg: GroupMessage) => {
+  const prependMessage = useCallback((msg: DirectMessage) => {
     setMessages(prev =>
       prev.some(m => m._id === msg._id) ? prev : [msg, ...prev],
     );
   }, []);
 
-  const openEvent = useCallback(
-    (eventId: string) => {
-      // Cross-tab jump into the Events stack's roster screen.
-      navigation.navigate('Events', {
-        screen: 'EventRoster',
-        params: {eventId},
-      });
-    },
-    [navigation],
-  );
-
-  // Initial load + room join + mark read.
+  // Resolve the thread, then load its first page. Arriving with only a
+  // userId (from a profile) opens or finds the thread first.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     (async () => {
       try {
-        const res = await fetchGroupMessages(groupId, {limit: 30});
+        const conv = routeConversationId
+          ? await fetchConversation(routeConversationId)
+          : routeUserId
+          ? await openConversation(routeUserId)
+          : null;
+        if (cancelled || !conv) {
+          if (!cancelled) {
+            setLoading(false);
+          }
+          return;
+        }
+        setConversation(conv);
+        setConversationId(conv._id);
+
+        const res = await fetchDirectMessages(conv._id, {limit: 30});
         if (cancelled) {
           return;
         }
         setMessages(res.messages);
         setHasMore(res.hasMore);
+        markConversationRead(conv._id).catch(() => {});
       } catch {
+        // Without a resolved thread there's nothing to send to, so flag
+        // it rather than leaving a composer that would silently no-op.
         if (!cancelled) {
           setMessages([]);
+          setLoadFailed(true);
         }
       } finally {
         if (!cancelled) {
           setLoading(false);
         }
       }
-      markGroupRead(groupId).catch(() => {});
     })();
-
-    joinGroup(groupId);
     return () => {
       cancelled = true;
-      leaveGroup(groupId);
     };
-  }, [groupId, joinGroup, leaveGroup]);
+  }, [routeConversationId, routeUserId]);
 
-  // Live incoming messages for this group.
+  // Join the thread's room once we know its id. Being in the room also
+  // tells the server not to push us messages we're already watching.
   useEffect(() => {
-    const unsub = subscribe('group:message:new', (msg: GroupMessage) => {
-      if (!msg || msg.groupId !== groupId) {
+    if (!conversationId) {
+      return;
+    }
+    joinConversation(conversationId);
+    return () => leaveConversation(conversationId);
+  }, [conversationId, joinConversation, leaveConversation]);
+
+  useEffect(() => {
+    const unsub = subscribe('dm:message:new', (msg: DirectMessage) => {
+      if (!msg || !conversationId || msg.conversationId !== conversationId) {
         return;
       }
       prependMessage(msg);
       // We're looking at the thread, so keep it marked read.
-      markGroupRead(groupId).catch(() => {});
+      markConversationRead(conversationId).catch(() => {});
     });
     return unsub;
-  }, [groupId, subscribe, prependMessage]);
+  }, [conversationId, subscribe, prependMessage]);
 
   // Someone retracted a message. Keep the row but strip it, matching what
   // the server now serves, so the thread doesn't shift under the reader.
   useEffect(() => {
     const unsub = subscribe(
-      'group:message:deleted',
-      (data: {groupId: string; messageId: string}) => {
-        if (!data || data.groupId !== groupId) {
+      'dm:message:deleted',
+      (data: {conversationId: string; messageId: string}) => {
+        if (!data || data.conversationId !== conversationId) {
           return;
         }
         setMessages(prev =>
@@ -317,17 +348,17 @@ const GroupChat: React.FC<GroupChatProps> = ({
       },
     );
     return unsub;
-  }, [groupId, subscribe]);
+  }, [conversationId, subscribe]);
 
   useEffect(() => {
     const unsub = subscribe(
-      'group:message:reacted',
+      'dm:message:reacted',
       (data: {
-        groupId: string;
+        conversationId: string;
         messageId: string;
-        reactions: GroupMessageReaction[];
+        reactions: DirectMessageReaction[];
       }) => {
-        if (!data || data.groupId !== groupId) {
+        if (!data || data.conversationId !== conversationId) {
           return;
         }
         setMessages(prev =>
@@ -340,23 +371,50 @@ const GroupChat: React.FC<GroupChatProps> = ({
       },
     );
     return unsub;
-  }, [groupId, subscribe]);
+  }, [conversationId, subscribe]);
+
+  // The other side accepted or declined while we had the thread open.
+  useEffect(() => {
+    const unsub = subscribe(
+      'dm:conversation:updated',
+      (data: {conversationId: string; status: Conversation['status']}) => {
+        if (!data || data.conversationId !== conversationId) {
+          return;
+        }
+        setConversation(prev =>
+          prev
+            ? {
+                ...prev,
+                status: data.status,
+                isIncomingRequest: false,
+                isOutgoingRequest: false,
+                // Declined while we had the thread open: swap the
+                // composer for the notice without needing a reload.
+                isClosedToMe:
+                  data.status === 'declined' &&
+                  prev.requestedBy === currentUserId,
+              }
+            : prev,
+        );
+      },
+    );
+    return unsub;
+  }, [conversationId, currentUserId, subscribe]);
 
   const loadOlder = useCallback(async () => {
-    if (loadingMore || !hasMore || messages.length === 0) {
+    if (loadingMore || !hasMore || !conversationId || messages.length === 0) {
       return;
     }
     setLoadingMore(true);
     try {
       const oldest = messages[messages.length - 1];
-      const res = await fetchGroupMessages(groupId, {
+      const res = await fetchDirectMessages(conversationId, {
         before: oldest.createdAt,
         limit: 30,
       });
       setMessages(prev => {
         const seen = new Set(prev.map(m => m._id));
-        const older = res.messages.filter(m => !seen.has(m._id));
-        return [...prev, ...older];
+        return [...prev, ...res.messages.filter(m => !seen.has(m._id))];
       });
       setHasMore(res.hasMore);
     } catch {
@@ -364,54 +422,15 @@ const GroupChat: React.FC<GroupChatProps> = ({
     } finally {
       setLoadingMore(false);
     }
-  }, [groupId, hasMore, loadingMore, messages]);
+  }, [conversationId, hasMore, loadingMore, messages]);
 
-  // Stage a photo in the composer. Nothing is uploaded or sent yet — that
-  // waits for the send button, so the photo can be captioned or dropped.
-  const handlePickImage = useCallback(async () => {
-    if (sending) {
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibrary({
-      mediaType: 'photo',
-      includeBase64: true,
-      maxWidth: 1280,
-      maxHeight: 1280,
-      quality: 0.7,
-    });
-    if (result.didCancel) {
-      return;
-    }
-
-    const asset = result.assets?.[0];
-    if (!asset?.base64 || !asset.uri) {
-      Alert.alert(
-        t('groupChat.imageFailed') || 'Could not attach photo',
-        t('groupChat.imageFailedMessage') || 'Please try another photo.',
-      );
-      return;
-    }
-
-    setPendingImage({
-      uri: asset.uri,
-      base64: asset.base64,
-      fileName: asset.fileName,
-      width: asset.width,
-      height: asset.height,
-    });
-  }, [sending, t]);
-
-  // Sends text, a staged photo, or a photo with the text as its caption.
-  // The upload happens here rather than at pick time so a photo the user
-  // backs out of never costs a round trip.
   // Arriving from a reaction notification: bring the reacted-to message
   // into view and flash it. It may be older than the first page, so page
   // backwards a bounded number of times looking for it — bounded because
   // the message could also have been deleted, and we don't want to walk
   // the entire history to discover that.
   useEffect(() => {
-    if (!highlightMessageId || loading) {
+    if (!highlightMessageId || loading || !conversationId) {
       return;
     }
 
@@ -461,7 +480,7 @@ const GroupChat: React.FC<GroupChatProps> = ({
         }
         let page;
         try {
-          page = await fetchGroupMessages(groupId, {
+          page = await fetchDirectMessages(conversationId, {
             before: oldest.createdAt,
             limit: 30,
           });
@@ -492,49 +511,162 @@ const GroupChat: React.FC<GroupChatProps> = ({
     // `messages` is deliberately excluded: this should run when a
     // notification points us at a message, not on every new message.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlightMessageId, highlightNonce, loading, groupId, highlightAnim]);
+  }, [
+    highlightMessageId,
+    highlightNonce,
+    loading,
+    conversationId,
+    highlightAnim,
+  ]);
+
+  // Stage a photo in the composer. Nothing is uploaded or sent yet — that
+  // waits for the send button, so the photo can be captioned or dropped.
+  const handlePickImage = useCallback(async () => {
+    if (sending) {
+      return;
+    }
+    try {
+      const result = await ImagePicker.launchImageLibrary({
+        mediaType: 'photo',
+        includeBase64: true,
+        quality: 0.7,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      });
+      const asset = result.assets?.[0];
+      if (!asset?.base64 || !asset.uri) {
+        return;
+      }
+      setPendingImage({
+        uri: asset.uri,
+        base64: asset.base64,
+        fileName: asset.fileName,
+        width: asset.width,
+        height: asset.height,
+      });
+    } catch {
+      Alert.alert(
+        t('groupChat.imageFailed') || 'Photo failed',
+        t('groupChat.imageFailedMessage') || "That photo couldn't be attached.",
+      );
+    }
+  }, [sending, t]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
     const image = pendingImage;
-    if ((!text && !image) || sending) {
+    if ((!text && !image) || sending || !conversationId) {
       return;
     }
 
+    setSending(true);
     setInput('');
     setPendingImage(null);
-    setSending(true);
     try {
-      const imageUrl = image
-        ? await uploadChatImage(image.base64, image.fileName)
-        : undefined;
-      const msg = await sendGroupMessage(groupId, {
+      let imageUrl: string | undefined;
+      if (image) {
+        imageUrl = await uploadDmImage(image.base64, image.fileName);
+      }
+      const msg = await sendDirectMessage(conversationId, {
         text,
         imageUrl,
         imageWidth: image?.width,
         imageHeight: image?.height,
       });
       prependMessage(msg);
+      // Writing back to a request accepts it server-side; reflect that so
+      // the Accept/Decline bar drops away immediately.
+      setConversation(prev =>
+        prev && prev.isIncomingRequest
+          ? {
+              ...prev,
+              status: 'accepted',
+              isIncomingRequest: false,
+              isOutgoingRequest: false,
+            }
+          : prev,
+      );
     } catch {
-      // Put the draft back so nothing is lost to a failed send.
+      // Put the draft back so nothing is silently lost.
       setInput(text);
       setPendingImage(image);
-      if (image) {
-        Alert.alert(
-          t('groupChat.imageFailed') || 'Could not attach photo',
-          t('groupChat.imageFailedMessage') || 'Please try another photo.',
-        );
-      }
+      Alert.alert(
+        t('common.error') || 'Error',
+        t('messages.sendFailed') || "That message couldn't be sent.",
+      );
     } finally {
       setSending(false);
     }
-  }, [groupId, input, pendingImage, sending, prependMessage, t]);
+  }, [conversationId, input, pendingImage, prependMessage, sending, t]);
+
+  const handleAccept = useCallback(async () => {
+    if (!conversationId || deciding) {
+      return;
+    }
+    setDeciding(true);
+    try {
+      await acceptConversation(conversationId);
+      setConversation(prev =>
+        prev
+          ? {
+              ...prev,
+              status: 'accepted',
+              isIncomingRequest: false,
+              isOutgoingRequest: false,
+            }
+          : prev,
+      );
+    } catch {
+      Alert.alert(
+        t('common.error') || 'Error',
+        t('messages.requestFailed') || "That request couldn't be updated.",
+      );
+    } finally {
+      setDeciding(false);
+    }
+  }, [conversationId, deciding, t]);
+
+  const handleDecline = useCallback(() => {
+    if (!conversationId || deciding) {
+      return;
+    }
+    Alert.alert(
+      t('messages.declineTitle') || 'Decline message request?',
+      t('messages.declineMessage') ||
+        "They won't be able to message you again, and they aren't told you declined.",
+      [
+        {text: t('common.cancel') || 'Cancel', style: 'cancel'},
+        {
+          text: t('messages.decline') || 'Decline',
+          style: 'destructive',
+          onPress: async () => {
+            setDeciding(true);
+            try {
+              await declineConversation(conversationId);
+              navigation.goBack();
+            } catch {
+              Alert.alert(
+                t('common.error') || 'Error',
+                t('messages.requestFailed') ||
+                  "That request couldn't be updated.",
+              );
+            } finally {
+              setDeciding(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [conversationId, deciding, navigation, t]);
 
   // Optimistic toggle: flip the pill immediately, then reconcile with the
-  // server's authoritative list (the socket echo also lands for everyone
-  // else in the room). On failure we restore the previous list.
+  // server's authoritative list (the socket echo also lands for the other
+  // side). On failure we restore the previous list.
   const handleReact = useCallback(
-    async (message: GroupMessage, emoji: string) => {
+    async (message: DirectMessage, emoji: string) => {
+      if (!conversationId) {
+        return;
+      }
       const previous = message.reactions || [];
       const alreadyMine = previous.some(
         r => r.userId === currentUserId && r.emoji === emoji,
@@ -552,8 +684,8 @@ const GroupChat: React.FC<GroupChatProps> = ({
       );
 
       try {
-        const reactions = await reactToGroupMessage(
-          groupId,
+        const reactions = await reactToDirectMessage(
+          conversationId,
           message._id,
           emoji,
         );
@@ -568,31 +700,36 @@ const GroupChat: React.FC<GroupChatProps> = ({
         );
       }
     },
-    [groupId, currentUserId],
+    [conversationId, currentUserId],
   );
 
-  // Long-pressing a pill answers "who reacted?" — the same affordance the
-  // event cards use for their reaction pills.
+  // Long-pressing a pill answers "who reacted?" — the same affordance
+  // group chat and the event cards use.
   const showReactedBy = useCallback(
-    async (message: GroupMessage) => {
+    async (message: DirectMessage) => {
+      if (!conversationId) {
+        return;
+      }
       setReactedBy([]);
       setLoadingReactedBy(true);
       try {
-        setReactedBy(await fetchMessageReactions(groupId, message._id));
+        setReactedBy(
+          await fetchDmMessageReactions(conversationId, message._id),
+        );
       } catch {
         setReactedBy([]);
       } finally {
         setLoadingReactedBy(false);
       }
     },
-    [groupId],
+    [conversationId],
   );
 
   const openReactorProfile = useCallback(
     (reactor: MessageReactor) => {
       setReactedBy(null);
-      // PublicProfile isn't registered in the Groups stack, so this has to
-      // hop to the Profile tab's copy of it.
+      // PublicProfile isn't registered in this stack, so hop to the
+      // Profile tab's copy of it.
       navigation.navigate('Profile', {
         screen: 'PublicProfile',
         params: {
@@ -605,12 +742,14 @@ const GroupChat: React.FC<GroupChatProps> = ({
     [navigation],
   );
 
-  const handleDelete = useCallback(
-    (message: GroupMessage) => {
+  const handleDeleteMessage = useCallback(
+    (message: DirectMessage) => {
+      if (!conversationId) {
+        return;
+      }
       Alert.alert(
         t('groupChat.deleteTitle') || 'Delete message?',
-        t('groupChat.deleteMessage') ||
-          'This removes it for everyone in the group.',
+        t('messages.deleteMessageBody') || 'This removes it for both of you.',
         [
           {text: t('common.cancel') || 'Cancel', style: 'cancel'},
           {
@@ -633,7 +772,7 @@ const GroupChat: React.FC<GroupChatProps> = ({
                 ),
               );
               try {
-                await deleteGroupMessage(groupId, message._id);
+                await deleteDirectMessage(conversationId, message._id);
               } catch {
                 setMessages(prev =>
                   prev.map(m => (m._id === snapshot._id ? snapshot : m)),
@@ -648,33 +787,41 @@ const GroupChat: React.FC<GroupChatProps> = ({
         ],
       );
     },
-    [groupId, t],
+    [conversationId, t],
   );
+
+  // The composer is closed only for the person who was declined. The
+  // thread stays readable so they can see what they sent — they just
+  // can't add to it.
+  const composerClosed = !!conversation?.isClosedToMe;
 
   // Actions offered on long-press, in menu order.
   const buildActions = useCallback(
-    (message: GroupMessage): MessageAction[] => {
-      const actions: MessageAction[] = [
-        {
+    (message: DirectMessage): MessageAction[] => {
+      const actions: MessageAction[] = [];
+      // A thread that won't take messages won't take reactions either —
+      // the server refuses them, so don't offer the option.
+      if (!composerClosed) {
+        actions.push({
           label: t('groupChat.react') || 'React',
           onPress: () => setReactionTarget(message),
-        },
-      ];
+        });
+      }
       if (message.text) {
         actions.push({
           label: t('groupChat.copy') || 'Copy text',
           onPress: () => Clipboard.setString(message.text),
         });
       }
-      if (message.userId === currentUserId) {
+      if (message.senderId === currentUserId) {
         actions.push({
           label: t('common.delete') || 'Delete',
           destructive: true,
-          onPress: () => handleDelete(message),
+          onPress: () => handleDeleteMessage(message),
         });
       } else {
         // Reporting your own message would be meaningless, so this is
-        // the one action that's offered only on someone else's.
+        // the one action that's offered only on the other side's.
         actions.push({
           label: t('moderation.report'),
           destructive: true,
@@ -683,19 +830,19 @@ const GroupChat: React.FC<GroupChatProps> = ({
       }
       return actions;
     },
-    [currentUserId, handleDelete, t],
+    [composerClosed, currentUserId, handleDeleteMessage, t],
   );
 
-  // iOS gets the native sheet, matching GroupDetail's member menu. Android
-  // can't: its Alert is backed by AlertDialog, which supports at most three
-  // buttons, and this menu can reach four with the cancel row — so it gets
-  // a themed sheet of its own instead.
+  // iOS gets the native sheet. Android can't: its Alert is backed by
+  // AlertDialog, which supports at most three buttons, and this menu can
+  // reach four with the cancel row — so it gets a themed sheet instead.
   const openMessageActions = useCallback(
-    (message: GroupMessage) => {
-      // Nothing on the menu applies to a blocked sender's message: it
-      // has no content to copy or react to, and reporting someone you've
-      // already blocked adds nothing.
-      if (message.kind === 'system' || message.deletedAt || message.blocked) {
+    (message: DirectMessage) => {
+      if (message.deletedAt) {
+        return;
+      }
+      const actions = buildActions(message);
+      if (actions.length === 0) {
         return;
       }
 
@@ -704,7 +851,6 @@ const GroupChat: React.FC<GroupChatProps> = ({
         return;
       }
 
-      const actions = buildActions(message);
       const labels = [
         ...actions.map(a => a.label),
         t('common.cancel') || 'Cancel',
@@ -721,11 +867,63 @@ const GroupChat: React.FC<GroupChatProps> = ({
     [buildActions, t],
   );
 
+  const openProfile = useCallback(() => {
+    if (!otherUserId) {
+      return;
+    }
+    // PublicProfile lives in the Events and Profile stacks, not this one.
+    navigation.navigate('Profile', {
+      screen: 'PublicProfile',
+      params: {
+        userId: otherUserId,
+        username: conversation?.otherUser.username || route.params?.username,
+        profilePicUrl: headerAvatar,
+      },
+    });
+  }, [conversation, headerAvatar, navigation, otherUserId, route.params]);
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        container: {flex: 1, backgroundColor: colors.background},
         flex: {flex: 1},
         loadingWrap: {flex: 1, alignItems: 'center', justifyContent: 'center'},
+        // ── Header ──
+        header: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        backBtn: {
+          width: 34,
+          height: 34,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        headerUser: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+        },
+        headerAvatar: {
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.08)'
+            : 'rgba(0,0,0,0.06)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        },
+        headerAvatarImage: {width: 34, height: 34},
+        headerInitials: {color: colors.text, fontWeight: '700', fontSize: 12},
+        headerName: {fontSize: 16, fontWeight: '700', color: colors.text},
         listContent: {paddingVertical: 12, paddingHorizontal: 12},
         emptyWrap: {
           flex: 1,
@@ -784,13 +982,6 @@ const GroupChat: React.FC<GroupChatProps> = ({
           borderRadius: 16,
           backgroundColor: colors.primary + '40',
         },
-        senderName: {
-          fontSize: 11,
-          fontWeight: '700',
-          color: colors.secondaryText,
-          marginBottom: 3,
-          marginLeft: 4,
-        },
         bubbleMine: {
           backgroundColor: colors.primary,
           borderRadius: 16,
@@ -809,8 +1000,6 @@ const GroupChat: React.FC<GroupChatProps> = ({
         },
         bubbleTextMine: {color: '#FFFFFF', fontSize: 15, lineHeight: 20},
         bubbleTextTheirs: {color: colors.text, fontSize: 15, lineHeight: 20},
-        // A retracted message keeps its slot so the thread doesn't shift,
-        // but reads as clearly absent rather than empty.
         bubbleDeleted: {
           backgroundColor: 'transparent',
           borderWidth: StyleSheet.hairlineWidth,
@@ -824,22 +1013,20 @@ const GroupChat: React.FC<GroupChatProps> = ({
           fontSize: 14,
           fontStyle: 'italic',
         },
-        // ── Image attachments ──
-        // The photo is its own block with no bubble behind it, so nothing
-        // frames or overlaps it; the caption is a separate bubble sitting
-        // below, matched to the photo's width.
-        imageStack: {gap: 4},
-        imageBubble: {
-          borderRadius: 16,
-          overflow: 'hidden',
-          backgroundColor: darkMode
-            ? 'rgba(255,255,255,0.06)'
-            : 'rgba(0,0,0,0.05)',
+        metaMine: {
+          fontSize: 10,
+          color: colors.secondaryText,
+          alignSelf: 'flex-end',
+          marginTop: 3,
+          marginRight: 4,
         },
-        // Matched to the photo's width; the corner radii (including the
-        // tail) come from the normal bubble styles so a caption looks like
-        // any other message in the thread.
-        captionBubble: {alignSelf: 'stretch'},
+        metaTheirs: {
+          fontSize: 10,
+          color: colors.secondaryText,
+          alignSelf: 'flex-start',
+          marginTop: 3,
+          marginLeft: 4,
+        },
         // ── Reaction pills ──
         reactionRow: {
           flexDirection: 'row',
@@ -855,13 +1042,17 @@ const GroupChat: React.FC<GroupChatProps> = ({
           paddingHorizontal: 7,
           paddingVertical: 3,
           borderRadius: 11,
-          backgroundColor: colors.card,
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.08)'
+            : 'rgba(0,0,0,0.06)',
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
+          borderColor: 'transparent',
         },
         reactionPillMine: {
-          backgroundColor: colors.primary + '22',
           borderColor: colors.primary,
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.12)'
+            : 'rgba(0,0,0,0.04)',
         },
         reactionEmoji: {fontSize: 12},
         reactionCount: {
@@ -870,7 +1061,67 @@ const GroupChat: React.FC<GroupChatProps> = ({
           color: colors.secondaryText,
         },
         reactionCountMine: {color: colors.primary},
-        // ── Full-screen image viewer ──
+        // ── Bottom sheets (Android action menu, reactors list) ──
+        sheetBackdrop: {
+          flex: 1,
+          backgroundColor: '#00000088',
+          justifyContent: 'flex-end',
+        },
+        sheet: {
+          backgroundColor: colors.card,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          paddingTop: 8,
+          paddingBottom: 28,
+          paddingHorizontal: 8,
+        },
+        sheetHandle: {
+          alignSelf: 'center',
+          width: 38,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
+          marginBottom: 8,
+        },
+        sheetRow: {paddingVertical: 14, paddingHorizontal: 16},
+        sheetLabel: {fontSize: 16, color: colors.text},
+        sheetLabelDestructive: {color: colors.error},
+        sheetTitle: {
+          fontSize: 15,
+          fontWeight: '700',
+          color: colors.text,
+          paddingHorizontal: 16,
+          paddingBottom: 8,
+        },
+        sheetLoading: {marginVertical: 20},
+        sheetEmpty: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          paddingHorizontal: 16,
+          paddingVertical: 18,
+          textAlign: 'center',
+        },
+        reactorRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 9,
+          paddingHorizontal: 16,
+        },
+        reactorName: {flex: 1, fontSize: 15, color: colors.text},
+        reactorEmoji: {fontSize: 18},
+        // ── Image attachments ──
+        // The photo is its own block with no bubble behind it, so nothing
+        // frames or overlaps it; the caption is a separate bubble sitting
+        // below, matched to the photo's width.
+        imageStack: {gap: 4},
+        imageBubble: {
+          borderRadius: 16,
+          overflow: 'hidden',
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.06)'
+            : 'rgba(0,0,0,0.05)',
+        },
+        captionBubble: {alignSelf: 'stretch'},
         viewerBackdrop: {
           flex: 1,
           backgroundColor: 'rgba(0,0,0,0.94)',
@@ -889,108 +1140,58 @@ const GroupChat: React.FC<GroupChatProps> = ({
           justifyContent: 'center',
           backgroundColor: 'rgba(255,255,255,0.15)',
         },
-        // ── Android long-press sheet ──
-        sheetBackdrop: {
-          flex: 1,
-          backgroundColor: '#00000066',
-          justifyContent: 'flex-end',
-        },
-        sheet: {
+        // ── Request bar ──
+        requestBar: {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
           backgroundColor: colors.card,
-          borderTopLeftRadius: 18,
-          borderTopRightRadius: 18,
-          paddingTop: 8,
-          paddingBottom: 24,
-        },
-        sheetHandle: {
-          alignSelf: 'center',
-          width: 36,
-          height: 4,
-          borderRadius: 2,
-          backgroundColor: colors.border,
-          marginBottom: 6,
-        },
-        sheetRow: {paddingVertical: 15, paddingHorizontal: 22},
-        sheetLabel: {fontSize: 16, color: colors.text, fontWeight: '600'},
-        sheetLabelDestructive: {color: '#E5484D'},
-        sheetTitle: {
-          fontSize: 15,
-          fontWeight: '700',
-          color: colors.text,
-          paddingHorizontal: 22,
-          paddingTop: 6,
+          paddingHorizontal: 16,
+          paddingTop: 12,
           paddingBottom: 10,
         },
-        sheetLoading: {paddingVertical: 22},
-        sheetEmpty: {
-          fontSize: 14,
+        requestText: {
+          fontSize: 13,
           color: colors.secondaryText,
-          paddingHorizontal: 22,
-          paddingVertical: 18,
-        },
-        reactorRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-          paddingHorizontal: 22,
-          paddingVertical: 9,
-        },
-        reactorName: {
-          flex: 1,
-          fontSize: 15,
-          color: colors.text,
-          fontWeight: '600',
-        },
-        reactorEmoji: {fontSize: 18},
-        metaMine: {
-          fontSize: 10,
-          color: colors.secondaryText,
-          alignSelf: 'flex-end',
-          marginTop: 3,
-          marginRight: 4,
-        },
-        metaTheirs: {
-          fontSize: 10,
-          color: colors.secondaryText,
-          alignSelf: 'flex-start',
-          marginTop: 3,
-          marginLeft: 4,
-        },
-        // ── System messages ──
-        systemWrap: {alignItems: 'center', marginVertical: 10},
-        systemText: {
-          fontSize: 12,
-          color: colors.secondaryText,
+          lineHeight: 19,
+          marginBottom: 10,
           textAlign: 'center',
-          marginBottom: 6,
-          fontWeight: '600',
         },
-        eventCard: {
-          flexDirection: 'row',
+        requestActions: {flexDirection: 'row', gap: 10},
+        requestBtn: {
+          flex: 1,
+          borderRadius: 20,
+          paddingVertical: 10,
           alignItems: 'center',
-          gap: 10,
-          backgroundColor: colors.card,
+        },
+        requestAccept: {backgroundColor: colors.primary},
+        requestAcceptText: {
+          color: '#FFFFFF',
+          fontSize: 14,
+          fontWeight: '700',
+        },
+        requestDecline: {
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          borderRadius: 12,
-          paddingVertical: 10,
-          paddingHorizontal: 12,
-          maxWidth: '90%',
         },
-        eventIcon: {
-          width: 34,
-          height: 34,
-          borderRadius: 17,
-          backgroundColor: colors.primary + '18',
-          alignItems: 'center',
-          justifyContent: 'center',
+        requestDeclineText: {
+          color: colors.secondaryText,
+          fontSize: 14,
+          fontWeight: '700',
         },
-        eventBody: {flexShrink: 1},
-        eventName: {fontSize: 14, fontWeight: '700', color: colors.text},
-        eventDate: {fontSize: 12, color: colors.secondaryText, marginTop: 1},
+        closedNotice: {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          backgroundColor: colors.card,
+          paddingHorizontal: 24,
+          paddingVertical: 16,
+        },
+        closedText: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          textAlign: 'center',
+          lineHeight: 19,
+        },
         // ── Composer ──
-        // The border and background live on the wrapper so a staged photo
-        // reads as part of the composer rather than floating above it.
         composerWrap: {
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
@@ -1066,76 +1267,24 @@ const GroupChat: React.FC<GroupChatProps> = ({
     [colors, darkMode],
   );
 
-  const renderItem = ({item}: {item: GroupMessage}) => {
-    if (item.kind === 'system') {
-      return (
-        <View style={styles.systemWrap}>
-          <Text style={styles.systemText}>{item.text}</Text>
-          {item.eventRef?.eventId ? (
-            <TouchableOpacity
-              style={styles.eventCard}
-              activeOpacity={0.8}
-              onPress={() => openEvent(item.eventRef!.eventId)}>
-              <View style={styles.eventIcon}>
-                <FontAwesomeIcon
-                  icon={faCalendarDay}
-                  size={15}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.eventBody}>
-                <Text style={styles.eventName} numberOfLines={1}>
-                  {item.eventRef.eventName ||
-                    t('groupChat.viewEvent') ||
-                    'View event'}
-                </Text>
-                {item.eventRef.eventDate ? (
-                  <Text style={styles.eventDate}>
-                    {item.eventRef.eventDate}
-                  </Text>
-                ) : null}
-              </View>
-              <FontAwesomeIcon
-                icon={faChevronRight}
-                size={13}
-                color={colors.secondaryText}
-              />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      );
-    }
-
-    const isMine = item.userId === currentUserId;
+  const renderItem = ({item}: {item: DirectMessage}) => {
+    const isMine = item.senderId === currentUserId;
     const isDeleted = !!item.deletedAt;
-    // The server strips content from blocked senders' messages but keeps
-    // the row, so the thread doesn't develop unexplained gaps where
-    // replies point at nothing.
-    const isBlocked = !!item.blocked;
     const pills = summarizeReactions(item.reactions, currentUserId);
 
-    // The bubble's interior: an image, text, or an image with a caption.
-    const body = isBlocked ? (
-      <View style={styles.bubbleDeleted}>
-        <Text style={styles.bubbleTextDeleted}>
-          {t('moderation.blockedMessage')}
-        </Text>
-      </View>
-    ) : isDeleted ? (
+    const body = isDeleted ? (
       <View style={styles.bubbleDeleted}>
         <Text style={styles.bubbleTextDeleted}>
           {t('groupChat.messageDeleted') || 'This message was deleted'}
         </Text>
       </View>
     ) : item.imageUrl ? (
-      // Photo and caption are separate stacked blocks, so the caption
-      // reads as sitting under a complete photo rather than covering the
-      // bottom of one.
       <View style={styles.imageStack}>
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => setViewerImage(item.imageUrl as string)}
-          onLongPress={() => openMessageActions(item)}>
+          onLongPress={() => openMessageActions(item)}
+          delayLongPress={300}>
           <Image
             source={{uri: item.imageUrl}}
             style={[
@@ -1228,13 +1377,12 @@ const GroupChat: React.FC<GroupChatProps> = ({
             />
           ) : (
             <Text style={styles.avatarInitials}>
-              {(item.username || '?').slice(0, 2).toUpperCase()}
+              {(item.username || headerName || '?').slice(0, 2).toUpperCase()}
             </Text>
           )}
         </View>
         <View style={styles.bubbleWrap}>
           {highlight}
-          <Text style={styles.senderName}>{item.username || 'Member'}</Text>
           <Pressable
             onLongPress={() => openMessageActions(item)}
             delayLongPress={300}>
@@ -1247,124 +1395,209 @@ const GroupChat: React.FC<GroupChatProps> = ({
     );
   };
 
+  const header = (
+    <View style={styles.header}>
+      <TouchableOpacity
+        style={styles.backBtn}
+        onPress={() => navigation.goBack()}
+        accessibilityLabel={t('common.back') || 'Back'}>
+        <FontAwesomeIcon icon={faChevronLeft} size={18} color={colors.text} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.headerUser}
+        activeOpacity={0.7}
+        onPress={openProfile}>
+        <View style={styles.headerAvatar}>
+          {headerAvatar ? (
+            <Image
+              source={{uri: headerAvatar}}
+              style={styles.headerAvatarImage}
+            />
+          ) : (
+            <Text style={styles.headerInitials}>
+              {(headerName || '?').slice(0, 2).toUpperCase()}
+            </Text>
+          )}
+        </View>
+        <Text style={styles.headerName} numberOfLines={1}>
+          {headerName}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   if (loading) {
     return (
-      <View style={styles.loadingWrap}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        {header}
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.flex, {paddingBottom: bottomInset}]}>
-      <FlatList
-        ref={listRef}
-        style={styles.flex}
-        data={messages}
-        inverted={messages.length > 0}
-        keyExtractor={m => m._id}
-        renderItem={renderItem}
-        // Rows are variable height, so a far-off index may not be measured
-        // yet. Nudge the list toward it and retry once it has been.
-        onScrollToIndexFailed={info => {
-          listRef.current?.scrollToOffset({
-            offset: info.averageItemLength * info.index,
-            animated: true,
-          });
-          setTimeout(() => {
-            if (messages.length > info.index) {
-              listRef.current?.scrollToIndex({
-                index: info.index,
-                animated: true,
-                viewPosition: 0.5,
-              });
-            }
-          }, 350);
-        }}
-        contentContainerStyle={
-          messages.length === 0 ? styles.flex : styles.listContent
-        }
-        onEndReached={loadOlder}
-        onEndReachedThreshold={0.3}
-        ListFooterComponent={
-          loadingMore ? (
-            <ActivityIndicator
-              size="small"
-              color={colors.primary}
-              style={{marginVertical: 12}}
-            />
-          ) : null
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyTitle}>
-              {t('groupChat.emptyTitle') || 'No messages yet'}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {t('groupChat.emptySubtitle') ||
-                'Say hi, share a plan, or lock in the next meetup.'}
-            </Text>
-          </View>
-        }
-      />
-      <View style={styles.composerWrap}>
-        {pendingImage ? (
-          <View style={styles.pendingRow}>
-            <View>
-              <Image
-                source={{uri: pendingImage.uri}}
-                style={styles.pendingImage}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={[styles.flex, {paddingBottom: bottomInset}]}>
+        {header}
+        <FlatList
+          ref={listRef}
+          style={styles.flex}
+          data={messages}
+          inverted={messages.length > 0}
+          keyExtractor={m => m._id}
+          renderItem={renderItem}
+          // Rows are variable height, so a far-off index may not be
+          // measured yet. Nudge the list toward it and retry once it has.
+          onScrollToIndexFailed={info => {
+            listRef.current?.scrollToOffset({
+              offset: info.averageItemLength * info.index,
+              animated: true,
+            });
+            setTimeout(() => {
+              if (messages.length > info.index) {
+                listRef.current?.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                  viewPosition: 0.5,
+                });
+              }
+            }, 350);
+          }}
+          contentContainerStyle={
+            messages.length === 0 ? styles.flex : styles.listContent
+          }
+          onEndReached={loadOlder}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.primary}
+                style={{marginVertical: 12}}
               />
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyTitle}>
+                {t('messages.threadEmptyTitle') || 'No messages yet'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {t('messages.threadEmptySubtitle') ||
+                  'Say hi and get something on the calendar.'}
+              </Text>
+            </View>
+          }
+        />
+
+        {conversation?.isIncomingRequest ? (
+          <View style={styles.requestBar}>
+            <Text style={styles.requestText}>
+              {t('messages.requestPrompt') ||
+                "You aren't connected yet. Accept to let them message you."}
+            </Text>
+            <View style={styles.requestActions}>
               <TouchableOpacity
-                style={styles.pendingRemove}
-                onPress={() => setPendingImage(null)}
-                disabled={sending}
-                accessibilityLabel={t('common.cancel') || 'Cancel'}>
-                <FontAwesomeIcon icon={faXmark} size={10} color="#FFFFFF" />
+                style={[styles.requestBtn, styles.requestDecline]}
+                activeOpacity={0.8}
+                disabled={deciding}
+                onPress={handleDecline}>
+                <Text style={styles.requestDeclineText}>
+                  {t('messages.decline') || 'Decline'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.requestBtn, styles.requestAccept]}
+                activeOpacity={0.85}
+                disabled={deciding}
+                onPress={handleAccept}>
+                <Text style={styles.requestAcceptText}>
+                  {t('messages.accept') || 'Accept'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
         ) : null}
-        <View style={styles.composer}>
-          <TouchableOpacity
-            style={[styles.attachBtn, sending && styles.sendBtnDisabled]}
-            onPress={handlePickImage}
-            disabled={sending}
-            accessibilityLabel={t('groupChat.attachPhoto') || 'Attach photo'}>
-            <FontAwesomeIcon
-              icon={faImage}
-              size={17}
-              color={colors.secondaryText}
-            />
-          </TouchableOpacity>
-          <TextInput
-            style={styles.textInput}
-            value={input}
-            onChangeText={setInput}
-            placeholder={
-              pendingImage
-                ? t('groupChat.caption') || 'Add a caption'
-                : t('groupChat.placeholder') || 'Message the group'
-            }
-            placeholderTextColor={colors.secondaryText}
-            multiline
-            maxLength={2000}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              ((!input.trim() && !pendingImage) || sending) &&
-                styles.sendBtnDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={(!input.trim() && !pendingImage) || sending}>
-            {sending ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <FontAwesomeIcon icon={faPaperPlane} size={16} color="#FFFFFF" />
-            )}
-          </TouchableOpacity>
-        </View>
+
+        {composerClosed || loadFailed ? (
+          <View style={styles.closedNotice}>
+            <Text style={styles.closedText}>
+              {composerClosed
+                ? t('messages.closedNotice') ||
+                  'This person is no longer accepting messages.'
+                : t('messages.threadUnavailable') ||
+                  "This conversation couldn't be loaded."}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.composerWrap}>
+            {pendingImage ? (
+              <View style={styles.pendingRow}>
+                <View>
+                  <Image
+                    source={{uri: pendingImage.uri}}
+                    style={styles.pendingImage}
+                  />
+                  <TouchableOpacity
+                    style={styles.pendingRemove}
+                    onPress={() => setPendingImage(null)}
+                    disabled={sending}
+                    accessibilityLabel={t('common.cancel') || 'Cancel'}>
+                    <FontAwesomeIcon icon={faXmark} size={10} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+            <View style={styles.composer}>
+              <TouchableOpacity
+                style={[styles.attachBtn, sending && styles.sendBtnDisabled]}
+                onPress={handlePickImage}
+                disabled={sending}
+                accessibilityLabel={
+                  t('groupChat.attachPhoto') || 'Attach photo'
+                }>
+                <FontAwesomeIcon
+                  icon={faImage}
+                  size={17}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.textInput}
+                value={input}
+                onChangeText={setInput}
+                placeholder={
+                  pendingImage
+                    ? t('groupChat.caption') || 'Add a caption'
+                    : t('messages.placeholder') || 'Message'
+                }
+                placeholderTextColor={colors.secondaryText}
+                multiline
+                maxLength={2000}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn,
+                  ((!input.trim() && !pendingImage) || sending) &&
+                    styles.sendBtnDisabled,
+                ]}
+                onPress={handleSend}
+                disabled={(!input.trim() && !pendingImage) || sending}>
+                {sending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <FontAwesomeIcon
+                    icon={faPaperPlane}
+                    size={16}
+                    color="#FFFFFF"
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
 
       <EmojiPicker
@@ -1483,7 +1716,7 @@ const GroupChat: React.FC<GroupChatProps> = ({
                     )}
                   </View>
                   <Text style={styles.reactorName} numberOfLines={1}>
-                    {reactor.name || reactor.username || 'Member'}
+                    {reactor.name || reactor.username || 'Someone'}
                   </Text>
                   <Text style={styles.reactorEmoji}>{reactor.emoji}</Text>
                 </TouchableOpacity>
@@ -1502,9 +1735,7 @@ const GroupChat: React.FC<GroupChatProps> = ({
         transparent
         animationType="fade"
         onRequestClose={() => setViewerImage(null)}>
-        <Pressable
-          style={styles.viewerBackdrop}
-          onPress={() => setViewerImage(null)}>
+        <View style={styles.viewerBackdrop}>
           {viewerImage ? (
             <Image
               source={{uri: viewerImage}}
@@ -1514,22 +1745,23 @@ const GroupChat: React.FC<GroupChatProps> = ({
           ) : null}
           <TouchableOpacity
             style={styles.viewerClose}
-            onPress={() => setViewerImage(null)}>
+            onPress={() => setViewerImage(null)}
+            accessibilityLabel={t('common.close') || 'Close'}>
             <FontAwesomeIcon icon={faXmark} size={18} color="#FFFFFF" />
           </TouchableOpacity>
-        </Pressable>
+        </View>
       </Modal>
 
       <ReportSheet
         visible={reportTarget !== null}
         onClose={() => setReportTarget(null)}
-        reportedUserId={reportTarget?.userId || ''}
-        username={reportTarget?.username}
-        target="group_message"
+        reportedUserId={reportTarget?.senderId || ''}
+        username={conversation?.otherUser.username}
+        target="direct_message"
         contentId={reportTarget?._id}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
-export default GroupChat;
+export default DmThread;

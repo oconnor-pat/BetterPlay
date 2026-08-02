@@ -80,6 +80,9 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   groupEvents: true,
   groupMessages: true,
   groupReactions: true,
+  directMessages: true,
+  messageRequests: true,
+  dmReactions: true,
 };
 
 /**
@@ -256,9 +259,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       refreshBadgeCount();
     });
 
-    const unsubBadge = subscribe('notification:badge', (data: {count: number}) => {
-      setBadgeCount(data.count);
-    });
+    const unsubBadge = subscribe(
+      'notification:badge',
+      (data: {count: number}) => {
+        setBadgeCount(data.count);
+      },
+    );
 
     // Fallback: refresh badge when app returns to foreground
     const subscription = AppState.addEventListener('change', nextState => {

@@ -19,6 +19,7 @@ import {
   TermsOfService,
   YourData,
 } from './src/components/LegalDocument';
+import AdminReports from './src/components/Moderation/AdminReports';
 import {StatusBar, ActivityIndicator, View, StyleSheet} from 'react-native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import UserContext from './src/components/UserContext';
@@ -63,6 +64,7 @@ type RootStackParamList = {
   PrivacyPolicy: undefined;
   TermsOfService: undefined;
   YourData: undefined;
+  AdminReports: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -440,6 +442,14 @@ const AppContent = () => {
                   <Stack.Screen
                     name="YourData"
                     component={YourData}
+                    options={{headerShown: false}}
+                  />
+                  {/* Registered unconditionally; the screen itself checks
+                      isAdmin, and the only route to it is a Settings row
+                      that admins alone can see. */}
+                  <Stack.Screen
+                    name="AdminReports"
+                    component={AdminReports}
                     options={{headerShown: false}}
                   />
                 </Stack.Navigator>

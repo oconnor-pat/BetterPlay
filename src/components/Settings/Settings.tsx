@@ -22,6 +22,8 @@ import {
   faSun,
   faLocationDot,
   faBell,
+  faUserSlash,
+  faShieldHalved,
   faGlobe,
   faCircleInfo,
   faChevronRight,
@@ -49,6 +51,7 @@ import {
 import UserContext, {UserContextType} from '../UserContext';
 import {version as appVersion} from '../../../package.json';
 import NotificationSettings from './NotificationSettings';
+import BlockedAndDeclined from './BlockedAndDeclined';
 
 interface Language {
   code: string;
@@ -104,7 +107,7 @@ const VISIBILITY_OPTIONS: {
 const Settings: React.FC = () => {
   const {t, i18n} = useTranslation();
   const {darkMode, themeMode, setThemeMode, colors} = useTheme();
-  const {setUserData} = useContext(UserContext) as UserContextType;
+  const {setUserData, isAdmin} = useContext(UserContext) as UserContextType;
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -122,6 +125,7 @@ const Settings: React.FC = () => {
     notificationSettingsModalVisible,
     setNotificationSettingsModalVisible,
   ] = useState(false);
+  const [blockedModalVisible, setBlockedModalVisible] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [defaultMapApp, setDefaultMapAppState] = useState<MapAppName | null>(
@@ -929,8 +933,7 @@ const Settings: React.FC = () => {
                 <Text
                   style={[
                     themedStyles.themeOptionText,
-                    themeMode === 'light' &&
-                      themedStyles.themeOptionTextActive,
+                    themeMode === 'light' && themedStyles.themeOptionTextActive,
                   ]}>
                   {t('settings.light')}
                 </Text>
@@ -946,9 +949,7 @@ const Settings: React.FC = () => {
                   icon={faMoon}
                   size={12}
                   color={
-                    themeMode === 'dark'
-                      ? colors.primary
-                      : colors.secondaryText
+                    themeMode === 'dark' ? colors.primary : colors.secondaryText
                   }
                 />
                 <Text
@@ -1082,6 +1083,64 @@ const Settings: React.FC = () => {
                 />
               </View>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={themedStyles.settingRow}
+              onPress={() => setBlockedModalVisible(true)}
+              activeOpacity={0.7}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={faUserSlash}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('moderation.blockedAndDeclined')}
+                </Text>
+                <Text style={themedStyles.settingDescription}>
+                  {t('moderation.blockedAndDeclinedDescription')}
+                </Text>
+              </View>
+              <View style={themedStyles.settingAction}>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </View>
+            </TouchableOpacity>
+
+            {isAdmin && (
+              <TouchableOpacity
+                style={themedStyles.settingRow}
+                onPress={() => navigation.navigate('AdminReports' as never)}
+                activeOpacity={0.7}>
+                <View style={themedStyles.iconContainer}>
+                  <FontAwesomeIcon
+                    icon={faShieldHalved}
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={themedStyles.settingContent}>
+                  <Text style={themedStyles.settingTitle}>
+                    {t('moderation.reportsQueue')}
+                  </Text>
+                  <Text style={themedStyles.settingDescription}>
+                    {t('moderation.reportsQueueDescription')}
+                  </Text>
+                </View>
+                <View style={themedStyles.settingAction}>
+                  <FontAwesomeIcon
+                    icon={faChevronRight}
+                    size={13}
+                    color={colors.secondaryText}
+                  />
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -1467,6 +1526,43 @@ const Settings: React.FC = () => {
               <NotificationSettings
                 onClose={() => setNotificationSettingsModalVisible(false)}
               />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Blocked & Declined Modal */}
+      <Modal
+        visible={blockedModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBlockedModalVisible(false)}>
+        <View style={themedStyles.modalOverlay}>
+          <TouchableOpacity
+            style={themedStyles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setBlockedModalVisible(false)}
+          />
+          <View style={themedStyles.modalContent}>
+            <View style={themedStyles.modalHandle} />
+            <View style={themedStyles.modalHeader}>
+              <Text style={themedStyles.modalTitle}>
+                {t('moderation.blockedAndDeclined')}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.modalCloseButton}
+                onPress={() => setBlockedModalVisible(false)}>
+                <FontAwesomeIcon icon={faXmark} size={18} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={true}
+              bounces={true}
+              contentContainerStyle={themedStyles.modalScrollContent}>
+              {/* Mounted only while open so the lists refetch on each
+                  visit — unblocking elsewhere shouldn't leave a stale row
+                  sitting here. */}
+              {blockedModalVisible && <BlockedAndDeclined />}
             </ScrollView>
           </View>
         </View>

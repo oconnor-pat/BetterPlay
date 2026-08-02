@@ -69,6 +69,9 @@ export interface AppNotification {
     | 'group_ownership_transferred'
     | 'group_message'
     | 'group_reaction'
+    | 'direct_message'
+    | 'message_request'
+    | 'direct_message_reaction'
     | 'general';
   title: string;
   body: string;
@@ -82,6 +85,9 @@ export interface AppNotification {
     groupId?: string;
     groupName?: string;
     messageId?: string;
+    conversationId?: string;
+    senderId?: string;
+    senderName?: string;
     profilePicUrl?: string;
     [key: string]: string | undefined;
   };
@@ -366,6 +372,25 @@ const Notifications: React.FC = () => {
           });
         }
         break;
+      // A message, a request to start one, or a reaction to one. All open
+      // the thread; the request's Accept/Decline bar is shown there above
+      // the composer, and a reaction flashes the message it landed on.
+      case 'direct_message':
+      case 'message_request':
+      case 'direct_message_reaction':
+        if (notification.data?.conversationId) {
+          navigation.navigate('Messages', {
+            screen: 'DmThread',
+            params: {
+              conversationId: notification.data.conversationId,
+              highlightMessageId: notification.data.messageId,
+              highlightNonce: Date.now(),
+            },
+          });
+        } else {
+          navigation.navigate('Messages', {screen: 'MessagesList'});
+        }
+        break;
       case 'group_added':
       case 'group_admin_promoted':
       case 'group_ownership_transferred':
@@ -438,6 +463,9 @@ const Notifications: React.FC = () => {
         return faCheck;
       case 'group_message':
       case 'group_reaction':
+      case 'direct_message':
+      case 'message_request':
+      case 'direct_message_reaction':
         return faComments;
       case 'group_event_created':
         return faCalendarPlus;
@@ -482,6 +510,9 @@ const Notifications: React.FC = () => {
       case 'event_join_approved':
       case 'group_message':
       case 'group_reaction':
+      case 'direct_message':
+      case 'message_request':
+      case 'direct_message_reaction':
       case 'group_event_created':
       case 'group_added':
       case 'group_admin_promoted':

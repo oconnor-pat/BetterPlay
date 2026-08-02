@@ -56,6 +56,12 @@ export interface NotificationSettings {
   groupEvents: boolean;
   groupMessages: boolean;
   groupReactions: boolean;
+  // Direct messages, split so the one ping a stranger can trigger (a
+  // message request) can be muted separately from ordinary conversation.
+  directMessages: boolean;
+  messageRequests: boolean;
+  // Reactions on your own DMs — the counterpart to groupReactions.
+  dmReactions: boolean;
 }
 
 export type NotificationNavigationCallback = (
@@ -80,6 +86,9 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   groupEvents: true,
   groupMessages: true,
   groupReactions: true,
+  directMessages: true,
+  messageRequests: true,
+  dmReactions: true,
 };
 
 class NotificationService {
@@ -535,13 +544,14 @@ class NotificationService {
   /**
    * Process notification data and navigate accordingly
    * Navigation uses nested structure:
-   *   RootStack -> BottomNavigator -> Tab (Events|Groups|Profile) -> Screen
+   *   RootStack -> BottomNavigator -> Tab (Events|Groups|Messages|Profile) -> Screen
    *
    * Actual Navigator Structure:
    * - RootStack: LandingPage, BottomNavigator, Settings, ResetPassword, ...
-   *   - Tab.Navigator (inside BottomNavigator): Events, Groups, Profile
+   *   - Tab.Navigator (inside BottomNavigator): Events, Groups, Messages, Profile
    *     - Events (LocalEventsStack): EventList, EventRoster, PublicProfile, UserSearch, Notifications, VenueList, VenuePlaceDetail, VenueWebView
    *     - Groups (GroupsStack): GroupsList, GroupDetail
+   *     - Messages (MessagesStack): MessagesList, DmThread, UserSearch, PublicProfile
    *     - Profile (ProfileStack): ProfileMain, UserSearch, PublicProfile, FriendsList, FriendRequests, Notifications, GroupDetail
    */
   private handleNotificationData(data: Record<string, string>): void {
@@ -560,6 +570,7 @@ class NotificationService {
       eventId,
       groupId,
       messageId,
+      conversationId,
       userId,
       accepterId,
       changedFields,
@@ -655,6 +666,26 @@ class NotificationService {
           });
         } else {
           navigateToTab('Groups', 'GroupsList');
+        }
+        break;
+
+      // A direct message, or a request to start one -> open the thread.
+      // A request lands on the same screen, where the Accept/Decline bar
+      // is shown above the composer.
+      case 'direct_message':
+      case 'message_request':
+      case 'direct_message_reaction':
+        if (conversationId) {
+          navigateToTab('Messages', 'DmThread', {
+            conversationId,
+            // Present on reaction notifications: scrolls the thread to the
+            // message that was reacted to and flashes it.
+            highlightMessageId: messageId,
+            // Forces a re-highlight when the thread is already open.
+            highlightNonce: Date.now(),
+          });
+        } else {
+          navigateToTab('Messages', 'MessagesList');
         }
         break;
 
@@ -789,6 +820,9 @@ class NotificationService {
         groupEvents: settings.groupEvents,
         groupMessages: settings.groupMessages,
         groupReactions: settings.groupReactions,
+        directMessages: settings.directMessages,
+        messageRequests: settings.messageRequests,
+        dmReactions: settings.dmReactions,
       };
 
       await fetch(`${API_BASE_URL}/api/notifications/preferences`, {
