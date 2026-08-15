@@ -623,12 +623,9 @@ const dateFilterOptions = [
   {label: 'This Month', value: 'thisMonth'},
 ];
 
-// App Store Links - Update these with your actual app store URLs when published
-const APP_STORE_LINKS = {
-  ios: 'https://apps.apple.com/app/betterplay/id000000000', // Replace with your iOS App Store link
-  android: 'https://play.google.com/store/apps/details?id=com.betterplay', // Replace with your Google Play link
-  fallback: 'https://betterplay.app', // Replace with your website/landing page
-};
+// Public landing / install bridge while App Store & Play aren't live yet.
+// Event shares use https://joinbetterplay.com/?e=<id>&name=<title>
+const SHARE_LANDING_BASE = 'https://joinbetterplay.com';
 
 const getEventTypeEmoji = (eventType: string) => {
   const found = activityOptions.find(
@@ -4456,8 +4453,9 @@ const EventList: React.FC = () => {
       event.totalSpots > 0
         ? event.totalSpots - event.rosterSpotsFilled
         : null;
-    const appLink =
-      Platform.OS === 'ios' ? APP_STORE_LINKS.ios : APP_STORE_LINKS.android;
+    const landingUrl =
+      `${SHARE_LANDING_BASE}/?e=${encodeURIComponent(event._id)}` +
+      `&name=${encodeURIComponent(event.name)}`;
 
     const shareMessage =
       `${emoji} Join me for ${event.name}!\n\n` +
@@ -4469,11 +4467,12 @@ const EventList: React.FC = () => {
         : `👥 ${spotsAvailable} spot${
             spotsAvailable !== 1 ? 's' : ''
           } available\n\n`) +
-      `Download BetterPlay to join:\n${appLink}`;
+      `Get BetterPlay and open the invite:\n${landingUrl}`;
 
     try {
       const result = await Share.share({
         message: shareMessage,
+        url: Platform.OS === 'ios' ? landingUrl : undefined,
         title: `Join ${event.name} on BetterPlay`,
       });
 

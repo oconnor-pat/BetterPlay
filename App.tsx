@@ -71,7 +71,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 // Deep linking configuration
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: ['betterplay://'],
+  prefixes: ['betterplay://', 'https://joinbetterplay.com'],
   config: {
     screens: {
       ResetPassword: {
@@ -81,7 +81,22 @@ const linking: LinkingOptions<RootStackParamList> = {
         },
       },
       LandingPage: 'login',
-      BottomNavigator: 'home',
+      BottomNavigator: {
+        path: '',
+        screens: {
+          Events: {
+            screens: {
+              EventList: 'home',
+              EventRoster: {
+                path: 'event/:eventId',
+                parse: {
+                  eventId: (eventId: string) => eventId,
+                },
+              },
+            },
+          },
+        },
+      },
       Settings: 'settings',
     },
   },

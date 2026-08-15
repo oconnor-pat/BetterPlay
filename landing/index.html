@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BetterPlay — Find people. Make plans. Show up.</title>
+    <meta
+      name="description"
+      content="BetterPlay helps you organize pickup games, hangouts, and group plans. Join the beta on iOS or Android."
+    />
+    <meta property="og:title" content="BetterPlay" />
+    <meta
+      property="og:description"
+      content="Find people. Make plans. Show up. Join the beta."
+    />
+    <meta property="og:url" content="https://joinbetterplay.com/" />
+    <meta name="theme-color" content="#0B1F14" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,700&family=Manrope:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!--
+      EDIT THESE LINKS before (or right after) you deploy.
+      - testFlightUrl: App Store Connect → TestFlight → Public Link
+      - firebaseUrl: Firebase Console → App Distribution → invite / tester link
+      Leave a link empty to hide that button.
+    -->
+    <script>
+      window.BETTERPLAY_LINKS = {
+        testFlightUrl: "", // e.g. https://testflight.apple.com/join/XXXXXXXX
+        firebaseUrl: "", // e.g. https://appdistribution.firebase.google.com/...
+        // Optional: your own email if you still add testers manually
+        testerEmail: "hello@joinbetterplay.com",
+      };
+    </script>
+
+    <div class="atmosphere" aria-hidden="true">
+      <div class="glow glow-a"></div>
+      <div class="glow glow-b"></div>
+      <div class="grain"></div>
+    </div>
+
+    <header class="top">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">BP</span>
+        <span class="brand-name">BetterPlay</span>
+      </a>
+      <a class="top-link" href="#get-the-app">Get the app</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow" id="eyebrow">Beta is open</p>
+        <h1>Find people.<br />Make plans.<br />Show up.</h1>
+        <p class="lede" id="lede">
+          Pickup games, hangouts, and group plans — organized in one place.
+          Join the beta and help shape BetterPlay.
+        </p>
+
+        <div class="cta-row" id="cta-row">
+          <a
+            class="btn btn-primary"
+            id="btn-ios"
+            href="#get-the-app"
+            data-platform="ios"
+          >
+            Get on iOS
+          </a>
+          <a
+            class="btn btn-secondary"
+            id="btn-android"
+            href="#get-the-app"
+            data-platform="android"
+          >
+            Get on Android
+          </a>
+        </div>
+
+        <p class="fine" id="event-hint" hidden></p>
+        <a class="open-app" id="open-app" hidden href="#">Open this event in the app</a>
+      </section>
+
+      <section class="strip" aria-label="What you can do">
+        <div class="strip-item">
+          <strong>Plan</strong>
+          <span>Create events, invite friends, set a place or go virtual.</span>
+        </div>
+        <div class="strip-item">
+          <strong>Rally</strong>
+          <span>RSVP, chat, and keep the group in sync.</span>
+        </div>
+        <div class="strip-item">
+          <strong>Play</strong>
+          <span>Show up knowing who’s coming — then do it again.</span>
+        </div>
+      </section>
+
+      <section class="get" id="get-the-app">
+        <h2>Get the beta</h2>
+        <p class="get-lede">
+          We’re still on TestFlight (iOS) and Firebase App Distribution
+          (Android). Pick your phone — it takes about a minute.
+        </p>
+
+        <div class="platforms">
+          <article class="platform" id="panel-ios">
+            <h3>iPhone</h3>
+            <ol>
+              <li>Install <strong>TestFlight</strong> from the App Store.</li>
+              <li>Tap the button below to join the BetterPlay beta.</li>
+              <li>Open BetterPlay from TestFlight when it’s ready.</li>
+            </ol>
+            <a class="btn btn-primary" id="link-ios" href="#">Join on TestFlight</a>
+            <p class="platform-note" id="note-ios" hidden>
+              Public TestFlight link isn’t set yet. Email
+              <a id="mail-ios" href="mailto:hello@joinbetterplay.com"
+                >hello@joinbetterplay.com</a
+              >
+              with your Apple ID email to get an invite.
+            </p>
+          </article>
+
+          <article class="platform" id="panel-android">
+            <h3>Android</h3>
+            <ol>
+              <li>Tap the button below to open Firebase App Distribution.</li>
+              <li>Accept the invite with the Google account on your phone.</li>
+              <li>Download and install the BetterPlay build.</li>
+            </ol>
+            <a class="btn btn-primary" id="link-android" href="#"
+              >Join on Firebase</a
+            >
+            <p class="platform-note" id="note-android" hidden>
+              Firebase invite link isn’t set yet. Email
+              <a id="mail-android" href="mailto:hello@joinbetterplay.com"
+                >hello@joinbetterplay.com</a
+              >
+              with your Google account email to get an invite.
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>© <span id="year"></span> BetterPlay</span>
+      <span class="footer-sep">·</span>
+      <a href="mailto:hello@joinbetterplay.com">Contact</a>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
