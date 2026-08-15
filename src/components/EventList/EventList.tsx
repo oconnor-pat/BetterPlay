@@ -63,6 +63,7 @@ import {
   faShareAlt,
   faLocationArrow,
   faComments,
+  faComment,
   faGlobe,
   faLock,
   faEnvelope,
@@ -104,6 +105,7 @@ import locationService, {Coordinates} from '../../services/LocationService';
 import {
   formatEventTimeRange,
   getEventDateTime,
+  isEventActive,
   isEventPast,
   parseEventDateLocal,
 } from '../../utils/eventDateTime';
@@ -136,7 +138,7 @@ export type RootStackParamList = {
     | {
         highlightEventId?: string;
         expandComments?: boolean;
-        profileFilter?: 'created' | 'joined';
+        profileFilter?: 'created' | 'joined' | 'upcoming';
         userId?: string;
         prefillEvent?: PrefillEvent;
       }
@@ -206,6 +208,7 @@ interface Event {
   reactions?: Array<{userId: string; emoji: string}>;
   latitude?: number;
   longitude?: number;
+  isVirtual?: boolean;
   jerseyColors?: string[];
   description?: string;
   privacy?: EventPrivacy;
@@ -220,6 +223,7 @@ interface Event {
   isRecurring?: boolean;
   recurrenceGroupId?: string;
   recurrenceFrequency?: RecurrenceFrequency;
+  recurrenceIndefinite?: boolean;
   waitlist?: Array<{
     userId: string;
     username: string;
@@ -302,12 +306,17 @@ const recurrenceOptions: {
 
 const recurrenceCountOptions = [2, 3, 4, 5, 6, 8, 10, 12];
 
-const DURATION_OPTIONS = [
+const DURATION_OPTIONS: {label: string; minutes: number | null}[] = [
   {label: '30m', minutes: 30},
   {label: '1h', minutes: 60},
   {label: '90m', minutes: 90},
   {label: '2h', minutes: 120},
   {label: '3h', minutes: 180},
+  {label: '4h', minutes: 240},
+  {label: '6h', minutes: 360},
+  // null = open-ended: start time only, no derived end. Matches the
+  // backend treating a missing duration as "unknown length".
+  {label: 'Open', minutes: null},
 ];
 const DEFAULT_DURATION_MINUTES = 60;
 
@@ -315,12 +324,13 @@ const createEmptyEvent = () => ({
   name: '',
   location: '',
   time: '',
-  durationMinutes: DEFAULT_DURATION_MINUTES,
+  durationMinutes: DEFAULT_DURATION_MINUTES as number | null,
   date: '',
   totalSpots: '',
   eventType: '',
   latitude: undefined as number | undefined,
   longitude: undefined as number | undefined,
+  isVirtual: false,
   jerseyColors: [] as string[],
   privacy: 'public' as EventPrivacy,
   invitedUsers: [] as string[],
@@ -329,6 +339,7 @@ const createEmptyEvent = () => ({
   isRecurring: false,
   recurrenceFrequency: 'weekly' as RecurrenceFrequency,
   recurrenceCount: 4,
+  recurrenceIndefinite: false,
   // Optional venue listing reference set by the Venues-tab bridge.
   venueId: undefined as string | undefined,
   venueName: undefined as string | undefined,
@@ -341,9 +352,44 @@ const createEmptyEvent = () => ({
   sourceUrl: undefined as string | undefined,
 });
 
-const rosterSizeOptions: string[] = Array.from({length: 30}, (_, i) =>
-  (i + 1).toString(),
-);
+// "0" is the unlimited sentinel — kept as a string so it fits the same
+// picker path as 1–30. The backend treats totalSpots === 0 as no cap.
+const rosterSizeOptions: string[] = [
+  ...Array.from({length: 30}, (_, i) => (i + 1).toString()),
+  '0',
+];
+
+const rosterSizeLabel = (value: string, noLimitLabel: string): string =>
+  value === '0' ? noLimitLabel : value;
+
+// Profile interest IDs → event activity chip labels. Only maps interests that
+// have a clear matching chip; others are skipped rather than forcing a bad filter.
+const INTEREST_TO_EVENT_TYPE: Record<string, string> = {
+  basketball: 'Basketball',
+  hockey: 'Hockey',
+  soccer: 'Soccer',
+  football: 'Football',
+  baseball: 'Baseball',
+  tennis: 'Tennis',
+  golf: 'Golf',
+  volleyball: 'Volleyball',
+  bowling: 'Bowling',
+  trivia: 'Trivia Night',
+  'game-nights': 'Game Night',
+  karaoke: 'Karaoke',
+  'live-music': 'Live Music',
+  brewery: 'Brewery Visit',
+  wine: 'Wine Tasting',
+  hiking: 'Hiking',
+  cycling: 'Cycling',
+  running: 'Running',
+  yoga: 'Yoga',
+  swimming: 'Swimming',
+  dance: 'Dancing',
+  gaming: 'Game Night',
+  'sports-bar': 'Watch Party',
+  coffee: 'Happy Hour',
+};
 
 const activityOptions = [
   // Sports
@@ -651,6 +697,9 @@ const openMapsForEvent = async (
   t: (key: string) => string,
   presentPicker?: (apps: AvailableMapApp[], onCancel: () => void) => void,
 ) => {
+  if (event?.isVirtual) {
+    return;
+  }
   const name = event?.name || 'Destination';
   const address = event?.location || '';
 
@@ -907,31 +956,32 @@ const EventList: React.FC = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          paddingTop: 16,
+          paddingTop: 4,
           backgroundColor: colors.background,
         },
         header: {
           flexDirection: 'row',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 16,
-          paddingTop: 8,
-          paddingHorizontal: 16,
+          gap: 8,
+          marginBottom: 8,
+          paddingTop: 4,
+          paddingHorizontal: 12,
           backgroundColor: colors.background,
-          zIndex: 1,
+          zIndex: 100,
         },
-        headerSide: {
+        headerSearch: {
+          flex: 1,
           flexDirection: 'row',
           alignItems: 'center',
-          width: 90,
+          minWidth: 0,
+          gap: 6,
         },
-        title: {
-          fontSize: 22,
-          fontWeight: '700',
-          color: colors.primary,
-          textAlign: 'center',
-          flex: 1,
-          letterSpacing: 0.2,
+        headerRight: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 8,
+          flexShrink: 0,
         },
         card: {
           backgroundColor: colors.card,
@@ -1003,12 +1053,12 @@ const EventList: React.FC = () => {
           marginLeft: 6,
         },
         cardBody: {
-          marginBottom: 10,
+          marginBottom: 6,
         },
         cardTitleRow: {
           flexDirection: 'row',
           alignItems: 'flex-start',
-          marginBottom: 8,
+          marginBottom: 10,
           gap: 8,
         },
         cardEventEmoji: {
@@ -1027,19 +1077,37 @@ const EventList: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 8,
-          marginTop: 4,
+          marginTop: 6,
         },
         detailText: {
           color: colors.secondaryText,
           fontSize: 13.5,
           flex: 1,
+          lineHeight: 18,
         },
         mapEmbed: {
           borderRadius: 12,
           overflow: 'hidden' as const,
-          marginBottom: 10,
+          marginTop: 4,
+          marginBottom: 4,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
+        },
+        virtualLocationBanner: {
+          borderRadius: 10,
+          marginTop: 4,
+          marginBottom: 4,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          backgroundColor: colors.inputBackground || colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        virtualLocationBannerText: {
+          color: colors.text,
+          fontSize: 13,
+          fontWeight: '600',
+          lineHeight: 18,
         },
         mapEmbedView: {
           height: 140,
@@ -1065,8 +1133,8 @@ const EventList: React.FC = () => {
         engagementRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingTop: 8,
-          paddingBottom: 4,
+          paddingTop: 6,
+          paddingBottom: 2,
           gap: 24,
         },
         engagementButton: {
@@ -1084,8 +1152,8 @@ const EventList: React.FC = () => {
           flex: 1,
         },
         rsvpContainer: {
-          paddingTop: 10,
-          paddingBottom: 2,
+          paddingTop: 8,
+          paddingBottom: 0,
         },
         rsvpButtonsRow: {
           flexDirection: 'row',
@@ -1155,6 +1223,30 @@ const EventList: React.FC = () => {
           fontSize: 12,
           fontStyle: 'italic',
         },
+        gatedActionsRow: {
+          flexDirection: 'row',
+          alignItems: 'stretch',
+          gap: 8,
+          marginTop: 10,
+        },
+        messageHostButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 7,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border || 'rgba(128,128,128,0.3)',
+          backgroundColor: colors.card,
+          flex: 1,
+        },
+        messageHostButtonText: {
+          color: colors.text,
+          fontSize: 14,
+          fontWeight: '600',
+        },
         requestButton: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -1163,7 +1255,7 @@ const EventList: React.FC = () => {
           paddingVertical: 12,
           borderRadius: 10,
           backgroundColor: colors.primary,
-          marginTop: 12,
+          flex: 1,
         },
         requestButtonPending: {
           backgroundColor: colors.card,
@@ -1398,20 +1490,16 @@ const EventList: React.FC = () => {
           elevation: 8,
           zIndex: 100,
         },
-        headerRight: {
-          justifyContent: 'flex-end',
-          gap: 14,
-        },
         bellButton: {
-          width: 38,
-          height: 38,
+          width: 34,
+          height: 34,
           alignItems: 'center',
           justifyContent: 'center',
           position: 'relative',
         },
         findPlaceButton: {
-          width: 38,
-          height: 38,
+          width: 34,
+          height: 34,
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -1654,25 +1742,27 @@ const EventList: React.FC = () => {
           alignSelf: 'flex-start',
         },
         searchContainer: {
+          flex: 1,
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: colors.inputBackground || colors.card,
-          borderRadius: 22,
-          paddingHorizontal: 12,
-          marginBottom: 16,
+          borderRadius: 18,
+          paddingHorizontal: 10,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          minHeight: 40,
+          minHeight: 36,
+          minWidth: 0,
         },
         searchInput: {
           flex: 1,
-          paddingVertical: 9,
-          paddingHorizontal: 6,
-          fontSize: 14,
+          paddingVertical: 7,
+          paddingHorizontal: 4,
+          fontSize: 13,
           color: colors.text,
+          minWidth: 0,
         },
         searchIcon: {
-          marginRight: 6,
+          marginRight: 4,
         },
         clearButton: {
           padding: 4,
@@ -1730,16 +1820,16 @@ const EventList: React.FC = () => {
           fontWeight: '700',
         },
         filterButton: {
-          width: 40,
-          height: 40,
-          borderRadius: 12,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           backgroundColor: 'transparent',
           alignItems: 'center',
           justifyContent: 'center',
-          marginLeft: 10,
           position: 'relative',
+          flexShrink: 0,
         },
         filterButtonActive: {
           borderColor: colors.primary,
@@ -2389,7 +2479,7 @@ const EventList: React.FC = () => {
           flexWrap: 'wrap',
           alignItems: 'center',
           gap: 6,
-          paddingTop: 10,
+          paddingTop: 8,
         },
         reactionPill: {
           flexDirection: 'row',
@@ -2685,6 +2775,33 @@ const EventList: React.FC = () => {
           marginBottom: 10,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
+        },
+        locationModeRow: {
+          flexDirection: 'row',
+          gap: 8,
+          marginBottom: 10,
+        },
+        locationModePill: {
+          flex: 1,
+          paddingVertical: 10,
+          borderRadius: 10,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          alignItems: 'center',
+          backgroundColor: colors.inputBackground || colors.background,
+        },
+        locationModePillSelected: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        locationModePillText: {
+          color: colors.secondaryText,
+          fontSize: 13,
+          fontWeight: '600',
+        },
+        locationModePillTextSelected: {
+          color: '#fff',
+          fontWeight: '700',
         },
         durationHeaderRow: {
           flexDirection: 'row',
@@ -3043,9 +3160,12 @@ const EventList: React.FC = () => {
   const [selectedDateFilter, setSelectedDateFilter] = useState('all');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [showMyEventsOnly, setShowMyEventsOnly] = useState(false);
+  // Opt-in: when true, activity chips default from profile interests. Persisted;
+  // defaults off so opening Events shows the full feed.
+  const [filterByInterests, setFilterByInterests] = useState(false);
   const [hidePastEvents, setHidePastEvents] = useState(true);
   const [profileFilter, setProfileFilter] = useState<
-    'created' | 'joined' | null
+    'created' | 'joined' | 'upcoming' | null
   >(null);
   const [profileFilterUserId, setProfileFilterUserId] = useState<string | null>(
     null,
@@ -3553,7 +3673,8 @@ const EventList: React.FC = () => {
     // Available spots filter
     if (showAvailableOnly) {
       filtered = filtered.filter(
-        event => event.rosterSpotsFilled < event.totalSpots,
+        event =>
+          event.totalSpots <= 0 || event.rosterSpotsFilled < event.totalSpots,
       );
     }
 
@@ -3587,6 +3708,18 @@ const EventList: React.FC = () => {
             (r: any) => r.userId === profileFilterUserId,
           ),
         );
+      } else if (profileFilter === 'upcoming') {
+        // Match Profile "Upcoming": hosting or on roster, not past.
+        filtered = filtered.filter(event => {
+          const isCreator = event.createdBy === profileFilterUserId;
+          const onRoster = (event.roster || []).some(
+            (r: any) => r.userId === profileFilterUserId,
+          );
+          return (
+            (isCreator || onRoster) &&
+            isEventActive(event.date, event.time, event.durationMinutes)
+          );
+        });
       }
     }
 
@@ -3704,10 +3837,77 @@ const EventList: React.FC = () => {
     if (route.params?.profileFilter && route.params?.userId) {
       setProfileFilter(route.params.profileFilter);
       setProfileFilterUserId(route.params.userId);
-      // Also disable hide past events to show all relevant events
-      setHidePastEvents(false);
+      // Upcoming is already active-only; other profile filters may include past.
+      if (route.params.profileFilter === 'upcoming') {
+        setHidePastEvents(true);
+      } else {
+        setHidePastEvents(false);
+      }
     }
   }, [route.params?.profileFilter, route.params?.userId]);
+
+  // One-shot load of the "match my interests" preference (defaults off).
+  useEffect(() => {
+    AsyncStorage.getItem('eventsFilterByInterests').then(value => {
+      if (value === 'true') {
+        setFilterByInterests(true);
+      }
+    });
+  }, []);
+
+  const applyInterestEventTypes = useCallback(async () => {
+    if (!myUserId) {
+      return;
+    }
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(
+        `${API_BASE_URL}/user/${myUserId}/favorite-sports`,
+        {headers: token ? {Authorization: `Bearer ${token}`} : undefined},
+      );
+      const interests: string[] = res.data?.favoriteSports || [];
+      const labels = Array.from(
+        new Set(
+          interests
+            .map(id => INTEREST_TO_EVENT_TYPE[id])
+            .filter((label): label is string => !!label)
+            .filter(label => activityOptions.some(opt => opt.label === label)),
+        ),
+      );
+      if (labels.length > 0) {
+        setSelectedEventTypes(labels);
+      }
+    } catch {
+      // Leave chips alone if interests can't be loaded.
+    }
+  }, [myUserId]);
+
+  // When the preference is on, apply interest chips once per session (or after
+  // the user turns the toggle on). Skipped when the preference is off.
+  const interestFilterAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!filterByInterests || !myUserId || interestFilterAppliedRef.current) {
+      return;
+    }
+    interestFilterAppliedRef.current = true;
+    applyInterestEventTypes();
+  }, [filterByInterests, myUserId, applyInterestEventTypes]);
+
+  const handleFilterByInterestsToggle = useCallback(async () => {
+    const next = !filterByInterests;
+    setFilterByInterests(next);
+    await AsyncStorage.setItem(
+      'eventsFilterByInterests',
+      next ? 'true' : 'false',
+    );
+    if (next) {
+      interestFilterAppliedRef.current = true;
+      await applyInterestEventTypes();
+    } else {
+      setSelectedEventTypes([]);
+      interestFilterAppliedRef.current = false;
+    }
+  }, [filterByInterests, applyInterestEventTypes]);
 
   // Open the create-event modal prefilled when a venue screen bridges in via
   // `navigate('EventList', {prefillEvent})` (same Events stack — the "Find a
@@ -3918,8 +4118,9 @@ const EventList: React.FC = () => {
               totalSpots: parseInt(newEvent.totalSpots, 10),
               eventType: newEvent.eventType,
               createdByUsername: userData?.username || '',
-              latitude: newEvent.latitude,
-              longitude: newEvent.longitude,
+              latitude: newEvent.isVirtual ? undefined : newEvent.latitude,
+              longitude: newEvent.isVirtual ? undefined : newEvent.longitude,
+              isVirtual: newEvent.isVirtual,
               jerseyColors: isTeamSport(newEvent.eventType)
                 ? newEvent.jerseyColors
                 : undefined,
@@ -3927,12 +4128,22 @@ const EventList: React.FC = () => {
               invitedUsers: newEvent.invitedUsers,
               allowJoinRequests: newEvent.allowJoinRequests,
               showLocationPublicly: newEvent.showLocationPublicly,
+              // Absolute start + creator offset so server reminders don't
+              // misread wall-clock time as UTC (Heroku).
+              startsAt: getEventDateTime(
+                newEvent.date,
+                newEvent.time,
+              )?.toISOString(),
+              timezoneOffsetMinutes: new Date().getTimezoneOffset(),
               // Recurrence intent — lets the backend convert single↔recurring
               // or re-shape the series. `recurrenceCount` is the number of
               // occurrences from this event forward (set in handleEditEvent).
               isRecurring: newEvent.isRecurring,
               recurrenceFrequency: newEvent.recurrenceFrequency,
-              recurrenceCount: newEvent.recurrenceCount,
+              recurrenceCount: newEvent.recurrenceIndefinite
+                ? 0
+                : newEvent.recurrenceCount,
+              recurrenceIndefinite: !!newEvent.recurrenceIndefinite,
             },
           );
           // Merge the response with local privacy settings in case backend doesn't return them
@@ -3966,8 +4177,9 @@ const EventList: React.FC = () => {
             eventType: newEvent.eventType,
             createdBy: userData?._id || '',
             createdByUsername: userData?.username || '',
-            latitude: newEvent.latitude,
-            longitude: newEvent.longitude,
+            latitude: newEvent.isVirtual ? undefined : newEvent.latitude,
+            longitude: newEvent.isVirtual ? undefined : newEvent.longitude,
+            isVirtual: newEvent.isVirtual,
             jerseyColors: isTeamSport(newEvent.eventType)
               ? newEvent.jerseyColors
               : undefined,
@@ -3976,19 +4188,27 @@ const EventList: React.FC = () => {
             allowJoinRequests: newEvent.allowJoinRequests,
             showLocationPublicly: newEvent.showLocationPublicly,
             // Optional venue listing reference (set by the Venues-tab bridge).
-            venueId: newEvent.venueId,
-            venueName: newEvent.venueName,
+            venueId: newEvent.isVirtual ? undefined : newEvent.venueId,
+            venueName: newEvent.isVirtual ? undefined : newEvent.venueName,
             // Optional Group reference (set when the user picked "Invite
             // a group"). BE re-resolves to snapshot members and cache
             // the display name for the group-name badge on event cards.
             groupId: newEvent.groupId,
             sourceUrl: newEvent.sourceUrl,
+            startsAt: getEventDateTime(
+              newEvent.date,
+              newEvent.time,
+            )?.toISOString(),
+            timezoneOffsetMinutes: new Date().getTimezoneOffset(),
           };
 
           if (newEvent.isRecurring) {
             eventPayload.isRecurring = true;
             eventPayload.recurrenceFrequency = newEvent.recurrenceFrequency;
-            eventPayload.recurrenceCount = newEvent.recurrenceCount;
+            eventPayload.recurrenceIndefinite = !!newEvent.recurrenceIndefinite;
+            eventPayload.recurrenceCount = newEvent.recurrenceIndefinite
+              ? 0
+              : newEvent.recurrenceCount;
           }
 
           const response = await axios.post(
@@ -4189,12 +4409,13 @@ const EventList: React.FC = () => {
       name: event.name,
       location: event.location || '',
       time: event.time,
-      durationMinutes: event.durationMinutes ?? DEFAULT_DURATION_MINUTES,
+      durationMinutes: event.durationMinutes ?? null,
       date: event.date,
       totalSpots: event.totalSpots.toString(),
       eventType: event.eventType,
       latitude: event.latitude,
       longitude: event.longitude,
+      isVirtual: !!event.isVirtual,
       jerseyColors: event.jerseyColors || [],
       // 'private' is deprecated (redundant with invite-only); migrate legacy
       // private events to invite-only when they're edited.
@@ -4204,7 +4425,8 @@ const EventList: React.FC = () => {
       invitedUsers: event.invitedUsers || [],
       isRecurring: event.isRecurring || false,
       recurrenceFrequency: event.recurrenceFrequency || 'weekly',
-      recurrenceCount: forwardCount,
+      recurrenceIndefinite: !!event.recurrenceIndefinite,
+      recurrenceCount: event.recurrenceIndefinite ? 0 : forwardCount,
       // Preserve any venue link the event was originally created with.
       venueId: event.venueId,
       venueName: event.venueName,
@@ -4230,7 +4452,10 @@ const EventList: React.FC = () => {
 
   const handleShareEvent = async (event: Event) => {
     const emoji = getEventTypeEmoji(event.eventType);
-    const spotsAvailable = event.totalSpots - event.rosterSpotsFilled;
+    const spotsAvailable =
+      event.totalSpots > 0
+        ? event.totalSpots - event.rosterSpotsFilled
+        : null;
     const appLink =
       Platform.OS === 'ios' ? APP_STORE_LINKS.ios : APP_STORE_LINKS.android;
 
@@ -4239,9 +4464,11 @@ const EventList: React.FC = () => {
       `🏷️ ${event.eventType}\n` +
       `📅 ${event.date} @ ${formatDisplayTime(event.time)}\n` +
       `📍 ${event.location}\n` +
-      `👥 ${spotsAvailable} spot${
-        spotsAvailable !== 1 ? 's' : ''
-      } available\n\n` +
+      (spotsAvailable === null
+        ? `👥 ${t('events.noLimit') || 'No limit'}\n\n`
+        : `👥 ${spotsAvailable} spot${
+            spotsAvailable !== 1 ? 's' : ''
+          } available\n\n`) +
       `Download BetterPlay to join:\n${appLink}`;
 
     try {
@@ -4642,6 +4869,20 @@ const EventList: React.FC = () => {
 
   // Ask the owner of a gated public event for access. Optimistically flips the
   // card to "Requested…"; the details unlock (via refetch) once approved.
+  const handleMessageHost = (event: Event) => {
+    if (!event.createdBy || event.createdBy === userData?._id) {
+      return;
+    }
+    navigation.navigate('Messages', {
+      screen: 'DmThread',
+      params: {
+        userId: event.createdBy,
+        username: event.createdByUsername,
+        profilePicUrl: event.createdByProfilePicUrl,
+      },
+    });
+  };
+
   const handleJoinRequest = async (event: Event) => {
     if (!userData) {
       return;
@@ -4668,6 +4909,43 @@ const EventList: React.FC = () => {
         ),
       );
       fetchLatestEvents();
+    }
+  };
+
+  // Open-join public events (`allowJoinRequests === false`): add self to roster.
+  const handleOpenJoin = async (event: Event) => {
+    if (!userData?._id) {
+      return;
+    }
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(
+        `${API_BASE_URL}/events/${event._id}/roster`,
+        {
+          participant: {
+            userId: userData._id,
+            username: userData.username,
+            profilePicUrl: userData.profilePicUrl,
+          },
+        },
+        {headers: {Authorization: `Bearer ${token}`}},
+      );
+      fetchLatestEvents();
+    } catch (error: any) {
+      if (error?.response?.data?.full) {
+        Alert.alert(
+          t('events.eventFull') || 'Event full',
+          t('events.eventFullMessage') ||
+            'This event is full right now. You can join the waitlist from the event page.',
+        );
+      } else {
+        Alert.alert(
+          t('common.error') || 'Error',
+          error?.response?.data?.message ||
+            t('events.joinError') ||
+            'Could not join this event.',
+        );
+      }
     }
   };
 
@@ -4734,7 +5012,8 @@ const EventList: React.FC = () => {
     const isPast = isEventPast(item.date, item.time);
     const isCommentsExpanded = expandedCommentsEventId === item._id;
     const isWatching = watchedEventIds.has(item._id);
-    const isEventFull = item.rosterSpotsFilled >= item.totalSpots;
+    const isEventFull =
+      item.totalSpots > 0 && item.rosterSpotsFilled >= item.totalSpots;
     const isCreator = userData?._id === item.createdBy;
     const username = item.createdByUsername || '';
     const creatorInfo = creatorInfoMap[username];
@@ -4777,12 +5056,12 @@ const EventList: React.FC = () => {
                 </Text>
                 <View style={themedStyles.cardHeaderMetaRow}>
                   <FontAwesomeIcon
-                    icon={faLock}
+                    icon={faUserGroup}
                     size={10}
                     color={colors.secondaryText}
                   />
                   <Text style={themedStyles.cardHeaderMeta}>
-                    {t('events.approvalRequired') || 'Approval required'}
+                    {t('events.lfgBadge') || 'Looking for group'}
                   </Text>
                 </View>
               </View>
@@ -4822,8 +5101,13 @@ const EventList: React.FC = () => {
                 color={colors.secondaryText}
               />
               <Text style={themedStyles.detailText}>
-                {item.rosterSpotsFilled}/{item.totalSpots}{' '}
-                {t('events.playersJoined')}
+                {item.totalSpots > 0
+                  ? `${item.rosterSpotsFilled}/${item.totalSpots} ${t(
+                      'events.playersJoined',
+                    )}`
+                  : `${item.rosterSpotsFilled} ${t(
+                      'events.playersJoined',
+                    )} · ${t('events.noLimit') || 'No limit'}`}
               </Text>
             </View>
 
@@ -4842,57 +5126,71 @@ const EventList: React.FC = () => {
 
             <View style={themedStyles.gatedHintRow}>
               <FontAwesomeIcon
-                icon={faLock}
+                icon={faComment}
                 size={11}
                 color={colors.secondaryText}
               />
               <Text style={themedStyles.gatedHintText}>
-                {item.showLocationPublicly
-                  ? t('events.gatedHintDetails') ||
-                    'Full details unlock when the host approves you.'
-                  : t('events.gatedHint') ||
-                    'Location and details unlock when the host approves you.'}
+                {item.allowJoinRequests === false
+                  ? t('events.openJoinHint') ||
+                    'Anyone can join this event. Message the host anytime.'
+                  : t('events.lfgHint') ||
+                    "Message the host with a question, then request to join when you're ready."}
               </Text>
             </View>
           </View>
 
-          {item.allowJoinRequests === false ? (
-            <View style={themedStyles.requestsClosedBar}>
-              <FontAwesomeIcon
-                icon={faLock}
-                size={13}
-                color={colors.secondaryText}
-              />
-              <Text style={themedStyles.requestsClosedText}>
-                {t('events.notAcceptingRequests') ||
-                  'Not accepting join requests'}
-              </Text>
-            </View>
-          ) : (
+          <View style={themedStyles.gatedActionsRow}>
             <TouchableOpacity
-              style={[
-                themedStyles.requestButton,
-                isPending && themedStyles.requestButtonPending,
-              ]}
-              onPress={() => !isPending && handleJoinRequest(item)}
-              disabled={isPending}
+              style={themedStyles.messageHostButton}
+              onPress={() => handleMessageHost(item)}
               activeOpacity={0.8}>
               <FontAwesomeIcon
-                icon={isPending ? faCheck : faUserPlus}
+                icon={faComment}
                 size={14}
-                color={isPending ? colors.secondaryText : '#fff'}
+                color={colors.text}
               />
-              <Text
-                style={[
-                  themedStyles.requestButtonText,
-                  isPending && themedStyles.requestButtonTextPending,
-                ]}>
-                {isPending
-                  ? t('events.requested') || 'Requested'
-                  : t('events.requestToJoin') || 'Request to join'}
+              <Text style={themedStyles.messageHostButtonText} numberOfLines={1}>
+                {t('events.messageHost') || 'Message host'}
               </Text>
             </TouchableOpacity>
-          )}
+            {item.allowJoinRequests === false ? (
+              <TouchableOpacity
+                style={[themedStyles.requestButton, {flex: 1, marginTop: 0}]}
+                onPress={() => handleOpenJoin(item)}
+                activeOpacity={0.8}>
+                <FontAwesomeIcon icon={faUserPlus} size={14} color="#fff" />
+                <Text style={themedStyles.requestButtonText} numberOfLines={1}>
+                  {t('events.joinEvent') || 'Join Event'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[
+                  themedStyles.requestButton,
+                  isPending && themedStyles.requestButtonPending,
+                ]}
+                onPress={() => !isPending && handleJoinRequest(item)}
+                disabled={isPending}
+                activeOpacity={0.8}>
+                <FontAwesomeIcon
+                  icon={isPending ? faCheck : faUserPlus}
+                  size={14}
+                  color={isPending ? colors.secondaryText : '#fff'}
+                />
+                <Text
+                  style={[
+                    themedStyles.requestButtonText,
+                    isPending && themedStyles.requestButtonTextPending,
+                  ]}
+                  numberOfLines={1}>
+                  {isPending
+                    ? t('events.requested') || 'Requested'
+                    : t('events.requestToJoin') || 'Request to join'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       );
     }
@@ -5034,8 +5332,12 @@ const EventList: React.FC = () => {
                 size={12}
                 color={colors.secondaryText}
               />
-              <Text style={themedStyles.detailText} numberOfLines={1}>
-                {item.location}
+              <Text style={themedStyles.detailText} numberOfLines={2}>
+                {item.isVirtual
+                  ? item.location
+                    ? `${t('events.virtualLocationBadge') || 'Online / other'} · ${item.location}`
+                    : t('events.virtualLocationBadge') || 'Online / other'
+                  : item.location}
               </Text>
             </View>
 
@@ -5062,8 +5364,13 @@ const EventList: React.FC = () => {
                 color={colors.secondaryText}
               />
               <Text style={themedStyles.detailText}>
-                {item.rosterSpotsFilled}/{item.totalSpots}{' '}
-                {t('events.playersJoined')}
+                {item.totalSpots > 0
+                  ? `${item.rosterSpotsFilled}/${item.totalSpots} ${t(
+                      'events.playersJoined',
+                    )}`
+                  : `${item.rosterSpotsFilled} ${t(
+                      'events.playersJoined',
+                    )} · ${t('events.noLimit') || 'No limit'}`}
                 {isEventFull && item.waitlist && item.waitlist.length > 0
                   ? ` · ${item.waitlist.length} waitlisted`
                   : ''}
@@ -5080,7 +5387,9 @@ const EventList: React.FC = () => {
           </View>
         </TouchableOpacity>
 
-        {/* Embedded Map Preview */}
+        {/* Physical events get a map preview; virtual ones already show
+            "Online / other · …" in the detail row above. */}
+        {!item.isVirtual ? (
         <TouchableOpacity
           style={themedStyles.mapEmbed}
           onPress={() => openMapsForEvent(item, t, presentMapPicker)}
@@ -5123,6 +5432,7 @@ const EventList: React.FC = () => {
             </Text>
           </View>
         </TouchableOpacity>
+        ) : null}
 
         {/* RSVP control — Going / Maybe / Can't make it. Only invite-only
             events use the 3-way RSVP: you were invited, so you reply. Public
@@ -5236,30 +5546,53 @@ const EventList: React.FC = () => {
                 typeof item.rosterSpotsFilled === 'number'
                   ? item.rosterSpotsFilled
                   : (item.roster || []).length;
+              const canMessageHost =
+                !isCreator && !!item.createdBy && item.createdBy !== myUserId;
               return (
                 <View style={themedStyles.rsvpContainer}>
-                  <TouchableOpacity
-                    style={[
-                      themedStyles.publicJoinButton,
-                      isGoing && themedStyles.rsvpButtonGoingActive,
-                    ]}
-                    onPress={() => handleRsvp(item, 'going')}
-                    activeOpacity={0.8}>
-                    <FontAwesomeIcon
-                      icon={faCheck}
-                      size={14}
-                      color={isGoing ? '#fff' : colors.secondaryText}
-                    />
-                    <Text
+                  <View
+                    style={[themedStyles.gatedActionsRow, {marginTop: 0}]}>
+                    {canMessageHost ? (
+                      <TouchableOpacity
+                        style={themedStyles.messageHostButton}
+                        onPress={() => handleMessageHost(item)}
+                        activeOpacity={0.8}>
+                        <FontAwesomeIcon
+                          icon={faComment}
+                          size={14}
+                          color={colors.text}
+                        />
+                        <Text
+                          style={themedStyles.messageHostButtonText}
+                          numberOfLines={1}>
+                          {t('events.messageHost') || 'Message host'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity
                       style={[
-                        themedStyles.rsvpButtonText,
-                        isGoing && themedStyles.rsvpButtonTextActive,
-                      ]}>
-                      {isGoing
-                        ? t('events.rsvpGoing') || 'Going'
-                        : t('events.joinEvent') || 'Join'}
-                    </Text>
-                  </TouchableOpacity>
+                        themedStyles.publicJoinButton,
+                        isGoing && themedStyles.rsvpButtonGoingActive,
+                        canMessageHost ? {flex: 1, alignSelf: 'stretch'} : null,
+                      ]}
+                      onPress={() => handleRsvp(item, 'going')}
+                      activeOpacity={0.8}>
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={14}
+                        color={isGoing ? '#fff' : colors.secondaryText}
+                      />
+                      <Text
+                        style={[
+                          themedStyles.rsvpButtonText,
+                          isGoing && themedStyles.rsvpButtonTextActive,
+                        ]}>
+                        {isGoing
+                          ? t('events.rsvpGoing') || 'Going'
+                          : t('events.joinEvent') || 'Join'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                   {goingCount > 0 ? (
                     <Text style={themedStyles.rsvpSummary}>
                       {`${goingCount} ${t('events.rsvpGoing') || 'Going'}`}
@@ -5434,27 +5767,80 @@ const EventList: React.FC = () => {
 
   return (
     <SafeAreaView style={themedStyles.container} edges={['top']}>
-      {/* Header */}
+      {/* Compact top bar: menu · search · filter · venues · notifications */}
       <View style={themedStyles.header}>
-        <View style={themedStyles.headerSide}>
-          <HamburgerMenu />
+        <HamburgerMenu />
+        <View style={themedStyles.headerSearch}>
+          <View style={themedStyles.searchContainer}>
+            <FontAwesomeIcon
+              icon={faSearch}
+              size={13}
+              color={colors.secondaryText}
+              style={themedStyles.searchIcon}
+            />
+            <TextInput
+              style={themedStyles.searchInput}
+              placeholder={t('events.searchPlaceholder') || 'Search events...'}
+              placeholderTextColor={colors.secondaryText}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                style={themedStyles.clearButton}
+                onPress={() => setSearchQuery('')}>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[
+              themedStyles.filterButton,
+              activeFilterCount > 0 && themedStyles.filterButtonActive,
+            ]}
+            onPress={() => setShowFilterModal(true)}
+            accessibilityLabel={t('events.filters') || 'Filters'}>
+            <FontAwesomeIcon
+              icon={faFilter}
+              size={14}
+              color={
+                activeFilterCount > 0 ? colors.primary : colors.secondaryText
+              }
+            />
+            {activeFilterCount > 0 && (
+              <View style={themedStyles.filterBadge}>
+                <Text style={themedStyles.filterBadgeText}>
+                  {activeFilterCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
-        <Text style={themedStyles.title}>{t('events.title')}</Text>
-        <View style={[themedStyles.headerSide, themedStyles.headerRight]}>
+        <View style={themedStyles.headerRight}>
           <TouchableOpacity
             style={themedStyles.findPlaceButton}
             onPress={() => navigation.navigate('VenueList' as never)}
             accessibilityLabel={t('events.findAPlace') || 'Find a place'}>
             <FontAwesomeIcon
               icon={faBuilding}
-              size={20}
+              size={18}
               color={colors.primary}
             />
           </TouchableOpacity>
           <TouchableOpacity
             style={themedStyles.bellButton}
-            onPress={() => navigation.navigate('Notifications' as never)}>
-            <FontAwesomeIcon icon={faBell} size={22} color={colors.primary} />
+            onPress={() => navigation.navigate('Notifications' as never)}
+            accessibilityLabel={
+              t('navigation.notifications') || 'Notifications'
+            }>
+            <FontAwesomeIcon icon={faBell} size={20} color={colors.primary} />
             {badgeCount > 0 && (
               <View style={themedStyles.badge}>
                 <Text style={themedStyles.badgeText}>
@@ -5464,62 +5850,6 @@ const EventList: React.FC = () => {
             )}
           </TouchableOpacity>
         </View>
-      </View>
-      {/* Search Bar with Filter Button */}
-      <View style={themedStyles.searchFilterRow}>
-        <View
-          style={[
-            themedStyles.searchContainer,
-            themedStyles.searchContainerInRow,
-          ]}>
-          <FontAwesomeIcon
-            icon={faSearch}
-            size={14}
-            color={colors.secondaryText}
-            style={themedStyles.searchIcon}
-          />
-          <TextInput
-            style={themedStyles.searchInput}
-            placeholder={t('events.searchPlaceholder') || 'Search events...'}
-            placeholderTextColor={colors.secondaryText}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              style={themedStyles.clearButton}
-              onPress={() => setSearchQuery('')}>
-              <FontAwesomeIcon
-                icon={faTimes}
-                size={14}
-                color={colors.secondaryText}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          style={[
-            themedStyles.filterButton,
-            activeFilterCount > 0 && themedStyles.filterButtonActive,
-          ]}
-          onPress={() => setShowFilterModal(true)}>
-          <FontAwesomeIcon
-            icon={faFilter}
-            size={16}
-            color={
-              activeFilterCount > 0 ? colors.primary : colors.secondaryText
-            }
-          />
-          {activeFilterCount > 0 && (
-            <View style={themedStyles.filterBadge}>
-              <Text style={themedStyles.filterBadgeText}>
-                {activeFilterCount}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
       </View>
       {/* Content wrapper: pills + filters + event list */}
       <KeyboardAvoidingView
@@ -5559,8 +5889,11 @@ const EventList: React.FC = () => {
               {profileFilter === 'created'
                 ? t('profile.showingEventsCreated') ||
                   'Showing events you created'
-                : t('profile.showingEventsJoined') ||
-                  'Showing events you joined'}
+                : profileFilter === 'upcoming'
+                  ? t('profile.showingUpcoming') ||
+                    'Showing your upcoming events'
+                  : t('profile.showingEventsJoined') ||
+                    'Showing events you joined'}
             </Text>
             <TouchableOpacity
               style={themedStyles.profileFilterClear}
@@ -5786,63 +6119,128 @@ const EventList: React.FC = () => {
                   value={newEvent.name}
                   onChangeText={text => setNewEvent({...newEvent, name: text})}
                 />
-                {/* Location Input with Autocomplete */}
-                <View style={themedStyles.autocompleteContainer}>
-                  {isApiKeyConfigured && !placesApiFailed ? (
-                    <GooglePlacesAutocomplete
-                      placeholder="Location/Facility"
-                      onPress={(data, details = null) => {
-                        console.log('Selected place:', data, details);
-                        const location =
-                          data.description ||
-                          data.structured_formatting?.main_text ||
-                          '';
-                        const coords = details?.geometry?.location;
-
-                        setNewEvent({
-                          ...newEvent,
-                          location: location,
-                          latitude: coords?.lat,
-                          longitude: coords?.lng,
-                        });
-                      }}
-                      query={{
-                        key: GOOGLE_PLACES_API_KEY,
-                        language: 'en',
-                        types: 'establishment|geocode',
-                      }}
-                      fetchDetails={true}
-                      disableScroll={true}
-                      listViewDisplayed="auto"
-                      styles={autocompleteStyles}
-                      onFail={error => {
-                        console.warn('GooglePlacesAutocomplete error:', error);
-                        // Fall back to plain text input when API fails
-                        // (e.g. billing not enabled, quota exceeded, invalid key)
-                        setPlacesApiFailed(true);
-                      }}
-                      textInputProps={{
-                        placeholderTextColor: colors.placeholder || '#888',
-                      }}
-                      enablePoweredByContainer={false}
-                      debounce={200}
-                    />
-                  ) : (
-                    <TextInput
-                      style={themedStyles.modalInput}
-                      placeholder={
-                        placesApiFailed
-                          ? 'Enter location manually'
-                          : t('events.eventLocation')
-                      }
-                      placeholderTextColor={colors.placeholder || '#888'}
-                      value={newEvent.location}
-                      onChangeText={text =>
-                        setNewEvent({...newEvent, location: text})
-                      }
-                    />
-                  )}
+                {/* Location: Place (maps) or Online/other (free-text label). */}
+                <View style={themedStyles.locationModeRow}>
+                  {(
+                    [
+                      {value: false, fallback: 'Place'},
+                      {value: true, fallback: 'Online / other'},
+                    ] as const
+                  ).map(option => {
+                    const selected = !!newEvent.isVirtual === option.value;
+                    return (
+                      <TouchableOpacity
+                        key={String(option.value)}
+                        style={[
+                          themedStyles.locationModePill,
+                          selected && themedStyles.locationModePillSelected,
+                        ]}
+                        onPress={() =>
+                          setNewEvent(prev => ({
+                            ...prev,
+                            isVirtual: option.value,
+                            ...(option.value
+                              ? {
+                                  latitude: undefined,
+                                  longitude: undefined,
+                                  venueId: undefined,
+                                  venueName: undefined,
+                                  location: prev.isVirtual ? prev.location : '',
+                                }
+                              : {
+                                  location: prev.isVirtual ? '' : prev.location,
+                                }),
+                          }))
+                        }
+                        activeOpacity={0.7}>
+                        <Text
+                          style={[
+                            themedStyles.locationModePillText,
+                            selected &&
+                              themedStyles.locationModePillTextSelected,
+                          ]}>
+                          {option.value
+                            ? t('events.locationVirtual') || option.fallback
+                            : t('events.locationPlace') || option.fallback}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
+
+                {newEvent.isVirtual ? (
+                  <TextInput
+                    style={themedStyles.modalInput}
+                    placeholder={
+                      t('events.virtualLocationPlaceholder') ||
+                      'e.g. Friday night gaming, Discord, my place'
+                    }
+                    placeholderTextColor={colors.placeholder || '#888'}
+                    value={newEvent.location}
+                    onChangeText={text =>
+                      setNewEvent({...newEvent, location: text})
+                    }
+                  />
+                ) : (
+                  <View style={themedStyles.autocompleteContainer}>
+                    {isApiKeyConfigured && !placesApiFailed ? (
+                      <GooglePlacesAutocomplete
+                        placeholder="Location/Facility"
+                        onPress={(data, details = null) => {
+                          console.log('Selected place:', data, details);
+                          const location =
+                            data.description ||
+                            data.structured_formatting?.main_text ||
+                            '';
+                          const coords = details?.geometry?.location;
+
+                          setNewEvent({
+                            ...newEvent,
+                            location: location,
+                            latitude: coords?.lat,
+                            longitude: coords?.lng,
+                            isVirtual: false,
+                          });
+                        }}
+                        query={{
+                          key: GOOGLE_PLACES_API_KEY,
+                          language: 'en',
+                          types: 'establishment|geocode',
+                        }}
+                        fetchDetails={true}
+                        disableScroll={true}
+                        listViewDisplayed="auto"
+                        styles={autocompleteStyles}
+                        onFail={error => {
+                          console.warn(
+                            'GooglePlacesAutocomplete error:',
+                            error,
+                          );
+                          setPlacesApiFailed(true);
+                        }}
+                        textInputProps={{
+                          placeholderTextColor: colors.placeholder || '#888',
+                        }}
+                        enablePoweredByContainer={false}
+                        debounce={200}
+                      />
+                    ) : (
+                      <TextInput
+                        style={themedStyles.modalInput}
+                        placeholder={
+                          placesApiFailed
+                            ? 'Enter location manually'
+                            : t('events.eventLocation')
+                        }
+                        placeholderTextColor={colors.placeholder || '#888'}
+                        value={newEvent.location}
+                        onChangeText={text =>
+                          setNewEvent({...newEvent, location: text})
+                        }
+                      />
+                    )}
+                  </View>
+                )}
 
                 {/* Event Date selector */}
                 <TouchableOpacity
@@ -5929,7 +6327,8 @@ const EventList: React.FC = () => {
                 )}
 
                 {/* How long the event runs. Stored as a duration; the end time
-                    shown here is derived so the organizer can sanity-check it. */}
+                    shown here is derived so the organizer can sanity-check it.
+                    "Open" clears the duration so the card shows a start only. */}
                 <View style={themedStyles.durationSection}>
                   <View style={themedStyles.durationHeaderRow}>
                     <Text style={themedStyles.durationLabel}>
@@ -5937,13 +6336,15 @@ const EventList: React.FC = () => {
                     </Text>
                     {newEvent.time ? (
                       <Text style={themedStyles.durationEndHint}>
-                        {t('events.endsAt', {
-                          time: formatEventTimeRange(
-                            newEvent.date || new Date().toDateString(),
-                            newEvent.time,
-                            newEvent.durationMinutes,
-                          ).split(' – ')[1],
-                        })}
+                        {newEvent.durationMinutes
+                          ? t('events.endsAt', {
+                              time: formatEventTimeRange(
+                                newEvent.date || new Date().toDateString(),
+                                newEvent.time,
+                                newEvent.durationMinutes,
+                              ).split(' – ')[1],
+                            })
+                          : t('events.openEnded') || 'Open-ended'}
                       </Text>
                     ) : null}
                   </View>
@@ -5953,7 +6354,7 @@ const EventList: React.FC = () => {
                         newEvent.durationMinutes === option.minutes;
                       return (
                         <TouchableOpacity
-                          key={option.minutes}
+                          key={option.label}
                           style={[
                             themedStyles.durationPill,
                             selected && themedStyles.durationPillSelected,
@@ -5970,7 +6371,9 @@ const EventList: React.FC = () => {
                               themedStyles.durationPillText,
                               selected && themedStyles.durationPillTextSelected,
                             ]}>
-                            {option.label}
+                            {option.minutes === null
+                              ? t('events.openEndedShort') || 'Open'
+                              : option.label}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -6049,24 +6452,49 @@ const EventList: React.FC = () => {
                           horizontal
                           showsHorizontalScrollIndicator={false}
                           style={themedStyles.recurrenceCountScroll}>
+                          <TouchableOpacity
+                            style={[
+                              themedStyles.recurrenceCountOption,
+                              newEvent.recurrenceIndefinite &&
+                                themedStyles.recurrenceCountSelected,
+                            ]}
+                            onPress={() =>
+                              setNewEvent({
+                                ...newEvent,
+                                recurrenceIndefinite: true,
+                                recurrenceCount: 0,
+                              })
+                            }>
+                            <Text
+                              style={[
+                                themedStyles.recurrenceCountText,
+                                newEvent.recurrenceIndefinite &&
+                                  themedStyles.recurrenceCountTextSelected,
+                              ]}>
+                              {t('events.noEnd') || 'No end'}
+                            </Text>
+                          </TouchableOpacity>
                           {recurrenceCountOptions.map(count => (
                             <TouchableOpacity
                               key={count}
                               style={[
                                 themedStyles.recurrenceCountOption,
-                                newEvent.recurrenceCount === count &&
+                                !newEvent.recurrenceIndefinite &&
+                                  newEvent.recurrenceCount === count &&
                                   themedStyles.recurrenceCountSelected,
                               ]}
                               onPress={() =>
                                 setNewEvent({
                                   ...newEvent,
+                                  recurrenceIndefinite: false,
                                   recurrenceCount: count,
                                 })
                               }>
                               <Text
                                 style={[
                                   themedStyles.recurrenceCountText,
-                                  newEvent.recurrenceCount === count &&
+                                  !newEvent.recurrenceIndefinite &&
+                                    newEvent.recurrenceCount === count &&
                                     themedStyles.recurrenceCountTextSelected,
                                 ]}>
                                 {count}
@@ -6077,7 +6505,9 @@ const EventList: React.FC = () => {
 
                         <Text style={themedStyles.recurrenceSummary}>
                           {newEvent.date
-                            ? `${newEvent.recurrenceCount} events, ${newEvent.recurrenceFrequency}, starting ${newEvent.date}`
+                            ? newEvent.recurrenceIndefinite
+                              ? `${newEvent.recurrenceFrequency}, no end date, starting ${newEvent.date}`
+                              : `${newEvent.recurrenceCount} events, ${newEvent.recurrenceFrequency}, starting ${newEvent.date}`
                             : 'Select a date above to see the schedule'}
                         </Text>
                       </View>
@@ -6099,7 +6529,10 @@ const EventList: React.FC = () => {
                         : colors.placeholder,
                     }}>
                     {newEvent.totalSpots
-                      ? newEvent.totalSpots
+                      ? rosterSizeLabel(
+                          newEvent.totalSpots,
+                          t('events.noLimit') || 'No limit',
+                        )
                       : t('events.selectRosterSize')}
                   </Text>
                 </TouchableOpacity>
@@ -6116,7 +6549,10 @@ const EventList: React.FC = () => {
                         {rosterSizeOptions.map(value => (
                           <Picker.Item
                             key={value}
-                            label={value}
+                            label={rosterSizeLabel(
+                              value,
+                              t('events.noLimit') || 'No limit',
+                            )}
                             value={value}
                             color={colors.text}
                           />
@@ -6362,12 +6798,12 @@ const EventList: React.FC = () => {
                     <View style={themedStyles.publicControlRow}>
                       <View style={themedStyles.publicControlText}>
                         <Text style={themedStyles.publicControlLabel}>
-                          {t('events.acceptJoinRequests') ||
-                            'Accept join requests'}
+                          {t('events.requireApproval') ||
+                            'Require approval to join'}
                         </Text>
                         <Text style={themedStyles.publicControlDesc}>
-                          {t('events.acceptJoinRequestsDesc') ||
-                            'Let people request to join. Turn off to stop new requests.'}
+                          {t('events.requireApprovalDesc') ||
+                            'On: people request and you approve. Off: anyone can join.'}
                         </Text>
                       </View>
                       <Switch
@@ -7028,6 +7464,40 @@ const EventList: React.FC = () => {
                       showAvailableOnly && themedStyles.toggleCheckActive,
                     ]}>
                     {showAvailableOnly && (
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={12}
+                        color={colors.buttonText || '#fff'}
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Match profile interests */}
+              <View style={themedStyles.filterSection}>
+                <Text style={themedStyles.filterSectionTitle}>
+                  {t('events.interests') || 'Interests'}
+                </Text>
+                <TouchableOpacity
+                  style={themedStyles.toggleOption}
+                  onPress={handleFilterByInterestsToggle}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      themedStyles.toggleOptionText,
+                      filterByInterests &&
+                        themedStyles.toggleOptionTextSelected,
+                    ]}>
+                    {t('events.filterByInterestsDescription') ||
+                      'Filter by my profile interests'}
+                  </Text>
+                  <View
+                    style={[
+                      themedStyles.toggleCheck,
+                      filterByInterests && themedStyles.toggleCheckActive,
+                    ]}>
+                    {filterByInterests && (
                       <FontAwesomeIcon
                         icon={faCheck}
                         size={12}

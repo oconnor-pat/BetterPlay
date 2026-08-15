@@ -145,7 +145,17 @@
     "myEventsOnlyDescription": "केवल वे इवेंट दिखाएं जिनकी मैं मेज़बानी कर रहा हूं या जिनमें शामिल हूं",
     "reactions": "प्रतिक्रियाएं",
     "reactedToThis": "ने इस पर प्रतिक्रिया दी",
-    "noReactionsYet": "अभी तक कोई प्रतिक्रिया नहीं"
+    "noReactionsYet": "अभी तक कोई प्रतिक्रिया नहीं",
+    "openEnded": "बिना समाप्ति",
+    "openEndedShort": "खुला",
+    "noLimit": "कोई सीमा नहीं",
+    "locationPlace": "स्थान",
+    "locationVirtual": "ऑनलाइन / अन्य",
+    "virtualLocationPlaceholder": "जैसे शुक्रवार गेमिंग, Discord, मेरे घर",
+    "virtualLocationBadge": "ऑनलाइन / अन्य",
+    "messageHost": "होस्ट को संदेश",
+    "lfgBadge": "ग्रुप चाहिए",
+    "lfgHint": "होस्ट से पूछें, फिर जॉइन का अनुरोध करें।"
   },
   "profile": {
     "title": "प्रोफ़ाइल",
@@ -277,7 +287,14 @@
     "saveChanges": "परिवर्तन सहेजें",
     "invitePlayers": "लोगों को आमंत्रित करें",
     "noReply": "आमंत्रित · कोई जवाब नहीं",
-    "joinRequests": "अनुरोध"
+    "joinRequests": "अनुरोध",
+    "remindAll": "सभी को याद दिलाएं",
+    "remindSentTitle": "रिमाइंडर भेजा गया",
+    "remindSentOne": "उन्हें RSVP का रिमाइंडर मिलेगा।",
+    "remindSentMany": "{{count}} लोगों को याद दिलाया।",
+    "remindCooldownTitle": "पहले से याद दिलाया",
+    "remindCooldownBody": "आपने हाल ही में रिमाइंडर भेजा है। लगभग एक घंटे बाद फिर कोशिश करें।",
+    "remindError": "रिमाइंडर भेजने में विफल"
   },
   "groupChat": {
     "tabMembers": "सदस्य",

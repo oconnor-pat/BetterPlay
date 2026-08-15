@@ -126,17 +126,25 @@ const BlockedAndDeclined: React.FC = () => {
   const themedStyles = useMemo(
     () =>
       StyleSheet.create({
+        // Horizontal inset lives on the root so the segment control and
+        // rows share one edge, instead of each fighting the modal's
+        // zero-padded ScrollView.
+        root: {
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 8,
+        },
         segmentRow: {
           flexDirection: 'row',
           backgroundColor: colors.inputBackground,
-          borderRadius: 10,
-          padding: 3,
-          marginBottom: 16,
+          borderRadius: 12,
+          padding: 4,
+          marginBottom: 20,
         },
         segmentButton: {
           flex: 1,
-          paddingVertical: 8,
-          borderRadius: 8,
+          paddingVertical: 11,
+          borderRadius: 9,
           alignItems: 'center',
         },
         segmentButtonActive: {backgroundColor: colors.card},
@@ -149,15 +157,16 @@ const BlockedAndDeclined: React.FC = () => {
         row: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 12,
+          paddingVertical: 16,
+          gap: 14,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
-        avatar: {width: 40, height: 40, borderRadius: 20},
+        avatar: {width: 44, height: 44, borderRadius: 22},
         avatarFallback: {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
           backgroundColor: colors.inputBackground,
           alignItems: 'center',
           justifyContent: 'center',
@@ -167,17 +176,27 @@ const BlockedAndDeclined: React.FC = () => {
           fontWeight: '700',
           color: colors.secondaryText,
         },
-        rowBody: {flex: 1, marginLeft: 12},
-        rowTitle: {fontSize: 15, fontWeight: '600', color: colors.text},
+        rowBody: {
+          flex: 1,
+          marginRight: 4,
+          // Keep long subtitles from crowding the action button.
+          paddingRight: 4,
+        },
+        rowTitle: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: 4,
+        },
         rowSubtitle: {
-          fontSize: 12,
+          fontSize: 13,
+          lineHeight: 18,
           color: colors.secondaryText,
-          marginTop: 2,
         },
         actionButton: {
-          paddingHorizontal: 14,
-          paddingVertical: 7,
-          borderRadius: 8,
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          borderRadius: 10,
           borderWidth: 1,
           borderColor: colors.primary,
         },
@@ -186,21 +205,26 @@ const BlockedAndDeclined: React.FC = () => {
           fontWeight: '600',
           color: colors.primary,
         },
-        empty: {alignItems: 'center', paddingVertical: 40},
+        empty: {
+          alignItems: 'center',
+          paddingVertical: 48,
+          paddingHorizontal: 12,
+        },
         emptyTitle: {
           fontSize: 15,
           fontWeight: '600',
           color: colors.text,
-          marginTop: 12,
+          marginTop: 14,
         },
         emptyBody: {
           fontSize: 13,
+          lineHeight: 19,
           color: colors.secondaryText,
-          marginTop: 4,
+          marginTop: 6,
           textAlign: 'center',
-          paddingHorizontal: 24,
+          paddingHorizontal: 12,
         },
-        loading: {paddingVertical: 40},
+        loading: {paddingVertical: 48},
       }),
     [colors],
   );
@@ -235,7 +259,7 @@ const BlockedAndDeclined: React.FC = () => {
   }
 
   return (
-    <View>
+    <View style={themedStyles.root}>
       <View style={themedStyles.segmentRow}>
         {(['blocked', 'declined'] as Segment[]).map(seg => (
           <TouchableOpacity
@@ -303,7 +327,7 @@ const BlockedAndDeclined: React.FC = () => {
                   <Text style={themedStyles.rowTitle}>
                     {conv.otherUser?.username}
                   </Text>
-                  <Text style={themedStyles.rowSubtitle} numberOfLines={1}>
+                  <Text style={themedStyles.rowSubtitle} numberOfLines={2}>
                     {conv.lastMessage?.text ||
                       t('moderation.declinedRowSubtitle')}
                   </Text>

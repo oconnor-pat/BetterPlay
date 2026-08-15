@@ -131,8 +131,8 @@ const themedStyles = (colors: ThemeColors) =>
       paddingVertical: 5,
       borderRadius: 10,
       alignSelf: 'flex-start',
-      marginTop: 4,
-      marginBottom: 2,
+      marginTop: 8,
+      marginBottom: 0,
     },
     normalContainer: {
       backgroundColor: colors.primary + '18',

@@ -154,7 +154,17 @@
     "endsAt": "Endet um {{time}}",
     "reactions": "Reaktionen",
     "reactedToThis": "haben darauf reagiert",
-    "noReactionsYet": "Noch keine Reaktionen"
+    "noReactionsYet": "Noch keine Reaktionen",
+    "openEnded": "Offen",
+    "openEndedShort": "Offen",
+    "noLimit": "Kein Limit",
+    "locationPlace": "Ort",
+    "locationVirtual": "Online / anders",
+    "virtualLocationPlaceholder": "z. B. Spieleabend, Discord, bei mir",
+    "virtualLocationBadge": "Online / anders",
+    "messageHost": "Host schreiben",
+    "lfgBadge": "Sucht Mitspieler",
+    "lfgHint": "Schreib dem Host eine Frage, und bitte danach um Beitritt."
   },
   "profile": {
     "title": "Profil",
@@ -292,7 +302,14 @@
     "saveChanges": "Änderungen speichern",
     "invitePlayers": "Personen einladen",
     "noReply": "Eingeladen · keine Antwort",
-    "joinRequests": "Anfragen"
+    "joinRequests": "Anfragen",
+    "remindAll": "Alle erinnern",
+    "remindSentTitle": "Erinnerung gesendet",
+    "remindSentOne": "Sie bekommen einen RSVP-Hinweis.",
+    "remindSentMany": "{{count}} Personen erinnert.",
+    "remindCooldownTitle": "Bereits erinnert",
+    "remindCooldownBody": "Du hast kürzlich schon erinnert. Bitte in etwa einer Stunde erneut versuchen.",
+    "remindError": "Erinnerung fehlgeschlagen"
   },
   "groupChat": {
     "tabMembers": "Mitglieder",

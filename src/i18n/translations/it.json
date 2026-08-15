@@ -145,7 +145,17 @@
     "myEventsOnlyDescription": "Mostra solo gli eventi che organizzo o a cui partecipo",
     "reactions": "Reazioni",
     "reactedToThis": "hanno reagito a questo",
-    "noReactionsYet": "Ancora nessuna reazione"
+    "noReactionsYet": "Ancora nessuna reazione",
+    "openEnded": "Senza fine",
+    "openEndedShort": "Libero",
+    "noLimit": "Nessun limite",
+    "locationPlace": "Luogo",
+    "locationVirtual": "Online / altro",
+    "virtualLocationPlaceholder": "es. Serata gaming, Discord, a casa mia",
+    "virtualLocationBadge": "Online / altro",
+    "messageHost": "Messaggia host",
+    "lfgBadge": "Cerca gruppo",
+    "lfgHint": "Scrivi all'host con una domanda, poi richiedi di unirti."
   },
   "profile": {
     "title": "Profilo",
@@ -283,7 +293,14 @@
     "saveChanges": "Salva Modifiche",
     "invitePlayers": "Invita Persone",
     "noReply": "Invitato · nessuna risposta",
-    "joinRequests": "Richieste"
+    "joinRequests": "Richieste",
+    "remindAll": "Ricorda a tutti",
+    "remindSentTitle": "Promemoria inviato",
+    "remindSentOne": "Riceveranno un promemoria RSVP.",
+    "remindSentMany": "Promemoria inviato a {{count}} persone.",
+    "remindCooldownTitle": "Già inviato",
+    "remindCooldownBody": "Hai già inviato un promemoria. Riprova tra circa un'ora.",
+    "remindError": "Invio fallito"
   },
   "groupChat": {
     "tabMembers": "Membri",

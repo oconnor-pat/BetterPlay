@@ -248,13 +248,11 @@ const Profile: React.FC = () => {
     [navigation],
   );
 
-  // Find the next event this user is involved in. "Involved" means they either
-  // created it or are on the roster. An event that's already underway still
-  // counts as active (see isEventActive) so a game in progress isn't dropped
-  // the moment it starts.
-  const nextUpcomingEvent = useMemo(() => {
-    const oneWeekFromNow = Date.now() + 7 * 24 * 60 * 60 * 1000;
-    const userEvents = events
+  // Upcoming events this user is involved in (created or on roster), soonest
+  // first. Shown as a short list on Profile; "See All" opens the Events tab
+  // filtered to the same set.
+  const upcomingEvents = useMemo(() => {
+    return events
       .filter(e => {
         const isCreator = e.createdBy === _id;
         const roster = (e as any).roster || (e as any).participants || [];
@@ -267,26 +265,13 @@ const Profile: React.FC = () => {
       .filter(
         ({event, when}) =>
           when != null &&
-          isEventActive(event.date, event.time, event.durationMinutes) &&
-          when.getTime() <= oneWeekFromNow,
+          isEventActive(event.date, event.time, event.durationMinutes),
       )
-      .sort((a, b) => a.when!.getTime() - b.when!.getTime());
-    return userEvents[0]?.event || null;
+      .sort((a, b) => a.when!.getTime() - b.when!.getTime())
+      .map(({event}) => event);
   }, [events, _id]);
 
-  // Whether the "Up Next" event is currently underway, so the card can show a
-  // live indicator rather than a countdown that's already elapsed.
-  const isNextEventLive = useMemo(
-    () =>
-      nextUpcomingEvent
-        ? isEventLive(
-            nextUpcomingEvent.date,
-            nextUpcomingEvent.time,
-            nextUpcomingEvent.durationMinutes,
-          )
-        : false,
-    [nextUpcomingEvent],
-  );
+  const previewUpcomingEvents = upcomingEvents.slice(0, 3);
 
   // Format upcoming event date nicely. Compare calendar days rather than
   // subtracting timestamps: an event 20 hours out can still be "Tomorrow".
@@ -354,32 +339,17 @@ const Profile: React.FC = () => {
         },
         header: {
           flexDirection: 'row',
-          justifyContent: 'space-between',
           alignItems: 'center',
           paddingHorizontal: 16,
-          paddingTop: 8,
-          paddingBottom: 8,
+          paddingTop: 4,
+          paddingBottom: 4,
           backgroundColor: colors.background,
           zIndex: 1,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
-        },
-        title: {
-          fontSize: 22,
-          fontWeight: '700',
-          color: colors.primary,
-          textAlign: 'center',
-          flex: 1,
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: 10,
-          zIndex: -1,
         },
         // ── Profile Header (compact) ──
         profileSection: {
           alignItems: 'center',
-          paddingTop: 20,
+          paddingTop: 16,
           paddingBottom: 20,
           paddingHorizontal: 16,
           borderBottomWidth: StyleSheet.hairlineWidth,
@@ -513,17 +483,26 @@ const Profile: React.FC = () => {
         upcomingEventCard: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 4,
+          paddingVertical: 10,
+        },
+        upcomingList: {
+          gap: 2,
+        },
+        upcomingMoreText: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          marginTop: 6,
+          paddingLeft: 2,
         },
         upcomingDateBadge: {
           backgroundColor: colors.primary + '14',
           borderRadius: 10,
           paddingVertical: 8,
-          paddingHorizontal: 12,
+          paddingHorizontal: 10,
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 12,
-          minWidth: 60,
+          minWidth: 64,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.primary + '40',
         },
@@ -540,33 +519,45 @@ const Profile: React.FC = () => {
         },
         upcomingEventInfo: {
           flex: 1,
+          minWidth: 0,
+          justifyContent: 'center',
         },
         upcomingEventName: {
           fontSize: 15,
           fontWeight: '700',
           color: colors.text,
-          marginBottom: 4,
+          marginBottom: 3,
         },
         upcomingEventMeta: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 5,
+        },
+        upcomingEventMetaIcon: {
+          width: 14,
+          alignItems: 'center',
+          marginRight: 5,
         },
         upcomingEventMetaText: {
           fontSize: 13,
           color: colors.secondaryText,
+          flex: 1,
           flexShrink: 1,
+        },
+        upcomingChevron: {
+          marginLeft: 8,
+          justifyContent: 'center',
+          alignItems: 'center',
         },
         liveBadge: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 5,
         },
         liveDot: {
           width: 7,
           height: 7,
           borderRadius: 4,
           backgroundColor: '#4CAF50',
+          marginRight: 5,
         },
         liveBadgeText: {
           fontSize: 12,
@@ -1143,10 +1134,9 @@ const Profile: React.FC = () => {
 
   return (
     <SafeAreaView style={themedStyles.safeArea} edges={['top']}>
-      {/* Header */}
+      {/* Compact top bar — tab label lives in the bottom nav */}
       <View style={themedStyles.header}>
         <HamburgerMenu />
-        <Text style={themedStyles.title}>{t('profile.title')}</Text>
       </View>
 
       <ScrollView
@@ -1304,71 +1294,104 @@ const Profile: React.FC = () => {
           </View>
         </View>
 
-        {/* ── Up Next ── */}
+        {/* ── Upcoming ── */}
         <View style={themedStyles.section}>
           <View style={themedStyles.sectionHeaderRow}>
             <Text style={themedStyles.sectionLabel}>
-              {t('profile.upNext') || 'Up Next'}
+              {t('profile.upcoming') || 'Upcoming'}
             </Text>
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate('Events', {
-                  screen: 'EventList',
-                  params: {profileFilter: 'joined', userId: _id},
-                })
-              }>
-              <Text style={themedStyles.sectionAction}>
-                {t('profile.seeAll') || 'See All'}
-              </Text>
-            </TouchableOpacity>
+            {upcomingEvents.length > 0 && (
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('Events', {
+                    screen: 'EventList',
+                    params: {profileFilter: 'upcoming', userId: _id},
+                  })
+                }>
+                <Text style={themedStyles.sectionAction}>
+                  {t('profile.seeAll') || 'See All'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {nextUpcomingEvent ? (
-            <TouchableOpacity
-              style={themedStyles.upcomingEventCard}
-              onPress={() => openEvent(nextUpcomingEvent)}>
-              <View style={themedStyles.upcomingDateBadge}>
-                <Text style={themedStyles.upcomingDateDay}>
-                  {formatEventDate(nextUpcomingEvent)}
+          {previewUpcomingEvents.length > 0 ? (
+            <View style={themedStyles.upcomingList}>
+              {previewUpcomingEvents.map(event => {
+                const live = isEventLive(
+                  event.date,
+                  event.time,
+                  event.durationMinutes,
+                );
+                return (
+                  <TouchableOpacity
+                    key={event._id}
+                    style={themedStyles.upcomingEventCard}
+                    onPress={() => openEvent(event)}>
+                    <View style={themedStyles.upcomingDateBadge}>
+                      <Text style={themedStyles.upcomingDateDay}>
+                        {formatEventDate(event)}
+                      </Text>
+                      <Text style={themedStyles.upcomingDateTime}>
+                        {formatEventTime(event)}
+                      </Text>
+                    </View>
+                    <View style={themedStyles.upcomingEventInfo}>
+                      <Text
+                        style={themedStyles.upcomingEventName}
+                        numberOfLines={1}>
+                        {event.name}
+                      </Text>
+                      {live ? (
+                        <View style={themedStyles.liveBadge}>
+                          <View style={themedStyles.liveDot} />
+                          <Text style={themedStyles.liveBadgeText}>
+                            {t('events.happeningNow') || 'Happening Now'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={themedStyles.upcomingEventMeta}>
+                          <View style={themedStyles.upcomingEventMetaIcon}>
+                            <FontAwesomeIcon
+                              icon={faLocationDot}
+                              size={11}
+                              color={colors.secondaryText}
+                            />
+                          </View>
+                          <Text
+                            style={themedStyles.upcomingEventMetaText}
+                            numberOfLines={1}>
+                            {(event as any).isVirtual
+                              ? event.location
+                                ? `${
+                                    t('events.virtualLocationBadge') ||
+                                    'Online / other'
+                                  } · ${event.location}`
+                                : t('events.virtualLocationBadge') ||
+                                  'Online / other'
+                              : event.location}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={themedStyles.upcomingChevron}>
+                      <FontAwesomeIcon
+                        icon={faChevronRight}
+                        size={13}
+                        color={colors.secondaryText}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+              {upcomingEvents.length > previewUpcomingEvents.length && (
+                <Text style={themedStyles.upcomingMoreText}>
+                  {`+${
+                    upcomingEvents.length - previewUpcomingEvents.length
+                  } ${t('profile.moreUpcoming') || 'more'}`}
                 </Text>
-                <Text style={themedStyles.upcomingDateTime}>
-                  {formatEventTime(nextUpcomingEvent)}
-                </Text>
-              </View>
-              <View style={themedStyles.upcomingEventInfo}>
-                <Text
-                  style={themedStyles.upcomingEventName}
-                  numberOfLines={1}>
-                  {nextUpcomingEvent.name}
-                </Text>
-                {isNextEventLive ? (
-                  <View style={themedStyles.liveBadge}>
-                    <View style={themedStyles.liveDot} />
-                    <Text style={themedStyles.liveBadgeText}>
-                      {t('events.happeningNow') || 'Happening Now'}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={themedStyles.upcomingEventMeta}>
-                    <FontAwesomeIcon
-                      icon={faLocationDot}
-                      size={11}
-                      color={colors.secondaryText}
-                    />
-                    <Text
-                      style={themedStyles.upcomingEventMetaText}
-                      numberOfLines={1}>
-                      {nextUpcomingEvent.location}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <FontAwesomeIcon
-                icon={faChevronRight}
-                size={13}
-                color={colors.secondaryText}
-              />
-            </TouchableOpacity>
+              )}
+            </View>
           ) : (
             <View>
               <Text style={themedStyles.upcomingEmptyText}>

@@ -145,7 +145,17 @@
     "myEventsOnlyDescription": "Показывать только события, которые я организую или посещаю",
     "reactions": "Реакции",
     "reactedToThis": "отреагировали на это",
-    "noReactionsYet": "Пока нет реакций"
+    "noReactionsYet": "Пока нет реакций",
+    "openEnded": "Без ограничения",
+    "openEndedShort": "Открыто",
+    "noLimit": "Без лимита",
+    "locationPlace": "Место",
+    "locationVirtual": "Онлайн / другое",
+    "virtualLocationPlaceholder": "напр. Игровой вечер, Discord, у меня",
+    "virtualLocationBadge": "Онлайн / другое",
+    "messageHost": "Написать организатору",
+    "lfgBadge": "Ищет компанию",
+    "lfgHint": "Напишите организатору, затем запросите участие."
   },
   "profile": {
     "title": "Профиль",
@@ -283,7 +293,14 @@
     "saveChanges": "Сохранить изменения",
     "invitePlayers": "Пригласить людей",
     "noReply": "Приглашён · нет ответа",
-    "joinRequests": "Запросы"
+    "joinRequests": "Запросы",
+    "remindAll": "Напомнить всем",
+    "remindSentTitle": "Напоминание отправлено",
+    "remindSentOne": "Им придёт напоминание ответить.",
+    "remindSentMany": "Напомнили {{count}} людям.",
+    "remindCooldownTitle": "Уже напоминали",
+    "remindCooldownBody": "Вы уже недавно напоминали. Попробуйте примерно через час.",
+    "remindError": "Не удалось отправить"
   },
   "groupChat": {
     "tabMembers": "Участники",

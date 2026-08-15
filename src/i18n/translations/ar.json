@@ -145,7 +145,17 @@
     "myEventsOnlyDescription": "إظهار الفعاليات التي أستضيفها أو أحضرها فقط",
     "reactions": "التفاعلات",
     "reactedToThis": "تفاعلوا مع هذا",
-    "noReactionsYet": "لا توجد تفاعلات بعد"
+    "noReactionsYet": "لا توجد تفاعلات بعد",
+    "openEnded": "بدون نهاية",
+    "openEndedShort": "مفتوح",
+    "noLimit": "بلا حد",
+    "locationPlace": "مكان",
+    "locationVirtual": "عبر الإنترنت / آخر",
+    "virtualLocationPlaceholder": "مثل ليلة ألعاب، Discord، بيتي",
+    "virtualLocationBadge": "عبر الإنترنت / آخر",
+    "messageHost": "راسل المضيف",
+    "lfgBadge": "يبحث عن مجموعة",
+    "lfgHint": "راسل المضيف بسؤال، ثم اطلب الانضمام عندما تكون مستعدًا."
   },
   "profile": {
     "title": "الملف الشخصي",
@@ -283,7 +293,14 @@
     "saveChanges": "حفظ التغييرات",
     "invitePlayers": "دعوة أشخاص",
     "noReply": "مدعو · لا يوجد رد",
-    "joinRequests": "الطلبات"
+    "joinRequests": "الطلبات",
+    "remindAll": "ذكّر الجميع",
+    "remindSentTitle": "تم إرسال التذكير",
+    "remindSentOne": "سيصله تنبيه لتأكيد الحضور.",
+    "remindSentMany": "تم تذكير {{count}} أشخاص.",
+    "remindCooldownTitle": "تم التذكير مسبقاً",
+    "remindCooldownBody": "أرسلت تذكيراً مؤخراً. حاول بعد ساعة تقريباً.",
+    "remindError": "فشل إرسال التذكير"
   },
   "groupChat": {
     "tabMembers": "الأعضاء",

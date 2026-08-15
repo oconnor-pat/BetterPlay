@@ -59,6 +59,7 @@ export interface AppNotification {
     | 'event_waitlist_join'
     | 'event_roster_change'
     | 'event_rsvp'
+    | 'event_rsvp_reminder'
     | 'event_join_request'
     | 'event_join_approved'
     | 'event_join_denied'
@@ -334,6 +335,7 @@ const Notifications: React.FC = () => {
       case 'event_waitlist_join':
       case 'event_roster_change':
       case 'event_rsvp':
+      case 'event_rsvp_reminder':
       case 'event_join_request':
       case 'event_join_approved':
       case 'group_event_created':
@@ -438,6 +440,7 @@ const Notifications: React.FC = () => {
       case 'event_reminder':
         return faClock;
       case 'event_invitation':
+      case 'event_rsvp_reminder':
         return faEnvelope;
       case 'event_roster':
       case 'event_roster_change':
@@ -491,6 +494,7 @@ const Notifications: React.FC = () => {
       case 'event_reminder':
         return '#9C27B0';
       case 'event_invitation':
+      case 'event_rsvp_reminder':
       case 'event_roster':
       case 'event_roster_change':
       case 'event_join':

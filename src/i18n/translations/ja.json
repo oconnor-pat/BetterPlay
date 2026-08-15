@@ -145,7 +145,17 @@
     "myEventsOnlyDescription": "主催または参加するイベントのみ表示",
     "reactions": "リアクション",
     "reactedToThis": "人がリアクションしました",
-    "noReactionsYet": "まだリアクションがありません"
+    "noReactionsYet": "まだリアクションがありません",
+    "openEnded": "終了時間なし",
+    "openEndedShort": "無制限",
+    "noLimit": "人数無制限",
+    "locationPlace": "場所",
+    "locationVirtual": "オンライン / その他",
+    "virtualLocationPlaceholder": "例: 金曜ゲーム夜、Discord、自宅",
+    "virtualLocationBadge": "オンライン / その他",
+    "messageHost": "ホストにメッセージ",
+    "lfgBadge": "メンバー募集",
+    "lfgHint": "まずホストにメッセージしてから、参加リクエストを送りましょう。"
   },
   "profile": {
     "title": "プロフィール",
@@ -283,7 +293,14 @@
     "saveChanges": "変更を保存",
     "invitePlayers": "人を招待",
     "noReply": "招待済み · 返信なし",
-    "joinRequests": "リクエスト"
+    "joinRequests": "リクエスト",
+    "remindAll": "全員にリマインド",
+    "remindSentTitle": "リマインドを送信しました",
+    "remindSentOne": "RSVPのリマインドが届きます。",
+    "remindSentMany": "{{count}}人にリマインドしました。",
+    "remindCooldownTitle": "最近送信済み",
+    "remindCooldownBody": "最近リマインド済みです。約1時間後に再試行してください。",
+    "remindError": "リマインドに失敗しました"
   },
   "groupChat": {
     "tabMembers": "メンバー",

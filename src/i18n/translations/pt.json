@@ -145,7 +145,17 @@
     "myEventsOnlyDescription": "Mostrar apenas eventos que eu organizo ou participo",
     "reactions": "Reações",
     "reactedToThis": "reagiram a isto",
-    "noReactionsYet": "Ainda não há reações"
+    "noReactionsYet": "Ainda não há reações",
+    "openEnded": "Sem fim",
+    "openEndedShort": "Aberto",
+    "noLimit": "Sem limite",
+    "locationPlace": "Local",
+    "locationVirtual": "Online / outro",
+    "virtualLocationPlaceholder": "ex. Noite de jogos, Discord, minha casa",
+    "virtualLocationBadge": "Online / outro",
+    "messageHost": "Mensagem ao anfitrião",
+    "lfgBadge": "Procurando grupo",
+    "lfgHint": "Mensage o anfitrião com uma pergunta e depois peça para entrar."
   },
   "profile": {
     "title": "Perfil",
@@ -283,7 +293,14 @@
     "saveChanges": "Salvar Alterações",
     "invitePlayers": "Convidar Pessoas",
     "noReply": "Convidado · sem resposta",
-    "joinRequests": "Solicitações"
+    "joinRequests": "Solicitações",
+    "remindAll": "Lembrar todos",
+    "remindSentTitle": "Lembrete enviado",
+    "remindSentOne": "Eles receberão um lembrete de RSVP.",
+    "remindSentMany": "Lembrete enviado a {{count}} pessoas.",
+    "remindCooldownTitle": "Já lembrado",
+    "remindCooldownBody": "Você já enviou um lembrete. Tente de novo em cerca de uma hora.",
+    "remindError": "Falha ao lembrar"
   },
   "groupChat": {
     "tabMembers": "Membros",

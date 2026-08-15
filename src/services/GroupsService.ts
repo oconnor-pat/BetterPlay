@@ -17,6 +17,20 @@ export const listMyGroups = async (): Promise<Group[]> => {
   return (res.data?.groups || []) as Group[];
 };
 
+export const fetchGroupUnreadCounts = async (): Promise<{
+  unreadGroups: number;
+  unreadMessages: number;
+}> => {
+  const headers = await authHeaders();
+  const res = await axios.get(`${API_BASE_URL}/groups/unread-count`, {
+    headers,
+  });
+  return {
+    unreadGroups: res.data?.unreadGroups || 0,
+    unreadMessages: res.data?.unreadMessages || 0,
+  };
+};
+
 export const getGroup = async (groupId: string): Promise<Group> => {
   const headers = await authHeaders();
   const res = await axios.get(`${API_BASE_URL}/groups/${groupId}`, {headers});

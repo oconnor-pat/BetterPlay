@@ -27,6 +27,7 @@ import {IconDefinition} from '@fortawesome/fontawesome-svg-core';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {useNotifications} from '../../Context/NotificationContext';
 import {useDmBadge} from '../../hooks/useDmBadge';
+import {useGroupBadge} from '../../hooks/useGroupBadge';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTranslation} from 'react-i18next';
 
@@ -273,6 +274,8 @@ const BottomNavigator: React.FC = () => {
   // Counts threads waiting on the user (unread conversations + pending
   // message requests), so the tab can say how many people need a reply.
   const dmBadge = useDmBadge(!!userData);
+  // Same idea for Groups: how many group chats have unread messages.
+  const groupBadge = useGroupBadge(!!userData);
 
   // Request notification permission after login (once per session)
   useEffect(() => {
@@ -346,12 +349,20 @@ const BottomNavigator: React.FC = () => {
         ? dmBadge > 99
           ? '99+'
           : dmBadge
-        : undefined,
+        : route.name === 'Groups' && groupBadge > 0
+          ? groupBadge > 99
+            ? '99+'
+            : groupBadge
+          : undefined,
     tabBarBadgeStyle: {
       backgroundColor: '#FF3B30',
       color: '#FFFFFF',
       fontSize: 10,
       fontWeight: '700' as const,
+      minWidth: 18,
+      height: 18,
+      lineHeight: 16,
+      borderRadius: 9,
     },
   });
 

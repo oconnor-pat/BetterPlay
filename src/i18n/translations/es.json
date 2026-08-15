@@ -154,7 +154,17 @@
     "endsAt": "Termina a las {{time}}",
     "reactions": "Reacciones",
     "reactedToThis": "reaccionaron a esto",
-    "noReactionsYet": "Aún no hay reacciones"
+    "noReactionsYet": "Aún no hay reacciones",
+    "openEnded": "Sin hora de fin",
+    "openEndedShort": "Libre",
+    "noLimit": "Sin límite",
+    "locationPlace": "Lugar",
+    "locationVirtual": "En línea / otro",
+    "virtualLocationPlaceholder": "p. ej. Noche de juegos, Discord, mi casa",
+    "virtualLocationBadge": "En línea / otro",
+    "messageHost": "Mensaje al anfitrión",
+    "lfgBadge": "Busca grupo",
+    "lfgHint": "Escribe al anfitrión con una pregunta y luego solicita unirte."
   },
   "profile": {
     "title": "Perfil",
@@ -292,7 +302,14 @@
     "saveChanges": "Guardar Cambios",
     "invitePlayers": "Invitar Personas",
     "noReply": "Invitado · sin respuesta",
-    "joinRequests": "Solicitudes"
+    "joinRequests": "Solicitudes",
+    "remindAll": "Recordar a todos",
+    "remindSentTitle": "Recordatorio enviado",
+    "remindSentOne": "Recibirán un aviso para confirmar.",
+    "remindSentMany": "Se recordó a {{count}} personas.",
+    "remindCooldownTitle": "Ya recordado",
+    "remindCooldownBody": "Ya enviaste un recordatorio. Inténtalo en aproximadamente una hora.",
+    "remindError": "Error al recordar"
   },
   "groupChat": {
     "tabMembers": "Miembros",

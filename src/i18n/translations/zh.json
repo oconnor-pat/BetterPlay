@@ -145,7 +145,17 @@
     "myEventsOnlyDescription": "仅显示我主办或参加的活动",
     "reactions": "反应",
     "reactedToThis": "人做出了反应",
-    "noReactionsYet": "还没有反应"
+    "noReactionsYet": "还没有反应",
+    "openEnded": "不限时长",
+    "openEndedShort": "不限",
+    "noLimit": "不限人数",
+    "locationPlace": "地点",
+    "locationVirtual": "线上 / 其他",
+    "virtualLocationPlaceholder": "例如：周五游戏夜、Discord、我家",
+    "virtualLocationBadge": "线上 / 其他",
+    "messageHost": "私信主办人",
+    "lfgBadge": "找搭子",
+    "lfgHint": "先私信主办人提问，准备好后再申请加入。"
   },
   "profile": {
     "title": "个人资料",
@@ -283,7 +293,14 @@
     "saveChanges": "保存更改",
     "invitePlayers": "邀请他人",
     "noReply": "已邀请 · 未回复",
-    "joinRequests": "申请"
+    "joinRequests": "申请",
+    "remindAll": "提醒全部",
+    "remindSentTitle": "提醒已发送",
+    "remindSentOne": "对方会收到 RSVP 提醒。",
+    "remindSentMany": "已提醒 {{count}} 人。",
+    "remindCooldownTitle": "刚刚提醒过",
+    "remindCooldownBody": "你刚刚发过提醒，请大约一小时后再试。",
+    "remindError": "发送提醒失败"
   },
   "groupChat": {
     "tabMembers": "成员",

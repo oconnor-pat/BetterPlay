@@ -27,11 +27,12 @@ import {
   faCheck,
   faTimes,
   faHeart,
-  faComments,
   faPaperPlane,
   faChevronUp,
   faChevronRight,
+  faPlus,
 } from '@fortawesome/free-solid-svg-icons';
+import EmojiPicker, {type EmojiType} from 'rn-emoji-keyboard';
 import UserContext, {UserContextType} from '../UserContext';
 import axios from 'axios';
 import {useTheme} from '../ThemeContext/ThemeContext';
@@ -40,6 +41,11 @@ import {useTranslation} from 'react-i18next';
 import {useNavigation, CommonActions} from '@react-navigation/native';
 import {useSocket} from '../../Context/SocketContext';
 
+interface CommentReaction {
+  userId: string;
+  emoji: string;
+}
+
 interface Reply {
   _id?: string;
   text: string;
@@ -47,6 +53,10 @@ interface Reply {
   userId: string;
   profilePicUrl?: string;
   createdAt?: string;
+  likes?: string[];
+  reactions?: CommentReaction[];
+  replyToUsername?: string | null;
+  replyToReplyId?: string | null;
 }
 
 interface LikedByUser {
@@ -65,7 +75,10 @@ interface Comment {
   likes?: string[];
   likedByUsernames?: string[];
   likedByUsers?: LikedByUser[];
+  reactions?: CommentReaction[];
   createdAt?: string;
+  // true = nests under the discussion opener; false/absent = own top-level thread
+  replyToPost?: boolean;
 }
 
 interface Post {
@@ -78,6 +91,7 @@ interface Post {
   likes?: string[];
   likedByUsernames?: string[];
   likedByUsers?: LikedByUser[];
+  reactions?: CommentReaction[];
   createdAt?: string;
   eventId?: string;
   eventName?: string;
@@ -91,6 +105,71 @@ interface EventCommentsProps {
   onClose: () => void;
   onCommentCountChange?: (eventId: string, count: number) => void;
 }
+
+const LIKE_EMOJI = '❤️';
+
+const summarizeReactions = (
+  reactions: CommentReaction[] | undefined,
+  userId?: string,
+): {emoji: string; count: number; mine: boolean}[] => {
+  const order: string[] = [];
+  const counts = new Map<string, number>();
+  const mine = new Set<string>();
+
+  (reactions || []).forEach(r => {
+    if (!counts.has(r.emoji)) {
+      order.push(r.emoji);
+    }
+    counts.set(r.emoji, (counts.get(r.emoji) || 0) + 1);
+    if (userId && r.userId === userId) {
+      mine.add(r.emoji);
+    }
+  });
+
+  return order.map(emoji => ({
+    emoji,
+    count: counts.get(emoji) as number,
+    mine: mine.has(emoji),
+  }));
+};
+
+const normalizeReply = (reply: Reply): Reply => ({
+  ...reply,
+  reactions:
+    reply.reactions && reply.reactions.length > 0
+      ? reply.reactions
+      : (reply.likes || []).map(userId => ({userId, emoji: LIKE_EMOJI})),
+});
+
+const normalizeComment = (comment: Comment): Comment => ({
+  ...comment,
+  replyToPost: !!comment.replyToPost,
+  reactions:
+    comment.reactions && comment.reactions.length > 0
+      ? comment.reactions
+      : (comment.likes || []).map(userId => ({userId, emoji: LIKE_EMOJI})),
+  replies: (comment.replies || []).map(normalizeReply),
+});
+
+const normalizePost = (post: Post): Post => ({
+  ...post,
+  reactions:
+    post.reactions && post.reactions.length > 0
+      ? post.reactions
+      : (post.likes || []).map(userId => ({userId, emoji: LIKE_EMOJI})),
+  comments: (post.comments || []).map(normalizeComment),
+});
+
+// Badge count: opener + independent top-level comments. Nested replies
+// (and replies-to-the-opener) are not included.
+const countTopLevelComments = (post: Post | null): number => {
+  if (!post) {
+    return 0;
+  }
+  const opener = post.text?.trim() ? 1 : 0;
+  const roots = (post.comments || []).filter(c => !c.replyToPost).length;
+  return opener + roots;
+};
 
 // Helper to get user initials for avatar
 const getInitials = (name: string): string => {
@@ -155,14 +234,25 @@ const EventComments: React.FC<EventCommentsProps> = ({
   );
   const [replyText, setReplyText] = useState<{[commentId: string]: string}>({});
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  // When replying to a nested reply, keep who we're continuing so the
+  // new reply can show "Replying to X" context on the server/FE.
+  const [replyingToReply, setReplyingToReply] = useState<{
+    replyId: string;
+    username: string;
+  } | null>(null);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [likesModalVisible, setLikesModalVisible] = useState(false);
   const [likesModalData, setLikesModalData] = useState<{
     title: string;
     users: LikedByUser[];
     anonymousCount: number;
   }>({title: '', users: [], anonymousCount: 0});
+  const [reactionTarget, setReactionTarget] = useState<
+    | {kind: 'post'}
+    | {kind: 'comment'; commentId: string}
+    | {kind: 'reply'; commentId: string; replyId: string}
+    | null
+  >(null);
 
   // Edit state
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -178,7 +268,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
   const [postingContent, setPostingContent] = useState(false);
 
   const {userData} = useContext(UserContext) as UserContextType;
-  const {colors} = useTheme();
+  const {colors, darkMode} = useTheme();
   const {t} = useTranslation();
   const navigation = useNavigation();
   const {subscribe: socketSubscribe, joinEvent, leaveEvent} = useSocket();
@@ -188,9 +278,11 @@ const EventComments: React.FC<EventCommentsProps> = ({
 
   // Autofocus reply input
   useEffect(() => {
-    if (replyingTo && replyInputRefs.current[replyingTo]) {
-      replyInputRefs.current[replyingTo]?.focus();
+    if (!replyingTo) {
+      return;
     }
+    const key = replyingTo === 'post' ? 'post' : replyingTo;
+    replyInputRefs.current[key]?.focus();
   }, [replyingTo]);
 
   // Fetch or create post for this event
@@ -203,19 +295,12 @@ const EventComments: React.FC<EventCommentsProps> = ({
       );
 
       if (response.data && response.data._id) {
-        setPost(response.data);
+        setPost(normalizePost(response.data));
         // Initialize liked states
         if (userData) {
           if (response.data.likes?.includes(userData._id)) {
             setLikedPosts(new Set([response.data._id]));
           }
-          const likedCommentsSet = new Set<string>();
-          response.data.comments?.forEach((comment: Comment) => {
-            if (comment.likes?.includes(userData._id) && comment._id) {
-              likedCommentsSet.add(comment._id);
-            }
-          });
-          setLikedComments(likedCommentsSet);
         }
       } else {
         setPost(null);
@@ -247,11 +332,16 @@ const EventComments: React.FC<EventCommentsProps> = ({
         if (data.eventId === eventId) {
           setPost(prev => {
             if (!prev) return prev;
-            const updates: Partial<Post> = {comments: data.comments};
+            const updates: Partial<Post> = {
+              comments: (data.comments || []).map(normalizeComment),
+            };
             if (data.likes) updates.likes = data.likes;
             if (data.likedByUsernames)
               updates.likedByUsernames = data.likedByUsernames;
-            return {...prev, ...updates};
+            if ((data as any).reactions) {
+              updates.reactions = (data as any).reactions;
+            }
+            return normalizePost({...prev, ...updates});
           });
         }
       },
@@ -268,8 +358,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
 
   useEffect(() => {
     if (onCommentCountChangeRef.current) {
-      const count = post?.comments?.length || 0;
-      onCommentCountChangeRef.current(eventId, count);
+      onCommentCountChangeRef.current(eventId, countTopLevelComments(post));
     }
   }, [post, eventId]);
 
@@ -350,164 +439,236 @@ const EventComments: React.FC<EventCommentsProps> = ({
     setLikesModalVisible(true);
   };
 
-  // Toggle like on post
-  const toggleLike = async (postId: string) => {
+  // Toggle Discord-style reaction on the discussion post
+  const togglePostReaction = async (postId: string, emoji: string) => {
     if (!userData || !post) {
       return;
     }
 
-    const isLiked = likedPosts.has(postId);
-
-    // Optimistic update
-    setLikedPosts(prev => {
-      const newSet = new Set(prev);
-      if (isLiked) {
-        newSet.delete(postId);
-      } else {
-        newSet.add(postId);
-      }
-      return newSet;
-    });
-
-    setPost(prev =>
-      prev
-        ? {
-            ...prev,
-            likes: isLiked
-              ? (prev.likes || []).filter(id => id !== userData._id)
-              : [...(prev.likes || []), userData._id],
-            likedByUsernames: isLiked
-              ? (prev.likedByUsernames || []).filter(
-                  name => name !== userData.username,
-                )
-              : [...(prev.likedByUsernames || []), userData.username],
-          }
-        : prev,
+    const myUid = userData._id;
+    const hadIt = (post.reactions || []).some(
+      r => r.userId === myUid && r.emoji === emoji,
     );
 
+    const withPair = (target: Post, shouldHave: boolean): Post => {
+      const others = (target.reactions || []).filter(
+        r => !(r.userId === myUid && r.emoji === emoji),
+      );
+      const reactions = shouldHave
+        ? [...others, {userId: myUid, emoji}]
+        : others;
+      return {
+        ...target,
+        reactions,
+        likes: reactions
+          .filter(r => r.emoji === LIKE_EMOJI)
+          .map(r => r.userId),
+      };
+    };
+
+    setPost(prev => (prev ? withPair(prev, !hadIt) : prev));
+
     try {
+      const token = await AsyncStorage.getItem('userToken');
       const response = await axios.post(
-        `${API_BASE_URL}/community-notes/${postId}/like`,
-        {userId: userData._id},
+        `${API_BASE_URL}/community-notes/${postId}/react`,
+        {emoji, userId: myUid},
+        {headers: token ? {Authorization: `Bearer ${token}`} : undefined},
       );
       setPost(prev =>
         prev
           ? {
               ...prev,
-              likes: response.data.likes,
-              likedByUsernames:
-                response.data.likedByUsernames || prev.likedByUsernames,
+              reactions: response.data.reactions || prev.reactions,
+              likes: response.data.likes || prev.likes,
             }
           : prev,
       );
     } catch {
-      // Revert on error
-      setLikedPosts(prev => {
-        const newSet = new Set(prev);
-        if (isLiked) {
-          newSet.add(postId);
-        } else {
-          newSet.delete(postId);
-        }
-        return newSet;
-      });
-      setPost(prev =>
-        prev
-          ? {
-              ...prev,
-              likes: isLiked
-                ? [...(prev.likes || []), userData._id]
-                : (prev.likes || []).filter(id => id !== userData._id),
-              likedByUsernames: isLiked
-                ? [...(prev.likedByUsernames || []), userData.username]
-                : (prev.likedByUsernames || []).filter(
-                    name => name !== userData.username,
-                  ),
-            }
-          : prev,
-      );
+      setPost(prev => (prev ? withPair(prev, hadIt) : prev));
     }
   };
 
-  // Toggle like on comment
-  const toggleCommentLike = async (postId: string, commentId: string) => {
+  // Toggle Discord-style reaction on a comment
+  const toggleCommentReaction = async (
+    postId: string,
+    commentId: string,
+    emoji: string,
+  ) => {
     if (!userData || !post) {
       return;
     }
 
-    const isLiked = likedComments.has(commentId);
+    const myUid = userData._id;
+    const comment = post.comments.find(c => c._id === commentId);
+    const hadIt = (comment?.reactions || []).some(
+      r => r.userId === myUid && r.emoji === emoji,
+    );
 
-    // Optimistic update
-    setLikedComments(prev => {
-      const newSet = new Set(prev);
-      if (isLiked) {
-        newSet.delete(commentId);
-      } else {
-        newSet.add(commentId);
-      }
-      return newSet;
-    });
+    const withPair = (target: Comment, shouldHave: boolean): Comment => {
+      const others = (target.reactions || []).filter(
+        r => !(r.userId === myUid && r.emoji === emoji),
+      );
+      const reactions = shouldHave
+        ? [...others, {userId: myUid, emoji}]
+        : others;
+      return {
+        ...target,
+        reactions,
+        likes: reactions
+          .filter(r => r.emoji === LIKE_EMOJI)
+          .map(r => r.userId),
+      };
+    };
 
     setPost(prev =>
       prev
         ? {
             ...prev,
-            comments: prev.comments.map(comment =>
-              comment._id === commentId
-                ? {
-                    ...comment,
-                    likes: isLiked
-                      ? (comment.likes || []).filter(id => id !== userData._id)
-                      : [...(comment.likes || []), userData._id],
-                    likedByUsernames: isLiked
-                      ? (comment.likedByUsernames || []).filter(
-                          name => name !== userData.username,
-                        )
-                      : [
-                          ...(comment.likedByUsernames || []),
-                          userData.username,
-                        ],
-                  }
-                : comment,
+            comments: prev.comments.map(c =>
+              c._id === commentId ? withPair(c, !hadIt) : c,
             ),
           }
         : prev,
     );
 
     try {
+      const token = await AsyncStorage.getItem('userToken');
       const response = await axios.post(
-        `${API_BASE_URL}/community-notes/${postId}/comments/${commentId}/like`,
-        {userId: userData._id},
+        `${API_BASE_URL}/community-notes/${postId}/comments/${commentId}/react`,
+        {emoji, userId: myUid},
+        {headers: token ? {Authorization: `Bearer ${token}`} : undefined},
       );
       setPost(prev =>
         prev
           ? {
               ...prev,
-              comments: prev.comments.map(comment =>
-                comment._id === commentId
+              comments: prev.comments.map(c =>
+                c._id === commentId
                   ? {
-                      ...comment,
-                      likes: response.data.likes,
-                      likedByUsernames:
-                        response.data.likedByUsernames ||
-                        comment.likedByUsernames,
+                      ...c,
+                      reactions: response.data.reactions || c.reactions,
+                      likes: response.data.likes || c.likes,
                     }
-                  : comment,
+                  : c,
               ),
             }
           : prev,
       );
     } catch {
-      // Revert on error
-      setLikedComments(prev => {
-        const newSet = new Set(prev);
-        if (isLiked) {
-          newSet.add(commentId);
-        } else {
-          newSet.delete(commentId);
-        }
-        return newSet;
-      });
+      setPost(prev =>
+        prev
+          ? {
+              ...prev,
+              comments: prev.comments.map(c =>
+                c._id === commentId ? withPair(c, hadIt) : c,
+              ),
+            }
+          : prev,
+      );
+    }
+  };
+
+  const toggleReplyReaction = async (
+    postId: string,
+    commentId: string,
+    replyId: string,
+    emoji: string,
+  ) => {
+    if (!userData || !post) {
+      return;
+    }
+
+    const myUid = userData._id;
+    const reply = post.comments
+      .find(c => c._id === commentId)
+      ?.replies?.find(r => r._id === replyId);
+    const hadIt = (reply?.reactions || []).some(
+      r => r.userId === myUid && r.emoji === emoji,
+    );
+
+    const withPair = (target: Reply, shouldHave: boolean): Reply => {
+      const others = (target.reactions || []).filter(
+        r => !(r.userId === myUid && r.emoji === emoji),
+      );
+      const reactions = shouldHave
+        ? [...others, {userId: myUid, emoji}]
+        : others;
+      return {
+        ...target,
+        reactions,
+        likes: reactions
+          .filter(r => r.emoji === LIKE_EMOJI)
+          .map(r => r.userId),
+      };
+    };
+
+    setPost(prev =>
+      prev
+        ? {
+            ...prev,
+            comments: prev.comments.map(c =>
+              c._id === commentId
+                ? {
+                    ...c,
+                    replies: (c.replies || []).map(r =>
+                      r._id === replyId ? withPair(r, !hadIt) : r,
+                    ),
+                  }
+                : c,
+            ),
+          }
+        : prev,
+    );
+
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.post(
+        `${API_BASE_URL}/community-notes/${postId}/comments/${commentId}/replies/${replyId}/react`,
+        {emoji, userId: myUid},
+        {headers: token ? {Authorization: `Bearer ${token}`} : undefined},
+      );
+      setPost(prev =>
+        prev
+          ? {
+              ...prev,
+              comments: prev.comments.map(c =>
+                c._id === commentId
+                  ? {
+                      ...c,
+                      replies: (c.replies || []).map(r =>
+                        r._id === replyId
+                          ? {
+                              ...r,
+                              reactions: response.data.reactions || r.reactions,
+                              likes: response.data.likes || r.likes,
+                            }
+                          : r,
+                      ),
+                    }
+                  : c,
+              ),
+            }
+          : prev,
+      );
+    } catch {
+      setPost(prev =>
+        prev
+          ? {
+              ...prev,
+              comments: prev.comments.map(c =>
+                c._id === commentId
+                  ? {
+                      ...c,
+                      replies: (c.replies || []).map(r =>
+                        r._id === replyId ? withPair(r, hadIt) : r,
+                      ),
+                    }
+                  : c,
+              ),
+            }
+          : prev,
+      );
     }
   };
 
@@ -565,8 +726,8 @@ const EventComments: React.FC<EventCommentsProps> = ({
     }
   };
 
-  // Add comment
-  const addComment = async (postId: string) => {
+  // Add a top-level comment thread, or a nested reply to the opener
+  const addComment = async (postId: string, replyToPost: boolean = false) => {
     const text = commentText[postId]?.trim();
     if (!text || !userData) {
       return;
@@ -580,12 +741,17 @@ const EventComments: React.FC<EventCommentsProps> = ({
           username: userData.username,
           userId: userData._id,
           profilePicUrl: userData.profilePicUrl || '',
+          replyToPost,
         },
       );
       setPost(prev =>
-        prev ? {...prev, comments: response.data.comments} : prev,
+        prev
+          ? normalizePost({...prev, comments: response.data.comments})
+          : prev,
       );
       setCommentText(prev => ({...prev, [postId]: ''}));
+      setReplyingTo(null);
+      setReplyingToReply(null);
     } catch {
       Alert.alert(t('common.error'), t('communityNotes.commentError'));
     }
@@ -659,6 +825,8 @@ const EventComments: React.FC<EventCommentsProps> = ({
           username: userData.username,
           userId: userData._id,
           profilePicUrl: userData.profilePicUrl || '',
+          replyToUsername: replyingToReply?.username || null,
+          replyToReplyId: replyingToReply?.replyId || null,
         },
       );
       setPost(prev =>
@@ -667,7 +835,12 @@ const EventComments: React.FC<EventCommentsProps> = ({
               ...prev,
               comments: prev.comments.map(comment =>
                 comment._id === commentId
-                  ? {...comment, replies: response.data.replies}
+                  ? {
+                      ...comment,
+                      replies: (response.data.replies || []).map(
+                        normalizeReply,
+                      ),
+                    }
                   : comment,
               ),
             }
@@ -675,9 +848,27 @@ const EventComments: React.FC<EventCommentsProps> = ({
       );
       setReplyText(prev => ({...prev, [commentId]: ''}));
       setReplyingTo(null);
+      setReplyingToReply(null);
     } catch {
       Alert.alert(t('common.error'), t('communityNotes.replyError'));
     }
+  };
+
+  const startReplyToComment = (commentId: string) => {
+    setReplyingTo(commentId);
+    setReplyingToReply(null);
+  };
+
+  const startReplyToReply = (
+    commentId: string,
+    reply: { _id?: string; username: string },
+  ) => {
+    setReplyingTo(commentId);
+    setReplyingToReply(
+      reply._id
+        ? {replyId: reply._id, username: reply.username}
+        : {replyId: '', username: reply.username},
+    );
   };
 
   // Edit reply
@@ -857,33 +1048,34 @@ const EventComments: React.FC<EventCommentsProps> = ({
         disabledButton: {
           opacity: 0.5,
         },
-        // Post
+        // Post / thread list
         postContainer: {
           paddingTop: 4,
           paddingBottom: 4,
+          gap: 10,
         },
         postHeaderRow: {
           flexDirection: 'row',
           alignItems: 'flex-start',
-          marginBottom: 6,
+          marginBottom: 2,
         },
         postAvatar: {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 32,
+          height: 32,
+          borderRadius: 16,
           backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 10,
         },
         postAvatarImage: {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 32,
+          height: 32,
+          borderRadius: 16,
           marginRight: 10,
         },
         postAvatarText: {
-          fontSize: 15,
+          fontSize: 11,
           fontWeight: '700',
           color: colors.primary,
         },
@@ -936,41 +1128,28 @@ const EventComments: React.FC<EventCommentsProps> = ({
           padding: 4,
         },
         postText: {
-          fontSize: 15,
+          fontSize: 14,
           color: colors.text,
-          lineHeight: 21,
+          lineHeight: 19,
           marginTop: 2,
-          marginBottom: 6,
-          marginLeft: 50,
+          marginBottom: 0,
+          marginLeft: 0,
         },
-        // Social actions — Bluesky-style ghost icon+count clusters
+        // Reaction row under a thread root
         socialActionsRow: {
           flexDirection: 'row',
+          flexWrap: 'wrap',
           alignItems: 'center',
-          paddingTop: 4,
-          paddingBottom: 2,
-          gap: 28,
-          marginLeft: 50,
-        },
-        socialPill: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingVertical: 4,
           gap: 6,
+          paddingTop: 6,
+          paddingBottom: 2,
+          marginLeft: 0,
         },
-        socialPillText: {
-          fontSize: 13,
-          color: colors.secondaryText,
-          fontWeight: '500',
-        },
-        socialPillTextActive: {
-          color: '#e74c3c',
-        },
-        // Comment input — flat row above comments
+        // Comment composer — under the thread list
         commentInputRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginTop: 12,
+          marginTop: 4,
           paddingTop: 12,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
@@ -1015,14 +1194,35 @@ const EventComments: React.FC<EventCommentsProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
         },
-        // Comments section
-        commentsSection: {
-          marginTop: 4,
+        // One card per top-level thread (opener is the root; replies nest inside)
+        commentThread: {
+          borderRadius: 12,
+          backgroundColor: colors.secondaryText + '0C',
+          borderLeftWidth: 3,
+          borderLeftColor: colors.primary + '66',
+          paddingVertical: 10,
+          paddingHorizontal: 10,
         },
         commentContainer: {
-          paddingVertical: 12,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          paddingVertical: 0,
+          borderBottomWidth: 0,
+        },
+        // Direct replies to a thread root
+        threadChildren: {
+          marginTop: 10,
+          marginLeft: 6,
+          paddingLeft: 12,
+          borderLeftWidth: 2,
+          borderLeftColor: colors.primary + '40',
+          gap: 8,
+        },
+        threadChildCard: {
+          backgroundColor: colors.background,
+          borderRadius: 10,
+          paddingVertical: 8,
+          paddingHorizontal: 10,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         commentRow: {
           flexDirection: 'row',
@@ -1034,11 +1234,12 @@ const EventComments: React.FC<EventCommentsProps> = ({
           marginRight: 10,
         },
         threadSpine: {
-          width: StyleSheet.hairlineWidth,
+          width: 2,
           backgroundColor: colors.border,
           flex: 1,
           marginTop: 4,
           minHeight: 8,
+          borderRadius: 1,
         },
         commentHeaderRow: {
           flexDirection: 'row',
@@ -1093,25 +1294,46 @@ const EventComments: React.FC<EventCommentsProps> = ({
           fontSize: 12,
           fontWeight: '600',
         },
-        commentLikeRow: {
+        commentReactionRow: {
           flexDirection: 'row',
+          flexWrap: 'wrap',
           alignItems: 'center',
+          gap: 6,
           marginTop: 6,
         },
-        commentLikePill: {
+        commentReactionPill: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 2,
-          paddingHorizontal: 0,
-          gap: 5,
+          gap: 4,
+          paddingHorizontal: 8,
+          height: 24,
+          borderRadius: 12,
+          backgroundColor: colors.secondaryText + '14',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: 'transparent',
         },
-        commentLikePillText: {
+        commentReactionPillMine: {
+          backgroundColor: colors.primary + '1F',
+          borderColor: colors.primary,
+        },
+        commentReactionPillEmoji: {
           fontSize: 12,
-          color: colors.secondaryText,
-          fontWeight: '600',
         },
-        commentLikePillTextActive: {
-          color: '#e74c3c',
+        commentReactionPillCount: {
+          fontSize: 11,
+          fontWeight: '600',
+          color: colors.secondaryText,
+        },
+        commentReactionPillCountMine: {
+          color: colors.primary,
+        },
+        commentReactionAddButton: {
+          width: 26,
+          height: 24,
+          borderRadius: 12,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.secondaryText + '14',
         },
         // Reply input — sits inside comment content column, indented to align with reply avatars
         replyInputRow: {
@@ -1140,52 +1362,60 @@ const EventComments: React.FC<EventCommentsProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
         },
-        // Replies — nested inside comment content column with their own threading spine
+        // Deeper replies under a comment within a thread
         repliesContainer: {
-          marginTop: 6,
+          marginTop: 10,
+          marginLeft: 4,
+          paddingLeft: 10,
+          borderLeftWidth: 2,
+          borderLeftColor: colors.primary + '33',
+          gap: 6,
         },
         replyContainer: {
-          paddingTop: 8,
-          paddingBottom: 4,
+          paddingTop: 0,
+          paddingBottom: 0,
+        },
+        replyBubble: {
+          backgroundColor: colors.secondaryText + '0A',
+          borderRadius: 10,
+          paddingVertical: 8,
+          paddingHorizontal: 10,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         replyRow: {
           flexDirection: 'row',
           alignItems: 'flex-start',
         },
         replyLeftCol: {
-          width: 26,
+          width: 24,
           alignItems: 'center',
           marginRight: 8,
         },
         replyThreadSpineTop: {
-          width: StyleSheet.hairlineWidth,
-          backgroundColor: colors.border,
-          height: 12,
-          marginBottom: 0,
+          width: 0,
+          height: 0,
         },
         replyThreadSpineBottom: {
-          width: StyleSheet.hairlineWidth,
-          backgroundColor: colors.border,
-          flex: 1,
-          marginTop: 4,
-          minHeight: 8,
+          width: 0,
+          height: 0,
         },
         replyHeaderRow: {
           flexDirection: 'row',
           alignItems: 'flex-start',
         },
         replyAvatar: {
-          width: 26,
-          height: 26,
-          borderRadius: 13,
+          width: 24,
+          height: 24,
+          borderRadius: 12,
           backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
         },
         replyAvatarImage: {
-          width: 26,
-          height: 26,
-          borderRadius: 13,
+          width: 24,
+          height: 24,
+          borderRadius: 12,
         },
         replyAvatarText: {
           fontSize: 9,
@@ -1460,423 +1690,967 @@ const EventComments: React.FC<EventCommentsProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Post */}
+      {/* Thread: opener is the root; comments nest under it */}
       <View style={styles.postContainer}>
-        <View style={styles.postHeaderRow}>
-          <TouchableOpacity
-            onPress={() =>
-              navigateToProfile(post.userId, post.username, post.profilePicUrl)
-            }
-            disabled={!!(userData && post.userId === userData._id)}>
-            {post.profilePicUrl ? (
-              <Image
-                source={{uri: post.profilePicUrl}}
-                style={styles.postAvatarImage}
-              />
-            ) : (
-              <View style={styles.postAvatar}>
-                <Text style={styles.postAvatarText}>
-                  {getInitials(post.username)}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <View style={styles.postHeaderContent}>
-            <View style={styles.postUsernameRow}>
-              <View style={styles.usernameWithTimestamp}>
-                <Text style={styles.postUsername}>{post.username}</Text>
-                {post.createdAt && (
-                  <Text style={styles.timestamp}>
-                    {formatRelativeTime(post.createdAt)}
-                  </Text>
+        <View style={styles.commentThread}>
+          <View style={styles.commentRow}>
+            <View style={styles.commentLeftCol}>
+              <TouchableOpacity
+                onPress={() =>
+                  navigateToProfile(
+                    post.userId,
+                    post.username,
+                    post.profilePicUrl,
+                  )
+                }
+                disabled={!!(userData && post.userId === userData._id)}>
+                {post.profilePicUrl ? (
+                  <Image
+                    source={{uri: post.profilePicUrl}}
+                    style={styles.commentAvatarImage}
+                  />
+                ) : (
+                  <View style={styles.commentAvatar}>
+                    <Text style={styles.commentAvatarText}>
+                      {getInitials(post.username)}
+                    </Text>
+                  </View>
                 )}
-              </View>
-              {userData && post.userId === userData._id && (
-                <View style={styles.postActionsRow}>
+              </TouchableOpacity>
+              {((post.comments || []).some(c => c.replyToPost) ||
+                replyingTo === 'post') && <View style={styles.threadSpine} />}
+            </View>
+            <View style={styles.commentContent}>
+              <View style={styles.postUsernameRow}>
+                <View style={styles.usernameWithTimestamp}>
+                  <Text style={styles.commentUsername}>{post.username}</Text>
+                  {post.createdAt && (
+                    <Text style={styles.timestampSmall}>
+                      {formatRelativeTime(post.createdAt)}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.commentActionsRow}>
                   <TouchableOpacity
-                    style={styles.postEditIcon}
-                    onPress={() => startEditPost(post)}>
+                    style={styles.replyButton}
+                    onPress={() => {
+                      setReplyingTo('post');
+                      setReplyingToReply(null);
+                    }}>
                     <FontAwesomeIcon
-                      icon={faEdit}
-                      size={14}
+                      icon={faReply}
+                      size={11}
+                      color={colors.primary}
+                    />
+                    <Text style={styles.replyButtonText}>
+                      {t('communityNotes.reply') || 'Reply'}
+                    </Text>
+                  </TouchableOpacity>
+                  {userData && post.userId === userData._id && (
+                    <>
+                      <TouchableOpacity
+                        style={styles.editActionIcon}
+                        onPress={() => startEditPost(post)}>
+                        <FontAwesomeIcon
+                          icon={faEdit}
+                          size={12}
+                          color={colors.primary}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.editActionIcon}
+                        onPress={() => deletePost(post._id)}>
+                        <FontAwesomeIcon
+                          icon={faTrash}
+                          size={12}
+                          color={colors.text}
+                        />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </View>
+
+              {editingPostId === post._id ? (
+                <View style={styles.rowCenter}>
+                  <TextInput
+                    style={styles.editInput}
+                    value={editingPostText}
+                    onChangeText={setEditingPostText}
+                    autoFocus
+                    multiline
+                  />
+                  <TouchableOpacity
+                    style={styles.editActionIcon}
+                    onPress={() => saveEditPost(post._id)}>
+                    <FontAwesomeIcon
+                      icon={faCheck}
+                      size={12}
                       color={colors.primary}
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.postTrashIcon}
-                    onPress={() => deletePost(post._id)}>
+                    style={styles.editActionIcon}
+                    onPress={cancelEditPost}>
                     <FontAwesomeIcon
-                      icon={faTrash}
-                      size={14}
+                      icon={faTimes}
+                      size={12}
                       color={colors.text}
                     />
                   </TouchableOpacity>
                 </View>
+              ) : (
+                <Text style={styles.postText}>{post.text}</Text>
               )}
-            </View>
-          </View>
-        </View>
 
-        {/* Post Content */}
-        {editingPostId === post._id ? (
-          <View style={styles.rowCenter}>
-            <TextInput
-              style={styles.editInput}
-              value={editingPostText}
-              onChangeText={setEditingPostText}
-              autoFocus
-              multiline
-            />
-            <TouchableOpacity
-              style={styles.editActionIcon}
-              onPress={() => saveEditPost(post._id)}>
-              <FontAwesomeIcon
-                icon={faCheck}
-                size={16}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.editActionIcon}
-              onPress={cancelEditPost}>
-              <FontAwesomeIcon icon={faTimes} size={16} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Text style={styles.postText}>{post.text}</Text>
-        )}
+              <View style={styles.socialActionsRow}>
+                {summarizeReactions(post.reactions, userData?._id).map(pill => (
+                  <TouchableOpacity
+                    key={pill.emoji}
+                    style={[
+                      styles.commentReactionPill,
+                      pill.mine && styles.commentReactionPillMine,
+                    ]}
+                    onPress={() => togglePostReaction(post._id, pill.emoji)}
+                    hitSlop={{top: 4, bottom: 4, left: 2, right: 2}}>
+                    <Text style={styles.commentReactionPillEmoji}>
+                      {pill.emoji}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.commentReactionPillCount,
+                        pill.mine && styles.commentReactionPillCountMine,
+                      ]}>
+                      {pill.count}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={styles.commentReactionAddButton}
+                  onPress={() => setReactionTarget({kind: 'post'})}
+                  hitSlop={{top: 4, bottom: 4, left: 4, right: 4}}>
+                  <FontAwesomeIcon
+                    icon={faPlus}
+                    size={10}
+                    color={colors.secondaryText}
+                  />
+                </TouchableOpacity>
+              </View>
 
-        {/* Social Actions */}
-        <View style={styles.socialActionsRow}>
-          <TouchableOpacity
-            style={styles.socialPill}
-            onPress={() => toggleLike(post._id)}
-            onLongPress={() =>
-              (post.likes?.length || 0) > 0 &&
-              showLikedBy(
-                t('communityNotes.likedBy') || 'Liked by',
-                post.likedByUsers || [],
-                post.likedByUsernames || [],
-                post.likes?.length || 0,
-              )
-            }>
-            <FontAwesomeIcon
-              icon={faHeart}
-              size={14}
-              color={likedPosts.has(post._id) ? '#e74c3c' : colors.secondaryText}
-            />
-            <Text
-              style={[
-                styles.socialPillText,
-                likedPosts.has(post._id) && styles.socialPillTextActive,
-              ]}>
-              {post.likes?.length || 0}
-            </Text>
-          </TouchableOpacity>
-          <View style={styles.socialPill}>
-            <FontAwesomeIcon
-              icon={faComments}
-              size={14}
-              color={colors.secondaryText}
-            />
-            <Text style={styles.socialPillText}>
-              {post.comments?.length || 0}
-            </Text>
-          </View>
-        </View>
-
-        {/* Add Comment */}
-        <View style={styles.commentInputRow}>
-          {userData?.profilePicUrl ? (
-            <Image
-              source={{uri: userData.profilePicUrl}}
-              style={styles.commentInputAvatarImage}
-            />
-          ) : (
-            <View style={styles.commentInputAvatar}>
-              <Text style={styles.commentInputAvatarText}>
-                {userData ? getInitials(userData.username) : '?'}
-              </Text>
-            </View>
-          )}
-          <TextInput
-            style={styles.commentInput}
-            placeholder={
-              t('communityNotes.writeComment') || 'Write a comment...'
-            }
-            placeholderTextColor={colors.border}
-            value={commentText[post._id] || ''}
-            onChangeText={text =>
-              setCommentText(prev => ({...prev, [post._id]: text}))
-            }
-          />
-          <TouchableOpacity
-            style={styles.commentSendButton}
-            onPress={() => addComment(post._id)}>
-            <FontAwesomeIcon icon={faPaperPlane} size={14} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Comments */}
-        {post.comments && post.comments.length > 0 && (
-          <View style={styles.commentsSection}>
-            {post.comments.map(comment => (
-              <View
-                key={comment._id || comment.text}
-                style={styles.commentContainer}>
-                <View style={styles.commentRow}>
-                  <View style={styles.commentLeftCol}>
-                    <TouchableOpacity
-                      onPress={() =>
-                        navigateToProfile(
-                          comment.userId,
-                          comment.username,
-                          comment.profilePicUrl,
-                        )
+              {replyingTo === 'post' && (
+                <View style={styles.replyInputRow}>
+                  <TextInput
+                    ref={ref => {
+                      if (ref) {
+                        replyInputRefs.current.post = ref;
                       }
-                      disabled={
-                        !!(userData && comment.userId === userData._id)
-                      }>
-                      {comment.profilePicUrl ? (
-                        <Image
-                          source={{uri: comment.profilePicUrl}}
-                          style={styles.commentAvatarImage}
-                        />
-                      ) : (
-                        <View style={styles.commentAvatar}>
-                          <Text style={styles.commentAvatarText}>
-                            {getInitials(comment.username)}
-                          </Text>
+                    }}
+                    style={styles.replyInput}
+                    placeholder={
+                      t('communityNotes.writeReply') || 'Write a reply...'
+                    }
+                    placeholderTextColor={colors.border}
+                    value={replyText.post || ''}
+                    onChangeText={text =>
+                      setReplyText(prev => ({...prev, post: text}))
+                    }
+                  />
+                  <TouchableOpacity
+                    style={styles.replySendButton}
+                    onPress={async () => {
+                      const text = replyText.post?.trim();
+                      if (!text || !userData) {
+                        return;
+                      }
+                      setReplyText(prev => ({...prev, post: ''}));
+                      try {
+                        const response = await axios.post(
+                          `${API_BASE_URL}/community-notes/${post._id}/comments`,
+                          {
+                            text,
+                            username: userData.username,
+                            userId: userData._id,
+                            profilePicUrl: userData.profilePicUrl || '',
+                            replyToPost: true,
+                          },
+                        );
+                        setPost(prev =>
+                          prev
+                            ? normalizePost({
+                                ...prev,
+                                comments: response.data.comments,
+                              })
+                            : prev,
+                        );
+                        setReplyingTo(null);
+                        setReplyingToReply(null);
+                      } catch {
+                        Alert.alert(
+                          t('common.error'),
+                          t('communityNotes.commentError'),
+                        );
+                      }
+                    }}>
+                    <FontAwesomeIcon
+                      icon={faPaperPlane}
+                      size={12}
+                      color="#fff"
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Replies that specifically continue the opener's thread */}
+              {(post.comments || []).filter(c => c.replyToPost).length > 0 && (
+                <View style={styles.threadChildren}>
+                  {(post.comments || [])
+                    .filter(c => c.replyToPost)
+                    .map(comment => (
+                    <View
+                      key={comment._id || comment.text}
+                      style={styles.threadChildCard}>
+                      <View style={styles.replyRow}>
+                        <View style={styles.replyLeftCol}>
+                          <TouchableOpacity
+                            onPress={() =>
+                              navigateToProfile(
+                                comment.userId,
+                                comment.username,
+                                comment.profilePicUrl,
+                              )
+                            }
+                            disabled={
+                              !!(userData && comment.userId === userData._id)
+                            }>
+                            {comment.profilePicUrl ? (
+                              <Image
+                                source={{uri: comment.profilePicUrl}}
+                                style={styles.replyAvatarImage}
+                              />
+                            ) : (
+                              <View style={styles.replyAvatar}>
+                                <Text style={styles.replyAvatarText}>
+                                  {getInitials(comment.username)}
+                                </Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
                         </View>
-                      )}
-                    </TouchableOpacity>
-                    {((comment.replies && comment.replies.length > 0) ||
-                      replyingTo === comment._id) && (
-                      <View style={styles.threadSpine} />
-                    )}
-                  </View>
-                  <View style={styles.commentContent}>
-                    <View style={styles.postUsernameRow}>
-                      <View style={styles.usernameWithTimestamp}>
-                        <Text style={styles.commentUsername}>
-                          {comment.username}
-                        </Text>
-                        {comment.createdAt && (
-                          <Text style={styles.timestampSmall}>
-                            {formatRelativeTime(comment.createdAt)}
-                          </Text>
-                        )}
-                      </View>
-                      <View style={styles.commentActionsRow}>
-                        <TouchableOpacity
-                          style={styles.replyButton}
-                          onPress={() => setReplyingTo(comment._id!)}>
-                          <FontAwesomeIcon
-                            icon={faReply}
-                            size={11}
-                            color={colors.primary}
-                          />
-                          <Text style={styles.replyButtonText}>
-                            {t('communityNotes.reply') || 'Reply'}
-                          </Text>
-                        </TouchableOpacity>
-                        {userData &&
-                          comment.userId === userData._id &&
-                          comment._id && (
-                            <>
+                        <View style={styles.replyContent}>
+                          <View style={styles.postUsernameRow}>
+                            <View style={styles.usernameWithTimestamp}>
+                              <Text style={styles.replyUsername}>
+                                {comment.username}
+                              </Text>
+                              {comment.createdAt && (
+                                <Text style={styles.timestampTiny}>
+                                  {formatRelativeTime(comment.createdAt)}
+                                </Text>
+                              )}
+                            </View>
+                            <View style={styles.commentActionsRow}>
+                              <TouchableOpacity
+                                style={styles.replyButton}
+                                onPress={() =>
+                                  startReplyToComment(comment._id!)
+                                }>
+                                <FontAwesomeIcon
+                                  icon={faReply}
+                                  size={11}
+                                  color={colors.primary}
+                                />
+                                <Text style={styles.replyButtonText}>
+                                  {t('communityNotes.reply') || 'Reply'}
+                                </Text>
+                              </TouchableOpacity>
+                              {userData &&
+                                comment.userId === userData._id &&
+                                comment._id && (
+                                  <>
+                                    <TouchableOpacity
+                                      style={styles.editActionIcon}
+                                      onPress={() => startEditComment(comment)}>
+                                      <FontAwesomeIcon
+                                        icon={faEdit}
+                                        size={12}
+                                        color={colors.primary}
+                                      />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      style={styles.editActionIcon}
+                                      onPress={() =>
+                                        deleteComment(post._id, comment._id!)
+                                      }>
+                                      <FontAwesomeIcon
+                                        icon={faTrash}
+                                        size={12}
+                                        color={colors.text}
+                                      />
+                                    </TouchableOpacity>
+                                  </>
+                                )}
+                            </View>
+                          </View>
+                          {editingCommentId === comment._id ? (
+                            <View style={styles.rowCenter}>
+                              <TextInput
+                                style={styles.editInput}
+                                value={editingCommentText}
+                                onChangeText={setEditingCommentText}
+                                autoFocus
+                              />
                               <TouchableOpacity
                                 style={styles.editActionIcon}
-                                onPress={() => startEditComment(comment)}>
+                                onPress={() =>
+                                  saveEditComment(post._id, comment._id!)
+                                }>
                                 <FontAwesomeIcon
-                                  icon={faEdit}
+                                  icon={faCheck}
                                   size={12}
                                   color={colors.primary}
                                 />
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={styles.editActionIcon}
-                                onPress={() =>
-                                  deleteComment(post._id, comment._id!)
-                                }>
+                                onPress={cancelEditComment}>
                                 <FontAwesomeIcon
-                                  icon={faTrash}
+                                  icon={faTimes}
                                   size={12}
                                   color={colors.text}
                                 />
                               </TouchableOpacity>
-                            </>
-                          )}
-                      </View>
-                    </View>
-                    {editingCommentId === comment._id ? (
-                      <View style={styles.rowCenter}>
-                        <TextInput
-                          style={styles.editInput}
-                          value={editingCommentText}
-                          onChangeText={setEditingCommentText}
-                          autoFocus
-                        />
-                        <TouchableOpacity
-                          style={styles.editActionIcon}
-                          onPress={() =>
-                            saveEditComment(post._id, comment._id!)
-                          }>
-                          <FontAwesomeIcon
-                            icon={faCheck}
-                            size={12}
-                            color={colors.primary}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.editActionIcon}
-                          onPress={cancelEditComment}>
-                          <FontAwesomeIcon
-                            icon={faTimes}
-                            size={12}
-                            color={colors.text}
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <>
-                        <Text style={styles.commentText}>{comment.text}</Text>
-                        <View style={styles.commentLikeRow}>
-                          <TouchableOpacity
-                            style={styles.commentLikePill}
-                            onPress={() =>
-                              toggleCommentLike(post._id, comment._id!)
-                            }
-                            onLongPress={() =>
-                              (comment.likes?.length || 0) > 0 &&
-                              showLikedBy(
-                                t('communityNotes.likedBy') || 'Liked by',
-                                comment.likedByUsers || [],
-                                comment.likedByUsernames || [],
-                                comment.likes?.length || 0,
-                              )
-                            }>
-                            <FontAwesomeIcon
-                              icon={faHeart}
-                              size={11}
-                              color={
-                                likedComments.has(comment._id!)
-                                  ? '#e74c3c'
-                                  : colors.secondaryText
-                              }
-                            />
-                            <Text
-                              style={[
-                                styles.commentLikePillText,
-                                likedComments.has(comment._id!) &&
-                                  styles.commentLikePillTextActive,
-                              ]}>
-                              {comment.likes?.length || 0}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      </>
-                    )}
-
-                    {/* Reply input */}
-                    {replyingTo === comment._id && (
-                      <View style={styles.replyInputRow}>
-                        <TextInput
-                          ref={ref => {
-                            if (ref) {
-                              replyInputRefs.current[comment._id!] = ref;
-                            }
-                          }}
-                          style={styles.replyInput}
-                          placeholder={
-                            t('communityNotes.writeReply') ||
-                            'Write a reply...'
-                          }
-                          placeholderTextColor={colors.border}
-                          value={replyText[comment._id!] || ''}
-                          onChangeText={text =>
-                            setReplyText(prev => ({
-                              ...prev,
-                              [comment._id!]: text,
-                            }))
-                          }
-                        />
-                        <TouchableOpacity
-                          style={styles.replySendButton}
-                          onPress={() => {
-                            addReply(post._id, comment._id!);
-                            setReplyingTo(null);
-                          }}>
-                          <FontAwesomeIcon
-                            icon={faPaperPlane}
-                            size={12}
-                            color="#fff"
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    )}
-
-                    {/* Replies */}
-                    {comment.replies && comment.replies.length > 0 && (
-                      <View style={styles.repliesContainer}>
-                        {comment.replies.map((reply, replyIdx, replyArr) => {
-                          const isLastReply =
-                            replyIdx === replyArr.length - 1;
-                          return (
-                            <View
-                              key={reply._id || reply.text}
-                              style={styles.replyContainer}>
-                              <View style={styles.replyRow}>
-                                <View style={styles.replyLeftCol}>
-                                  <View style={styles.replyThreadSpineTop} />
+                            </View>
+                          ) : (
+                            <>
+                              <Text style={styles.replyText}>
+                                {comment.text}
+                              </Text>
+                              <View style={styles.commentReactionRow}>
+                                {summarizeReactions(
+                                  comment.reactions,
+                                  userData?._id,
+                                ).map(pill => (
                                   <TouchableOpacity
+                                    key={pill.emoji}
+                                    style={[
+                                      styles.commentReactionPill,
+                                      pill.mine &&
+                                        styles.commentReactionPillMine,
+                                    ]}
                                     onPress={() =>
-                                      navigateToProfile(
-                                        reply.userId,
-                                        reply.username,
-                                        reply.profilePicUrl,
+                                      toggleCommentReaction(
+                                        post._id,
+                                        comment._id!,
+                                        pill.emoji,
                                       )
                                     }
-                                    disabled={
-                                      !!(
-                                        userData &&
-                                        reply.userId === userData._id
-                                      )
-                                    }>
-                                    {reply.profilePicUrl ? (
-                                      <Image
-                                        source={{uri: reply.profilePicUrl}}
-                                        style={styles.replyAvatarImage}
-                                      />
-                                    ) : (
-                                      <View style={styles.replyAvatar}>
-                                        <Text style={styles.replyAvatarText}>
-                                          {getInitials(reply.username)}
-                                        </Text>
-                                      </View>
-                                    )}
+                                    hitSlop={{
+                                      top: 4,
+                                      bottom: 4,
+                                      left: 2,
+                                      right: 2,
+                                    }}>
+                                    <Text
+                                      style={styles.commentReactionPillEmoji}>
+                                      {pill.emoji}
+                                    </Text>
+                                    <Text
+                                      style={[
+                                        styles.commentReactionPillCount,
+                                        pill.mine &&
+                                          styles.commentReactionPillCountMine,
+                                      ]}>
+                                      {pill.count}
+                                    </Text>
                                   </TouchableOpacity>
-                                  {!isLastReply && (
-                                    <View
-                                      style={styles.replyThreadSpineBottom}
-                                    />
-                                  )}
-                                </View>
-                                <View style={styles.replyContent}>
-                                  <View style={styles.postUsernameRow}>
-                                    <View style={styles.usernameWithTimestamp}>
-                                      <Text style={styles.replyUsername}>
-                                        {reply.username}
-                                      </Text>
-                                      {reply.createdAt && (
-                                        <Text style={styles.timestampTiny}>
-                                          {formatRelativeTime(reply.createdAt)}
-                                        </Text>
-                                      )}
+                                ))}
+                                <TouchableOpacity
+                                  style={styles.commentReactionAddButton}
+                                  onPress={() =>
+                                    setReactionTarget({
+                                      kind: 'comment',
+                                      commentId: comment._id!,
+                                    })
+                                  }
+                                  hitSlop={{
+                                    top: 4,
+                                    bottom: 4,
+                                    left: 4,
+                                    right: 4,
+                                  }}>
+                                  <FontAwesomeIcon
+                                    icon={faPlus}
+                                    size={10}
+                                    color={colors.secondaryText}
+                                  />
+                                </TouchableOpacity>
+                              </View>
+                            </>
+                          )}
+
+                          {replyingTo === comment._id && (
+                            <View style={styles.replyInputRow}>
+                              <TextInput
+                                ref={ref => {
+                                  if (ref) {
+                                    replyInputRefs.current[comment._id!] = ref;
+                                  }
+                                }}
+                                style={styles.replyInput}
+                                placeholder={
+                                  replyingToReply?.username
+                                    ? `${t('communityNotes.reply') || 'Reply'} @${replyingToReply.username}...`
+                                    : t('communityNotes.writeReply') ||
+                                      'Write a reply...'
+                                }
+                                placeholderTextColor={colors.border}
+                                value={replyText[comment._id!] || ''}
+                                onChangeText={text =>
+                                  setReplyText(prev => ({
+                                    ...prev,
+                                    [comment._id!]: text,
+                                  }))
+                                }
+                              />
+                              <TouchableOpacity
+                                style={styles.replySendButton}
+                                onPress={() => {
+                                  addReply(post._id, comment._id!);
+                                }}>
+                                <FontAwesomeIcon
+                                  icon={faPaperPlane}
+                                  size={12}
+                                  color="#fff"
+                                />
+                              </TouchableOpacity>
+                            </View>
+                          )}
+
+                          {comment.replies && comment.replies.length > 0 && (
+                            <View style={styles.repliesContainer}>
+                              {comment.replies.map(reply => (
+                                <View
+                                  key={reply._id || reply.text}
+                                  style={styles.replyContainer}>
+                                  <View style={styles.replyBubble}>
+                                    <View style={styles.replyRow}>
+                                      <View style={styles.replyLeftCol}>
+                                        <TouchableOpacity
+                                          onPress={() =>
+                                            navigateToProfile(
+                                              reply.userId,
+                                              reply.username,
+                                              reply.profilePicUrl,
+                                            )
+                                          }
+                                          disabled={
+                                            !!(
+                                              userData &&
+                                              reply.userId === userData._id
+                                            )
+                                          }>
+                                          {reply.profilePicUrl ? (
+                                            <Image
+                                              source={{
+                                                uri: reply.profilePicUrl,
+                                              }}
+                                              style={styles.replyAvatarImage}
+                                            />
+                                          ) : (
+                                            <View style={styles.replyAvatar}>
+                                              <Text
+                                                style={styles.replyAvatarText}>
+                                                {getInitials(reply.username)}
+                                              </Text>
+                                            </View>
+                                          )}
+                                        </TouchableOpacity>
+                                      </View>
+                                      <View style={styles.replyContent}>
+                                        <View style={styles.postUsernameRow}>
+                                          <View
+                                            style={styles.usernameWithTimestamp}>
+                                            <Text style={styles.replyUsername}>
+                                              {reply.username}
+                                            </Text>
+                                            {reply.createdAt && (
+                                              <Text
+                                                style={styles.timestampTiny}>
+                                                {formatRelativeTime(
+                                                  reply.createdAt,
+                                                )}
+                                              </Text>
+                                            )}
+                                          </View>
+                                          <View style={styles.replyActionsRow}>
+                                            <TouchableOpacity
+                                              style={styles.replyButton}
+                                              onPress={() =>
+                                                startReplyToReply(
+                                                  comment._id!,
+                                                  reply,
+                                                )
+                                              }>
+                                              <FontAwesomeIcon
+                                                icon={faReply}
+                                                size={10}
+                                                color={colors.primary}
+                                              />
+                                              <Text
+                                                style={styles.replyButtonText}>
+                                                {t('communityNotes.reply') ||
+                                                  'Reply'}
+                                              </Text>
+                                            </TouchableOpacity>
+                                            {userData &&
+                                              reply.userId === userData._id &&
+                                              reply._id && (
+                                                <>
+                                                  <TouchableOpacity
+                                                    style={
+                                                      styles.editActionIcon
+                                                    }
+                                                    onPress={() =>
+                                                      startEditReply(
+                                                        post._id,
+                                                        comment._id!,
+                                                        reply,
+                                                      )
+                                                    }>
+                                                    <FontAwesomeIcon
+                                                      icon={faEdit}
+                                                      size={10}
+                                                      color={colors.primary}
+                                                    />
+                                                  </TouchableOpacity>
+                                                  <TouchableOpacity
+                                                    style={
+                                                      styles.editActionIcon
+                                                    }
+                                                    onPress={() =>
+                                                      deleteReply(
+                                                        post._id,
+                                                        comment._id!,
+                                                        reply._id!,
+                                                      )
+                                                    }>
+                                                    <FontAwesomeIcon
+                                                      icon={faTrash}
+                                                      size={10}
+                                                      color={colors.text}
+                                                    />
+                                                  </TouchableOpacity>
+                                                </>
+                                              )}
+                                          </View>
+                                        </View>
+                                        {reply.replyToUsername ? (
+                                          <Text
+                                            style={[
+                                              styles.timestampTiny,
+                                              {marginLeft: 0, marginTop: 2},
+                                            ]}>
+                                            {`↳ @${reply.replyToUsername}`}
+                                          </Text>
+                                        ) : null}
+                                        {editingReplyId === reply._id ? (
+                                          <View style={styles.rowCenter}>
+                                            <TextInput
+                                              style={styles.editInput}
+                                              value={editingReplyText}
+                                              onChangeText={setEditingReplyText}
+                                              autoFocus
+                                            />
+                                            <TouchableOpacity
+                                              style={styles.editActionIcon}
+                                              onPress={saveEditReply}>
+                                              <FontAwesomeIcon
+                                                icon={faCheck}
+                                                size={10}
+                                                color={colors.primary}
+                                              />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                              style={styles.editActionIcon}
+                                              onPress={cancelEditReply}>
+                                              <FontAwesomeIcon
+                                                icon={faTimes}
+                                                size={10}
+                                                color={colors.text}
+                                              />
+                                            </TouchableOpacity>
+                                          </View>
+                                        ) : (
+                                          <>
+                                            <Text style={styles.replyText}>
+                                              {reply.text}
+                                            </Text>
+                                            <View
+                                              style={styles.commentReactionRow}>
+                                              {summarizeReactions(
+                                                reply.reactions,
+                                                userData?._id,
+                                              ).map(pill => (
+                                                <TouchableOpacity
+                                                  key={pill.emoji}
+                                                  style={[
+                                                    styles.commentReactionPill,
+                                                    pill.mine &&
+                                                      styles.commentReactionPillMine,
+                                                  ]}
+                                                  onPress={() =>
+                                                    toggleReplyReaction(
+                                                      post._id,
+                                                      comment._id!,
+                                                      reply._id!,
+                                                      pill.emoji,
+                                                    )
+                                                  }
+                                                  hitSlop={{
+                                                    top: 4,
+                                                    bottom: 4,
+                                                    left: 2,
+                                                    right: 2,
+                                                  }}>
+                                                  <Text
+                                                    style={
+                                                      styles.commentReactionPillEmoji
+                                                    }>
+                                                    {pill.emoji}
+                                                  </Text>
+                                                  <Text
+                                                    style={[
+                                                      styles.commentReactionPillCount,
+                                                      pill.mine &&
+                                                        styles.commentReactionPillCountMine,
+                                                    ]}>
+                                                    {pill.count}
+                                                  </Text>
+                                                </TouchableOpacity>
+                                              ))}
+                                              {reply._id ? (
+                                                <TouchableOpacity
+                                                  style={
+                                                    styles.commentReactionAddButton
+                                                  }
+                                                  onPress={() =>
+                                                    setReactionTarget({
+                                                      kind: 'reply',
+                                                      commentId: comment._id!,
+                                                      replyId: reply._id!,
+                                                    })
+                                                  }
+                                                  hitSlop={{
+                                                    top: 4,
+                                                    bottom: 4,
+                                                    left: 4,
+                                                    right: 4,
+                                                  }}>
+                                                  <FontAwesomeIcon
+                                                    icon={faPlus}
+                                                    size={10}
+                                                    color={colors.secondaryText}
+                                                  />
+                                                </TouchableOpacity>
+                                              ) : null}
+                                            </View>
+                                          </>
+                                        )}
+                                      </View>
                                     </View>
+                                  </View>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Independent top-level comment threads (not replies to the opener) */}
+        {(post.comments || [])
+          .filter(c => !c.replyToPost)
+          .map(comment => (
+            <View
+              key={comment._id || comment.text}
+              style={styles.commentThread}>
+              <View style={styles.commentRow}>
+                <View style={styles.commentLeftCol}>
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigateToProfile(
+                        comment.userId,
+                        comment.username,
+                        comment.profilePicUrl,
+                      )
+                    }
+                    disabled={
+                      !!(userData && comment.userId === userData._id)
+                    }>
+                    {comment.profilePicUrl ? (
+                      <Image
+                        source={{uri: comment.profilePicUrl}}
+                        style={styles.commentAvatarImage}
+                      />
+                    ) : (
+                      <View style={styles.commentAvatar}>
+                        <Text style={styles.commentAvatarText}>
+                          {getInitials(comment.username)}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  {((comment.replies && comment.replies.length > 0) ||
+                    replyingTo === comment._id) && (
+                    <View style={styles.threadSpine} />
+                  )}
+                </View>
+                <View style={styles.commentContent}>
+                  <View style={styles.postUsernameRow}>
+                    <View style={styles.usernameWithTimestamp}>
+                      <Text style={styles.commentUsername}>
+                        {comment.username}
+                      </Text>
+                      {comment.createdAt && (
+                        <Text style={styles.timestampSmall}>
+                          {formatRelativeTime(comment.createdAt)}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.commentActionsRow}>
+                      <TouchableOpacity
+                        style={styles.replyButton}
+                        onPress={() => startReplyToComment(comment._id!)}>
+                        <FontAwesomeIcon
+                          icon={faReply}
+                          size={11}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.replyButtonText}>
+                          {t('communityNotes.reply') || 'Reply'}
+                        </Text>
+                      </TouchableOpacity>
+                      {userData &&
+                        comment.userId === userData._id &&
+                        comment._id && (
+                          <>
+                            <TouchableOpacity
+                              style={styles.editActionIcon}
+                              onPress={() => startEditComment(comment)}>
+                              <FontAwesomeIcon
+                                icon={faEdit}
+                                size={12}
+                                color={colors.primary}
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.editActionIcon}
+                              onPress={() =>
+                                deleteComment(post._id, comment._id!)
+                              }>
+                              <FontAwesomeIcon
+                                icon={faTrash}
+                                size={12}
+                                color={colors.text}
+                              />
+                            </TouchableOpacity>
+                          </>
+                        )}
+                    </View>
+                  </View>
+                  {editingCommentId === comment._id ? (
+                    <View style={styles.rowCenter}>
+                      <TextInput
+                        style={styles.editInput}
+                        value={editingCommentText}
+                        onChangeText={setEditingCommentText}
+                        autoFocus
+                      />
+                      <TouchableOpacity
+                        style={styles.editActionIcon}
+                        onPress={() =>
+                          saveEditComment(post._id, comment._id!)
+                        }>
+                        <FontAwesomeIcon
+                          icon={faCheck}
+                          size={12}
+                          color={colors.primary}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.editActionIcon}
+                        onPress={cancelEditComment}>
+                        <FontAwesomeIcon
+                          icon={faTimes}
+                          size={12}
+                          color={colors.text}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={styles.commentText}>{comment.text}</Text>
+                      <View style={styles.commentReactionRow}>
+                        {summarizeReactions(
+                          comment.reactions,
+                          userData?._id,
+                        ).map(pill => (
+                          <TouchableOpacity
+                            key={pill.emoji}
+                            style={[
+                              styles.commentReactionPill,
+                              pill.mine && styles.commentReactionPillMine,
+                            ]}
+                            onPress={() =>
+                              toggleCommentReaction(
+                                post._id,
+                                comment._id!,
+                                pill.emoji,
+                              )
+                            }
+                            hitSlop={{top: 4, bottom: 4, left: 2, right: 2}}>
+                            <Text style={styles.commentReactionPillEmoji}>
+                              {pill.emoji}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.commentReactionPillCount,
+                                pill.mine &&
+                                  styles.commentReactionPillCountMine,
+                              ]}>
+                              {pill.count}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                        <TouchableOpacity
+                          style={styles.commentReactionAddButton}
+                          onPress={() =>
+                            setReactionTarget({
+                              kind: 'comment',
+                              commentId: comment._id!,
+                            })
+                          }
+                          hitSlop={{top: 4, bottom: 4, left: 4, right: 4}}>
+                          <FontAwesomeIcon
+                            icon={faPlus}
+                            size={10}
+                            color={colors.secondaryText}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+
+                  {replyingTo === comment._id && (
+                    <View style={styles.replyInputRow}>
+                      <TextInput
+                        ref={ref => {
+                          if (ref) {
+                            replyInputRefs.current[comment._id!] = ref;
+                          }
+                        }}
+                        style={styles.replyInput}
+                        placeholder={
+                          replyingToReply?.username
+                            ? `${t('communityNotes.reply') || 'Reply'} @${replyingToReply.username}...`
+                            : t('communityNotes.writeReply') ||
+                              'Write a reply...'
+                        }
+                        placeholderTextColor={colors.border}
+                        value={replyText[comment._id!] || ''}
+                        onChangeText={text =>
+                          setReplyText(prev => ({
+                            ...prev,
+                            [comment._id!]: text,
+                          }))
+                        }
+                      />
+                      <TouchableOpacity
+                        style={styles.replySendButton}
+                        onPress={() => addReply(post._id, comment._id!)}>
+                        <FontAwesomeIcon
+                          icon={faPaperPlane}
+                          size={12}
+                          color="#fff"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {comment.replies && comment.replies.length > 0 && (
+                    <View style={styles.repliesContainer}>
+                      {comment.replies.map(reply => (
+                        <View
+                          key={reply._id || reply.text}
+                          style={styles.replyContainer}>
+                          <View style={styles.replyBubble}>
+                            <View style={styles.replyRow}>
+                              <View style={styles.replyLeftCol}>
+                                <TouchableOpacity
+                                  onPress={() =>
+                                    navigateToProfile(
+                                      reply.userId,
+                                      reply.username,
+                                      reply.profilePicUrl,
+                                    )
+                                  }
+                                  disabled={
+                                    !!(
+                                      userData &&
+                                      reply.userId === userData._id
+                                    )
+                                  }>
+                                  {reply.profilePicUrl ? (
+                                    <Image
+                                      source={{uri: reply.profilePicUrl}}
+                                      style={styles.replyAvatarImage}
+                                    />
+                                  ) : (
+                                    <View style={styles.replyAvatar}>
+                                      <Text style={styles.replyAvatarText}>
+                                        {getInitials(reply.username)}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+                              <View style={styles.replyContent}>
+                                <View style={styles.postUsernameRow}>
+                                  <View style={styles.usernameWithTimestamp}>
+                                    <Text style={styles.replyUsername}>
+                                      {reply.username}
+                                    </Text>
+                                    {reply.createdAt && (
+                                      <Text style={styles.timestampTiny}>
+                                        {formatRelativeTime(reply.createdAt)}
+                                      </Text>
+                                    )}
+                                  </View>
+                                  <View style={styles.replyActionsRow}>
+                                    <TouchableOpacity
+                                      style={styles.replyButton}
+                                      onPress={() =>
+                                        startReplyToReply(comment._id!, reply)
+                                      }>
+                                      <FontAwesomeIcon
+                                        icon={faReply}
+                                        size={10}
+                                        color={colors.primary}
+                                      />
+                                      <Text style={styles.replyButtonText}>
+                                        {t('communityNotes.reply') || 'Reply'}
+                                      </Text>
+                                    </TouchableOpacity>
                                     {userData &&
                                       reply.userId === userData._id &&
                                       reply._id && (
-                                        <View style={styles.replyActionsRow}>
+                                        <>
                                           <TouchableOpacity
                                             style={styles.editActionIcon}
                                             onPress={() =>
@@ -1907,55 +2681,214 @@ const EventComments: React.FC<EventCommentsProps> = ({
                                               color={colors.text}
                                             />
                                           </TouchableOpacity>
-                                        </View>
+                                        </>
                                       )}
                                   </View>
-                                  {editingReplyId === reply._id ? (
-                                    <View style={styles.rowCenter}>
-                                      <TextInput
-                                        style={styles.editInput}
-                                        value={editingReplyText}
-                                        onChangeText={setEditingReplyText}
-                                        autoFocus
+                                </View>
+                                {reply.replyToUsername ? (
+                                  <Text
+                                    style={[
+                                      styles.timestampTiny,
+                                      {marginLeft: 0, marginTop: 2},
+                                    ]}>
+                                    {`↳ @${reply.replyToUsername}`}
+                                  </Text>
+                                ) : null}
+                                {editingReplyId === reply._id ? (
+                                  <View style={styles.rowCenter}>
+                                    <TextInput
+                                      style={styles.editInput}
+                                      value={editingReplyText}
+                                      onChangeText={setEditingReplyText}
+                                      autoFocus
+                                    />
+                                    <TouchableOpacity
+                                      style={styles.editActionIcon}
+                                      onPress={saveEditReply}>
+                                      <FontAwesomeIcon
+                                        icon={faCheck}
+                                        size={10}
+                                        color={colors.primary}
                                       />
-                                      <TouchableOpacity
-                                        style={styles.editActionIcon}
-                                        onPress={saveEditReply}>
-                                        <FontAwesomeIcon
-                                          icon={faCheck}
-                                          size={10}
-                                          color={colors.primary}
-                                        />
-                                      </TouchableOpacity>
-                                      <TouchableOpacity
-                                        style={styles.editActionIcon}
-                                        onPress={cancelEditReply}>
-                                        <FontAwesomeIcon
-                                          icon={faTimes}
-                                          size={10}
-                                          color={colors.text}
-                                        />
-                                      </TouchableOpacity>
-                                    </View>
-                                  ) : (
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      style={styles.editActionIcon}
+                                      onPress={cancelEditReply}>
+                                      <FontAwesomeIcon
+                                        icon={faTimes}
+                                        size={10}
+                                        color={colors.text}
+                                      />
+                                    </TouchableOpacity>
+                                  </View>
+                                ) : (
+                                  <>
                                     <Text style={styles.replyText}>
                                       {reply.text}
                                     </Text>
-                                  )}
-                                </View>
+                                    <View style={styles.commentReactionRow}>
+                                      {summarizeReactions(
+                                        reply.reactions,
+                                        userData?._id,
+                                      ).map(pill => (
+                                        <TouchableOpacity
+                                          key={pill.emoji}
+                                          style={[
+                                            styles.commentReactionPill,
+                                            pill.mine &&
+                                              styles.commentReactionPillMine,
+                                          ]}
+                                          onPress={() =>
+                                            toggleReplyReaction(
+                                              post._id,
+                                              comment._id!,
+                                              reply._id!,
+                                              pill.emoji,
+                                            )
+                                          }
+                                          hitSlop={{
+                                            top: 4,
+                                            bottom: 4,
+                                            left: 2,
+                                            right: 2,
+                                          }}>
+                                          <Text
+                                            style={
+                                              styles.commentReactionPillEmoji
+                                            }>
+                                            {pill.emoji}
+                                          </Text>
+                                          <Text
+                                            style={[
+                                              styles.commentReactionPillCount,
+                                              pill.mine &&
+                                                styles.commentReactionPillCountMine,
+                                            ]}>
+                                            {pill.count}
+                                          </Text>
+                                        </TouchableOpacity>
+                                      ))}
+                                      {reply._id ? (
+                                        <TouchableOpacity
+                                          style={
+                                            styles.commentReactionAddButton
+                                          }
+                                          onPress={() =>
+                                            setReactionTarget({
+                                              kind: 'reply',
+                                              commentId: comment._id!,
+                                              replyId: reply._id!,
+                                            })
+                                          }
+                                          hitSlop={{
+                                            top: 4,
+                                            bottom: 4,
+                                            left: 4,
+                                            right: 4,
+                                          }}>
+                                          <FontAwesomeIcon
+                                            icon={faPlus}
+                                            size={10}
+                                            color={colors.secondaryText}
+                                          />
+                                        </TouchableOpacity>
+                                      ) : null}
+                                    </View>
+                                  </>
+                                )}
                               </View>
                             </View>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               </View>
-            ))}
-          </View>
-        )}
+            </View>
+          ))}
+
+        {/* New independent comment (starts its own thread) */}
+        <View style={styles.commentInputRow}>
+          {userData?.profilePicUrl ? (
+            <Image
+              source={{uri: userData.profilePicUrl}}
+              style={styles.commentInputAvatarImage}
+            />
+          ) : (
+            <View style={styles.commentInputAvatar}>
+              <Text style={styles.commentInputAvatarText}>
+                {userData ? getInitials(userData.username) : '?'}
+              </Text>
+            </View>
+          )}
+          <TextInput
+            style={styles.commentInput}
+            placeholder={
+              t('communityNotes.writeComment') || 'Write a comment...'
+            }
+            placeholderTextColor={colors.border}
+            value={commentText[post._id] || ''}
+            onChangeText={text =>
+              setCommentText(prev => ({...prev, [post._id]: text}))
+            }
+          />
+          <TouchableOpacity
+            style={styles.commentSendButton}
+            onPress={() => addComment(post._id, false)}>
+            <FontAwesomeIcon icon={faPaperPlane} size={14} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      <EmojiPicker
+        open={!!reactionTarget}
+        onClose={() => setReactionTarget(null)}
+        onEmojiSelected={(picked: EmojiType) => {
+          const target = reactionTarget;
+          setReactionTarget(null);
+          if (!target || !post || !picked?.emoji) {
+            return;
+          }
+          if (target.kind === 'post') {
+            togglePostReaction(post._id, picked.emoji);
+          } else if (target.kind === 'comment') {
+            toggleCommentReaction(post._id, target.commentId, picked.emoji);
+          } else {
+            toggleReplyReaction(
+              post._id,
+              target.commentId,
+              target.replyId,
+              picked.emoji,
+            );
+          }
+        }}
+        enableSearchBar
+        enableRecentlyUsed
+        categoryPosition="bottom"
+        enableCategoryChangeAnimation={false}
+        enableSearchAnimation={false}
+        theme={{
+          backdrop: '#00000066',
+          knob: colors.primary,
+          container: colors.card || colors.background,
+          header: colors.text,
+          category: {
+            icon: colors.secondaryText,
+            iconActive: '#FFFFFF',
+            container: darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+            containerActive: colors.primary,
+          },
+          search: {
+            text: colors.text,
+            placeholder: colors.secondaryText,
+            icon: colors.secondaryText,
+            background: darkMode
+              ? 'rgba(255,255,255,0.07)'
+              : 'rgba(0,0,0,0.05)',
+          },
+        }}
+      />
 
       {/* Likes Modal */}
       <Modal

@@ -26,7 +26,6 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
-  faChevronRight,
   faGlobe,
   faLock,
   faPlus,
@@ -164,15 +163,10 @@ const GroupsList: React.FC = () => {
         header: {
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           paddingHorizontal: 16,
-          paddingTop: 12,
-          paddingBottom: 12,
-        },
-        title: {
-          fontSize: 24,
-          fontWeight: '800',
-          color: colors.text,
+          paddingTop: 8,
+          paddingBottom: 8,
         },
         newButton: {
           flexDirection: 'row',
@@ -243,6 +237,12 @@ const GroupsList: React.FC = () => {
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
+        rowUnread: {
+          backgroundColor: colors.primary + '12',
+          borderLeftWidth: 3,
+          borderLeftColor: '#FF3B30',
+          paddingLeft: 13,
+        },
         rowAvatars: {
           marginRight: 12,
           justifyContent: 'center',
@@ -254,6 +254,9 @@ const GroupsList: React.FC = () => {
           fontSize: 16,
           fontWeight: '600',
           color: colors.text,
+        },
+        rowTitleUnread: {
+          fontWeight: '800',
         },
         rowMetaRow: {
           flexDirection: 'row',
@@ -272,21 +275,21 @@ const GroupsList: React.FC = () => {
         },
         rowPreviewUnread: {
           color: colors.text,
-          fontWeight: '600',
+          fontWeight: '700',
         },
         unreadBadge: {
-          minWidth: 20,
-          height: 20,
-          borderRadius: 10,
-          paddingHorizontal: 6,
-          backgroundColor: colors.primary,
+          minWidth: 22,
+          height: 22,
+          borderRadius: 11,
+          paddingHorizontal: 7,
+          backgroundColor: '#FF3B30',
           alignItems: 'center',
           justifyContent: 'center',
           marginLeft: 8,
         },
         unreadBadgeText: {
           color: '#FFFFFF',
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: '800',
         },
       }),
@@ -298,7 +301,7 @@ const GroupsList: React.FC = () => {
     const unread = g.unreadCount || 0;
     return (
       <TouchableOpacity
-        style={styles.row}
+        style={[styles.row, unread > 0 && styles.rowUnread]}
         activeOpacity={0.7}
         onPress={() => openGroup(g._id)}>
         <View style={styles.rowAvatars}>
@@ -310,7 +313,9 @@ const GroupsList: React.FC = () => {
           />
         </View>
         <View style={styles.rowContent}>
-          <Text style={styles.rowTitle} numberOfLines={1}>
+          <Text
+            style={[styles.rowTitle, unread > 0 && styles.rowTitleUnread]}
+            numberOfLines={1}>
             {g.name}
           </Text>
           {preview ? (
@@ -338,13 +343,7 @@ const GroupsList: React.FC = () => {
               {unread > 99 ? '99+' : unread}
             </Text>
           </View>
-        ) : (
-          <FontAwesomeIcon
-            icon={faChevronRight}
-            size={13}
-            color={colors.secondaryText}
-          />
-        )}
+        ) : null}
       </TouchableOpacity>
     );
   };
@@ -384,11 +383,11 @@ const GroupsList: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t('navigation.groups') || 'Groups'}</Text>
         <TouchableOpacity
           style={styles.newButton}
           activeOpacity={0.85}
-          onPress={() => setCreateVisible(true)}>
+          onPress={() => setCreateVisible(true)}
+          accessibilityLabel={t('profile.newGroup') || 'New group'}>
           <FontAwesomeIcon icon={faPlus} size={12} color="#FFFFFF" />
           <Text style={styles.newButtonText}>
             {t('profile.newGroup') || 'New'}

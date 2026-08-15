@@ -78,12 +78,12 @@
 {
   NSDictionary *userInfo = notification.request.content.userInfo;
   NSLog(@"Foreground notification received: %@", userInfo);
-  
-  // Show the notification even when app is in foreground
-  // This allows the JavaScript side (Notifee) to handle the display
-  completionHandler(UNNotificationPresentationOptionAlert |
-                    UNNotificationPresentationOptionBadge |
-                    UNNotificationPresentationOptionSound);
+
+  // Badge only. Alert/sound are owned by Notifee via messaging().onMessage
+  // → displayNotification. Presenting here as well stacked 2–3 identical
+  // banners for a single FCM (system banner + Notifee + willPresent on the
+  // local Notifee notification).
+  completionHandler(UNNotificationPresentationOptionBadge);
 }
 
 // Handle notification tap (when user taps on notification)

@@ -145,7 +145,17 @@
     "myEventsOnlyDescription": "내가 주최하거나 참여하는 이벤트만 표시",
     "reactions": "반응",
     "reactedToThis": "명이 반응했습니다",
-    "noReactionsYet": "아직 반응이 없습니다"
+    "noReactionsYet": "아직 반응이 없습니다",
+    "openEnded": "종료 시간 없음",
+    "openEndedShort": "무제한",
+    "noLimit": "인원 제한 없음",
+    "locationPlace": "장소",
+    "locationVirtual": "온라인 / 기타",
+    "virtualLocationPlaceholder": "예: 금요일 게임 밤, Discord, 우리 집",
+    "virtualLocationBadge": "온라인 / 기타",
+    "messageHost": "호스트에게 메시지",
+    "lfgBadge": "그룹 모집",
+    "lfgHint": "호스트에게 먼저 물어본 뒤 참가 요청하세요."
   },
   "profile": {
     "title": "프로필",
@@ -283,7 +293,14 @@
     "saveChanges": "변경사항 저장",
     "invitePlayers": "사람 초대",
     "noReply": "초대됨 · 응답 없음",
-    "joinRequests": "요청"
+    "joinRequests": "요청",
+    "remindAll": "모두 알림",
+    "remindSentTitle": "알림을 보냈습니다",
+    "remindSentOne": "RSVP 알림을 받게 됩니다.",
+    "remindSentMany": "{{count}}명에게 알림을 보냈습니다.",
+    "remindCooldownTitle": "이미 알림을 보냄",
+    "remindCooldownBody": "최근에 이미 알림을 보냈습니다. 약 한 시간 후에 다시 시도하세요.",
+    "remindError": "알림 전송 실패"
   },
   "groupChat": {
     "tabMembers": "멤버",

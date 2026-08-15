@@ -36,7 +36,6 @@ import {Swipeable, RectButton} from 'react-native-gesture-handler';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faBan,
-  faChevronRight,
   faCommentDots,
   faPenToSquare,
   faTrash,
@@ -352,12 +351,11 @@ const MessagesList: React.FC = () => {
         header: {
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           paddingHorizontal: 16,
-          paddingTop: 12,
-          paddingBottom: 12,
+          paddingTop: 8,
+          paddingBottom: 8,
         },
-        title: {fontSize: 24, fontWeight: '800', color: colors.text},
         newButton: {
           width: 38,
           height: 38,
@@ -370,7 +368,7 @@ const MessagesList: React.FC = () => {
           flexDirection: 'row',
           gap: 8,
           paddingHorizontal: 16,
-          paddingBottom: 12,
+          paddingBottom: 10,
         },
         segment: {
           flexDirection: 'row',
@@ -400,7 +398,7 @@ const MessagesList: React.FC = () => {
           paddingHorizontal: 5,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: colors.primary,
+          backgroundColor: '#FF3B30',
         },
         segmentCountActive: {backgroundColor: 'rgba(255,255,255,0.28)'},
         segmentCountText: {
@@ -416,6 +414,12 @@ const MessagesList: React.FC = () => {
           paddingHorizontal: 16,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
+        },
+        rowUnread: {
+          backgroundColor: colors.primary + '12',
+          borderLeftWidth: 3,
+          borderLeftColor: '#FF3B30',
+          paddingLeft: 13,
         },
         avatar: {
           width: 44,
@@ -444,13 +448,17 @@ const MessagesList: React.FC = () => {
           fontWeight: '600',
           color: colors.text,
         },
+        rowTitleUnread: {
+          fontWeight: '800',
+        },
         rowTime: {fontSize: 11, color: colors.secondaryText},
+        rowTimeUnread: {color: '#FF3B30', fontWeight: '700'},
         rowPreview: {
           fontSize: 13,
           color: colors.secondaryText,
           marginTop: 3,
         },
-        rowPreviewUnread: {color: colors.text, fontWeight: '600'},
+        rowPreviewUnread: {color: colors.text, fontWeight: '700'},
         // Only shown on the sender's own unanswered or declined threads,
         // so a request doesn't read like an ordinary conversation.
         rowStatus: {
@@ -460,18 +468,18 @@ const MessagesList: React.FC = () => {
           marginTop: 2,
         },
         unreadBadge: {
-          minWidth: 20,
-          height: 20,
-          borderRadius: 10,
-          paddingHorizontal: 6,
-          backgroundColor: colors.primary,
+          minWidth: 22,
+          height: 22,
+          borderRadius: 11,
+          paddingHorizontal: 7,
+          backgroundColor: '#FF3B30',
           alignItems: 'center',
           justifyContent: 'center',
           marginLeft: 8,
         },
         unreadBadgeText: {
           color: '#FFFFFF',
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: '800',
         },
         // ── Swipe action ──
@@ -494,6 +502,9 @@ const MessagesList: React.FC = () => {
         },
         rowWrapper: {
           backgroundColor: colors.background,
+        },
+        rowWrapperUnread: {
+          backgroundColor: colors.primary + '12',
         },
         emptyCard: {
           margin: 16,
@@ -572,7 +583,7 @@ const MessagesList: React.FC = () => {
       item.otherUser.name || item.otherUser.username || 'Someone';
     const rowContent = (
       <TouchableOpacity
-        style={styles.row}
+        style={[styles.row, unread > 0 && styles.rowUnread]}
         activeOpacity={0.7}
         onPress={() => openThread(item)}>
         <View style={styles.avatar}>
@@ -589,10 +600,13 @@ const MessagesList: React.FC = () => {
         </View>
         <View style={styles.rowContent}>
           <View style={styles.rowTopLine}>
-            <Text style={styles.rowTitle} numberOfLines={1}>
+            <Text
+              style={[styles.rowTitle, unread > 0 && styles.rowTitleUnread]}
+              numberOfLines={1}>
               {displayName}
             </Text>
-            <Text style={styles.rowTime}>
+            <Text
+              style={[styles.rowTime, unread > 0 && styles.rowTimeUnread]}>
               {relativeTime(item.lastMessageAt)}
             </Text>
           </View>
@@ -617,18 +631,12 @@ const MessagesList: React.FC = () => {
               {unread > 99 ? '99+' : unread}
             </Text>
           </View>
-        ) : (
-          <FontAwesomeIcon
-            icon={faChevronRight}
-            size={13}
-            color={colors.secondaryText}
-          />
-        )}
+        ) : null}
       </TouchableOpacity>
     );
 
     return (
-      <View style={styles.rowWrapper}>
+      <View style={[styles.rowWrapper, unread > 0 && styles.rowWrapperUnread]}>
         <Swipeable
           ref={ref => {
             if (ref) {
@@ -722,9 +730,6 @@ const MessagesList: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>
-          {t('navigation.messages') || 'Messages'}
-        </Text>
         <TouchableOpacity
           style={styles.newButton}
           activeOpacity={0.85}

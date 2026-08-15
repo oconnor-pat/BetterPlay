@@ -20,6 +20,7 @@ import notifee, {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Platform, Alert} from 'react-native';
 import {API_BASE_URL} from '../config/api';
+import {getEventDateTime} from '../utils/eventDateTime';
 
 // Storage keys
 const DEVICE_TOKEN_KEY = 'pushNotificationDeviceToken';
@@ -95,6 +96,9 @@ class NotificationService {
   private navigationCallback: NotificationNavigationCallback | null = null;
   private isInitialized = false;
   private pendingNotificationData: Record<string, string> | null = null;
+  private unsubscribeOnMessage: (() => void) | null = null;
+  private unsubscribeOnOpened: (() => void) | null = null;
+  private unsubscribeTokenRefresh: (() => void) | null = null;
 
   /**
    * Initialize the notification service
@@ -407,20 +411,29 @@ class NotificationService {
    * Set up Firebase message handlers
    */
   private setupMessageHandlers(): void {
+    // Metro Fast Refresh / remounts can re-enter initialize; tear down any
+    // prior listeners first so one FCM delivery doesn't fan out into
+    // multiple Notifee banners.
+    this.unsubscribeOnMessage?.();
+    this.unsubscribeOnOpened?.();
+    this.unsubscribeTokenRefresh?.();
+
     // Handle messages received while app is in foreground
-    messaging().onMessage(async remoteMessage => {
+    this.unsubscribeOnMessage = messaging().onMessage(async remoteMessage => {
       console.log('Foreground message received:', remoteMessage);
       await this.displayNotification(remoteMessage);
     });
 
     // Handle notification opened from background state
-    messaging().onNotificationOpenedApp(remoteMessage => {
-      console.log('Notification opened app from background:', remoteMessage);
-      this.handleNotificationNavigation(remoteMessage);
-    });
+    this.unsubscribeOnOpened = messaging().onNotificationOpenedApp(
+      remoteMessage => {
+        console.log('Notification opened app from background:', remoteMessage);
+        this.handleNotificationNavigation(remoteMessage);
+      },
+    );
 
     // Handle token refresh
-    messaging().onTokenRefresh(async token => {
+    this.unsubscribeTokenRefresh = messaging().onTokenRefresh(async token => {
       console.log('FCM token refreshed');
       await AsyncStorage.setItem(DEVICE_TOKEN_KEY, token);
       await this.registerTokenWithBackend(token);
@@ -475,7 +488,16 @@ class NotificationService {
         return;
       }
 
+      // Stable id so a duplicate onMessage delivery replaces the banner
+      // instead of stacking another identical one.
+      const dedupeId =
+        remoteMessage.messageId ||
+        (typeof data?.type === 'string' && typeof data?.eventId === 'string'
+          ? `${data.type}:${data.eventId}`
+          : undefined);
+
       await notifee.displayNotification({
+        ...(dedupeId ? {id: dedupeId} : {}),
         title: notification.title || 'BetterPlay',
         body: notification.body || '',
         data: data as Record<string, string>,
@@ -621,8 +643,11 @@ class NotificationService {
       case 'event_join':
       case 'event_leave':
       case 'event_rsvp':
+      case 'event_rsvp_reminder':
       case 'event_join_request':
       case 'event_join_approved':
+      case 'event_guest_add_request':
+      case 'event_guest_add_approved':
       case 'group_event_created': {
         const targetEventId = eventId || id;
         if (targetEventId) {
@@ -638,7 +663,8 @@ class NotificationService {
       }
 
       // Denied requester can't see the roster; land on the (re-gated) card.
-      case 'event_join_denied': {
+      case 'event_join_denied':
+      case 'event_guest_add_denied': {
         const deniedEventId = eventId || id;
         if (deniedEventId) {
           navigateToTab('Events', 'EventList', {
@@ -950,7 +976,7 @@ class NotificationService {
 
       await this.cancelEventNotifications(event._id);
 
-      const eventDateTime = this.parseEventDateTime(event.date, event.time);
+      const eventDateTime = getEventDateTime(event.date, event.time);
       if (!eventDateTime) {
         return;
       }
@@ -985,6 +1011,21 @@ class NotificationService {
             data: {type: 'event_reminder', eventId: event._id},
           },
           new Date(fifteenMinBefore),
+        );
+        if (id) {
+          ids.push(id);
+        }
+      }
+
+      // At start
+      if (eventMs > now) {
+        const id = await this.scheduleNotification(
+          {
+            title: 'Event Starting!',
+            body: `${event.name} is starting now`,
+            data: {type: 'event_reminder', eventId: event._id},
+          },
+          new Date(eventMs),
         );
         if (id) {
           ids.push(id);
@@ -1034,51 +1075,6 @@ class NotificationService {
     } catch (error) {
       console.error('Error cancelling event notifications:', error);
     }
-  }
-
-  private parseEventDateTime(
-    eventDate: string,
-    eventTime: string,
-  ): Date | null {
-    let cleanDate = eventDate.replace(/^[A-Za-z]{3}\s+/, '');
-    let eventDateTime: Date | null = null;
-
-    const monthDayYearMatch = cleanDate.match(
-      /([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/,
-    );
-    if (monthDayYearMatch) {
-      const [, month, day, year] = monthDayYearMatch;
-      eventDateTime = new Date(`${month} ${day}, ${year}`);
-    }
-
-    if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-      eventDateTime = new Date(cleanDate);
-    }
-
-    if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-      eventDateTime = new Date(eventDate);
-    }
-
-    if (!eventDateTime || isNaN(eventDateTime.getTime())) {
-      return null;
-    }
-
-    let hours = 0;
-    let minutes = 0;
-    const timeMatch = eventTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-    if (timeMatch) {
-      hours = parseInt(timeMatch[1], 10);
-      minutes = parseInt(timeMatch[2], 10);
-      const period = timeMatch[3]?.toUpperCase();
-      if (period === 'PM' && hours !== 12) {
-        hours += 12;
-      } else if (period === 'AM' && hours === 12) {
-        hours = 0;
-      }
-    }
-
-    eventDateTime.setHours(hours, minutes, 0, 0);
-    return eventDateTime;
   }
 
   /**
