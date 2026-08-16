@@ -36,6 +36,7 @@ import {
   faUserGroup,
   faLock,
   faMapLocationDot,
+  faLink,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
@@ -52,6 +53,7 @@ import UserContext, {UserContextType} from '../UserContext';
 import {version as appVersion} from '../../../package.json';
 import NotificationSettings from './NotificationSettings';
 import BlockedAndDeclined from './BlockedAndDeclined';
+import LinkAccountModal from '../Landingpage/LinkAccountModal';
 
 interface Language {
   code: string;
@@ -107,7 +109,9 @@ const VISIBILITY_OPTIONS: {
 const Settings: React.FC = () => {
   const {t, i18n} = useTranslation();
   const {darkMode, themeMode, setThemeMode, colors} = useTheme();
-  const {setUserData, isAdmin} = useContext(UserContext) as UserContextType;
+  const {setUserData, userData, isAdmin} = useContext(
+    UserContext,
+  ) as UserContextType;
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -133,6 +137,12 @@ const Settings: React.FC = () => {
   );
   const [mapModalVisible, setMapModalVisible] = useState(false);
   const [aboutModalVisible, setAboutModalVisible] = useState(false);
+  const [linkModalVisible, setLinkModalVisible] = useState(false);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+
+  const isPrivateRelay = /@privaterelay\.appleid\.com$/i.test(
+    userData?.email || '',
+  );
 
   // Load saved preferences on mount
   useEffect(() => {
@@ -1207,6 +1217,48 @@ const Settings: React.FC = () => {
             <TouchableOpacity
               style={themedStyles.settingRow}
               activeOpacity={0.7}
+              onPress={async () => {
+                const token = await AsyncStorage.getItem('userToken');
+                setLinkToken(token);
+                setLinkModalVisible(true);
+              }}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={faLink}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('auth.linkToExisting', {
+                    defaultValue: 'Link to existing account',
+                  })}
+                </Text>
+                <Text style={themedStyles.settingDescription}>
+                  {isPrivateRelay
+                    ? t('auth.linkAccountRelayBody', {
+                        defaultValue:
+                          'Apple hid your email, so we created a new account. Sign in with your existing BetterPlay username and password to merge them.',
+                      })
+                    : t('settings.linkAccountDesc', {
+                        defaultValue:
+                          'Merge Apple/Google sign-in into another BetterPlay account',
+                      })}
+                </Text>
+              </View>
+              <View style={themedStyles.chevronContainer}>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={themedStyles.settingRow}
+              activeOpacity={0.7}
               onPress={() => setAboutModalVisible(true)}>
               <View style={themedStyles.iconContainer}>
                 <FontAwesomeIcon
@@ -1658,6 +1710,26 @@ const Settings: React.FC = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+      <LinkAccountModal
+        visible={linkModalVisible}
+        orphanToken={linkToken}
+        isPrivateRelay={isPrivateRelay}
+        startOnCredentials
+        onCancel={() => setLinkModalVisible(false)}
+        onKeepNew={() => setLinkModalVisible(false)}
+        onLinked={async (user, token) => {
+          await AsyncStorage.setItem('userToken', token);
+          await AsyncStorage.setItem('cachedUserData', JSON.stringify(user));
+          setUserData(user);
+          setLinkModalVisible(false);
+          Alert.alert(
+            t('common.success'),
+            t('auth.accountsLinked', {
+              defaultValue: 'Accounts linked. Welcome back!',
+            }),
+          );
+        }}
+      />
     </SafeAreaView>
   );
 };

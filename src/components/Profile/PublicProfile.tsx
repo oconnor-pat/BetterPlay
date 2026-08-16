@@ -15,6 +15,9 @@ import {
   Alert,
   ActionSheetIOS,
   Platform,
+  Modal,
+  Pressable,
+  TouchableOpacity,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
@@ -34,9 +37,13 @@ import {
   faUserClock,
   faEllipsisVertical,
   faUserSlash,
+  faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
-import {TouchableOpacity} from 'react-native';
+import ProfileRatingBadges from '../EventRating/ProfileRatingBadges';
+import PlayerRatingModal, {
+  PlayerRatingTarget,
+} from '../EventRating/PlayerRatingModal';
 import UserContext, {UserContextType} from '../UserContext';
 import ReportSheet from '../Moderation/ReportSheet';
 import {
@@ -61,6 +68,7 @@ type PublicProfileRouteProp = RouteProp<
 interface PublicUserData {
   _id: string;
   username: string;
+  name?: string;
   profilePicUrl?: string;
   favoriteSports?: string[];
 }
@@ -432,6 +440,68 @@ const PublicProfile: React.FC = () => {
     return {eventsCreated, eventsJoined};
   }, [events, userId]);
 
+  const [hostRatingAverage, setHostRatingAverage] = useState<number | null>(
+    null,
+  );
+  const [hostRatingCount, setHostRatingCount] = useState(0);
+  const [playerRatingAverage, setPlayerRatingAverage] = useState<number | null>(
+    null,
+  );
+  const [playerRatingCount, setPlayerRatingCount] = useState(0);
+  const [canRatePlayer, setCanRatePlayer] = useState(false);
+  const [myPlayerScore, setMyPlayerScore] = useState(0);
+  const [playerModalVisible, setPlayerModalVisible] = useState(false);
+  const [playerModalTarget, setPlayerModalTarget] =
+    useState<PlayerRatingTarget | null>(null);
+  const [photoPreviewVisible, setPhotoPreviewVisible] = useState(false);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const headers = token ? {Authorization: `Bearer ${token}`} : {};
+        const response = await axios.get(
+          `${API_BASE_URL}/user/${userId}/events/stats`,
+          {headers},
+        );
+        if (!cancelled) {
+          setHostRatingAverage(
+            typeof response.data?.hostRatingAverage === 'number'
+              ? response.data.hostRatingAverage
+              : null,
+          );
+          setHostRatingCount(response.data?.hostRatingCount || 0);
+          setPlayerRatingAverage(
+            typeof response.data?.playerRatingAverage === 'number'
+              ? response.data.playerRatingAverage
+              : null,
+          );
+          setPlayerRatingCount(response.data?.playerRatingCount || 0);
+        }
+
+        if (token && currentUser?._id && currentUser._id !== userId) {
+          const me = await axios.get(
+            `${API_BASE_URL}/user/${userId}/player-rating/me`,
+            {headers},
+          );
+          if (!cancelled) {
+            setCanRatePlayer(!!me.data?.canRate);
+            setMyPlayerScore(me.data?.rating?.score || 0);
+          }
+        }
+      } catch {
+        // best-effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, currentUser?._id]);
+
   // Fetch user data if needed
   useEffect(() => {
     const fetchUserData = async () => {
@@ -549,48 +619,70 @@ const PublicProfile: React.FC = () => {
         // ── Profile Header ──
         profileSection: {
           alignItems: 'center',
-          paddingTop: 20,
-          paddingBottom: 20,
+          paddingTop: 12,
+          paddingBottom: 14,
           paddingHorizontal: 16,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         avatarContainer: {
-          marginBottom: 12,
+          marginBottom: 8,
         },
         avatar: {
-          width: 96,
-          height: 96,
-          borderRadius: 48,
-          borderWidth: 2,
+          width: 112,
+          height: 112,
+          borderRadius: 56,
+          borderWidth: 3,
           borderColor: colors.primary,
         },
         avatarPlaceholder: {
-          width: 96,
-          height: 96,
-          borderRadius: 48,
+          width: 112,
+          height: 112,
+          borderRadius: 56,
           backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
-          borderWidth: 2,
+          borderWidth: 3,
           borderColor: colors.primary,
         },
         avatarInitials: {
-          fontSize: 32,
+          fontSize: 36,
           fontWeight: '700',
           color: colors.primary,
+        },
+        photoPreviewBackdrop: {
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.92)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        photoPreviewImage: {
+          width: '92%',
+          aspectRatio: 1,
+          borderRadius: 16,
+        },
+        photoPreviewClose: {
+          position: 'absolute',
+          top: 56,
+          right: 20,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: 'rgba(255,255,255,0.15)',
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         userName: {
           fontSize: 22,
           fontWeight: '700',
           color: colors.text,
           textAlign: 'center',
-          marginBottom: 2,
+          marginBottom: 6,
         },
         userHandle: {
           fontSize: 13,
           color: colors.secondaryText,
-          marginBottom: 14,
+          marginBottom: 12,
         },
         actionRow: {
           flexDirection: 'row',
@@ -780,7 +872,17 @@ const PublicProfile: React.FC = () => {
           showsVerticalScrollIndicator={false}>
           {/* ── Profile Header ── */}
           <View style={themedStyles.profileSection}>
-            <View style={themedStyles.avatarContainer}>
+            <TouchableOpacity
+              style={themedStyles.avatarContainer}
+              activeOpacity={userData?.profilePicUrl ? 0.85 : 1}
+              disabled={!userData?.profilePicUrl}
+              onPress={() => {
+                if (userData?.profilePicUrl) {
+                  setPhotoPreviewVisible(true);
+                }
+              }}
+              accessibilityRole="imagebutton"
+              accessibilityLabel="View profile photo">
               {userData?.profilePicUrl ? (
                 <Image
                   source={{uri: userData.profilePicUrl}}
@@ -793,8 +895,21 @@ const PublicProfile: React.FC = () => {
                   </Text>
                 </View>
               )}
-            </View>
-            <Text style={themedStyles.userName}>{userData?.username}</Text>
+            </TouchableOpacity>
+
+            <Text style={themedStyles.userName}>
+              {userData?.name?.trim() || userData?.username}
+            </Text>
+
+            <ProfileRatingBadges
+              userId={userId}
+              username={userData?.username || username}
+              hostAverage={hostRatingAverage}
+              hostCount={hostRatingCount}
+              playerAverage={playerRatingAverage}
+              playerCount={playerRatingCount}
+            />
+
             <Text style={themedStyles.userHandle}>@{userData?.username}</Text>
 
             {/* Friend + Message actions */}
@@ -842,6 +957,24 @@ const PublicProfile: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
+            )}
+            {canRatePlayer && (
+              <TouchableOpacity
+                style={[
+                  themedStyles.messageButton,
+                  {marginTop: 10, alignSelf: 'center'},
+                ]}
+                onPress={() => {
+                  setPlayerModalTarget({
+                    userId,
+                    username: userData?.username || username,
+                  });
+                  setPlayerModalVisible(true);
+                }}>
+                <Text style={themedStyles.messageButtonText}>
+                  {myPlayerScore > 0 ? 'Update player rating' : 'Rate as player'}
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -928,6 +1061,52 @@ const PublicProfile: React.FC = () => {
         target="user"
         onBlockRequested={isBlocked ? undefined : handleBlock}
       />
+
+      <PlayerRatingModal
+        visible={playerModalVisible}
+        target={playerModalTarget}
+        initialScore={myPlayerScore}
+        onClose={() => setPlayerModalVisible(false)}
+        onSubmitted={() => {
+          setMyPlayerScore(prev => (prev > 0 ? prev : 5));
+          // Refresh aggregates
+          axios
+            .get(`${API_BASE_URL}/user/${userId}/events/stats`)
+            .then(response => {
+              setPlayerRatingAverage(
+                typeof response.data?.playerRatingAverage === 'number'
+                  ? response.data.playerRatingAverage
+                  : null,
+              );
+              setPlayerRatingCount(response.data?.playerRatingCount || 0);
+            })
+            .catch(() => {});
+        }}
+      />
+
+      <Modal
+        visible={photoPreviewVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoPreviewVisible(false)}>
+        <Pressable
+          style={themedStyles.photoPreviewBackdrop}
+          onPress={() => setPhotoPreviewVisible(false)}>
+          <TouchableOpacity
+            style={themedStyles.photoPreviewClose}
+            onPress={() => setPhotoPreviewVisible(false)}
+            hitSlop={12}>
+            <FontAwesomeIcon icon={faTimes} size={18} color="#fff" />
+          </TouchableOpacity>
+          {userData?.profilePicUrl ? (
+            <Image
+              source={{uri: userData.profilePicUrl}}
+              style={themedStyles.photoPreviewImage}
+              resizeMode="cover"
+            />
+          ) : null}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 };

@@ -155,7 +155,11 @@
     "virtualLocationBadge": "线上 / 其他",
     "messageHost": "私信主办人",
     "lfgBadge": "找搭子",
-    "lfgHint": "先私信主办人提问，准备好后再申请加入。"
+    "lfgHint": "先私信主办人提问，准备好后再申请加入。",
+    "addToCalendar": "添加到日历",
+    "calendarError": "无法添加到日历",
+    "calendarMissingDate": "此活动缺少有效的日期或时间。",
+    "calendarErrorMessage": "请确保已安装日历应用后再试。"
   },
   "profile": {
     "title": "个人资料",

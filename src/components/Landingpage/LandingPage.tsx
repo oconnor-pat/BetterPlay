@@ -18,6 +18,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from '../../config/api';
 import notificationService from '../../services/NotificationService';
 import analyticsService from '../../services/AnalyticsService';
+import {
+  isGoogleSignInConfigured,
+  signInWithApple,
+  signInWithGoogle,
+  SocialProvider,
+} from '../../services/SocialAuthService';
+import LinkAccountModal from './LinkAccountModal';
+import EditProfileModal from '../Profile/EditProfileModal';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
@@ -37,6 +45,7 @@ import {
   faExclamationTriangle,
   faCheck,
 } from '@fortawesome/free-solid-svg-icons';
+import {faApple, faGoogle} from '@fortawesome/free-brands-svg-icons';
 import {useTranslation} from 'react-i18next';
 
 // Interfaces
@@ -274,6 +283,49 @@ function LandingPage() {
           fontSize: 13,
           fontWeight: '700',
         },
+        socialDividerRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginTop: 18,
+          marginBottom: 4,
+          gap: 10,
+        },
+        socialDividerLine: {
+          flex: 1,
+          height: StyleSheet.hairlineWidth,
+          backgroundColor: colors.border,
+        },
+        socialDividerText: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
+        },
+        socialButtonsColumn: {
+          marginTop: 10,
+          gap: 10,
+        },
+        socialButton: {
+          borderRadius: 24,
+          paddingVertical: 13,
+          paddingHorizontal: 16,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          gap: 10,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+        },
+        socialButtonDisabled: {
+          opacity: 0.55,
+        },
+        socialButtonText: {
+          color: colors.text,
+          fontSize: 15,
+          fontWeight: '700',
+        },
         // Modal — bottom sheet pattern
         modalOverlay: {
           flex: 1,
@@ -408,6 +460,23 @@ function LandingPage() {
     null,
   );
 
+  const [socialLoading, setSocialLoading] = useState<SocialProvider | null>(
+    null,
+  );
+  const [linkModalVisible, setLinkModalVisible] = useState(false);
+  const [pendingSocial, setPendingSocial] = useState<{
+    user: any;
+    token: string;
+    provider: SocialProvider;
+    isPrivateRelay?: boolean;
+  } | null>(null);
+  const [completeProfileVisible, setCompleteProfileVisible] = useState(false);
+  const [pendingCompleteProfile, setPendingCompleteProfile] = useState<{
+    user: any;
+    token: string;
+    provider: string;
+  } | null>(null);
+
   const loginUsernameInputRef = useRef<TextInput>(null);
   const loginPasswordInputRef = useRef<TextInput>(null);
   const forgotPasswordEmailRef = useRef<TextInput>(null);
@@ -432,6 +501,199 @@ function LandingPage() {
     setSuccessMessage(null);
   }, [activeTab]);
 
+  const completeAuthSession = async (
+    user: any,
+    token: string,
+    method: string,
+    isNew: boolean,
+  ) => {
+    await AsyncStorage.setItem('userToken', token);
+    await AsyncStorage.setItem('cachedUserData', JSON.stringify(user));
+    await notificationService.requestPermission();
+    await notificationService.ensureTokenRegistered();
+    setUserData(user);
+    if (isNew) {
+      analyticsService.trackSignUp(method).catch(() => {});
+    } else {
+      analyticsService.trackLogin(method).catch(() => {});
+    }
+  };
+
+  const finishAuthNavigation = (user: any, isNew: boolean) => {
+    navigation.navigate('BottomNavigator', {
+      screen: isNew ? 'Profile' : 'EventList',
+      params: isNew
+        ? {
+            Profile: {
+              _id: user._id,
+              username: user.username,
+              email: user.email,
+            },
+          }
+        : {
+            EventList: {
+              username: user.username,
+            },
+          },
+    } as any);
+  };
+
+  const handleSocialSignIn = async (provider: SocialProvider) => {
+    Keyboard.dismiss();
+    setSocialLoading(provider);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const result =
+        provider === 'apple'
+          ? await signInWithApple()
+          : await signInWithGoogle();
+      if (!result.success) {
+        if (!result.cancelled) {
+          setErrorMessage(result.message);
+        }
+        return;
+      }
+
+      if (result.isNew || result.suggestLink) {
+        setPendingSocial({
+          user: result.user,
+          token: result.token,
+          provider,
+          isPrivateRelay: result.isPrivateRelay,
+        });
+        setLinkModalVisible(true);
+        return;
+      }
+
+      await completeAuthSession(
+        result.user,
+        result.token,
+        provider,
+        result.isNew,
+      );
+      setSuccessMessage('Welcome back!');
+      finishAuthNavigation(result.user, false);
+    } catch (error) {
+      console.error('Social sign-in error:', error);
+      setErrorMessage(
+        t('auth.socialSignInError', {
+          defaultValue: 'Social sign-in failed. Please try again.',
+        }),
+      );
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleKeepNewSocialAccount = async () => {
+    if (!pendingSocial) {
+      setLinkModalVisible(false);
+      return;
+    }
+    const {user, token, provider} = pendingSocial;
+    setLinkModalVisible(false);
+    setPendingSocial(null);
+    // Persist token first so the complete-profile save can authenticate.
+    await AsyncStorage.setItem('userToken', token);
+    await AsyncStorage.setItem('cachedUserData', JSON.stringify(user));
+    setPendingCompleteProfile({user, token, provider});
+    setCompleteProfileVisible(true);
+  };
+
+  const handleLinkedSocialAccount = async (user: any, token: string) => {
+    const provider = pendingSocial?.provider || 'email';
+    setLinkModalVisible(false);
+    setPendingSocial(null);
+    await completeAuthSession(user, token, provider, false);
+    setSuccessMessage(
+      t('auth.accountsLinked', {
+        defaultValue: 'Accounts linked. Welcome back!',
+      }),
+    );
+    finishAuthNavigation(user, false);
+  };
+
+  const finishCompleteProfile = async (user: any) => {
+    const pending = pendingCompleteProfile;
+    setCompleteProfileVisible(false);
+    setPendingCompleteProfile(null);
+    const token = pending?.token || (await AsyncStorage.getItem('userToken'));
+    if (!token) {
+      return;
+    }
+    await completeAuthSession(user, token, pending?.provider || 'email', true);
+    setSuccessMessage('Account created successfully!');
+    finishAuthNavigation(user, true);
+  };
+
+  const renderSocialButtons = () => {
+    const googleReady = isGoogleSignInConfigured();
+    return (
+      <>
+        <View style={themedStyles.socialDividerRow}>
+          <View style={themedStyles.socialDividerLine} />
+          <Text style={themedStyles.socialDividerText}>
+            {t('auth.orContinueWith', {defaultValue: 'or continue with'})}
+          </Text>
+          <View style={themedStyles.socialDividerLine} />
+        </View>
+        <View style={themedStyles.socialButtonsColumn}>
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[
+                themedStyles.socialButton,
+                socialLoading !== null && themedStyles.socialButtonDisabled,
+              ]}
+              disabled={socialLoading !== null}
+              onPress={() => handleSocialSignIn('apple')}>
+              {socialLoading === 'apple' ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <FontAwesomeIcon icon={faApple} size={18} color={colors.text} />
+              )}
+              <Text style={themedStyles.socialButtonText}>
+                {t('auth.continueWithApple', {
+                  defaultValue: 'Continue with Apple',
+                })}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[
+              themedStyles.socialButton,
+              (!googleReady || socialLoading !== null) &&
+                themedStyles.socialButtonDisabled,
+            ]}
+            disabled={!googleReady || socialLoading !== null}
+            onPress={() => {
+              if (!googleReady) {
+                setErrorMessage(
+                  t('auth.googleNotConfigured', {
+                    defaultValue:
+                      'Google Sign-In is not configured yet. Set GOOGLE_WEB_CLIENT_ID in .env and rebuild.',
+                  }),
+                );
+                return;
+              }
+              handleSocialSignIn('google');
+            }}>
+            {socialLoading === 'google' ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <FontAwesomeIcon icon={faGoogle} size={16} color={colors.text} />
+            )}
+            <Text style={themedStyles.socialButtonText}>
+              {t('auth.continueWithGoogle', {
+                defaultValue: 'Continue with Google',
+              })}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </>
+    );
+  };
+
   const handleRegistration = async () => {
     Keyboard.dismiss();
     try {
@@ -442,21 +704,14 @@ function LandingPage() {
       });
       const responseData = await response.json();
       if (responseData.success) {
-        await AsyncStorage.setItem('userToken', responseData.token);
-        // Cache user data for faster app startup
-        await AsyncStorage.setItem(
-          'cachedUserData',
-          JSON.stringify(responseData.user),
+        await completeAuthSession(
+          responseData.user,
+          responseData.token,
+          'email',
+          true,
         );
-
-        // Request notification permission for first-time users, then register token
-        await notificationService.requestPermission();
-        await notificationService.ensureTokenRegistered();
-
         setSuccessMessage('Account created successfully!');
         setErrorMessage(null);
-        setUserData(responseData.user);
-        analyticsService.trackSignUp().catch(() => {});
         navigation.navigate('BottomNavigator', {
           screen: 'Profile',
           params: {
@@ -494,23 +749,16 @@ function LandingPage() {
 
       if (responseData.success) {
         setFailedAttempts(0); // Reset on successful login
-        setUserData(responseData.user);
-        analyticsService.trackLogin().catch(() => {});
         if (!responseData.token) {
           console.error('No token in response', responseData);
           return;
         }
-        await AsyncStorage.setItem('userToken', responseData.token);
-        // Cache user data for faster app startup
-        await AsyncStorage.setItem(
-          'cachedUserData',
-          JSON.stringify(responseData.user),
+        await completeAuthSession(
+          responseData.user,
+          responseData.token,
+          'email',
+          false,
         );
-
-        // Request notification permission if not yet granted, then register token
-        await notificationService.requestPermission();
-        await notificationService.ensureTokenRegistered();
-
         setSuccessMessage('Welcome back!');
         setErrorMessage(null);
 
@@ -851,6 +1099,8 @@ function LandingPage() {
         />
       </TouchableOpacity>
 
+      {renderSocialButtons()}
+
       {/* Forgot Password Link */}
       <TouchableOpacity
         style={themedStyles.forgotPasswordLink}
@@ -1044,6 +1294,8 @@ function LandingPage() {
           color={colors.buttonText}
         />
       </TouchableOpacity>
+
+      {renderSocialButtons()}
     </>
   );
 
@@ -1157,6 +1409,26 @@ function LandingPage() {
 
       {/* Forgot Password Modal */}
       {renderForgotPasswordModal()}
+      <LinkAccountModal
+        visible={linkModalVisible}
+        orphanToken={pendingSocial?.token || null}
+        isPrivateRelay={pendingSocial?.isPrivateRelay}
+        onCancel={() => {
+          // Dismiss without keeping session — user can try again.
+          setLinkModalVisible(false);
+          setPendingSocial(null);
+        }}
+        onKeepNew={handleKeepNewSocialAccount}
+        onLinked={handleLinkedSocialAccount}
+      />
+      <EditProfileModal
+        visible={completeProfileVisible}
+        required
+        initialName={pendingCompleteProfile?.user?.name || ''}
+        initialUsername={pendingCompleteProfile?.user?.username || ''}
+        onCancel={() => {}}
+        onSaved={finishCompleteProfile}
+      />
     </SafeAreaView>
   );
 }

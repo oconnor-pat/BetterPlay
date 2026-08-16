@@ -4,6 +4,7 @@ export type UserData = {
   _id: string;
   username: string;
   email: string;
+  name?: string;
   profilePicUrl?: string;
   isAdmin?: boolean;
 };

@@ -200,3 +200,11 @@ export const isEventActive = (
   }
   return Date.now() - eventDateTime.getTime() < durationToMs(durationMinutes);
 };
+
+/** True once the event's active window (start + duration / assumed) has passed. */
+export const isEventEnded = (
+  eventDate?: string,
+  eventTime?: string,
+  durationMinutes?: number,
+): boolean => !isEventActive(eventDate, eventTime, durationMinutes);
+

@@ -60,6 +60,7 @@ export interface AppNotification {
     | 'event_roster_change'
     | 'event_rsvp'
     | 'event_rsvp_reminder'
+    | 'event_rating_prompt'
     | 'event_join_request'
     | 'event_join_approved'
     | 'event_join_denied'
@@ -336,13 +337,17 @@ const Notifications: React.FC = () => {
       case 'event_roster_change':
       case 'event_rsvp':
       case 'event_rsvp_reminder':
+      case 'event_rating_prompt':
       case 'event_join_request':
       case 'event_join_approved':
       case 'group_event_created':
         if (notification.data?.eventId) {
           navigation.navigate('Events', {
             screen: 'EventRoster',
-            params: {eventId: notification.data.eventId},
+            params: {
+              eventId: notification.data.eventId,
+              openRating: notification.type === 'event_rating_prompt',
+            },
           });
         }
         break;
@@ -441,6 +446,7 @@ const Notifications: React.FC = () => {
         return faClock;
       case 'event_invitation':
       case 'event_rsvp_reminder':
+      case 'event_rating_prompt':
         return faEnvelope;
       case 'event_roster':
       case 'event_roster_change':
@@ -495,6 +501,7 @@ const Notifications: React.FC = () => {
         return '#9C27B0';
       case 'event_invitation':
       case 'event_rsvp_reminder':
+      case 'event_rating_prompt':
       case 'event_roster':
       case 'event_roster_change':
       case 'event_join':

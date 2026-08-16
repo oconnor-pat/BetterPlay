@@ -52,10 +52,21 @@ import {
   faPlus,
   faBell,
   faComment,
+  faStar,
+  faCalendarPlus,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notificationService from '../../services/NotificationService';
+import {addEventToCalendar} from '../../services/CalendarService';
 import {useSocket} from '../../Context/SocketContext';
+import {getEventDateTime, isEventEnded} from '../../utils/eventDateTime';
+import EventRatingModal from '../EventRating/EventRatingModal';
+import PlayerRatingModal, {
+  PlayerRatingTarget,
+} from '../EventRating/PlayerRatingModal';
+
+/** Minimum ratings before showing the roster avatar chip. */
+const ROSTER_RATING_MIN_COUNT = 3;
 
 export interface Player {
   userId?: string;
@@ -85,6 +96,7 @@ type EventRosterRouteProp = RouteProp<
       isRecurring?: boolean;
       groupId?: string;
       groupName?: string;
+      openRating?: boolean;
     };
   },
   'EventRoster'
@@ -321,6 +333,7 @@ const EventRoster: React.FC = () => {
     isRecurring: paramIsRecurring,
     groupId: paramGroupId,
     groupName: paramGroupName,
+    openRating: paramOpenRating,
   } = route.params;
   const {colors} = useTheme();
   const {updateRosterSpots} = useEventContext();
@@ -351,6 +364,21 @@ const EventRoster: React.FC = () => {
   const [time, setTime] = useState(paramTime || '');
   const [location, setLocation] = useState(paramLocation || '');
   const [totalSpots, setTotalSpots] = useState(paramTotalSpots);
+  const [durationMinutes, setDurationMinutes] = useState<number | undefined>(
+    undefined,
+  );
+  const [hostRatings, setHostRatings] = useState<
+    Record<string, {average: number; count: number}>
+  >({});
+  const [playerRatings, setPlayerRatings] = useState<
+    Record<string, {average: number; count: number}>
+  >({});
+  const [hasRatedEvent, setHasRatedEvent] = useState(false);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [eventCreatedByUsername, setEventCreatedByUsername] = useState('');
+  const [playerModalVisible, setPlayerModalVisible] = useState(false);
+  const [playerModalTarget, setPlayerModalTarget] =
+    useState<PlayerRatingTarget | null>(null);
 
   // State for event jersey colors (can be updated from backend)
   const [eventJerseyColors, setEventJerseyColors] = useState<
@@ -493,6 +521,39 @@ const EventRoster: React.FC = () => {
     return userData?._id === eventCreatedBy;
   }, [userData?._id, eventCreatedBy]);
 
+  const isUserOnRoster = useMemo(
+    () =>
+      roster.some(
+        p =>
+          (p.userId && p.userId === userData?._id) ||
+          p.username === userData?.username,
+      ),
+    [roster, userData?._id, userData?.username],
+  );
+
+  const eventHasEnded = useMemo(
+    () => isEventEnded(date, time, durationMinutes),
+    [date, time, durationMinutes],
+  );
+
+  const canAddToCalendar = useMemo(
+    () => !!getEventDateTime(date, time),
+    [date, time],
+  );
+
+  const canRateEvent =
+    !!userData?._id &&
+    !isEventCreator &&
+    isUserOnRoster &&
+    eventHasEnded &&
+    !hasRatedEvent;
+
+  useEffect(() => {
+    if (paramOpenRating && canRateEvent) {
+      setRatingModalVisible(true);
+    }
+  }, [paramOpenRating, canRateEvent]);
+
   // Check if current user is invited to the event
   const isUserInvited = useMemo(() => {
     return invitedUsers.includes(userData?._id || '');
@@ -514,15 +575,6 @@ const EventRoster: React.FC = () => {
     }
     return true;
   }, [eventPrivacy, isEventCreator, isUserInvited]);
-
-  // Check if current user is already on roster
-  const isUserOnRoster = useMemo(() => {
-    return roster.some(
-      player =>
-        player.userId === userData?._id ||
-        player.username === userData?.username,
-    );
-  }, [roster, userData?._id, userData?.username]);
 
   // Invitees / roster members can suggest guests for the creator to approve.
   const canSuggestGuests = useMemo(() => {
@@ -1373,6 +1425,63 @@ const EventRoster: React.FC = () => {
         avatarTextDark: {
           color: '#333',
         },
+        avatarWrap: {
+          position: 'relative',
+          marginRight: 12,
+        },
+        ratingChip: {
+          position: 'absolute',
+          right: -2,
+          bottom: -2,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 2,
+          backgroundColor: colors.card,
+          borderRadius: 8,
+          paddingHorizontal: 4,
+          paddingVertical: 1,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        ratingChipText: {
+          fontSize: 9,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        ratePlayerFab: {
+          position: 'absolute',
+          left: -4,
+          top: -4,
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        eventActionButtons: {
+          marginTop: 12,
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+        },
+        rateEventButton: {
+          alignSelf: 'flex-start',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: colors.primary + '18',
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+        },
+        rateEventButtonText: {
+          color: colors.primary,
+          fontWeight: '700',
+          fontSize: 13,
+        },
         playerInfo: {
           flex: 1,
         },
@@ -1637,6 +1746,11 @@ const EventRoster: React.FC = () => {
       if (response.data.location) {
         setLocation(response.data.location);
       }
+      if (response.data.durationMinutes != null) {
+        setDurationMinutes(response.data.durationMinutes);
+      } else {
+        setDurationMinutes(undefined);
+      }
       if (
         response.data.totalSpots !== undefined &&
         response.data.totalSpots !== null
@@ -1653,12 +1767,57 @@ const EventRoster: React.FC = () => {
       // Update privacy settings
       setEventPrivacy(response.data.privacy || 'public');
       setEventCreatedBy(response.data.createdBy || '');
+      setEventCreatedByUsername(response.data.createdByUsername || '');
       setInvitedUsers(response.data.invitedUsers || []);
       setRsvps(response.data.rsvps || []);
       setJoinRequests(response.data.joinRequests || []);
       setGuestAddRequests(response.data.guestAddRequests || []);
       setWaitlist(response.data.waitlist || []);
       setSpotReservation(response.data.spotReservation || null);
+
+      // Rating chips for everyone on the roster (host + player averages).
+      const hostIds = Array.from(
+        new Set(
+          [
+            response.data.createdBy,
+            ...((response.data.roster || []).map((p: any) => p.userId) || []),
+          ]
+            .filter(Boolean)
+            .map(String),
+        ),
+      );
+      if (hostIds.length > 0) {
+        try {
+          const [hostRes, playerRes] = await Promise.all([
+            axios.post(
+              `${API_BASE_URL}/events/ratings/hosts`,
+              {hostIds},
+              {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+            ),
+            axios.post(
+              `${API_BASE_URL}/users/player-ratings/summary`,
+              {userIds: hostIds},
+              {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+            ),
+          ]);
+          setHostRatings(hostRes.data?.ratings || {});
+          setPlayerRatings(playerRes.data?.ratings || {});
+        } catch {
+          // non-blocking
+        }
+      }
+
+      if (userData?._id) {
+        try {
+          const meResponse = await axios.get(
+            `${API_BASE_URL}/events/${eventId}/ratings/me`,
+            {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+          );
+          setHasRatedEvent(!!meResponse.data?.rated);
+        } catch {
+          // non-blocking
+        }
+      }
 
       // Fetch invited user details if invite-only
       if (
@@ -1682,7 +1841,7 @@ const EventRoster: React.FC = () => {
     } catch (error) {
       setRoster([]);
     }
-  }, [eventId]);
+  }, [eventId, userData?._id]);
 
   const handleApproveRequest = useCallback(
     async (requesterId: string) => {
@@ -2334,14 +2493,14 @@ const EventRoster: React.FC = () => {
         source={{uri: displayProfilePicUrl}}
         style={[
           themedStyles.avatarImage,
-          {borderWidth: 3, borderColor: jerseyColorHex},
+          {borderWidth: 3, borderColor: jerseyColorHex, marginRight: 0},
         ]}
       />
     ) : (
       <View
         style={[
           themedStyles.avatar,
-          {backgroundColor: jerseyColorHex},
+          {backgroundColor: jerseyColorHex, marginRight: 0},
           isLight && themedStyles.avatarLight,
         ]}>
         <Text
@@ -2354,13 +2513,30 @@ const EventRoster: React.FC = () => {
       </View>
     );
 
-    return (
-      <View
-        key={item.userId || item.username}
-        style={[
-          themedStyles.playerCard,
-          isSelf && themedStyles.playerCardSelf,
-        ]}>
+    const hostInfo = item.userId ? hostRatings[item.userId] : undefined;
+    const playerInfo = item.userId ? playerRatings[item.userId] : undefined;
+    // Prefer player chip (everyone); fall back to host chip for frequent hosts.
+    let chipInfo: {average: number; kind: 'player' | 'host'} | null = null;
+    if (playerInfo && playerInfo.count >= ROSTER_RATING_MIN_COUNT) {
+      chipInfo = {average: playerInfo.average, kind: 'player'};
+    } else if (hostInfo && hostInfo.count >= ROSTER_RATING_MIN_COUNT) {
+      chipInfo = {average: hostInfo.average, kind: 'host'};
+    }
+
+    const openPlayerRating = () => {
+      if (!item.userId || isSelf || !isUserOnRoster) {
+        return;
+      }
+      setPlayerModalTarget({
+        userId: item.userId,
+        username: item.username,
+        eventId,
+      });
+      setPlayerModalVisible(true);
+    };
+
+    const avatarWithChip = (
+      <View style={themedStyles.avatarWrap}>
         {canNavigateToProfile ? (
           <TouchableOpacity
             onPress={() => handlePlayerPress(item)}
@@ -2370,6 +2546,38 @@ const EventRoster: React.FC = () => {
         ) : (
           avatarContent
         )}
+        {chipInfo && (
+          <View style={themedStyles.ratingChip} pointerEvents="none">
+            <FontAwesomeIcon
+              icon={faStar}
+              size={8}
+              color={chipInfo.kind === 'host' ? '#F5A623' : '#4FC3F7'}
+            />
+            <Text style={themedStyles.ratingChipText}>
+              {chipInfo.average.toFixed(1)}
+            </Text>
+          </View>
+        )}
+        {!isSelf && isUserOnRoster && !!item.userId && (
+          <TouchableOpacity
+            style={themedStyles.ratePlayerFab}
+            onPress={openPlayerRating}
+            hitSlop={8}
+            accessibilityLabel={`Rate ${item.username} as player`}>
+            <FontAwesomeIcon icon={faStar} size={9} color="#F5A623" />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+
+    return (
+      <View
+        key={item.userId || item.username}
+        style={[
+          themedStyles.playerCard,
+          isSelf && themedStyles.playerCardSelf,
+        ]}>
+        {avatarWithChip}
         <View style={themedStyles.playerInfo}>
           {canNavigateToProfile ? (
             <TouchableOpacity onPress={() => handlePlayerPress(item)}>
@@ -2551,6 +2759,53 @@ const EventRoster: React.FC = () => {
                 <Text style={themedStyles.eventDetailIcon}>📍</Text>
                 <Text style={themedStyles.eventDetailText}>{location}</Text>
               </Animated.View>
+            )}
+
+            {(canAddToCalendar || canRateEvent) && (
+              <View style={themedStyles.eventActionButtons}>
+                {canAddToCalendar && (
+                  <TouchableOpacity
+                    style={themedStyles.rateEventButton}
+                    onPress={() =>
+                      addEventToCalendar(
+                        {
+                          title: eventName || 'BetterPlay event',
+                          date,
+                          time,
+                          durationMinutes,
+                          location,
+                          eventType,
+                        },
+                        t,
+                      )
+                    }>
+                    <FontAwesomeIcon
+                      icon={faCalendarPlus}
+                      size={13}
+                      color={colors.primary}
+                    />
+                    <Text style={themedStyles.rateEventButtonText}>
+                      {t('events.addToCalendar', {
+                        defaultValue: 'Add to calendar',
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {canRateEvent && (
+                  <TouchableOpacity
+                    style={themedStyles.rateEventButton}
+                    onPress={() => setRatingModalVisible(true)}>
+                    <FontAwesomeIcon
+                      icon={faStar}
+                      size={13}
+                      color={colors.primary}
+                    />
+                    <Text style={themedStyles.rateEventButtonText}>
+                      Rate this event
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
 
             {/* Group banner — shown whenever an event belongs to a Group.
@@ -4243,6 +4498,44 @@ const EventRoster: React.FC = () => {
           </Modal>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <EventRatingModal
+        visible={ratingModalVisible}
+        pending={
+          canRateEvent || ratingModalVisible
+            ? {
+                eventId,
+                eventName,
+                hostId: eventCreatedBy,
+                hostUsername: eventCreatedByUsername || null,
+              }
+            : null
+        }
+        onClose={() => setRatingModalVisible(false)}
+        onSubmitted={() => setHasRatedEvent(true)}
+      />
+
+      <PlayerRatingModal
+        visible={playerModalVisible}
+        target={playerModalTarget}
+        onClose={() => setPlayerModalVisible(false)}
+        onSubmitted={() => {
+          // Refresh player rating chips after submit
+          if (playerModalTarget?.userId) {
+            axios
+              .post(`${API_BASE_URL}/users/player-ratings/summary`, {
+                userIds: [playerModalTarget.userId],
+              })
+              .then(res => {
+                setPlayerRatings(prev => ({
+                  ...prev,
+                  ...(res.data?.ratings || {}),
+                }));
+              })
+              .catch(() => {});
+          }
+        }}
+      />
     </SafeAreaView>
   );
 };

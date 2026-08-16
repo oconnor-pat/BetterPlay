@@ -155,7 +155,11 @@
     "virtualLocationBadge": "オンライン / その他",
     "messageHost": "ホストにメッセージ",
     "lfgBadge": "メンバー募集",
-    "lfgHint": "まずホストにメッセージしてから、参加リクエストを送りましょう。"
+    "lfgHint": "まずホストにメッセージしてから、参加リクエストを送りましょう。",
+    "addToCalendar": "カレンダーに追加",
+    "calendarError": "カレンダーに追加できませんでした",
+    "calendarMissingDate": "このイベントには有効な日時がありません。",
+    "calendarErrorMessage": "カレンダーアプリがインストールされているか確認してください。"
   },
   "profile": {
     "title": "プロフィール",

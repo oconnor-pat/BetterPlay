@@ -4,6 +4,7 @@ import React, {
   useState,
   useMemo,
   useCallback,
+  useRef,
 } from 'react';
 import {
   View,
@@ -17,12 +18,20 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
+  ActionSheetIOS,
+  Animated,
+  Pressable,
 } from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
 import {ImagePickerResponse} from 'react-native-image-picker';
 import UserContext, {UserContextType} from '../UserContext';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
+import {
+  useRoute,
+  RouteProp,
+  useNavigation,
+  useFocusEffect,
+} from '@react-navigation/native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
@@ -41,9 +50,7 @@ import {
   faCalendarCheck,
   faCalendarPlus,
   faCamera,
-  faImage,
   faChevronRight,
-  faCalendarDays,
   faGear,
   faRightFromBracket,
   faPlus,
@@ -51,8 +58,13 @@ import {
   faUserClock,
   faLocationDot,
   faUserGroup,
+  faCalendarDays,
+  faTimes,
+  faPen,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
+import ProfileRatingBadges from '../EventRating/ProfileRatingBadges';
+import EditProfileModal from './EditProfileModal';
 
 // Types
 type ProfileScreenRouteProp = RouteProp<
@@ -108,6 +120,11 @@ const Profile: React.FC = () => {
   const [pendingRequestsCount, setPendingRequestsCount] = useState<number>(0);
   const [signOutModalVisible, setSignOutModalVisible] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [photoPreviewVisible, setPhotoPreviewVisible] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
+  const [editProfileVisible, setEditProfileVisible] = useState(false);
+  const avatarScale = useRef(new Animated.Value(0.92)).current;
+  const avatarOpacity = useRef(new Animated.Value(0)).current;
 
   const route = useRoute<ProfileScreenRouteProp>();
   const navigation = useNavigation<any>();
@@ -230,6 +247,57 @@ const Profile: React.FC = () => {
     return {eventsCreated, eventsJoined};
   }, [events, _id]);
 
+  const [hostRatingAverage, setHostRatingAverage] = useState<number | null>(
+    null,
+  );
+  const [hostRatingCount, setHostRatingCount] = useState(0);
+  const [playerRatingAverage, setPlayerRatingAverage] = useState<number | null>(
+    null,
+  );
+  const [playerRatingCount, setPlayerRatingCount] = useState(0);
+
+  useEffect(() => {
+    if (!_id) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await axios.get(
+          `${API_BASE_URL}/user/${_id}/events/stats`,
+          {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+        );
+        if (!cancelled) {
+          setHostRatingAverage(
+            typeof response.data?.hostRatingAverage === 'number'
+              ? response.data.hostRatingAverage
+              : null,
+          );
+          setHostRatingCount(response.data?.hostRatingCount || 0);
+          setPlayerRatingAverage(
+            typeof response.data?.playerRatingAverage === 'number'
+              ? response.data.playerRatingAverage
+              : null,
+          );
+          setPlayerRatingCount(response.data?.playerRatingCount || 0);
+        }
+      } catch {
+        // Stats enrichment is best-effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [_id]);
+
+  const memberSinceYear = useMemo(() => {
+    if (userData && 'createdAt' in userData && userData.createdAt) {
+      return new Date(userData.createdAt as string).getFullYear();
+    }
+    return new Date().getFullYear();
+  }, [userData]);
+
   // Events live in a sibling tab's stack, so jumping to one has to address the
   // tab first — a bare navigate() looks only in this stack and silently does
   // nothing. Name and type are passed so the roster header renders immediately
@@ -314,14 +382,6 @@ const Profile: React.FC = () => {
     });
   };
 
-  // Get member since year from user data
-  const memberSinceYear = useMemo(() => {
-    if (userData && 'createdAt' in userData && userData.createdAt) {
-      return new Date(userData.createdAt as string).getFullYear();
-    }
-    return new Date().getFullYear();
-  }, [userData]);
-
   // Themed styles
   const themedStyles = useMemo(
     () =>
@@ -349,50 +409,94 @@ const Profile: React.FC = () => {
         // ── Profile Header (compact) ──
         profileSection: {
           alignItems: 'center',
-          paddingTop: 16,
-          paddingBottom: 20,
+          paddingTop: 12,
+          paddingBottom: 14,
           paddingHorizontal: 16,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
         avatarContainer: {
           position: 'relative',
-          marginBottom: 12,
+          marginBottom: 8,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        avatarGlow: {
+          position: 'absolute',
+          width: 128,
+          height: 128,
+          borderRadius: 64,
+          backgroundColor: colors.primary + '22',
+        },
+        avatarRing: {
+          padding: 4,
+          borderRadius: 64,
+          borderWidth: 2,
+          borderColor: colors.primary + '55',
         },
         avatar: {
-          width: 96,
-          height: 96,
-          borderRadius: 48,
-          borderWidth: 2,
+          width: 112,
+          height: 112,
+          borderRadius: 56,
+          borderWidth: 3,
           borderColor: colors.primary,
         },
         avatarPlaceholder: {
-          width: 96,
-          height: 96,
-          borderRadius: 48,
+          width: 112,
+          height: 112,
+          borderRadius: 56,
           backgroundColor: colors.primary + '14',
           alignItems: 'center',
           justifyContent: 'center',
-          borderWidth: 2,
+          borderWidth: 3,
           borderColor: colors.primary,
         },
         avatarInitials: {
-          fontSize: 32,
+          fontSize: 36,
           fontWeight: '700',
           color: colors.primary,
         },
         avatarEditBadge: {
           position: 'absolute',
-          bottom: 0,
-          right: -4,
+          bottom: 4,
+          right: 4,
           backgroundColor: colors.primary,
-          width: 30,
-          height: 30,
-          borderRadius: 15,
+          width: 32,
+          height: 32,
+          borderRadius: 16,
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: 2,
           borderColor: colors.background,
+        },
+        avatarUploadingOverlay: {
+          ...StyleSheet.absoluteFillObject,
+          borderRadius: 56,
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        photoPreviewBackdrop: {
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.92)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        photoPreviewImage: {
+          width: '92%',
+          aspectRatio: 1,
+          borderRadius: 16,
+        },
+        photoPreviewClose: {
+          position: 'absolute',
+          top: 56,
+          right: 20,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: 'rgba(255,255,255,0.15)',
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         userName: {
           fontSize: 22,
@@ -400,36 +504,47 @@ const Profile: React.FC = () => {
           color: colors.text,
           marginBottom: 2,
         },
+        userHandle: {
+          fontSize: 14,
+          fontWeight: '500',
+          color: colors.secondaryText,
+          marginBottom: 6,
+        },
+        nameRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 2,
+        },
+        editProfileChip: {
+          paddingHorizontal: 8,
+          paddingVertical: 4,
+          borderRadius: 8,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
         emailText: {
           fontSize: 13,
           color: colors.secondaryText,
-          marginBottom: 12,
+          marginBottom: 0,
+          textAlign: 'center',
         },
-        photoButtonsRow: {
-          flexDirection: 'row',
-          gap: 8,
+        emailToggle: {
+          marginTop: 2,
+          paddingVertical: 4,
+          paddingHorizontal: 8,
         },
-        photoButton: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: 'transparent',
-          paddingVertical: 8,
-          paddingHorizontal: 14,
-          borderRadius: 20,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.primary,
-        },
-        photoButtonText: {
-          color: colors.primary,
-          fontSize: 13,
-          fontWeight: '700',
-          marginLeft: 6,
+        emailToggleText: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
+          textAlign: 'center',
         },
         // ── Section (flat block) ──
         section: {
           paddingHorizontal: 16,
-          paddingTop: 16,
-          paddingBottom: 16,
+          paddingTop: 14,
+          paddingBottom: 14,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         },
@@ -437,7 +552,7 @@ const Profile: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 12,
+          marginBottom: 10,
         },
         sectionLabel: {
           fontSize: 12,
@@ -1003,6 +1118,91 @@ const Profile: React.FC = () => {
     });
   };
 
+  const openPhotoPreview = () => {
+    if (selectedImage) {
+      setPhotoPreviewVisible(true);
+    }
+  };
+
+  const openAvatarMenu = () => {
+    if (uploadingImage) {
+      return;
+    }
+
+    const viewLabel = selectedImage
+      ? t('profile.viewPhoto', {defaultValue: 'View photo'})
+      : null;
+    const galleryLabel = t('profile.chooseFromLibrary', {
+      defaultValue: 'Choose from Library',
+    });
+    const cameraLabel = t('profile.takePhoto', {defaultValue: 'Take Photo'});
+    const cancelLabel = t('common.cancel', {defaultValue: 'Cancel'});
+    const title = t('profile.profilePhoto', {defaultValue: 'Profile photo'});
+
+    if (Platform.OS === 'ios') {
+      const options = [
+        ...(viewLabel ? [viewLabel] : []),
+        galleryLabel,
+        cameraLabel,
+        cancelLabel,
+      ];
+      const cancelButtonIndex = options.length - 1;
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex,
+          title,
+        },
+        buttonIndex => {
+          const label = options[buttonIndex];
+          if (label === viewLabel) {
+            openPhotoPreview();
+          } else if (label === galleryLabel) {
+            handleChoosePhoto();
+          } else if (label === cameraLabel) {
+            handleTakePhoto();
+          }
+        },
+      );
+      return;
+    }
+
+    const buttons: {
+      text: string;
+      onPress?: () => void;
+      style?: 'cancel' | 'default' | 'destructive';
+    }[] = [];
+    if (viewLabel) {
+      buttons.push({text: viewLabel, onPress: openPhotoPreview});
+    }
+    buttons.push(
+      {text: galleryLabel, onPress: handleChoosePhoto},
+      {text: cameraLabel, onPress: handleTakePhoto},
+      {text: cancelLabel, style: 'cancel'},
+    );
+    Alert.alert(title, undefined, buttons);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      avatarScale.setValue(0.92);
+      avatarOpacity.setValue(0);
+      Animated.parallel([
+        Animated.spring(avatarScale, {
+          toValue: 1,
+          friction: 7,
+          tension: 80,
+          useNativeDriver: true,
+        }),
+        Animated.timing(avatarOpacity, {
+          toValue: 1,
+          duration: 280,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, [avatarOpacity, avatarScale]),
+  );
+
   const uploadImageToLambda = async (
     base64Image: string,
     fileName: string | undefined,
@@ -1153,57 +1353,91 @@ const Profile: React.FC = () => {
         }>
         {/* ── Profile Header (compact) ── */}
         <View style={themedStyles.profileSection}>
-          <View style={themedStyles.avatarContainer}>
-            {selectedImage ? (
-              <Image
-                source={{uri: selectedImage}}
-                style={themedStyles.avatar}
-              />
-            ) : (
-              <View style={themedStyles.avatarPlaceholder}>
-                <Text style={themedStyles.avatarInitials}>
-                  {getInitials(userData?.username)}
-                </Text>
+          <Animated.View
+            style={[
+              themedStyles.avatarContainer,
+              {
+                opacity: avatarOpacity,
+                transform: [{scale: avatarScale}],
+              },
+            ]}>
+            <View style={themedStyles.avatarGlow} pointerEvents="none" />
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={openAvatarMenu}
+              accessibilityRole="button"
+              accessibilityLabel="Profile photo">
+              <View style={themedStyles.avatarRing}>
+                {selectedImage ? (
+                  <Image
+                    source={{uri: selectedImage}}
+                    style={themedStyles.avatar}
+                  />
+                ) : (
+                  <View style={themedStyles.avatarPlaceholder}>
+                    <Text style={themedStyles.avatarInitials}>
+                      {getInitials(userData?.username)}
+                    </Text>
+                  </View>
+                )}
+                {uploadingImage && (
+                  <View style={themedStyles.avatarUploadingOverlay}>
+                    <ActivityIndicator color="#fff" />
+                  </View>
+                )}
               </View>
-            )}
+              <View style={themedStyles.avatarEditBadge}>
+                <FontAwesomeIcon icon={faCamera} size={13} color="#fff" />
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+
+          <View style={themedStyles.nameRow}>
+            <Text style={themedStyles.userName}>
+              {userData?.name?.trim() || userData?.username}
+            </Text>
+            <TouchableOpacity
+              style={themedStyles.editProfileChip}
+              onPress={() => setEditProfileVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('profile.editProfile')}>
+              <FontAwesomeIcon icon={faPen} size={12} color={colors.primary} />
+            </TouchableOpacity>
           </View>
-
-          <Text style={themedStyles.userName}>{userData?.username}</Text>
-          <Text style={themedStyles.emailText}>{userData?.email}</Text>
-
-          {/* Photo Buttons */}
-          {uploadingImage ? (
-            <View style={themedStyles.photoButtonsRow}>
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
-          ) : (
-            <View style={themedStyles.photoButtonsRow}>
-              <TouchableOpacity
-                style={themedStyles.photoButton}
-                onPress={handleChoosePhoto}>
-                <FontAwesomeIcon
-                  icon={faImage}
-                  size={13}
-                  color={colors.primary}
-                />
-                <Text style={themedStyles.photoButtonText}>
-                  {t('profile.gallery')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={themedStyles.photoButton}
-                onPress={handleTakePhoto}>
-                <FontAwesomeIcon
-                  icon={faCamera}
-                  size={13}
-                  color={colors.primary}
-                />
-                <Text style={themedStyles.photoButtonText}>
-                  {t('profile.camera')}
-                </Text>
-              </TouchableOpacity>
-            </View>
+          {!!userData?.name?.trim() && (
+            <Text style={themedStyles.userHandle}>@{userData.username}</Text>
           )}
+
+          <ProfileRatingBadges
+            userId={_id}
+            username={userData?.username}
+            hostAverage={hostRatingAverage}
+            hostCount={hostRatingCount}
+            playerAverage={playerRatingAverage}
+            playerCount={playerRatingCount}
+          />
+
+          {userData?.email ? (
+            showEmail ? (
+              <TouchableOpacity
+                onPress={() => setShowEmail(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Hide email"
+                hitSlop={8}>
+                <Text style={themedStyles.emailText}>{userData.email}</Text>
+                <Text style={themedStyles.emailToggleText}>Hide email</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={themedStyles.emailToggle}
+                onPress={() => setShowEmail(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Show email"
+                hitSlop={8}>
+                <Text style={themedStyles.emailToggleText}>Show email</Text>
+              </TouchableOpacity>
+            )
+          ) : null}
         </View>
 
         {/* ── Your Activity (2x2 stats) ── */}
@@ -1670,6 +1904,49 @@ const Profile: React.FC = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <Modal
+        visible={photoPreviewVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoPreviewVisible(false)}>
+        <Pressable
+          style={themedStyles.photoPreviewBackdrop}
+          onPress={() => setPhotoPreviewVisible(false)}>
+          <TouchableOpacity
+            style={themedStyles.photoPreviewClose}
+            onPress={() => setPhotoPreviewVisible(false)}
+            hitSlop={12}>
+            <FontAwesomeIcon icon={faTimes} size={18} color="#fff" />
+          </TouchableOpacity>
+          {selectedImage ? (
+            <Image
+              source={{uri: selectedImage}}
+              style={themedStyles.photoPreviewImage}
+              resizeMode="cover"
+            />
+          ) : null}
+        </Pressable>
+      </Modal>
+      <EditProfileModal
+        visible={editProfileVisible}
+        initialName={userData?.name || ''}
+        initialUsername={userData?.username || ''}
+        onCancel={() => setEditProfileVisible(false)}
+        onSaved={async user => {
+          setUserData(prev => ({
+            ...(prev || { _id, username: user.username, email: user.email }),
+            ...user,
+            _id: user._id || _id,
+            username: user.username,
+            email: user.email || prev?.email || '',
+            name: user.name,
+            profilePicUrl: user.profilePicUrl || prev?.profilePicUrl,
+          }));
+          await AsyncStorage.setItem('cachedUserData', JSON.stringify(user));
+          setEditProfileVisible(false);
+        }}
+      />
     </SafeAreaView>
   );
 };

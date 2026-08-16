@@ -644,6 +644,7 @@ class NotificationService {
       case 'event_leave':
       case 'event_rsvp':
       case 'event_rsvp_reminder':
+      case 'event_rating_prompt':
       case 'event_join_request':
       case 'event_join_approved':
       case 'event_guest_add_request':
@@ -654,6 +655,9 @@ class NotificationService {
           const params: Record<string, unknown> = {eventId: targetEventId};
           if (changedFields) {
             params.changedFields = changedFields;
+          }
+          if (type === 'event_rating_prompt') {
+            params.openRating = true;
           }
           navigateToTab('Events', 'EventRoster', params);
         } else {

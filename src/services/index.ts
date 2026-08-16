@@ -15,4 +15,8 @@ export * from './EventWatchService';
 
 export * from './MapLauncher';
 
+export * from './CalendarService';
+
+export * from './SocialAuthService';
+
 export {default as analyticsService} from './AnalyticsService';

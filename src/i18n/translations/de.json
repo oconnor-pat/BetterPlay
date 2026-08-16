@@ -164,7 +164,11 @@
     "virtualLocationBadge": "Online / anders",
     "messageHost": "Host schreiben",
     "lfgBadge": "Sucht Mitspieler",
-    "lfgHint": "Schreib dem Host eine Frage, und bitte danach um Beitritt."
+    "lfgHint": "Schreib dem Host eine Frage, und bitte danach um Beitritt.",
+    "addToCalendar": "Zum Kalender hinzufügen",
+    "calendarError": "Konnte nicht zum Kalender hinzugefügt werden",
+    "calendarMissingDate": "Dieses Event hat kein gültiges Datum oder keine gültige Uhrzeit.",
+    "calendarErrorMessage": "Bitte stelle sicher, dass eine Kalender-App installiert ist."
   },
   "profile": {
     "title": "Profil",

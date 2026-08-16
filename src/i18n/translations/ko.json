@@ -155,7 +155,11 @@
     "virtualLocationBadge": "온라인 / 기타",
     "messageHost": "호스트에게 메시지",
     "lfgBadge": "그룹 모집",
-    "lfgHint": "호스트에게 먼저 물어본 뒤 참가 요청하세요."
+    "lfgHint": "호스트에게 먼저 물어본 뒤 참가 요청하세요.",
+    "addToCalendar": "캘린더에 추가",
+    "calendarError": "캘린더에 추가할 수 없습니다",
+    "calendarMissingDate": "이 이벤트에 유효한 날짜 또는 시간이 없습니다.",
+    "calendarErrorMessage": "캘린더 앱이 설치되어 있는지 확인해 주세요."
   },
   "profile": {
     "title": "프로필",

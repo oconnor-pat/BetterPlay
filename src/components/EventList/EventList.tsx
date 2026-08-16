@@ -86,6 +86,7 @@ import {
   NavigationProp,
   useRoute,
   RouteProp,
+  useFocusEffect,
 } from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
@@ -98,6 +99,9 @@ import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
 import EventComments from './EventComments';
 import CountdownTimer from './CountdownTimer';
+import EventRatingModal, {
+  PendingRating,
+} from '../EventRating/EventRatingModal';
 import {useNotifications} from '../../Context/NotificationContext';
 import {useSocket} from '../../Context/SocketContext';
 import notificationService from '../../services/NotificationService';
@@ -110,6 +114,7 @@ import {
   parseEventDateLocal,
 } from '../../utils/eventDateTime';
 import {AvailableMapApp, openDirections} from '../../services/MapLauncher';
+import {addEventToCalendar} from '../../services/CalendarService';
 import MapAppPicker from '../MapAppPicker/MapAppPicker';
 import eventWatchService, {
   EventWatchPreferences,
@@ -3342,6 +3347,13 @@ const EventList: React.FC = () => {
   // First-time user onboarding state
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
 
+  // Post-event rating prompt (one at a time)
+  const [pendingRating, setPendingRating] = useState<PendingRating | null>(
+    null,
+  );
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const dismissedRatingIds = useRef<Set<string>>(new Set());
+
   // Ref for scrolling to specific events
   const flatListRef = useRef<FlatList<any> | null>(null);
 
@@ -3380,6 +3392,39 @@ const EventList: React.FC = () => {
       }
     });
   }, [fetchEvents]);
+
+  // After attending an ended event, prompt to rate (one at a time per session).
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const checkPendingRatings = async () => {
+        if (!myUserId) {
+          return;
+        }
+        try {
+          const token = await AsyncStorage.getItem('userToken');
+          const response = await axios.get(
+            `${API_BASE_URL}/events/ratings/pending`,
+            {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+          );
+          const list: PendingRating[] = response.data?.pending || [];
+          const next = list.find(
+            p => !dismissedRatingIds.current.has(p.eventId),
+          );
+          if (!cancelled && next) {
+            setPendingRating(next);
+            setRatingModalVisible(true);
+          }
+        } catch {
+          // Non-blocking — ratings prompt is best-effort
+        }
+      };
+      checkPendingRatings();
+      return () => {
+        cancelled = true;
+      };
+    }, [myUserId]),
+  );
 
   // Pre-seed creator cache with the current user so events they create
   // optimistically render with their avatar before /users resolves.
@@ -4489,6 +4534,21 @@ const EventList: React.FC = () => {
         t('events.shareError') || 'Failed to share event',
       );
     }
+  };
+
+  const handleAddToCalendar = (event: Event) => {
+    addEventToCalendar(
+      {
+        title: event.name,
+        date: event.date,
+        time: event.time,
+        durationMinutes: event.durationMinutes,
+        location: event.location,
+        description: event.description,
+        eventType: event.eventType,
+      },
+      t,
+    );
   };
 
   const openWatchModal = async (event: Event) => {
@@ -5666,6 +5726,20 @@ const EventList: React.FC = () => {
             hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
             <FontAwesomeIcon
               icon={faShareAlt}
+              size={16}
+              color={colors.secondaryText}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={themedStyles.engagementButton}
+            onPress={() => handleAddToCalendar(item)}
+            hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}
+            accessibilityLabel={t('events.addToCalendar', {
+              defaultValue: 'Add to calendar',
+            })}>
+            <FontAwesomeIcon
+              icon={faCalendarAlt}
               size={16}
               color={colors.secondaryText}
             />
@@ -7844,6 +7918,20 @@ const EventList: React.FC = () => {
           await app.open();
         }}
         onClose={() => setMapPickerVisible(false)}
+      />
+
+      <EventRatingModal
+        visible={ratingModalVisible}
+        pending={pendingRating}
+        onClose={() => {
+          if (pendingRating?.eventId) {
+            dismissedRatingIds.current.add(pendingRating.eventId);
+          }
+          setRatingModalVisible(false);
+        }}
+        onSubmitted={eventId => {
+          dismissedRatingIds.current.add(eventId);
+        }}
       />
     </SafeAreaView>
   );

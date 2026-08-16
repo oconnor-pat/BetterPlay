@@ -164,7 +164,11 @@
     "virtualLocationBadge": "En ligne / autre",
     "messageHost": "Message à l'hôte",
     "lfgBadge": "Cherche un groupe",
-    "lfgHint": "Écrivez à l'hôte, puis demandez à rejoindre quand vous êtes prêt."
+    "lfgHint": "Écrivez à l'hôte, puis demandez à rejoindre quand vous êtes prêt.",
+    "addToCalendar": "Ajouter au calendrier",
+    "calendarError": "Impossible d'ajouter au calendrier",
+    "calendarMissingDate": "Cet événement n'a pas de date ou d'heure valide.",
+    "calendarErrorMessage": "Assurez-vous qu'une application calendrier est installée."
   },
   "profile": {
     "title": "Profil",

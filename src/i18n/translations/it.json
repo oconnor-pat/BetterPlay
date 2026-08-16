@@ -155,7 +155,11 @@
     "virtualLocationBadge": "Online / altro",
     "messageHost": "Messaggia host",
     "lfgBadge": "Cerca gruppo",
-    "lfgHint": "Scrivi all'host con una domanda, poi richiedi di unirti."
+    "lfgHint": "Scrivi all'host con una domanda, poi richiedi di unirti.",
+    "addToCalendar": "Aggiungi al calendario",
+    "calendarError": "Impossibile aggiungere al calendario",
+    "calendarMissingDate": "Questo evento non ha una data o un'ora valida.",
+    "calendarErrorMessage": "Assicurati di avere un'app calendario installata."
   },
   "profile": {
     "title": "Profilo",
