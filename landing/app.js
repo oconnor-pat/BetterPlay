@@ -79,7 +79,6 @@
     var eyebrow = document.getElementById('eyebrow');
     var lede = document.getElementById('lede');
     var hint = document.getElementById('event-hint');
-    var openApp = document.getElementById('open-app');
 
     if (eyebrow) {
       eyebrow.textContent = "You're invited";
@@ -94,11 +93,7 @@
     if (hint) {
       hint.hidden = false;
       hint.textContent =
-        'Already installed? Open the invite in the app, or get the beta below.';
-    }
-    if (openApp) {
-      openApp.hidden = false;
-      openApp.href = 'betterplay://event/' + encodeURIComponent(eventId);
+        'Install BetterPlay below, then open the app and find the event on your Events tab.';
     }
   }
 })();

@@ -231,18 +231,6 @@ a {
   font-size: 0.95rem;
 }
 
-.open-app {
-  display: inline-block;
-  margin-top: 14px;
-  color: var(--green);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.open-app:hover {
-  text-decoration: underline;
-}
-
 .strip {
   max-width: 1080px;
   margin: 0 auto;
