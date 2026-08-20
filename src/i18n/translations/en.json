@@ -250,6 +250,8 @@
     "usernameInvalid": "Username must be 3–20 characters (letters, numbers, underscores).",
     "nameInvalid": "Name must be between 1 and 80 characters.",
     "updateFailed": "Could not update profile. Please try again.",
+    "mutualFriendOne": "1 mutual friend",
+    "mutualFriendsCount": "{{count}} mutual friends",
     "eventsCreated": "Events Created",
     "eventsJoined": "Events Joined",
     "quickSettings": "Quick Settings",

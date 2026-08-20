@@ -80,8 +80,8 @@ android {
         applicationId "com.BetterPlay"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 13
-        versionName "2.7.0"
+        versionCode 14
+        versionName "2.8.0"
     }
     buildFeatures {
         buildConfig true

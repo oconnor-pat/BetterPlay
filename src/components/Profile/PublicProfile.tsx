@@ -122,6 +122,9 @@ const PublicProfile: React.FC = () => {
   const [userData, setUserData] = useState<PublicUserData | null>(null);
   const [friendStatus, setFriendStatus] = useState<FriendStatus>('none');
   const [mutualFriendsCount, setMutualFriendsCount] = useState<number>(0);
+  const [mutualFriends, setMutualFriends] = useState<
+    Array<{_id: string; username: string; profilePicUrl?: string}>
+  >([]);
   const [favoriteSports, setFavoriteSports] = useState<string[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
@@ -196,6 +199,38 @@ const PublicProfile: React.FC = () => {
   useEffect(() => {
     fetchFriendStatus();
   }, [fetchFriendStatus]);
+
+  useEffect(() => {
+    if (!currentUser?._id || userId === currentUser._id) {
+      setMutualFriendsCount(0);
+      setMutualFriends([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await fetch(
+          `${API_BASE_URL}/users/${userId}/mutual-friends`,
+          {headers: token ? {Authorization: `Bearer ${token}`} : undefined},
+        );
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        if (cancelled) {
+          return;
+        }
+        setMutualFriendsCount(Number(data.count) || 0);
+        setMutualFriends(Array.isArray(data.friends) ? data.friends : []);
+      } catch (error) {
+        console.error('Error loading mutual friends:', error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, currentUser?._id]);
 
   // Fetch favorite sports for this user
   useEffect(() => {
@@ -699,6 +734,39 @@ const PublicProfile: React.FC = () => {
           color: colors.secondaryText,
           marginBottom: 12,
         },
+        mutualFriendsRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+          maxWidth: '92%',
+        },
+        mutualFriendsAvatars: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        mutualFriendAvatar: {
+          width: 22,
+          height: 22,
+          borderRadius: 11,
+          borderWidth: 1.5,
+          borderColor: colors.background,
+        },
+        mutualFriendAvatarFallback: {
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        mutualFriendAvatarText: {
+          color: '#fff',
+          fontSize: 9,
+          fontWeight: '700',
+        },
+        mutualFriendsLabel: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          flexShrink: 1,
+        },
         actionRow: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -926,6 +994,51 @@ const PublicProfile: React.FC = () => {
             />
 
             <Text style={themedStyles.userHandle}>@{userData?.username}</Text>
+
+            {!isSelf && mutualFriendsCount > 0 ? (
+              <View style={themedStyles.mutualFriendsRow}>
+                {mutualFriends.length > 0 ? (
+                  <View style={themedStyles.mutualFriendsAvatars}>
+                    {mutualFriends.slice(0, 3).map((friend, index) => (
+                      <TouchableOpacity
+                        key={friend._id}
+                        onPress={() =>
+                          navigation.push('PublicProfile', {
+                            userId: friend._id,
+                            username: friend.username,
+                            profilePicUrl: friend.profilePicUrl,
+                          })
+                        }
+                        style={{marginLeft: index === 0 ? 0 : -6}}>
+                        {friend.profilePicUrl ? (
+                          <Image
+                            source={{uri: friend.profilePicUrl}}
+                            style={themedStyles.mutualFriendAvatar}
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              themedStyles.mutualFriendAvatar,
+                              themedStyles.mutualFriendAvatarFallback,
+                            ]}>
+                            <Text style={themedStyles.mutualFriendAvatarText}>
+                              {getInitials(friend.username)}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
+                <Text style={themedStyles.mutualFriendsLabel}>
+                  {mutualFriendsCount === 1
+                    ? t('profile.mutualFriendOne') || '1 mutual friend'
+                    : t('profile.mutualFriendsCount', {
+                        count: mutualFriendsCount,
+                      }) || `${mutualFriendsCount} mutual friends`}
+                </Text>
+              </View>
+            ) : null}
 
             {/* Friend + Message actions */}
             {userId !== currentUser?._id && (
