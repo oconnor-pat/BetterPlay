@@ -240,7 +240,6 @@ const EventComments: React.FC<EventCommentsProps> = ({
     replyId: string;
     username: string;
   } | null>(null);
-  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [likesModalVisible, setLikesModalVisible] = useState(false);
   const [likesModalData, setLikesModalData] = useState<{
     title: string;
@@ -296,12 +295,6 @@ const EventComments: React.FC<EventCommentsProps> = ({
 
       if (response.data && response.data._id) {
         setPost(normalizePost(response.data));
-        // Initialize liked states
-        if (userData) {
-          if (response.data.likes?.includes(userData._id)) {
-            setLikedPosts(new Set([response.data._id]));
-          }
-        }
       } else {
         setPost(null);
       }
@@ -311,7 +304,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [eventId, userData]);
+  }, [eventId]);
 
   useEffect(() => {
     fetchOrCreatePost();
@@ -331,13 +324,18 @@ const EventComments: React.FC<EventCommentsProps> = ({
       }) => {
         if (data.eventId === eventId) {
           setPost(prev => {
-            if (!prev) return prev;
+            if (!prev) {
+              return prev;
+            }
             const updates: Partial<Post> = {
               comments: (data.comments || []).map(normalizeComment),
             };
-            if (data.likes) updates.likes = data.likes;
-            if (data.likedByUsernames)
+            if (data.likes) {
+              updates.likes = data.likes;
+            }
+            if (data.likedByUsernames) {
               updates.likedByUsernames = data.likedByUsernames;
+            }
             if ((data as any).reactions) {
               updates.reactions = (data as any).reactions;
             }
