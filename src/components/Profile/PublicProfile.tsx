@@ -431,15 +431,6 @@ const PublicProfile: React.FC = () => {
     ]);
   }, [isBlocked, handleBlock, handleUnblock, username, t]);
 
-  // Calculate user stats based on events
-  const userStats = useMemo(() => {
-    const eventsCreated = events.filter(e => e.createdBy === userId).length;
-    const eventsJoined = events.filter(e =>
-      (e as any).roster?.some((r: any) => r.userId === userId),
-    ).length;
-    return {eventsCreated, eventsJoined};
-  }, [events, userId]);
-
   const [hostRatingAverage, setHostRatingAverage] = useState<number | null>(
     null,
   );
@@ -448,12 +439,30 @@ const PublicProfile: React.FC = () => {
     null,
   );
   const [playerRatingCount, setPlayerRatingCount] = useState(0);
+  const [createdCount, setCreatedCount] = useState<number | null>(null);
+  const [joinedCount, setJoinedCount] = useState<number | null>(null);
   const [canRatePlayer, setCanRatePlayer] = useState(false);
   const [myPlayerScore, setMyPlayerScore] = useState(0);
   const [playerModalVisible, setPlayerModalVisible] = useState(false);
   const [playerModalTarget, setPlayerModalTarget] =
     useState<PlayerRatingTarget | null>(null);
   const [photoPreviewVisible, setPhotoPreviewVisible] = useState(false);
+
+  const userStats = useMemo(() => {
+    const eventsCreated =
+      createdCount != null
+        ? createdCount
+        : events.filter(e => String(e.createdBy) === String(userId)).length;
+    const eventsJoined =
+      joinedCount != null
+        ? joinedCount
+        : events.filter(e =>
+            (e as any).roster?.some(
+              (r: any) => String(r.userId) === String(userId),
+            ),
+          ).length;
+    return {eventsCreated, eventsJoined};
+  }, [events, userId, createdCount, joinedCount]);
 
   useEffect(() => {
     if (!userId) {
@@ -481,6 +490,12 @@ const PublicProfile: React.FC = () => {
               : null,
           );
           setPlayerRatingCount(response.data?.playerRatingCount || 0);
+          if (typeof response.data?.created === 'number') {
+            setCreatedCount(response.data.created);
+          }
+          if (typeof response.data?.joined === 'number') {
+            setJoinedCount(response.data.joined);
+          }
         }
 
         if (token && currentUser?._id && currentUser._id !== userId) {
@@ -965,6 +980,13 @@ const PublicProfile: React.FC = () => {
                   {marginTop: 10, alignSelf: 'center'},
                 ]}
                 onPress={() => {
+                  if (myPlayerScore > 0) {
+                    Alert.alert(
+                      'Already rated',
+                      "You've already rated this player. Each person can leave one review.",
+                    );
+                    return;
+                  }
                   setPlayerModalTarget({
                     userId,
                     username: userData?.username || username,
@@ -972,7 +994,7 @@ const PublicProfile: React.FC = () => {
                   setPlayerModalVisible(true);
                 }}>
                 <Text style={themedStyles.messageButtonText}>
-                  {myPlayerScore > 0 ? 'Update player rating' : 'Rate as player'}
+                  Rate as player
                 </Text>
               </TouchableOpacity>
             )}

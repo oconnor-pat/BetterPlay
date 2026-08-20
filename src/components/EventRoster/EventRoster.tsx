@@ -21,6 +21,7 @@ import {
   Platform,
   Animated,
   AppState,
+  ActionSheetIOS,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
@@ -54,6 +55,7 @@ import {
   faComment,
   faStar,
   faCalendarPlus,
+  faEllipsisH,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notificationService from '../../services/NotificationService';
@@ -90,6 +92,7 @@ type EventRosterRouteProp = RouteProp<
       roster?: Player[];
       jerseyColors?: string[];
       changedFields?: string;
+      isVirtual?: boolean;
       // Recurring + Group context for the "live link" banner. When both
       // `isRecurring` and `groupName` are present, the banner tells the
       // user that future instances re-pull the group's roster.
@@ -330,6 +333,7 @@ const EventRoster: React.FC = () => {
     roster: initialRoster,
     jerseyColors: initialJerseyColors,
     changedFields: changedFieldsParam,
+    isVirtual: paramIsVirtual,
     isRecurring: paramIsRecurring,
     groupId: paramGroupId,
     groupName: paramGroupName,
@@ -363,6 +367,7 @@ const EventRoster: React.FC = () => {
   const [date, setDate] = useState(paramDate || '');
   const [time, setTime] = useState(paramTime || '');
   const [location, setLocation] = useState(paramLocation || '');
+  const [isVirtual, setIsVirtual] = useState(!!paramIsVirtual);
   const [totalSpots, setTotalSpots] = useState(paramTotalSpots);
   const [durationMinutes, setDurationMinutes] = useState<number | undefined>(
     undefined,
@@ -373,6 +378,9 @@ const EventRoster: React.FC = () => {
   const [playerRatings, setPlayerRatings] = useState<
     Record<string, {average: number; count: number}>
   >({});
+  const [ratedPlayerIds, setRatedPlayerIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [hasRatedEvent, setHasRatedEvent] = useState(false);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [eventCreatedByUsername, setEventCreatedByUsername] = useState('');
@@ -433,6 +441,8 @@ const EventRoster: React.FC = () => {
   >('public');
   const [eventCreatedBy, setEventCreatedBy] = useState<string>('');
   const [invitedUsers, setInvitedUsers] = useState<string[]>([]);
+  // Host-kicked users — blocked from rejoining until the host re-invites.
+  const [removedUserIds, setRemovedUserIds] = useState<string[]>([]);
   // "Maybe"/"can't make it" replies. "Going" is roster membership, so this
   // only holds the other two states.
   const [rsvps, setRsvps] = useState<
@@ -559,8 +569,15 @@ const EventRoster: React.FC = () => {
     return invitedUsers.includes(userData?._id || '');
   }, [invitedUsers, userData?._id]);
 
+  const isUserRemoved = useMemo(() => {
+    return removedUserIds.map(String).includes(String(userData?._id || ''));
+  }, [removedUserIds, userData?._id]);
+
   // Check if user can join this event
   const canJoinEvent = useMemo(() => {
+    if (isUserRemoved && !isEventCreator) {
+      return false;
+    }
     // Public events: anyone can join
     if (eventPrivacy === 'public') {
       return true;
@@ -574,7 +591,7 @@ const EventRoster: React.FC = () => {
       return isEventCreator || isUserInvited;
     }
     return true;
-  }, [eventPrivacy, isEventCreator, isUserInvited]);
+  }, [eventPrivacy, isEventCreator, isUserInvited, isUserRemoved]);
 
   // Invitees / roster members can suggest guests for the creator to approve.
   const canSuggestGuests = useMemo(() => {
@@ -895,6 +912,37 @@ const EventRoster: React.FC = () => {
           borderBottomColor: colors.border,
           overflow: 'hidden',
         },
+        primaryActionsRow: {
+          paddingHorizontal: 16,
+          paddingTop: 14,
+          paddingBottom: 10,
+          gap: 10,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        primaryActionButton: {
+          backgroundColor: colors.primary,
+          paddingVertical: 14,
+          paddingHorizontal: 16,
+          borderRadius: 14,
+          alignItems: 'center',
+          flexDirection: 'row',
+          justifyContent: 'center',
+          gap: 8,
+        },
+        primaryActionButtonSecondary: {
+          backgroundColor: 'transparent',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary,
+        },
+        primaryActionButtonText: {
+          color: colors.buttonText || '#fff',
+          fontWeight: '700',
+          fontSize: 16,
+        },
+        primaryActionButtonTextSecondary: {
+          color: colors.primary,
+        },
         addPlayerHeader: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -1131,6 +1179,7 @@ const EventRoster: React.FC = () => {
         rsvpPersonRow: {
           flexDirection: 'row',
           alignItems: 'center',
+          gap: 8,
           paddingVertical: 6,
         },
         rsvpPersonAvatar: {
@@ -1161,7 +1210,7 @@ const EventRoster: React.FC = () => {
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border || 'rgba(128,128,128,0.35)',
           backgroundColor: colors.card,
-          marginLeft: 8,
+          marginLeft: 0,
         },
         rsvpRemindBtnDisabled: {
           opacity: 0.45,
@@ -1494,7 +1543,8 @@ const EventRoster: React.FC = () => {
         playerActions: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 6,
+          gap: 8,
+          marginLeft: 8,
         },
         editButton: {
           paddingVertical: 6,
@@ -1746,6 +1796,9 @@ const EventRoster: React.FC = () => {
       if (response.data.location) {
         setLocation(response.data.location);
       }
+      if (response.data.isVirtual !== undefined) {
+        setIsVirtual(!!response.data.isVirtual);
+      }
       if (response.data.durationMinutes != null) {
         setDurationMinutes(response.data.durationMinutes);
       } else {
@@ -1769,6 +1822,7 @@ const EventRoster: React.FC = () => {
       setEventCreatedBy(response.data.createdBy || '');
       setEventCreatedByUsername(response.data.createdByUsername || '');
       setInvitedUsers(response.data.invitedUsers || []);
+      setRemovedUserIds(response.data.removedUserIds || []);
       setRsvps(response.data.rsvps || []);
       setJoinRequests(response.data.joinRequests || []);
       setGuestAddRequests(response.data.guestAddRequests || []);
@@ -1802,6 +1856,13 @@ const EventRoster: React.FC = () => {
           ]);
           setHostRatings(hostRes.data?.ratings || {});
           setPlayerRatings(playerRes.data?.ratings || {});
+          setRatedPlayerIds(
+            new Set(
+              Array.isArray(playerRes.data?.ratedByMe)
+                ? playerRes.data.ratedByMe.map(String)
+                : [],
+            ),
+          );
         } catch {
           // non-blocking
         }
@@ -1819,11 +1880,8 @@ const EventRoster: React.FC = () => {
         }
       }
 
-      // Fetch invited user details if invite-only
-      if (
-        response.data.privacy === 'invite-only' &&
-        response.data.invitedUsers?.length > 0
-      ) {
+      // Fetch invited user details for the pending-invite section
+      if (response.data.invitedUsers?.length > 0) {
         const usersResponse = await axios.get(`${API_BASE_URL}/users`, {
           headers: token ? {Authorization: `Bearer ${token}`} : {},
         });
@@ -1837,6 +1895,8 @@ const EventRoster: React.FC = () => {
             profilePicUrl: u.profilePicUrl,
           }));
         setInvitedUserDetails(invitedDetails);
+      } else {
+        setInvitedUserDetails([]);
       }
     } catch (error) {
       setRoster([]);
@@ -1944,10 +2004,16 @@ const EventRoster: React.FC = () => {
         waitlist?: any[];
         spotReservation?: any;
         rsvps?: any[];
+        invitedUsers?: string[];
+        removedUserIds?: string[];
+        joinRequests?: any[];
+        totalSpots?: number;
       }) => {
         if (data.eventId === eventId) {
           setRoster(data.roster);
-          setTotalSpots(prev => prev);
+          if (typeof data.totalSpots === 'number') {
+            setTotalSpots(data.totalSpots);
+          }
           updateRosterSpots(eventId, data.rosterSpotsFilled);
           if (data.waitlist !== undefined) {
             setWaitlist(data.waitlist);
@@ -1957,6 +2023,18 @@ const EventRoster: React.FC = () => {
           }
           if (data.rsvps !== undefined) {
             setRsvps(data.rsvps);
+          }
+          if (data.invitedUsers !== undefined) {
+            setInvitedUsers(data.invitedUsers);
+            setInvitedUserDetails(prev =>
+              prev.filter(u => data.invitedUsers!.includes(u._id)),
+            );
+          }
+          if (data.removedUserIds !== undefined) {
+            setRemovedUserIds(data.removedUserIds);
+          }
+          if (data.joinRequests !== undefined) {
+            setJoinRequests(data.joinRequests);
           }
         }
       },
@@ -1990,6 +2068,9 @@ const EventRoster: React.FC = () => {
           }
           if (ev.location) {
             setLocation(ev.location);
+          }
+          if (ev.isVirtual !== undefined) {
+            setIsVirtual(!!ev.isVirtual);
           }
           if (ev.totalSpots !== undefined && ev.totalSpots !== null) {
             setTotalSpots(ev.totalSpots);
@@ -2077,11 +2158,14 @@ const EventRoster: React.FC = () => {
 
     try {
       const token = await AsyncStorage.getItem('userToken');
-      await axios.post(
+      const response = await axios.post(
         `${API_BASE_URL}/events/${eventId}/roster`,
         {participant: newPlayer},
         token ? {headers: {Authorization: `Bearer ${token}`}} : {},
       );
+      if (typeof response.data?.totalSpots === 'number') {
+        setTotalSpots(response.data.totalSpots);
+      }
     } catch (error: any) {
       if (error?.response?.status === 409) {
         setErrorMessage('You are already on this roster.');
@@ -2191,14 +2275,25 @@ const EventRoster: React.FC = () => {
         );
         return;
       }
-      await axios.post(
+      const inviteRes = await axios.post(
         `${API_BASE_URL}/events/${eventId}/invite`,
         {userIds: [user._id]},
         {headers: token ? {Authorization: `Bearer ${token}`} : {}},
       );
       // Update local state
-      setInvitedUsers(prev => [...prev, user._id]);
-      setInvitedUserDetails(prev => [...prev, user]);
+      setInvitedUsers(prev =>
+        prev.includes(user._id) ? prev : [...prev, user._id],
+      );
+      setInvitedUserDetails(prev =>
+        prev.some(u => u._id === user._id) ? prev : [...prev, user],
+      );
+      setRemovedUserIds(prev => prev.filter(id => id !== user._id));
+      if (inviteRes.data?.removedUserIds) {
+        setRemovedUserIds(inviteRes.data.removedUserIds);
+      }
+      if (typeof inviteRes.data?.totalSpots === 'number') {
+        setTotalSpots(inviteRes.data.totalSpots);
+      }
       setInviteSearchQuery('');
       setInviteSearchResults([]);
     } catch (error: any) {
@@ -2211,23 +2306,73 @@ const EventRoster: React.FC = () => {
     }
   };
 
-  // Remove invite from a user
-  const removeInvite = async (userId: string) => {
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      await axios.delete(`${API_BASE_URL}/events/${eventId}/invite/${userId}`, {
-        headers: token ? {Authorization: `Bearer ${token}`} : {},
-      });
-      // Update local state
-      setInvitedUsers(prev => prev.filter(id => id !== userId));
-      setInvitedUserDetails(prev => prev.filter(u => u._id !== userId));
-    } catch (error) {
+  // Remove invite from a user (pending invite only — not a roster kick/ban).
+  const removeInvite = useCallback(
+    async (userId: string) => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await axios.delete(
+          `${API_BASE_URL}/events/${eventId}/invite/${userId}`,
+          {
+            headers: token ? {Authorization: `Bearer ${token}`} : {},
+          },
+        );
+        if (response.data?.invitedUsers) {
+          setInvitedUsers(response.data.invitedUsers);
+        } else {
+          setInvitedUsers(prev => prev.filter(id => id !== userId));
+        }
+        setInvitedUserDetails(prev => prev.filter(u => u._id !== userId));
+      } catch (error) {
+        Alert.alert(
+          t('common.error'),
+          t('roster.removeInviteError') || 'Failed to uninvite',
+        );
+      }
+    },
+    [eventId, t],
+  );
+
+  const showInviteeMoreMenu = useCallback(
+    (personUserId: string, name: string) => {
+      if (!isEventCreator) {
+        return;
+      }
+      const uninviteLabel = t('roster.uninvite') || 'Uninvite';
+      const cancelLabel = t('common.cancel') || 'Cancel';
+
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: [cancelLabel, uninviteLabel],
+            cancelButtonIndex: 0,
+            destructiveButtonIndex: 1,
+          },
+          index => {
+            if (index === 1) {
+              removeInvite(personUserId);
+            }
+          },
+        );
+        return;
+      }
+
       Alert.alert(
-        t('common.error'),
-        t('roster.removeInviteError') || 'Failed to remove invite',
+        t('roster.uninviteTitle') || 'Uninvite?',
+        t('roster.uninviteMessage') ||
+          `Uninvite ${name}? They can be invited again later.`,
+        [
+          {text: cancelLabel, style: 'cancel'},
+          {
+            text: uninviteLabel,
+            style: 'destructive',
+            onPress: () => removeInvite(personUserId),
+          },
+        ],
       );
-    }
-  };
+    },
+    [isEventCreator, t, removeInvite],
+  );
 
   // Nudge invitees who haven't RSVP'd. Pass userIds for one person, or omit
   // for everyone still pending. Server enforces a 1h cooldown per invitee.
@@ -2345,9 +2490,83 @@ const EventRoster: React.FC = () => {
     });
   };
 
-  // Delete player (only allow logged-in user to remove themselves)
+  // Leave (self) or boot (host removing someone else)
   const handleDelete = useCallback(
-    (playerUsername: string) => {
+    (playerUsername: string, options?: {boot?: boolean}) => {
+      const isBoot = !!options?.boot;
+      if (isBoot) {
+        if (!isEventCreator) {
+          return;
+        }
+        Alert.alert(
+          t('roster.bootConfirm') || 'Remove from event?',
+          t('roster.bootConfirmMessage') ||
+            `Remove ${playerUsername} from this event? They'll be notified and won't be able to rejoin unless you invite them again.`,
+          [
+            {text: t('common.cancel'), style: 'cancel'},
+            {
+              text: t('roster.removePlayer') || 'Remove',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  const token = await AsyncStorage.getItem('userToken');
+                  const response = await axios.delete(
+                    `${API_BASE_URL}/events/${eventId}/roster/${encodeURIComponent(
+                      playerUsername,
+                    )}`,
+                    token
+                      ? {headers: {Authorization: `Bearer ${token}`}}
+                      : undefined,
+                  );
+                  const updatedRoster =
+                    response.data?.roster ||
+                    roster.filter(p => p.username !== playerUsername);
+                  setRoster(updatedRoster);
+                  updateRosterSpots(eventId, updatedRoster.length);
+                  if (response.data?.invitedUsers) {
+                    setInvitedUsers(response.data.invitedUsers);
+                    setInvitedUserDetails(prev =>
+                      prev.filter(u =>
+                        response.data.invitedUsers.includes(u._id),
+                      ),
+                    );
+                  } else {
+                    const booted = roster.find(
+                      p => p.username === playerUsername,
+                    );
+                    if (booted?.userId) {
+                      setInvitedUsers(prev =>
+                        prev.filter(id => id !== booted.userId),
+                      );
+                      setInvitedUserDetails(prev =>
+                        prev.filter(u => u._id !== booted.userId),
+                      );
+                    }
+                  }
+                  if (response.data?.removedUserIds) {
+                    setRemovedUserIds(response.data.removedUserIds);
+                  }
+                  if (response.data?.waitlist) {
+                    setWaitlist(response.data.waitlist);
+                  }
+                  if (response.data?.rsvps) {
+                    setRsvps(response.data.rsvps);
+                  }
+                } catch (error: any) {
+                  Alert.alert(
+                    t('common.error'),
+                    error?.response?.data?.message ||
+                      t('roster.bootError') ||
+                      'Failed to remove player',
+                  );
+                }
+              },
+            },
+          ],
+        );
+        return;
+      }
+
       if (!userData?.username || playerUsername !== userData.username) {
         Alert.alert(
           t('roster.onlyRemoveSelf'),
@@ -2364,7 +2583,9 @@ const EventRoster: React.FC = () => {
             try {
               const token = await AsyncStorage.getItem('userToken');
               await axios.delete(
-                `${API_BASE_URL}/events/${eventId}/roster/${playerUsername}`,
+                `${API_BASE_URL}/events/${eventId}/roster/${encodeURIComponent(
+                  playerUsername,
+                )}`,
                 token
                   ? {headers: {Authorization: `Bearer ${token}`}}
                   : undefined,
@@ -2384,7 +2605,7 @@ const EventRoster: React.FC = () => {
         },
       ]);
     },
-    [userData?.username, t, eventId, updateRosterSpots, roster],
+    [userData?.username, t, eventId, updateRosterSpots, roster, isEventCreator],
   );
 
   const handleJoinWaitlist = useCallback(async () => {
@@ -2396,6 +2617,23 @@ const EventRoster: React.FC = () => {
         {},
         {headers: token ? {Authorization: `Bearer ${token}`} : {}},
       );
+      if (response.data.joinedRoster) {
+        if (response.data.roster) {
+          setRoster(response.data.roster);
+        }
+        if (typeof response.data.totalSpots === 'number') {
+          setTotalSpots(response.data.totalSpots);
+        }
+        if (Array.isArray(response.data.roster)) {
+          updateRosterSpots(eventId, response.data.roster.length);
+        }
+        Alert.alert(
+          t('common.success') || 'Success',
+          t('roster.invitedJoinBody') ||
+            "You're on the roster — the host reserved a spot for you.",
+        );
+        return;
+      }
       if (response.data.waitlist) {
         setWaitlist(response.data.waitlist);
       }
@@ -2409,7 +2647,7 @@ const EventRoster: React.FC = () => {
     } finally {
       setJoiningWaitlist(false);
     }
-  }, [eventId, t]);
+  }, [eventId, t, updateRosterSpots]);
 
   const handleLeaveWaitlist = useCallback(async () => {
     try {
@@ -2523,8 +2761,19 @@ const EventRoster: React.FC = () => {
       chipInfo = {average: hostInfo.average, kind: 'host'};
     }
 
+    const alreadyRated = item.userId
+      ? ratedPlayerIds.has(String(item.userId))
+      : false;
+
     const openPlayerRating = () => {
       if (!item.userId || isSelf || !isUserOnRoster) {
+        return;
+      }
+      if (alreadyRated) {
+        Alert.alert(
+          'Already rated',
+          "You've already rated this player. Each person can leave one review.",
+        );
         return;
       }
       setPlayerModalTarget({
@@ -2563,7 +2812,11 @@ const EventRoster: React.FC = () => {
             style={themedStyles.ratePlayerFab}
             onPress={openPlayerRating}
             hitSlop={8}
-            accessibilityLabel={`Rate ${item.username} as player`}>
+            accessibilityLabel={
+              alreadyRated
+                ? `Already rated ${item.username}`
+                : `Rate ${item.username} as player`
+            }>
             <FontAwesomeIcon icon={faStar} size={9} color="#F5A623" />
           </TouchableOpacity>
         )}
@@ -2637,23 +2890,36 @@ const EventRoster: React.FC = () => {
             )}
           </View>
         </View>
-        {!isSelf && !!item.userId && (
-          <TouchableOpacity
-            style={themedStyles.rsvpRemindBtn}
-            onPress={() =>
-              messageUser({
-                userId: item.userId,
-                username: item.username,
-                profilePicUrl: item.profilePicUrl,
-              })
-            }
-            hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}>
-            <FontAwesomeIcon
-              icon={faComment}
-              size={13}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
+        {!isSelf && (!!item.userId || isEventCreator) && (
+          <View style={themedStyles.playerActions}>
+            {!!item.userId && (
+              <TouchableOpacity
+                style={[themedStyles.rsvpRemindBtn, {marginLeft: 0}]}
+                onPress={() =>
+                  messageUser({
+                    userId: item.userId,
+                    username: item.username,
+                    profilePicUrl: item.profilePicUrl,
+                  })
+                }
+                hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}>
+                <FontAwesomeIcon
+                  icon={faComment}
+                  size={13}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            )}
+            {isEventCreator && (
+              <TouchableOpacity
+                style={themedStyles.deleteButton}
+                onPress={() => handleDelete(item.username, {boot: true})}>
+                <Text style={themedStyles.deleteButtonText}>
+                  {t('roster.boot') || 'Remove'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
         {isSelf && (
           <View style={themedStyles.playerActions}>
@@ -2757,7 +3023,21 @@ const EventRoster: React.FC = () => {
                   },
                 ]}>
                 <Text style={themedStyles.eventDetailIcon}>📍</Text>
-                <Text style={themedStyles.eventDetailText}>{location}</Text>
+                <Text style={themedStyles.eventDetailText}>
+                  {isVirtual
+                    ? (() => {
+                        const badge =
+                          t('events.virtualLocationBadge') || 'Other';
+                        const loc = location.trim();
+                        const generic =
+                          !loc ||
+                          loc.toLowerCase() === 'other' ||
+                          loc.toLowerCase() === 'online / other' ||
+                          loc.toLowerCase() === 'online/other';
+                        return generic ? badge : `${badge} · ${loc}`;
+                      })()
+                    : location}
+                </Text>
               </Animated.View>
             )}
 
@@ -2968,204 +3248,295 @@ const EventRoster: React.FC = () => {
             </View>
           )}
 
-          {/* Add Player Section (Collapsible) - Only show if user can join */}
-          {canJoinEvent && (
-            <View style={themedStyles.addPlayerSection}>
-              <TouchableOpacity
-                style={themedStyles.addPlayerHeader}
-                onPress={() => setAddPlayerExpanded(!addPlayerExpanded)}
-                activeOpacity={0.7}>
-                <View style={themedStyles.addPlayerHeaderLeft}>
-                  <FontAwesomeIcon
-                    icon={faUserPlus}
-                    size={18}
-                    color={colors.primary}
-                  />
-                  <Text style={themedStyles.addPlayerTitle}>
-                    {isUserOnRoster
-                      ? t('roster.alreadyJoined')
-                      : t('roster.joinThisEvent')}
+          {/* Primary CTAs — Join / Suggest guest / Invite (obvious buttons) */}
+          {((canJoinEvent && !isUserOnRoster) ||
+            canSuggestGuests ||
+            (eventPrivacy === 'invite-only' && isEventCreator)) && (
+            <View style={themedStyles.primaryActionsRow}>
+              {canJoinEvent && !isUserOnRoster && (
+                <TouchableOpacity
+                  style={themedStyles.primaryActionButton}
+                  onPress={() => {
+                    if (isEventFull && !isMyReservation) {
+                      if (isUserOnWaitlist) {
+                        handleLeaveWaitlist();
+                      } else {
+                        handleJoinWaitlist();
+                      }
+                      return;
+                    }
+                    setAddPlayerExpanded(true);
+                  }}
+                  activeOpacity={0.85}
+                  disabled={joiningWaitlist}>
+                  {joiningWaitlist ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.buttonText || '#fff'}
+                    />
+                  ) : (
+                    <FontAwesomeIcon
+                      icon={faUserPlus}
+                      size={16}
+                      color={colors.buttonText || '#fff'}
+                    />
+                  )}
+                  <Text style={themedStyles.primaryActionButtonText}>
+                    {isEventFull && !isMyReservation
+                      ? isUserOnWaitlist
+                        ? `Leave Waitlist (#${userWaitlistPosition})`
+                        : t('roster.joinWaitlist') || 'Join Waitlist'
+                      : t('roster.joinEvent')}
                   </Text>
-                </View>
-                <FontAwesomeIcon
-                  icon={addPlayerExpanded ? faChevronUp : faChevronDown}
-                  size={16}
-                  color={colors.placeholder}
-                />
-              </TouchableOpacity>
+                </TouchableOpacity>
+              )}
+              {canSuggestGuests && (
+                <TouchableOpacity
+                  style={[
+                    themedStyles.primaryActionButton,
+                    ((canJoinEvent && !isUserOnRoster) ||
+                      (eventPrivacy === 'invite-only' && isEventCreator)) &&
+                      themedStyles.primaryActionButtonSecondary,
+                  ]}
+                  onPress={() => setInviteExpanded(true)}
+                  activeOpacity={0.85}>
+                  <FontAwesomeIcon
+                    icon={faEnvelope}
+                    size={16}
+                    color={
+                      (canJoinEvent && !isUserOnRoster) ||
+                      (eventPrivacy === 'invite-only' && isEventCreator)
+                        ? colors.primary
+                        : colors.buttonText || '#fff'
+                    }
+                  />
+                  <Text
+                    style={[
+                      themedStyles.primaryActionButtonText,
+                      ((canJoinEvent && !isUserOnRoster) ||
+                        (eventPrivacy === 'invite-only' && isEventCreator)) &&
+                        themedStyles.primaryActionButtonTextSecondary,
+                    ]}>
+                    {t('roster.suggestGuest') || 'Suggest a guest'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {eventPrivacy === 'invite-only' && isEventCreator && (
+                <TouchableOpacity
+                  style={[
+                    themedStyles.primaryActionButton,
+                    ((canJoinEvent && !isUserOnRoster) || canSuggestGuests) &&
+                      themedStyles.primaryActionButtonSecondary,
+                  ]}
+                  onPress={() => setInviteExpanded(true)}
+                  activeOpacity={0.85}>
+                  <FontAwesomeIcon
+                    icon={faEnvelope}
+                    size={16}
+                    color={
+                      (canJoinEvent && !isUserOnRoster) || canSuggestGuests
+                        ? colors.primary
+                        : colors.buttonText || '#fff'
+                    }
+                  />
+                  <Text
+                    style={[
+                      themedStyles.primaryActionButtonText,
+                      ((canJoinEvent && !isUserOnRoster) || canSuggestGuests) &&
+                        themedStyles.primaryActionButtonTextSecondary,
+                    ]}>
+                    {t('roster.invitePlayers') || 'Invite People'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
-              {addPlayerExpanded && (
-                <View style={themedStyles.addPlayerContent}>
-                  {isUserOnRoster ? (
-                    <View style={themedStyles.alreadyJoinedBadge}>
-                      <FontAwesomeIcon
-                        icon={faCheck}
-                        size={14}
-                        color={colors.primary}
-                      />
-                      <Text style={themedStyles.alreadyJoinedText}>
-                        {t('roster.youreOnTheRoster')}
+          {/* Join form — expands from the primary Join button */}
+          {canJoinEvent && !isUserOnRoster && addPlayerExpanded && (
+            <View style={themedStyles.addPlayerSection}>
+              <View style={themedStyles.addPlayerContent}>
+                {errorMessage ? (
+                  <Text style={themedStyles.errorMessage}>{errorMessage}</Text>
+                ) : null}
+
+                <TextInput
+                  style={themedStyles.input}
+                  placeholder={t('roster.yourName')}
+                  placeholderTextColor={colors.placeholder}
+                  value={username}
+                  onChangeText={setUsername}
+                />
+
+                {/* Paid Status Dropdown - Sports only */}
+                {isTeamSport(eventType) && (
+                  <TouchableOpacity
+                    style={themedStyles.dropdown}
+                    onPress={() => setPaidStatusModalVisible(true)}>
+                    <Text
+                      style={
+                        paidStatus
+                          ? themedStyles.dropdownText
+                          : themedStyles.placeholderText
+                      }>
+                      {paidStatus || t('roster.selectPaidStatus')}
+                    </Text>
+                    <FontAwesomeIcon
+                      icon={faChevronDown}
+                      size={14}
+                      color={colors.placeholder}
+                    />
+                  </TouchableOpacity>
+                )}
+
+                {/* Jersey Color Dropdown - Sports only */}
+                {isTeamSport(eventType) && (
+                  <TouchableOpacity
+                    style={themedStyles.dropdown}
+                    onPress={() => setJerseyColorModalVisible(true)}>
+                    <View style={themedStyles.jerseyDropdownRow}>
+                      {jerseyColor && (
+                        <View
+                          style={[
+                            themedStyles.jerseyIndicatorLarge,
+                            {
+                              backgroundColor:
+                                jerseyColors[jerseyColor] || jerseyColors.Other,
+                            },
+                          ]}
+                        />
+                      )}
+                      <Text
+                        style={
+                          jerseyColor
+                            ? themedStyles.dropdownText
+                            : themedStyles.placeholderText
+                        }>
+                        {jerseyColor || t('roster.selectJerseyColor')}
                       </Text>
                     </View>
+                    <FontAwesomeIcon
+                      icon={faChevronDown}
+                      size={14}
+                      color={colors.placeholder}
+                    />
+                  </TouchableOpacity>
+                )}
+
+                {/* Position Dropdown */}
+                <TouchableOpacity
+                  style={themedStyles.dropdown}
+                  onPress={() => setPositionModalVisible(true)}>
+                  <Text
+                    style={
+                      position
+                        ? themedStyles.dropdownText
+                        : themedStyles.placeholderText
+                    }>
+                    {position || t('roster.selectPosition')}
+                  </Text>
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    size={14}
+                    color={colors.placeholder}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    themedStyles.saveButton,
+                    ((spotsRemaining === 0 && !isMyReservation) ||
+                      savingRoster) &&
+                      themedStyles.saveButtonDisabled,
+                    isMyReservation && {backgroundColor: colors.primary},
+                  ]}
+                  onPress={handleSave}
+                  disabled={
+                    (spotsRemaining === 0 && !isMyReservation) || savingRoster
+                  }>
+                  {savingRoster ? (
+                    <ActivityIndicator size="small" color={colors.buttonText} />
                   ) : (
-                    <>
-                      {errorMessage ? (
-                        <Text style={themedStyles.errorMessage}>
-                          {errorMessage}
-                        </Text>
-                      ) : null}
-
-                      <TextInput
-                        style={themedStyles.input}
-                        placeholder={t('roster.yourName')}
-                        placeholderTextColor={colors.placeholder}
-                        value={username}
-                        onChangeText={setUsername}
-                      />
-
-                      {/* Paid Status Dropdown - Sports only */}
-                      {isTeamSport(eventType) && (
-                        <TouchableOpacity
-                          style={themedStyles.dropdown}
-                          onPress={() => setPaidStatusModalVisible(true)}>
-                          <Text
-                            style={
-                              paidStatus
-                                ? themedStyles.dropdownText
-                                : themedStyles.placeholderText
-                            }>
-                            {paidStatus || t('roster.selectPaidStatus')}
-                          </Text>
-                          <FontAwesomeIcon
-                            icon={faChevronDown}
-                            size={14}
-                            color={colors.placeholder}
-                          />
-                        </TouchableOpacity>
-                      )}
-
-                      {/* Jersey Color Dropdown - Sports only */}
-                      {isTeamSport(eventType) && (
-                        <TouchableOpacity
-                          style={themedStyles.dropdown}
-                          onPress={() => setJerseyColorModalVisible(true)}>
-                          <View style={themedStyles.jerseyDropdownRow}>
-                            {jerseyColor && (
-                              <View
-                                style={[
-                                  themedStyles.jerseyIndicatorLarge,
-                                  {
-                                    backgroundColor:
-                                      jerseyColors[jerseyColor] ||
-                                      jerseyColors.Other,
-                                  },
-                                ]}
-                              />
-                            )}
-                            <Text
-                              style={
-                                jerseyColor
-                                  ? themedStyles.dropdownText
-                                  : themedStyles.placeholderText
-                              }>
-                              {jerseyColor || t('roster.selectJerseyColor')}
-                            </Text>
-                          </View>
-                          <FontAwesomeIcon
-                            icon={faChevronDown}
-                            size={14}
-                            color={colors.placeholder}
-                          />
-                        </TouchableOpacity>
-                      )}
-
-                      {/* Position Dropdown */}
-                      <TouchableOpacity
-                        style={themedStyles.dropdown}
-                        onPress={() => setPositionModalVisible(true)}>
-                        <Text
-                          style={
-                            position
-                              ? themedStyles.dropdownText
-                              : themedStyles.placeholderText
-                          }>
-                          {position || t('roster.selectPosition')}
-                        </Text>
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          size={14}
-                          color={colors.placeholder}
-                        />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          themedStyles.saveButton,
-                          ((spotsRemaining === 0 && !isMyReservation) ||
-                            savingRoster) &&
-                            themedStyles.saveButtonDisabled,
-                          isMyReservation && {backgroundColor: colors.primary},
-                        ]}
-                        onPress={handleSave}
-                        disabled={
-                          (spotsRemaining === 0 && !isMyReservation) ||
-                          savingRoster
-                        }>
-                        {savingRoster ? (
-                          <ActivityIndicator
-                            size="small"
-                            color={colors.buttonText}
-                          />
-                        ) : (
-                          <FontAwesomeIcon
-                            icon={faUserPlus}
-                            size={16}
-                            color={colors.buttonText}
-                          />
-                        )}
-                        <Text style={themedStyles.buttonText}>
-                          {savingRoster
-                            ? t('common.loading') || 'Joining...'
-                            : isMyReservation
-                            ? 'Claim Your Spot!'
-                            : spotsRemaining === 0
-                            ? t('roster.rosterFull')
-                            : t('roster.joinEvent')}
-                        </Text>
-                      </TouchableOpacity>
-
-                      {isEventFull && !isUserOnRoster && !isMyReservation && (
-                        <TouchableOpacity
-                          style={[
-                            themedStyles.saveButton,
-                            {marginTop: 10},
-                            isUserOnWaitlist && {backgroundColor: colors.error},
-                          ]}
-                          onPress={
-                            isUserOnWaitlist
-                              ? handleLeaveWaitlist
-                              : handleJoinWaitlist
-                          }
-                          disabled={joiningWaitlist}>
-                          {joiningWaitlist ? (
-                            <ActivityIndicator
-                              size="small"
-                              color={colors.buttonText}
-                            />
-                          ) : null}
-                          <Text style={themedStyles.buttonText}>
-                            {joiningWaitlist
-                              ? 'Joining...'
-                              : isUserOnWaitlist
-                              ? `Leave Waitlist (#${userWaitlistPosition})`
-                              : 'Join Waitlist'}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </>
+                    <FontAwesomeIcon
+                      icon={
+                        isMyReservation || spotsRemaining === 0
+                          ? faUserPlus
+                          : faCheck
+                      }
+                      size={16}
+                      color={colors.buttonText}
+                    />
                   )}
+                  <Text style={themedStyles.buttonText}>
+                    {savingRoster
+                      ? t('common.loading') || 'Joining...'
+                      : isMyReservation
+                      ? 'Claim Your Spot!'
+                      : spotsRemaining === 0
+                      ? t('roster.rosterFull')
+                      : t('common.confirm') || 'Confirm'}
+                  </Text>
+                </TouchableOpacity>
+
+                {isEventFull && !isUserOnRoster && !isMyReservation && (
+                  <TouchableOpacity
+                    style={[
+                      themedStyles.saveButton,
+                      {marginTop: 10},
+                      isUserOnWaitlist && {backgroundColor: colors.error},
+                    ]}
+                    onPress={
+                      isUserOnWaitlist
+                        ? handleLeaveWaitlist
+                        : handleJoinWaitlist
+                    }
+                    disabled={joiningWaitlist}>
+                    {joiningWaitlist ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.buttonText}
+                      />
+                    ) : null}
+                    <Text style={themedStyles.buttonText}>
+                      {joiningWaitlist
+                        ? 'Joining...'
+                        : isUserOnWaitlist
+                        ? `Leave Waitlist (#${userWaitlistPosition})`
+                        : t('roster.joinWaitlist') || 'Join Waitlist'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => setAddPlayerExpanded(false)}
+                  style={{alignItems: 'center', paddingTop: 12}}>
+                  <Text
+                    style={{color: colors.secondaryText, fontWeight: '600'}}>
+                    {t('common.cancel') || 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {canJoinEvent && isUserOnRoster && (
+            <View style={themedStyles.addPlayerSection}>
+              <View
+                style={[
+                  themedStyles.addPlayerContent,
+                  {paddingTop: 12, paddingBottom: 12},
+                ]}>
+                <View style={themedStyles.alreadyJoinedBadge}>
+                  <FontAwesomeIcon
+                    icon={faCheck}
+                    size={14}
+                    color={colors.primary}
+                  />
+                  <Text style={themedStyles.alreadyJoinedText}>
+                    {t('roster.youreOnTheRoster')}
+                  </Text>
                 </View>
-              )}
+              </View>
             </View>
           )}
 
@@ -3367,165 +3738,153 @@ const EventRoster: React.FC = () => {
             </View>
           )}
 
-          {/* Invite / suggest guests — creator invites; invitees suggest. */}
+          {/* Invite / suggest guests — opened from the primary CTA above. */}
           {eventPrivacy === 'invite-only' &&
-            (isEventCreator || canSuggestGuests) && (
+            (isEventCreator || canSuggestGuests) &&
+            inviteExpanded && (
               <View style={themedStyles.inviteSection}>
-                <TouchableOpacity
-                  style={themedStyles.addPlayerHeader}
-                  onPress={() => setInviteExpanded(!inviteExpanded)}
-                  activeOpacity={0.7}>
-                  <View style={themedStyles.addPlayerHeaderLeft}>
+                <View style={themedStyles.inviteContent}>
+                  {/* Search Input */}
+                  <View style={themedStyles.inviteSearchContainer}>
                     <FontAwesomeIcon
-                      icon={faEnvelope}
-                      size={18}
-                      color={colors.primary}
+                      icon={faSearch}
+                      size={16}
+                      color={colors.placeholder}
+                      style={themedStyles.inviteSearchIcon}
                     />
-                    <Text style={themedStyles.addPlayerTitle}>
-                      {canSuggestGuests
-                        ? t('roster.suggestGuest') || 'Suggest a guest'
-                        : t('roster.invitePlayers') || 'Invite Players'}
-                    </Text>
+                    <TextInput
+                      style={themedStyles.inviteSearchInput}
+                      placeholder={
+                        canSuggestGuests
+                          ? t('roster.searchUsersToSuggest') ||
+                            'Search people to suggest...'
+                          : t('roster.searchUsersToInvite') ||
+                            'Search users to invite...'
+                      }
+                      placeholderTextColor={colors.placeholder}
+                      value={inviteSearchQuery}
+                      onChangeText={text => {
+                        setInviteSearchQuery(text);
+                        searchUsersToInvite(text);
+                      }}
+                      autoFocus
+                    />
+                    {loadingInviteSearch && (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    )}
                   </View>
-                  <FontAwesomeIcon
-                    icon={inviteExpanded ? faChevronUp : faChevronDown}
-                    size={16}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
 
-                {inviteExpanded && (
-                  <View style={themedStyles.inviteContent}>
-                    {/* Search Input */}
-                    <View style={themedStyles.inviteSearchContainer}>
-                      <FontAwesomeIcon
-                        icon={faSearch}
-                        size={16}
-                        color={colors.placeholder}
-                        style={themedStyles.inviteSearchIcon}
-                      />
-                      <TextInput
-                        style={themedStyles.inviteSearchInput}
-                        placeholder={
-                          canSuggestGuests
-                            ? t('roster.searchUsersToSuggest') ||
-                              'Search people to suggest...'
-                            : t('roster.searchUsersToInvite') ||
-                              'Search users to invite...'
-                        }
-                        placeholderTextColor={colors.placeholder}
-                        value={inviteSearchQuery}
-                        onChangeText={text => {
-                          setInviteSearchQuery(text);
-                          searchUsersToInvite(text);
-                        }}
-                      />
-                      {loadingInviteSearch && (
-                        <ActivityIndicator
-                          size="small"
-                          color={colors.primary}
-                        />
-                      )}
-                    </View>
-
-                    {/* Search Results */}
-                    {inviteSearchResults.length > 0 && (
-                      <View style={themedStyles.inviteSearchResults}>
-                        {inviteSearchResults.map(user => (
-                          <TouchableOpacity
-                            key={user._id}
-                            style={themedStyles.inviteSearchResultRow}
-                            onPress={() => inviteUserToEvent(user)}>
-                            {user.profilePicUrl ? (
-                              <Image
-                                source={{uri: user.profilePicUrl}}
-                                style={themedStyles.inviteUserAvatar}
-                              />
-                            ) : (
-                              <View
-                                style={
-                                  themedStyles.inviteUserAvatarPlaceholder
-                                }>
-                                <Text style={themedStyles.inviteUserAvatarText}>
-                                  {getInitials(user.name || user.username)}
-                                </Text>
-                              </View>
-                            )}
-                            <View style={themedStyles.inviteUserTextBlock}>
-                              <Text
-                                style={themedStyles.inviteUserName}
-                                numberOfLines={1}>
-                                {user.name || user.username}
-                              </Text>
-                              {user.name ? (
-                                <Text
-                                  style={themedStyles.inviteUserHandle}
-                                  numberOfLines={1}>
-                                  @{user.username}
-                                </Text>
-                              ) : null}
-                            </View>
-                            <FontAwesomeIcon
-                              icon={faPlus}
-                              size={16}
-                              color={colors.primary}
+                  {/* Search Results */}
+                  {inviteSearchResults.length > 0 && (
+                    <View style={themedStyles.inviteSearchResults}>
+                      {inviteSearchResults.map(user => (
+                        <TouchableOpacity
+                          key={user._id}
+                          style={themedStyles.inviteSearchResultRow}
+                          onPress={() => inviteUserToEvent(user)}>
+                          {user.profilePicUrl ? (
+                            <Image
+                              source={{uri: user.profilePicUrl}}
+                              style={themedStyles.inviteUserAvatar}
                             />
-                          </TouchableOpacity>
+                          ) : (
+                            <View
+                              style={themedStyles.inviteUserAvatarPlaceholder}>
+                              <Text style={themedStyles.inviteUserAvatarText}>
+                                {getInitials(user.name || user.username)}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={themedStyles.inviteUserTextBlock}>
+                            <Text
+                              style={themedStyles.inviteUserName}
+                              numberOfLines={1}>
+                              {user.name || user.username}
+                            </Text>
+                            {user.name ? (
+                              <Text
+                                style={themedStyles.inviteUserHandle}
+                                numberOfLines={1}>
+                                @{user.username}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <FontAwesomeIcon
+                            icon={faPlus}
+                            size={16}
+                            color={colors.primary}
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Invited Users List (creator only) */}
+                  {isEventCreator && invitedUserDetails.length > 0 && (
+                    <View style={themedStyles.invitedUsersList}>
+                      <Text style={themedStyles.invitedUsersLabel}>
+                        {t('roster.invitedUsers') || 'Invited'} (
+                        {invitedUserDetails.length})
+                      </Text>
+                      <View style={themedStyles.invitedUsersChips}>
+                        {invitedUserDetails.map(user => (
+                          <View
+                            key={user._id}
+                            style={themedStyles.invitedUserChip}>
+                            <Text style={themedStyles.invitedUserChipText}>
+                              {user.name || user.username}
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => removeInvite(user._id)}
+                              hitSlop={{
+                                top: 10,
+                                bottom: 10,
+                                left: 10,
+                                right: 10,
+                              }}>
+                              <FontAwesomeIcon
+                                icon={faTimes}
+                                size={12}
+                                color={colors.secondaryText}
+                              />
+                            </TouchableOpacity>
+                          </View>
                         ))}
                       </View>
-                    )}
+                    </View>
+                  )}
 
-                    {/* Invited Users List (creator only) */}
-                    {isEventCreator && invitedUserDetails.length > 0 && (
-                      <View style={themedStyles.invitedUsersList}>
-                        <Text style={themedStyles.invitedUsersLabel}>
-                          {t('roster.invitedUsers') || 'Invited'} (
-                          {invitedUserDetails.length})
-                        </Text>
-                        <View style={themedStyles.invitedUsersChips}>
-                          {invitedUserDetails.map(user => (
-                            <View
-                              key={user._id}
-                              style={themedStyles.invitedUserChip}>
-                              <Text style={themedStyles.invitedUserChipText}>
-                                {user.name || user.username}
-                              </Text>
-                              <TouchableOpacity
-                                onPress={() => removeInvite(user._id)}
-                                hitSlop={{
-                                  top: 10,
-                                  bottom: 10,
-                                  left: 10,
-                                  right: 10,
-                                }}>
-                                <FontAwesomeIcon
-                                  icon={faTimes}
-                                  size={12}
-                                  color={colors.secondaryText}
-                                />
-                              </TouchableOpacity>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-
-                    {inviteSearchQuery.length === 0 &&
-                      (canSuggestGuests ? (
+                  {inviteSearchQuery.length === 0 &&
+                    (canSuggestGuests ? (
+                      <Text style={themedStyles.inviteHint}>
+                        {t('roster.suggestGuestHint') ||
+                          'Suggest someone — the host will approve before they get an invite'}
+                      </Text>
+                    ) : (
+                      invitedUserDetails.length === 0 && (
                         <Text style={themedStyles.inviteHint}>
-                          {t('roster.suggestGuestHint') ||
-                            'Suggest someone — the host will approve before they get an invite'}
+                          {t('roster.inviteHint') ||
+                            'Search and add users who can see and join this event'}
                         </Text>
-                      ) : (
-                        invitedUserDetails.length === 0 && (
-                          <Text style={themedStyles.inviteHint}>
-                            {t('roster.inviteHint') ||
-                              'Search and add users who can see and join this event'}
-                          </Text>
-                        )
-                      ))}
-                  </View>
-                )}
+                      )
+                    ))}
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setInviteExpanded(false);
+                      setInviteSearchQuery('');
+                      setInviteSearchResults([]);
+                    }}
+                    style={{alignItems: 'center', paddingTop: 12}}>
+                    <Text
+                      style={{
+                        color: colors.secondaryText,
+                        fontWeight: '600',
+                      }}>
+                      {t('common.done') || 'Done'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -3891,6 +4250,7 @@ const EventRoster: React.FC = () => {
               tint: string,
               personUserId?: string,
               showRemind?: boolean,
+              showRemoveInvite?: boolean,
             ) => {
               const isMe = !!personUserId && personUserId === userData?._id;
               const canOpen = !!personUserId && !isMe;
@@ -3984,6 +4344,21 @@ const EventRoster: React.FC = () => {
                       )}
                     </TouchableOpacity>
                   ) : null}
+                  {showRemoveInvite && personUserId && isEventCreator ? (
+                    <TouchableOpacity
+                      style={themedStyles.rsvpRemindBtn}
+                      onPress={() => showInviteeMoreMenu(personUserId, name)}
+                      hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}
+                      accessibilityLabel={
+                        t('roster.moreActions') || 'More actions'
+                      }>
+                      <FontAwesomeIcon
+                        icon={faEllipsisH}
+                        size={13}
+                        color={colors.secondaryText}
+                      />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               );
             };
@@ -4070,6 +4445,7 @@ const EventRoster: React.FC = () => {
                         u.profilePicUrl,
                         colors.secondaryText,
                         u._id,
+                        true,
                         true,
                       ),
                     )}
@@ -4520,11 +4896,16 @@ const EventRoster: React.FC = () => {
         target={playerModalTarget}
         onClose={() => setPlayerModalVisible(false)}
         onSubmitted={() => {
-          // Refresh player rating chips after submit
           if (playerModalTarget?.userId) {
+            const ratedId = playerModalTarget.userId;
+            setRatedPlayerIds(prev => {
+              const next = new Set(prev);
+              next.add(ratedId);
+              return next;
+            });
             axios
               .post(`${API_BASE_URL}/users/player-ratings/summary`, {
-                userIds: [playerModalTarget.userId],
+                userIds: [ratedId],
               })
               .then(res => {
                 setPlayerRatings(prev => ({

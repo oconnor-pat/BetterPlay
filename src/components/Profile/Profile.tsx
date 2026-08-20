@@ -178,41 +178,42 @@ const Profile: React.FC = () => {
   }, [navigation]);
 
   // Fetch friends count and pending requests count
-  useEffect(() => {
-    const loadSocialCounts = async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        // Fetch friends
-        const friendsRes = await fetch(`${API_BASE_URL}/users/me/friends`, {
-          headers: {Authorization: `Bearer ${token}`},
-        });
-        if (friendsRes.ok) {
-          const friendsData = await friendsRes.json();
-          const list = Array.isArray(friendsData)
-            ? friendsData
-            : friendsData.friends || [];
-          setFriendsCount(list.length);
-        }
-        // Fetch pending incoming requests
-        const reqRes = await fetch(
-          `${API_BASE_URL}/users/me/friend-requests/incoming`,
-          {
-            headers: {Authorization: `Bearer ${token}`},
-          },
-        );
-        if (reqRes.ok) {
-          const reqData = await reqRes.json();
-          const reqList = Array.isArray(reqData)
-            ? reqData
-            : reqData.requests || [];
-          setPendingRequestsCount(reqList.length);
-        }
-      } catch (error) {
-        console.error('Error loading social counts:', error);
+  const loadSocialCounts = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      // Fetch friends
+      const friendsRes = await fetch(`${API_BASE_URL}/users/me/friends`, {
+        headers: {Authorization: `Bearer ${token}`},
+      });
+      if (friendsRes.ok) {
+        const friendsData = await friendsRes.json();
+        const list = Array.isArray(friendsData)
+          ? friendsData
+          : friendsData.friends || [];
+        setFriendsCount(list.length);
       }
-    };
-    loadSocialCounts();
+      // Fetch pending incoming requests
+      const reqRes = await fetch(
+        `${API_BASE_URL}/users/me/friend-requests/incoming`,
+        {
+          headers: {Authorization: `Bearer ${token}`},
+        },
+      );
+      if (reqRes.ok) {
+        const reqData = await reqRes.json();
+        const reqList = Array.isArray(reqData)
+          ? reqData
+          : reqData.requests || [];
+        setPendingRequestsCount(reqList.length);
+      }
+    } catch (error) {
+      console.error('Error loading social counts:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    loadSocialCounts();
+  }, [loadSocialCounts]);
 
   // Save favorite sports to backend when they change
   const saveFavoriteSports = useCallback(
@@ -237,16 +238,6 @@ const Profile: React.FC = () => {
     [_id],
   );
 
-  // Calculate user stats
-  const userStats = useMemo(() => {
-    const eventsCreated = events.filter(e => e.createdBy === _id).length;
-    const eventsJoined = events.filter(e => {
-      const roster = (e as any).roster || (e as any).participants || [];
-      return roster.some((r: any) => r.userId === _id || r._id === _id);
-    }).length;
-    return {eventsCreated, eventsJoined};
-  }, [events, _id]);
-
   const [hostRatingAverage, setHostRatingAverage] = useState<number | null>(
     null,
   );
@@ -255,41 +246,65 @@ const Profile: React.FC = () => {
     null,
   );
   const [playerRatingCount, setPlayerRatingCount] = useState(0);
+  const [createdCount, setCreatedCount] = useState<number | null>(null);
+  const [joinedCount, setJoinedCount] = useState<number | null>(null);
 
-  useEffect(() => {
+  // Calculate user stats. Prefer the server counts (all events, unique series)
+  // over the privacy-scoped events feed, which undercounts.
+  const userStats = useMemo(() => {
+    const eventsCreated =
+      createdCount != null
+        ? createdCount
+        : events.filter(e => String(e.createdBy) === String(_id)).length;
+    const eventsJoined =
+      joinedCount != null
+        ? joinedCount
+        : events.filter(e => {
+            const roster = (e as any).roster || (e as any).participants || [];
+            return roster.some(
+              (r: any) =>
+                String(r.userId) === String(_id) || String(r._id) === String(_id),
+            );
+          }).length;
+    return {eventsCreated, eventsJoined};
+  }, [events, _id, createdCount, joinedCount]);
+
+  const fetchEventStats = useCallback(async () => {
     if (!_id) {
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        const response = await axios.get(
-          `${API_BASE_URL}/user/${_id}/events/stats`,
-          {headers: token ? {Authorization: `Bearer ${token}`} : {}},
-        );
-        if (!cancelled) {
-          setHostRatingAverage(
-            typeof response.data?.hostRatingAverage === 'number'
-              ? response.data.hostRatingAverage
-              : null,
-          );
-          setHostRatingCount(response.data?.hostRatingCount || 0);
-          setPlayerRatingAverage(
-            typeof response.data?.playerRatingAverage === 'number'
-              ? response.data.playerRatingAverage
-              : null,
-          );
-          setPlayerRatingCount(response.data?.playerRatingCount || 0);
-        }
-      } catch {
-        // Stats enrichment is best-effort
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.get(
+        `${API_BASE_URL}/user/${_id}/events/stats`,
+        {headers: token ? {Authorization: `Bearer ${token}`} : {}},
+      );
+      setHostRatingAverage(
+        typeof response.data?.hostRatingAverage === 'number'
+          ? response.data.hostRatingAverage
+          : null,
+      );
+      setHostRatingCount(response.data?.hostRatingCount || 0);
+      setPlayerRatingAverage(
+        typeof response.data?.playerRatingAverage === 'number'
+          ? response.data.playerRatingAverage
+          : null,
+      );
+      setPlayerRatingCount(response.data?.playerRatingCount || 0);
+      if (typeof response.data?.created === 'number') {
+        setCreatedCount(response.data.created);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      if (typeof response.data?.joined === 'number') {
+        setJoinedCount(response.data.joined);
+      }
+    } catch {
+      // Stats enrichment is best-effort
+    }
   }, [_id]);
+
+  useEffect(() => {
+    fetchEventStats();
+  }, [fetchEventStats]);
 
   const memberSinceYear = useMemo(() => {
     if (userData && 'createdAt' in userData && userData.createdAt) {
@@ -1055,9 +1070,9 @@ const Profile: React.FC = () => {
     setRefreshing(true);
     // Stats and "Up Next" are derived from the shared events list, so it has to
     // be refreshed too or a pull-to-refresh reports the same stale counts.
-    await Promise.all([fetchUserData(), fetchEvents()]);
+    await Promise.all([fetchUserData(), fetchEvents(), loadSocialCounts(), fetchEventStats()]);
     setRefreshing(false);
-  }, [fetchUserData, fetchEvents]);
+  }, [fetchUserData, fetchEvents, loadSocialCounts, fetchEventStats]);
 
   useEffect(() => {
     fetchUserData();
@@ -1070,9 +1085,11 @@ const Profile: React.FC = () => {
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchEvents();
+      loadSocialCounts();
+      fetchEventStats();
     });
     return unsubscribe;
-  }, [navigation, fetchEvents]);
+  }, [navigation, fetchEvents, loadSocialCounts, fetchEventStats]);
 
   const handleChoosePhoto = () => {
     const options: ImagePicker.ImageLibraryOptions = {
@@ -1596,13 +1613,17 @@ const Profile: React.FC = () => {
                             style={themedStyles.upcomingEventMetaText}
                             numberOfLines={1}>
                             {(event as any).isVirtual
-                              ? event.location
-                                ? `${
-                                    t('events.virtualLocationBadge') ||
-                                    'Online / other'
-                                  } · ${event.location}`
-                                : t('events.virtualLocationBadge') ||
-                                  'Online / other'
+                              ? (() => {
+                                  const badge =
+                                    t('events.virtualLocationBadge') || 'Other';
+                                  const loc = (event.location || '').trim();
+                                  const generic =
+                                    !loc ||
+                                    loc.toLowerCase() === 'other' ||
+                                    loc.toLowerCase() === 'online / other' ||
+                                    loc.toLowerCase() === 'online/other';
+                                  return generic ? badge : `${badge} · ${loc}`;
+                                })()
                               : event.location}
                           </Text>
                         </View>

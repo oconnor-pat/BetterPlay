@@ -642,6 +642,7 @@ class NotificationService {
       case 'event_roster':
       case 'event_join':
       case 'event_leave':
+      case 'event_removed':
       case 'event_rsvp':
       case 'event_rsvp_reminder':
       case 'event_rating_prompt':

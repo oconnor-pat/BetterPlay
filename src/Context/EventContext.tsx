@@ -28,6 +28,7 @@ export interface Event {
   isRecurring?: boolean;
   recurrenceGroupId?: string;
   recurrenceFrequency?: string;
+  recurrenceOffsetsDays?: number[];
   waitlist?: Array<{userId: string; username: string; profilePicUrl?: string; joinedAt: string}>;
 }
 

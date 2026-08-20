@@ -112,6 +112,8 @@ import {
   isEventActive,
   isEventPast,
   parseEventDateLocal,
+  customOccurrenceDates,
+  daysBetweenEventDates,
 } from '../../utils/eventDateTime';
 import {AvailableMapApp, openDirections} from '../../services/MapLauncher';
 import {addEventToCalendar} from '../../services/CalendarService';
@@ -158,6 +160,10 @@ export type RootStackParamList = {
     totalSpots: number;
     roster: any[];
     jerseyColors?: string[];
+    isVirtual?: boolean;
+    isRecurring?: boolean;
+    groupId?: string;
+    groupName?: string;
   };
   Profile: {_id: string};
 };
@@ -185,7 +191,7 @@ const privacyOptions: {
   },
 ];
 
-type RecurrenceFrequency = 'weekly' | 'biweekly' | 'monthly';
+type RecurrenceFrequency = 'weekly' | 'biweekly' | 'monthly' | 'custom';
 
 interface Event {
   _id: string;
@@ -229,6 +235,7 @@ interface Event {
   recurrenceGroupId?: string;
   recurrenceFrequency?: RecurrenceFrequency;
   recurrenceIndefinite?: boolean;
+  recurrenceOffsetsDays?: number[];
   waitlist?: Array<{
     userId: string;
     username: string;
@@ -307,9 +314,66 @@ const recurrenceOptions: {
   {value: 'weekly', label: 'Weekly', description: 'Same day every week'},
   {value: 'biweekly', label: 'Biweekly', description: 'Every two weeks'},
   {value: 'monthly', label: 'Monthly', description: 'Same day each month'},
+  {value: 'custom', label: 'Custom', description: 'Pick days after each previous event'},
 ];
 
 const recurrenceCountOptions = [2, 3, 4, 5, 6, 8, 10, 12];
+const MIN_RECURRENCE_COUNT = 2;
+const MAX_RECURRENCE_COUNT = 12;
+const DEFAULT_GAP_DAYS = 7;
+const MAX_GAP_DAYS = 365;
+
+const clampRecurrenceCount = (n: number, min = MIN_RECURRENCE_COUNT): number => {
+  const v = Math.round(Number(n));
+  const fallback = min;
+  if (!Number.isFinite(v)) {
+    return fallback;
+  }
+  return Math.min(MAX_RECURRENCE_COUNT, Math.max(min, v));
+};
+
+const customPatternEventCount = (count: number): number =>
+  clampRecurrenceCount(count >= 2 ? count : 4);
+
+const customFormEventCount = (event: {
+  recurrenceCount: number;
+  recurrenceIndefinite: boolean;
+  recurrenceOffsetsDays?: number[];
+}): number => {
+  if (event.recurrenceIndefinite) {
+    return Math.max((event.recurrenceOffsetsDays || []).length + 1, 2);
+  }
+  return customPatternEventCount(event.recurrenceCount);
+};
+
+const padRecurrenceOffsets = (
+  offsets: number[] | undefined,
+  gaps: number,
+): number[] => {
+  const next = [...(offsets || [])];
+  while (next.length < gaps) {
+    next.push(DEFAULT_GAP_DAYS);
+  }
+  return next.slice(0, Math.max(gaps, 0)).map(n => {
+    const v = Math.round(Number(n));
+    if (!Number.isFinite(v) || v < 1) {
+      return DEFAULT_GAP_DAYS;
+    }
+    return Math.min(v, MAX_GAP_DAYS);
+  });
+};
+
+const formatScheduleDate = (dateString: string): string => {
+  const d = parseEventDateLocal(dateString);
+  if (isNaN(d.getTime())) {
+    return dateString;
+  }
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+};
 
 const DURATION_OPTIONS: {label: string; minutes: number | null}[] = [
   {label: '30m', minutes: 30},
@@ -344,7 +408,9 @@ const createEmptyEvent = () => ({
   isRecurring: false,
   recurrenceFrequency: 'weekly' as RecurrenceFrequency,
   recurrenceCount: 4,
+  recurrenceCountCustom: false,
   recurrenceIndefinite: false,
+  recurrenceOffsetsDays: [7, 7, 7] as number[],
   // Optional venue listing reference set by the Venues-tab bridge.
   venueId: undefined as string | undefined,
   venueName: undefined as string | undefined,
@@ -691,6 +757,28 @@ const summarizeReactions = (
     count: counts.get(emoji) as number,
     mine: mine.has(emoji),
   }));
+};
+
+// Stored location for "Other" (non-place) events. Display uses i18n badge;
+// legacy free-text values (e.g. Discord) still show as "Other · Discord".
+const VIRTUAL_LOCATION_VALUE = 'Other';
+const isGenericVirtualLocation = (location?: string) => {
+  const trimmed = (location || '').trim().toLowerCase();
+  return (
+    !trimmed ||
+    trimmed === 'other' ||
+    trimmed === 'online / other' ||
+    trimmed === 'online/other'
+  );
+};
+const formatVirtualLocationLabel = (
+  location: string | undefined,
+  badge: string,
+) => {
+  if (isGenericVirtualLocation(location)) {
+    return badge;
+  }
+  return `${badge} · ${(location || '').trim()}`;
 };
 
 // Open maps for an event — delegates to shared MapLauncher
@@ -1718,6 +1806,44 @@ const EventList: React.FC = () => {
           fontWeight: '700',
           color: colors.secondaryText,
         },
+        editScopeCountRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+        },
+        editScopeCountInput: {
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+          minWidth: 64,
+          marginRight: 10,
+          textAlign: 'center',
+          color: colors.text,
+          fontSize: 16,
+          fontWeight: '700',
+        },
+        editScopeCountHint: {
+          flex: 1,
+          fontSize: 12,
+          color: colors.secondaryText,
+        },
+        editScopeApplyCount: {
+          marginHorizontal: 16,
+          marginTop: 4,
+          marginBottom: 8,
+          backgroundColor: colors.primary,
+          borderRadius: 24,
+          paddingVertical: 12,
+          alignItems: 'center',
+        },
+        editScopeApplyCountText: {
+          fontSize: 15,
+          fontWeight: '700',
+          color: '#fff',
+        },
         picker: {
           backgroundColor: 'transparent',
           color: colors.text,
@@ -2061,9 +2187,26 @@ const EventList: React.FC = () => {
         flatListContent: {
           paddingBottom: 120,
         },
+        flatListContentEmpty: {
+          // Keep empty state under the pills — do not stretch/center in the
+          // leftover viewport (that created the huge gap on Android/iOS).
+          flexGrow: 0,
+          paddingTop: 8,
+          paddingBottom: 120,
+        },
+        listEmptyState: {
+          alignItems: 'center',
+          paddingTop: 12,
+          paddingBottom: 24,
+          paddingHorizontal: 32,
+        },
         noResultsContainerCompact: {
           flex: 0,
-          paddingVertical: 60,
+          flexGrow: 0,
+          alignSelf: 'stretch',
+          justifyContent: 'flex-start',
+          paddingTop: 12,
+          paddingBottom: 24,
         },
         // Jersey color picker styles
         jerseyColorPickerContainer: {
@@ -2150,11 +2293,12 @@ const EventList: React.FC = () => {
         // Horizontal filter chip bar (compact pills)
         chipBarContainer: {
           marginBottom: 12,
-          minHeight: 46,
+          height: 44,
+          flexGrow: 0,
+          flexShrink: 0,
           zIndex: 100,
           backgroundColor: colors.background,
           elevation: 10,
-          flexShrink: 0,
           overflow: 'visible',
         },
         chipBarContent: {
@@ -2162,6 +2306,9 @@ const EventList: React.FC = () => {
           paddingVertical: 6,
           gap: 8,
           alignItems: 'center',
+        },
+        eventList: {
+          flex: 1,
         },
         chip: {
           flexDirection: 'row',
@@ -2876,12 +3023,16 @@ const EventList: React.FC = () => {
         },
         recurrenceFrequencyRow: {
           flexDirection: 'row',
+          flexWrap: 'wrap',
           gap: 8,
         },
         recurrenceFrequencyOption: {
-          flex: 1,
+          flexGrow: 1,
+          flexBasis: '22%',
+          minWidth: 72,
           alignItems: 'center',
           paddingVertical: 8,
+          paddingHorizontal: 6,
           borderRadius: 18,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
@@ -2899,12 +3050,14 @@ const EventList: React.FC = () => {
         recurrenceFrequencyTextSelected: {
           color: colors.primary,
         },
-        recurrenceCountScroll: {
-          flexGrow: 0,
+        recurrenceCountRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
           marginBottom: 10,
         },
         recurrenceCountOption: {
-          width: 40,
+          minWidth: 40,
           height: 40,
           borderRadius: 20,
           borderWidth: StyleSheet.hairlineWidth,
@@ -2912,7 +3065,11 @@ const EventList: React.FC = () => {
           backgroundColor: 'transparent',
           alignItems: 'center',
           justifyContent: 'center',
-          marginRight: 8,
+          paddingHorizontal: 8,
+        },
+        recurrenceNoEndOption: {
+          minWidth: 72,
+          paddingHorizontal: 12,
         },
         recurrenceCountSelected: {
           borderColor: colors.primary,
@@ -2930,6 +3087,85 @@ const EventList: React.FC = () => {
           color: colors.secondaryText,
           fontSize: 12,
           marginTop: 4,
+        },
+        customOffsetSection: {
+          marginBottom: 10,
+        },
+        sequenceActions: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 16,
+          marginTop: 4,
+        },
+        sequenceActionText: {
+          color: colors.primary,
+          fontSize: 13,
+          fontWeight: '700',
+        },
+        customCountRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 10,
+          gap: 8,
+        },
+        customOffsetHint: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          marginBottom: 10,
+          lineHeight: 16,
+        },
+        customOffsetRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 10,
+          gap: 8,
+        },
+        customOffsetTitle: {
+          color: colors.text,
+          fontSize: 13,
+          fontWeight: '700',
+        },
+        customOffsetDate: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          marginTop: 2,
+        },
+        customOffsetStepper: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        customOffsetStepBtn: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        customOffsetStepText: {
+          color: colors.text,
+          fontSize: 18,
+          fontWeight: '700',
+          lineHeight: 20,
+        },
+        customOffsetInput: {
+          width: 44,
+          height: 32,
+          marginHorizontal: 6,
+          borderRadius: 8,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          color: colors.text,
+          textAlign: 'center',
+          fontSize: 14,
+          fontWeight: '700',
+          paddingVertical: 0,
+        },
+        customOffsetUnit: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          width: 68,
         },
         recurringBadge: {
           flexDirection: 'row',
@@ -3316,6 +3552,17 @@ const EventList: React.FC = () => {
   // Loading state for save operations
   const [savingEvent, setSavingEvent] = useState(false);
   const [_deletingEventId, setDeletingEventId] = useState<string | null>(null);
+  const [editingRecurrenceGroupId, setEditingRecurrenceGroupId] = useState<
+    string | null
+  >(null);
+  const [editingSeriesForwardCount, setEditingSeriesForwardCount] =
+    useState(1);
+  const [editScopeModalVisible, setEditScopeModalVisible] = useState(false);
+  const [editScopeCountInput, setEditScopeCountInput] = useState('1');
+  const pendingEditScopeRef = useRef<{
+    scope: 'this' | 'series' | 'count';
+    count?: number;
+  } | null>(null);
 
   // Recurring group deck state
   const [expandedRecurringGroup, setExpandedRecurringGroup] = useState<
@@ -3558,7 +3805,7 @@ const EventList: React.FC = () => {
   }, [fetchEvents]);
 
   // Refresh event data via REST (used by socket triggers and foreground resume)
-  const fetchLatestEvents = useCallback(async () => {
+  const fetchLatestEvents = useCallback(async (): Promise<Event[]> => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       const response = await axios.get(`${API_BASE_URL}/events`, {
@@ -3567,11 +3814,31 @@ const EventList: React.FC = () => {
       if (Array.isArray(response.data)) {
         setEventData(response.data);
         AsyncStorage.setItem('cachedEvents', JSON.stringify(response.data));
+        const uid = userData?._id;
+        if (uid) {
+          for (const evt of response.data as Event[]) {
+            const involved =
+              String(evt.createdBy) === String(uid) ||
+              (evt.roster || []).some(
+                (p: any) => String(p.userId) === String(uid),
+              ) ||
+              (evt.invitedUsers || []).some(
+                (id: any) => String(id) === String(uid),
+              );
+            if (involved && evt.date && evt.time) {
+              notificationService
+                .scheduleEventNotifications(evt)
+                .catch(() => {});
+            }
+          }
+        }
+        return response.data;
       }
     } catch {
       // Silent fail — will retry on next socket event or foreground resume
     }
-  }, []);
+    return [];
+  }, [userData?._id]);
 
   // Listen for real-time event updates via WebSocket
   useEffect(() => {
@@ -3594,6 +3861,7 @@ const EventList: React.FC = () => {
         roster?: any[];
         rsvps?: any[];
         rosterSpotsFilled?: number;
+        totalSpots?: number;
       }) => {
         setEventData(prev =>
           prev.map(ev =>
@@ -3606,6 +3874,10 @@ const EventList: React.FC = () => {
                     typeof data.rosterSpotsFilled === 'number'
                       ? data.rosterSpotsFilled
                       : ev.rosterSpotsFilled,
+                  totalSpots:
+                    typeof data.totalSpots === 'number'
+                      ? data.totalSpots
+                      : ev.totalSpots,
                 }
               : ev,
           ),
@@ -3833,20 +4105,27 @@ const EventList: React.FC = () => {
           continue;
         }
         seenGroups.add(event.recurrenceGroupId);
+        const groupSize = eventData.filter(
+          e => e.recurrenceGroupId === event.recurrenceGroupId,
+        ).length;
         const groupEvents = filteredEvents.filter(
           e => e.recurrenceGroupId === event.recurrenceGroupId,
         );
-        items.push({
-          type: 'recurring',
-          groupId: event.recurrenceGroupId,
-          events: groupEvents,
-        });
+        if (groupSize < 2) {
+          items.push({type: 'single', event});
+        } else {
+          items.push({
+            type: 'recurring',
+            groupId: event.recurrenceGroupId,
+            events: groupEvents.length > 0 ? groupEvents : [event],
+          });
+        }
       } else {
         items.push({type: 'single', event});
       }
     }
     return items;
-  }, [filteredEvents]);
+  }, [filteredEvents, eventData]);
 
   // Scroll so the comment input is visible when the keyboard opens
   useEffect(() => {
@@ -3987,6 +4266,7 @@ const EventList: React.FC = () => {
     setTempEventType(prefill.eventType || '');
     setIsEditing(false);
     setEditingEventId(null);
+    setEditingRecurrenceGroupId(null);
     setPlacesApiFailed(false);
     setModalVisible(true);
     // Clear the param so navigating away and back doesn't re-pop the modal.
@@ -4146,14 +4426,26 @@ const EventList: React.FC = () => {
       newEvent.totalSpots &&
       newEvent.eventType
     ) {
+      const stillSeries =
+        !!(isEditing && editingRecurrenceGroupId && newEvent.isRecurring);
+      const pendingScope = pendingEditScopeRef.current;
+      if (stillSeries && !pendingScope) {
+        setEditScopeCountInput(String(Math.max(1, editingSeriesForwardCount)));
+        setEditScopeModalVisible(true);
+        return;
+      }
+
       setSavingEvent(true);
       if (isEditing && editingEventId) {
         try {
+          const token = await AsyncStorage.getItem('userToken');
           const response = await axios.put(
             `${API_BASE_URL}/events/${editingEventId}`,
             {
               name: newEvent.name,
-              location: newEvent.location,
+              location: newEvent.isVirtual
+                ? VIRTUAL_LOCATION_VALUE
+                : newEvent.location,
               time: newEvent.time,
               durationMinutes: newEvent.durationMinutes,
               date: newEvent.date,
@@ -4182,27 +4474,57 @@ const EventList: React.FC = () => {
               // occurrences from this event forward (set in handleEditEvent).
               isRecurring: newEvent.isRecurring,
               recurrenceFrequency: newEvent.recurrenceFrequency,
-              recurrenceCount: newEvent.recurrenceIndefinite
-                ? 0
-                : newEvent.recurrenceCount,
+              recurrenceCount:
+                newEvent.recurrenceFrequency === 'custom' ||
+                !newEvent.recurrenceIndefinite
+                  ? newEvent.recurrenceFrequency === 'custom'
+                    ? customFormEventCount(newEvent)
+                    : newEvent.recurrenceCount
+                  : 0,
               recurrenceIndefinite: !!newEvent.recurrenceIndefinite,
+              recurrenceOffsetsDays:
+                newEvent.recurrenceFrequency === 'custom'
+                  ? padRecurrenceOffsets(
+                      newEvent.recurrenceOffsetsDays,
+                      customFormEventCount(newEvent) - 1,
+                    )
+                  : [],
+              ...(pendingScope
+                ? {
+                    editScope: pendingScope.scope,
+                    editScopeCount: pendingScope.count,
+                  }
+                : {}),
             },
+            {headers: token ? {Authorization: `Bearer ${token}`} : {}},
           );
-          // Merge the response with local privacy settings in case backend doesn't return them
+          pendingEditScopeRef.current = null;
+          const appliedScope = pendingScope?.scope;
+          const eventDoc = {...response.data};
+          delete eventDoc.affectedEventIds;
           const updatedEvent = {
-            ...response.data,
+            ...eventDoc,
             privacy: response.data.privacy || newEvent.privacy,
             invitedUsers: response.data.invitedUsers || newEvent.invitedUsers,
+            isVirtual:
+              response.data.isVirtual !== undefined
+                ? response.data.isVirtual
+                : newEvent.isVirtual,
           };
           setEventData(prevData =>
             prevData.map(event =>
               event._id === editingEventId ? updatedEvent : event,
             ),
           );
-          notificationService
-            .scheduleEventNotifications(updatedEvent)
-            .catch(() => {});
+          if (appliedScope && appliedScope !== 'this') {
+            await fetchLatestEvents();
+          } else {
+            notificationService
+              .scheduleEventNotifications(updatedEvent)
+              .catch(() => {});
+          }
         } catch (error) {
+          pendingEditScopeRef.current = null;
           Alert.alert(t('common.error'), t('events.updateError'));
           setSavingEvent(false);
           return;
@@ -4211,7 +4533,9 @@ const EventList: React.FC = () => {
         try {
           const eventPayload: Record<string, any> = {
             name: newEvent.name,
-            location: newEvent.location,
+            location: newEvent.isVirtual
+              ? VIRTUAL_LOCATION_VALUE
+              : newEvent.location,
             time: newEvent.time,
             durationMinutes: newEvent.durationMinutes,
             date: newEvent.date,
@@ -4245,12 +4569,22 @@ const EventList: React.FC = () => {
           };
 
           if (newEvent.isRecurring) {
+            const isCustom = newEvent.recurrenceFrequency === 'custom';
             eventPayload.isRecurring = true;
             eventPayload.recurrenceFrequency = newEvent.recurrenceFrequency;
             eventPayload.recurrenceIndefinite = !!newEvent.recurrenceIndefinite;
-            eventPayload.recurrenceCount = newEvent.recurrenceIndefinite
-              ? 0
-              : newEvent.recurrenceCount;
+            eventPayload.recurrenceCount =
+              isCustom || !newEvent.recurrenceIndefinite
+                ? isCustom
+                  ? customFormEventCount(newEvent)
+                  : newEvent.recurrenceCount
+                : 0;
+            eventPayload.recurrenceOffsetsDays = isCustom
+              ? padRecurrenceOffsets(
+                  newEvent.recurrenceOffsetsDays,
+                  customFormEventCount(newEvent) - 1,
+                )
+              : [];
           }
 
           const response = await axios.post(
@@ -4286,6 +4620,8 @@ const EventList: React.FC = () => {
       setTempEventType('');
       setIsEditing(false);
       setEditingEventId(null);
+      setEditingRecurrenceGroupId(null);
+      setEditScopeModalVisible(false);
       setInviteSearchQuery('');
       setAvailableUsersToInvite([]);
       setInvitedUserDetails([]);
@@ -4317,6 +4653,7 @@ const EventList: React.FC = () => {
       totalSpots: event.totalSpots,
       roster: [],
       jerseyColors: event.jerseyColors,
+      isVirtual: !!event.isVirtual,
       isRecurring: event.isRecurring,
       groupId: event.groupId,
       groupName: event.groupName,
@@ -4345,9 +4682,30 @@ const EventList: React.FC = () => {
         notificationService
           .cancelEventNotifications(event._id)
           .catch(() => {});
-        setEventData(prevData =>
-          prevData.filter(e => e._id !== event._id),
-        );
+        const groupId = event.recurrenceGroupId;
+        setEventData(prevData => {
+          const next = prevData.filter(e => e._id !== event._id);
+          if (!groupId) {
+            return next;
+          }
+          const leftover = next.filter(e => e.recurrenceGroupId === groupId);
+          if (leftover.length !== 1) {
+            return next;
+          }
+          const soloId = leftover[0]._id;
+          return next.map(e =>
+            e._id === soloId
+              ? {
+                  ...e,
+                  isRecurring: false,
+                  recurrenceGroupId: undefined,
+                  recurrenceFrequency: undefined,
+                  recurrenceIndefinite: false,
+                  recurrenceOffsetsDays: undefined,
+                }
+              : e,
+          );
+        });
       } catch (error) {
         Alert.alert(t('common.error'), t('events.deleteError'));
       } finally {
@@ -4383,9 +4741,28 @@ const EventList: React.FC = () => {
             .cancelEventNotifications(e._id)
             .catch(() => {}),
         );
-        setEventData(prevData =>
-          prevData.filter(e => !isFutureInSeries(e)),
-        );
+        setEventData(prevData => {
+          const next = prevData.filter(e => !isFutureInSeries(e));
+          const leftover = next.filter(
+            e => e.recurrenceGroupId === recurrenceId,
+          );
+          if (leftover.length !== 1) {
+            return next;
+          }
+          const soloId = leftover[0]._id;
+          return next.map(e =>
+            e._id === soloId
+              ? {
+                  ...e,
+                  isRecurring: false,
+                  recurrenceGroupId: undefined,
+                  recurrenceFrequency: undefined,
+                  recurrenceIndefinite: false,
+                  recurrenceOffsetsDays: undefined,
+                }
+              : e,
+          );
+        });
       } catch (error) {
         Alert.alert(t('common.error'), t('events.deleteError'));
       } finally {
@@ -4438,18 +4815,55 @@ const EventList: React.FC = () => {
     // For a recurring event, the modal's count reflects how many occurrences
     // remain from this one forward (inclusive), so leaving it untouched is a
     // no-op on the backend. Single events default to 4 if turned recurring.
-    const forwardCount =
+    const forwardEvents =
       event.isRecurring && event.recurrenceGroupId
-        ? eventData.filter(
-            e =>
-              e.recurrenceGroupId === event.recurrenceGroupId &&
-              parseEventDateLocal(e.date).getTime() >=
-                parseEventDateLocal(event.date).getTime(),
-          ).length
-        : 4;
+        ? eventData
+            .filter(
+              e =>
+                e.recurrenceGroupId === event.recurrenceGroupId &&
+                parseEventDateLocal(e.date).getTime() >=
+                  parseEventDateLocal(event.date).getTime(),
+            )
+            .sort(
+              (a, b) =>
+                parseEventDateLocal(a.date).getTime() -
+                parseEventDateLocal(b.date).getTime(),
+            )
+        : [];
+    const forwardCount = event.isRecurring && event.recurrenceGroupId
+      ? forwardEvents.length
+      : 4;
+    const derivedOffsets: number[] = [];
+    for (let i = 1; i < forwardEvents.length; i++) {
+      derivedOffsets.push(
+        Math.max(
+          1,
+          daysBetweenEventDates(forwardEvents[i - 1].date, forwardEvents[i].date) ||
+            DEFAULT_GAP_DAYS,
+        ),
+      );
+    }
+    const storedOffsets = event.recurrenceOffsetsDays;
+    const isCustomFreq = event.recurrenceFrequency === 'custom';
+    const isIndefinite = !!event.recurrenceIndefinite;
+    const patternCount =
+      isCustomFreq && isIndefinite
+        ? customPatternEventCount(
+            storedOffsets && storedOffsets.length > 0
+              ? storedOffsets.length + 1
+              : forwardCount,
+          )
+        : forwardCount;
+    const gaps = Math.max(patternCount, 2) - 1;
+    const offsets =
+      isCustomFreq && storedOffsets && storedOffsets.length > 0
+        ? storedOffsets
+        : derivedOffsets;
     setNewEvent({
       name: event.name,
-      location: event.location || '',
+      location: event.isVirtual
+        ? VIRTUAL_LOCATION_VALUE
+        : event.location || '',
       time: event.time,
       durationMinutes: event.durationMinutes ?? null,
       date: event.date,
@@ -4467,8 +4881,12 @@ const EventList: React.FC = () => {
       invitedUsers: event.invitedUsers || [],
       isRecurring: event.isRecurring || false,
       recurrenceFrequency: event.recurrenceFrequency || 'weekly',
-      recurrenceIndefinite: !!event.recurrenceIndefinite,
-      recurrenceCount: event.recurrenceIndefinite ? 0 : forwardCount,
+      recurrenceIndefinite: isIndefinite,
+      recurrenceCount: isIndefinite && !isCustomFreq ? 0 : patternCount,
+      recurrenceCountCustom:
+        !(isIndefinite && !isCustomFreq) &&
+        !recurrenceCountOptions.includes(patternCount),
+      recurrenceOffsetsDays: padRecurrenceOffsets(offsets, gaps),
       // Preserve any venue link the event was originally created with.
       venueId: event.venueId,
       venueName: event.venueName,
@@ -4482,6 +4900,8 @@ const EventList: React.FC = () => {
     setTempEventType(event.eventType);
     setIsEditing(true);
     setEditingEventId(event._id);
+    setEditingRecurrenceGroupId(event.recurrenceGroupId || null);
+    setEditingSeriesForwardCount(Math.max(forwardCount, 1));
 
     // Load invited user details if editing an invite-only event
     if (event.invitedUsers && event.invitedUsers.length > 0) {
@@ -4515,9 +4935,10 @@ const EventList: React.FC = () => {
       `Get BetterPlay and open the invite:\n${landingUrl}`;
 
     try {
+      // iOS Copy concatenates `message` + `url`, which duplicated the landing
+      // link. Keep the URL in the message only so Copy / Messages / Mail get one.
       const result = await Share.share({
         message: shareMessage,
-        url: Platform.OS === 'ios' ? landingUrl : undefined,
         title: `Join ${event.name} on BetterPlay`,
       });
 
@@ -5015,6 +5436,8 @@ const EventList: React.FC = () => {
     setTempEventType('');
     setIsEditing(false);
     setEditingEventId(null);
+    setEditingRecurrenceGroupId(null);
+    setEditScopeModalVisible(false);
     setInviteSearchQuery('');
     setAvailableUsersToInvite([]);
     setInvitedUserDetails([]);
@@ -5299,7 +5722,12 @@ const EventList: React.FC = () => {
                     </Text>
                   </>
                 )}
-                {item.isRecurring && (
+                {item.isRecurring &&
+                  eventData.filter(
+                    e =>
+                      e.recurrenceGroupId &&
+                      e.recurrenceGroupId === item.recurrenceGroupId,
+                  ).length >= 2 && (
                   <>
                     <Text style={themedStyles.cardHeaderMetaDot}>·</Text>
                     <FontAwesomeIcon
@@ -5393,9 +5821,10 @@ const EventList: React.FC = () => {
               />
               <Text style={themedStyles.detailText} numberOfLines={2}>
                 {item.isVirtual
-                  ? item.location
-                    ? `${t('events.virtualLocationBadge') || 'Online / other'} · ${item.location}`
-                    : t('events.virtualLocationBadge') || 'Online / other'
+                  ? formatVirtualLocationLabel(
+                      item.location,
+                      t('events.virtualLocationBadge') || 'Other',
+                    )
                   : item.location}
               </Text>
             </View>
@@ -5447,7 +5876,7 @@ const EventList: React.FC = () => {
         </TouchableOpacity>
 
         {/* Physical events get a map preview; virtual ones already show
-            "Online / other · …" in the detail row above. */}
+            "Other" (or "Other · …" for legacy labels) in the detail row. */}
         {!item.isVirtual ? (
         <TouchableOpacity
           style={themedStyles.mapEmbed}
@@ -5782,6 +6211,11 @@ const EventList: React.FC = () => {
   };
 
   const renderRecurringGroup = (groupId: string, events: Event[]) => {
+    if (events.length < 2) {
+      return (
+        <View key={groupId}>{renderEventCard({item: events[0]})}</View>
+      );
+    }
     const isExpanded = expandedRecurringGroup === groupId;
     const activeIdx = deckActiveIndex[groupId] || 0;
     const previewEvent = events[activeIdx] || events[0];
@@ -6049,6 +6483,7 @@ const EventList: React.FC = () => {
         ) : (
           <FlatList
             ref={flatListRef}
+            style={themedStyles.eventList}
             data={displayItems}
             renderItem={renderDisplayItem}
             keyExtractor={item =>
@@ -6058,7 +6493,11 @@ const EventList: React.FC = () => {
             onRefresh={fetchEvents}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
-            contentContainerStyle={themedStyles.flatListContent}
+            contentContainerStyle={
+              displayItems.length === 0
+                ? themedStyles.flatListContentEmpty
+                : themedStyles.flatListContent
+            }
             onScrollToIndexFailed={info => {
               const maxIndex = displayItems.length - 1;
               if (maxIndex >= 0) {
@@ -6071,11 +6510,7 @@ const EventList: React.FC = () => {
               }
             }}
             ListEmptyComponent={
-              <View
-                style={[
-                  themedStyles.noResultsContainer,
-                  themedStyles.noResultsContainerCompact,
-                ]}>
+              <View style={themedStyles.listEmptyState}>
                 <View style={themedStyles.noResultsIconContainer}>
                   <FontAwesomeIcon
                     icon={
@@ -6155,6 +6590,8 @@ const EventList: React.FC = () => {
           setModalVisible(true);
           setIsEditing(false);
           setEditingEventId(null);
+          setEditingRecurrenceGroupId(null);
+          setEditScopeModalVisible(false);
           setNewEvent(createEmptyEvent());
           setTempRosterSize('');
           setTempEventType('');
@@ -6192,12 +6629,12 @@ const EventList: React.FC = () => {
                   value={newEvent.name}
                   onChangeText={text => setNewEvent({...newEvent, name: text})}
                 />
-                {/* Location: Place (maps) or Online/other (free-text label). */}
+                {/* Location: Place (maps) or Other (no address / no second name field). */}
                 <View style={themedStyles.locationModeRow}>
                   {(
                     [
                       {value: false, fallback: 'Place'},
-                      {value: true, fallback: 'Online / other'},
+                      {value: true, fallback: 'Other'},
                     ] as const
                   ).map(option => {
                     const selected = !!newEvent.isVirtual === option.value;
@@ -6218,10 +6655,10 @@ const EventList: React.FC = () => {
                                   longitude: undefined,
                                   venueId: undefined,
                                   venueName: undefined,
-                                  location: prev.isVirtual ? prev.location : '',
+                                  location: VIRTUAL_LOCATION_VALUE,
                                 }
                               : {
-                                  location: prev.isVirtual ? '' : prev.location,
+                                  location: '',
                                 }),
                           }))
                         }
@@ -6241,20 +6678,7 @@ const EventList: React.FC = () => {
                   })}
                 </View>
 
-                {newEvent.isVirtual ? (
-                  <TextInput
-                    style={themedStyles.modalInput}
-                    placeholder={
-                      t('events.virtualLocationPlaceholder') ||
-                      'e.g. Friday night gaming, Discord, my place'
-                    }
-                    placeholderTextColor={colors.placeholder || '#888'}
-                    value={newEvent.location}
-                    onChangeText={text =>
-                      setNewEvent({...newEvent, location: text})
-                    }
-                  />
-                ) : (
+                {!newEvent.isVirtual && (
                   <View style={themedStyles.autocompleteContainer}>
                     {isApiKeyConfigured && !placesApiFailed ? (
                       <GooglePlacesAutocomplete
@@ -6493,12 +6917,40 @@ const EventList: React.FC = () => {
                                 newEvent.recurrenceFrequency === option.value &&
                                   themedStyles.recurrenceFrequencySelected,
                               ]}
-                              onPress={() =>
+                              onPress={() => {
+                                const switchingToCustom =
+                                  option.value === 'custom';
+                                const leavingCustom =
+                                  newEvent.recurrenceFrequency === 'custom' &&
+                                  !switchingToCustom;
+                                let nextCount = newEvent.recurrenceCount;
+                                if (
+                                  switchingToCustom &&
+                                  (newEvent.recurrenceIndefinite ||
+                                    nextCount < 2)
+                                ) {
+                                  nextCount = customPatternEventCount(nextCount);
+                                }
+                                if (leavingCustom && newEvent.recurrenceIndefinite) {
+                                  nextCount = 0;
+                                }
                                 setNewEvent({
                                   ...newEvent,
                                   recurrenceFrequency: option.value,
-                                })
-                              }>
+                                  recurrenceCount: switchingToCustom
+                                    ? Math.max(nextCount, 2)
+                                    : nextCount,
+                                  recurrenceOffsetsDays: padRecurrenceOffsets(
+                                    newEvent.recurrenceOffsetsDays,
+                                    Math.max(
+                                      switchingToCustom
+                                        ? Math.max(nextCount, 2)
+                                        : nextCount,
+                                      2,
+                                    ) - 1,
+                                  ),
+                                });
+                              }}>
                               <Text
                                 style={[
                                   themedStyles.recurrenceFrequencyText,
@@ -6517,27 +6969,60 @@ const EventList: React.FC = () => {
                             themedStyles.recurrenceSubLabel,
                             themedStyles.recurrenceCountSubLabel,
                           ]}>
-                          {isEditing
-                            ? 'Occurrences (from this one forward)'
-                            : 'Number of Events'}
+                          {newEvent.recurrenceFrequency === 'custom' &&
+                          newEvent.recurrenceIndefinite
+                            ? 'Ends'
+                            : isEditing
+                              ? 'Occurrences (from this one forward)'
+                              : 'Number of events'}
                         </Text>
-                        <ScrollView
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          style={themedStyles.recurrenceCountScroll}>
+                        <View style={themedStyles.recurrenceCountRow}>
                           <TouchableOpacity
                             style={[
                               themedStyles.recurrenceCountOption,
+                              themedStyles.recurrenceNoEndOption,
                               newEvent.recurrenceIndefinite &&
                                 themedStyles.recurrenceCountSelected,
                             ]}
-                            onPress={() =>
+                            onPress={() => {
+                              if (newEvent.recurrenceIndefinite) {
+                                const nextCount = customPatternEventCount(
+                                  newEvent.recurrenceCount,
+                                );
+                                setNewEvent({
+                                  ...newEvent,
+                                  recurrenceIndefinite: false,
+                                  recurrenceCount: nextCount,
+                                  recurrenceCountCustom:
+                                    !recurrenceCountOptions.includes(nextCount),
+                                  recurrenceOffsetsDays: padRecurrenceOffsets(
+                                    newEvent.recurrenceOffsetsDays,
+                                    nextCount - 1,
+                                  ),
+                                });
+                                return;
+                              }
+                              const isCustom =
+                                newEvent.recurrenceFrequency === 'custom';
+                              const sequenceGaps = padRecurrenceOffsets(
+                                newEvent.recurrenceOffsetsDays,
+                                Math.max(
+                                  (newEvent.recurrenceOffsetsDays || []).length,
+                                  1,
+                                ),
+                              );
                               setNewEvent({
                                 ...newEvent,
                                 recurrenceIndefinite: true,
-                                recurrenceCount: 0,
-                              })
-                            }>
+                                recurrenceCount: isCustom
+                                  ? sequenceGaps.length + 1
+                                  : 0,
+                                recurrenceCountCustom: false,
+                                recurrenceOffsetsDays: isCustom
+                                  ? sequenceGaps
+                                  : newEvent.recurrenceOffsetsDays,
+                              });
+                            }}>
                             <Text
                               style={[
                                 themedStyles.recurrenceCountText,
@@ -6547,40 +7032,347 @@ const EventList: React.FC = () => {
                               {t('events.noEnd') || 'No end'}
                             </Text>
                           </TouchableOpacity>
-                          {recurrenceCountOptions.map(count => (
-                            <TouchableOpacity
-                              key={count}
-                              style={[
-                                themedStyles.recurrenceCountOption,
-                                !newEvent.recurrenceIndefinite &&
-                                  newEvent.recurrenceCount === count &&
-                                  themedStyles.recurrenceCountSelected,
-                              ]}
-                              onPress={() =>
-                                setNewEvent({
-                                  ...newEvent,
-                                  recurrenceIndefinite: false,
-                                  recurrenceCount: count,
-                                })
-                              }>
-                              <Text
+                          {!(
+                            newEvent.recurrenceFrequency === 'custom' &&
+                            newEvent.recurrenceIndefinite
+                          ) && (
+                            <>
+                              {recurrenceCountOptions.map(count => (
+                                <TouchableOpacity
+                                  key={count}
+                                  style={[
+                                    themedStyles.recurrenceCountOption,
+                                    !newEvent.recurrenceIndefinite &&
+                                      !newEvent.recurrenceCountCustom &&
+                                      newEvent.recurrenceCount === count &&
+                                      themedStyles.recurrenceCountSelected,
+                                  ]}
+                                  onPress={() =>
+                                    setNewEvent({
+                                      ...newEvent,
+                                      recurrenceIndefinite: false,
+                                      recurrenceCountCustom: false,
+                                      recurrenceCount: count,
+                                      recurrenceOffsetsDays:
+                                        padRecurrenceOffsets(
+                                          newEvent.recurrenceOffsetsDays,
+                                          count - 1,
+                                        ),
+                                    })
+                                  }>
+                                  <Text
+                                    style={[
+                                      themedStyles.recurrenceCountText,
+                                      !newEvent.recurrenceIndefinite &&
+                                        !newEvent.recurrenceCountCustom &&
+                                        newEvent.recurrenceCount === count &&
+                                        themedStyles.recurrenceCountTextSelected,
+                                    ]}>
+                                    {count}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                              <TouchableOpacity
                                 style={[
-                                  themedStyles.recurrenceCountText,
+                                  themedStyles.recurrenceCountOption,
+                                  themedStyles.recurrenceNoEndOption,
                                   !newEvent.recurrenceIndefinite &&
-                                    newEvent.recurrenceCount === count &&
-                                    themedStyles.recurrenceCountTextSelected,
-                                ]}>
-                                {count}
+                                    newEvent.recurrenceCountCustom &&
+                                    themedStyles.recurrenceCountSelected,
+                                ]}
+                                onPress={() => {
+                                  const min =
+                                    newEvent.recurrenceFrequency === 'custom'
+                                      ? MIN_RECURRENCE_COUNT
+                                      : isEditing
+                                        ? 1
+                                        : MIN_RECURRENCE_COUNT;
+                                  const nextCount = clampRecurrenceCount(
+                                    newEvent.recurrenceCount >= min
+                                      ? newEvent.recurrenceCount
+                                      : 7,
+                                    min,
+                                  );
+                                  setNewEvent({
+                                    ...newEvent,
+                                    recurrenceIndefinite: false,
+                                    recurrenceCountCustom: true,
+                                    recurrenceCount: nextCount,
+                                    recurrenceOffsetsDays:
+                                      padRecurrenceOffsets(
+                                        newEvent.recurrenceOffsetsDays,
+                                        Math.max(nextCount, 1) - 1,
+                                      ),
+                                  });
+                                }}>
+                                <Text
+                                  style={[
+                                    themedStyles.recurrenceCountText,
+                                    !newEvent.recurrenceIndefinite &&
+                                      newEvent.recurrenceCountCustom &&
+                                      themedStyles.recurrenceCountTextSelected,
+                                  ]}>
+                                  Other
+                                </Text>
+                              </TouchableOpacity>
+                            </>
+                          )}
+                        </View>
+
+                        {!newEvent.recurrenceIndefinite &&
+                          newEvent.recurrenceCountCustom && (
+                            <View style={themedStyles.customCountRow}>
+                              <Text style={themedStyles.customOffsetTitle}>
+                                How many
                               </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
+                              <View style={themedStyles.customOffsetStepper}>
+                                <TouchableOpacity
+                                  style={themedStyles.customOffsetStepBtn}
+                                  onPress={() => {
+                                    const min =
+                                      newEvent.recurrenceFrequency === 'custom'
+                                        ? MIN_RECURRENCE_COUNT
+                                        : isEditing
+                                          ? 1
+                                          : MIN_RECURRENCE_COUNT;
+                                    const nextCount = clampRecurrenceCount(
+                                      newEvent.recurrenceCount - 1,
+                                      min,
+                                    );
+                                    setNewEvent({
+                                      ...newEvent,
+                                      recurrenceCount: nextCount,
+                                      recurrenceOffsetsDays:
+                                        padRecurrenceOffsets(
+                                          newEvent.recurrenceOffsetsDays,
+                                          Math.max(nextCount, 1) - 1,
+                                        ),
+                                    });
+                                  }}>
+                                  <Text
+                                    style={themedStyles.customOffsetStepText}>
+                                    −
+                                  </Text>
+                                </TouchableOpacity>
+                                <TextInput
+                                  style={themedStyles.customOffsetInput}
+                                  keyboardType="number-pad"
+                                  value={String(
+                                    Math.max(newEvent.recurrenceCount, 1),
+                                  )}
+                                  maxLength={2}
+                                  onChangeText={text => {
+                                    const min =
+                                      newEvent.recurrenceFrequency === 'custom'
+                                        ? MIN_RECURRENCE_COUNT
+                                        : isEditing
+                                          ? 1
+                                          : MIN_RECURRENCE_COUNT;
+                                    const parsed = parseInt(text, 10);
+                                    const nextCount = clampRecurrenceCount(
+                                      Number.isFinite(parsed) ? parsed : min,
+                                      min,
+                                    );
+                                    setNewEvent({
+                                      ...newEvent,
+                                      recurrenceCount: nextCount,
+                                      recurrenceOffsetsDays:
+                                        padRecurrenceOffsets(
+                                          newEvent.recurrenceOffsetsDays,
+                                          Math.max(nextCount, 1) - 1,
+                                        ),
+                                    });
+                                  }}
+                                />
+                                <TouchableOpacity
+                                  style={themedStyles.customOffsetStepBtn}
+                                  onPress={() => {
+                                    const min =
+                                      newEvent.recurrenceFrequency === 'custom'
+                                        ? MIN_RECURRENCE_COUNT
+                                        : isEditing
+                                          ? 1
+                                          : MIN_RECURRENCE_COUNT;
+                                    const nextCount = clampRecurrenceCount(
+                                      newEvent.recurrenceCount + 1,
+                                      min,
+                                    );
+                                    setNewEvent({
+                                      ...newEvent,
+                                      recurrenceCount: nextCount,
+                                      recurrenceOffsetsDays:
+                                        padRecurrenceOffsets(
+                                          newEvent.recurrenceOffsetsDays,
+                                          Math.max(nextCount, 1) - 1,
+                                        ),
+                                    });
+                                  }}>
+                                  <Text
+                                    style={themedStyles.customOffsetStepText}>
+                                    +
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                              <Text style={themedStyles.customOffsetUnit}>
+                                events
+                              </Text>
+                            </View>
+                          )}
+
+                        {newEvent.recurrenceFrequency === 'custom' &&
+                          (() => {
+                            const isSequence = newEvent.recurrenceIndefinite;
+                            const eventCount = isSequence
+                              ? Math.max(
+                                  (newEvent.recurrenceOffsetsDays || []).length +
+                                    1,
+                                  2,
+                                )
+                              : Math.max(newEvent.recurrenceCount, 2);
+                            const gaps = padRecurrenceOffsets(
+                              newEvent.recurrenceOffsetsDays,
+                              eventCount - 1,
+                            );
+                            const previewDates = newEvent.date
+                              ? customOccurrenceDates(newEvent.date, gaps)
+                              : [];
+                            const setGaps = (next: number[]) => {
+                              setNewEvent({
+                                ...newEvent,
+                                recurrenceCount: next.length + 1,
+                                recurrenceOffsetsDays: next,
+                              });
+                            };
+                            const setGap = (index: number, value: number) => {
+                              const next = [...gaps];
+                              next[index] = Math.min(
+                                MAX_GAP_DAYS,
+                                Math.max(1, value),
+                              );
+                              setGaps(next);
+                            };
+                            return (
+                              <View style={themedStyles.customOffsetSection}>
+                                <Text style={themedStyles.recurrenceSubLabel}>
+                                  {isSequence
+                                    ? 'Sequence'
+                                    : 'Days between events'}
+                                </Text>
+                                <Text style={themedStyles.customOffsetHint}>
+                                  {isSequence
+                                    ? 'These gaps repeat until you end the series.'
+                                    : 'Each later event is this many days after the one before it.'}
+                                </Text>
+                                {gaps.map((gap, index) => (
+                                  <View
+                                    key={`gap-${index}`}
+                                    style={themedStyles.customOffsetRow}>
+                                    <View style={themedStyles.flexOne}>
+                                      <Text
+                                        style={themedStyles.customOffsetTitle}>
+                                        Event {index + 2}
+                                      </Text>
+                                      {previewDates[index + 1] ? (
+                                        <Text
+                                          style={themedStyles.customOffsetDate}>
+                                          {formatScheduleDate(
+                                            previewDates[index + 1],
+                                          )}
+                                        </Text>
+                                      ) : null}
+                                    </View>
+                                    <View
+                                      style={themedStyles.customOffsetStepper}>
+                                      <TouchableOpacity
+                                        style={themedStyles.customOffsetStepBtn}
+                                        onPress={() =>
+                                          setGap(index, gap - 1)
+                                        }>
+                                        <Text
+                                          style={
+                                            themedStyles.customOffsetStepText
+                                          }>
+                                          −
+                                        </Text>
+                                      </TouchableOpacity>
+                                      <TextInput
+                                        style={themedStyles.customOffsetInput}
+                                        keyboardType="number-pad"
+                                        value={String(gap)}
+                                        maxLength={3}
+                                        onChangeText={text => {
+                                          const parsed = parseInt(text, 10);
+                                          setGap(
+                                            index,
+                                            Number.isFinite(parsed)
+                                              ? parsed
+                                              : 1,
+                                          );
+                                        }}
+                                      />
+                                      <TouchableOpacity
+                                        style={themedStyles.customOffsetStepBtn}
+                                        onPress={() =>
+                                          setGap(index, gap + 1)
+                                        }>
+                                        <Text
+                                          style={
+                                            themedStyles.customOffsetStepText
+                                          }>
+                                          +
+                                        </Text>
+                                      </TouchableOpacity>
+                                    </View>
+                                    <Text style={themedStyles.customOffsetUnit}>
+                                      days later
+                                    </Text>
+                                  </View>
+                                ))}
+                                {isSequence ? (
+                                  <View style={themedStyles.sequenceActions}>
+                                    {gaps.length < 11 && (
+                                      <TouchableOpacity
+                                        onPress={() =>
+                                          setGaps([...gaps, DEFAULT_GAP_DAYS])
+                                        }>
+                                        <Text
+                                          style={themedStyles.sequenceActionText}>
+                                          Add to sequence
+                                        </Text>
+                                      </TouchableOpacity>
+                                    )}
+                                    {gaps.length > 1 && (
+                                      <TouchableOpacity
+                                        onPress={() =>
+                                          setGaps(gaps.slice(0, -1))
+                                        }>
+                                        <Text
+                                          style={themedStyles.sequenceActionText}>
+                                          Remove last
+                                        </Text>
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
+                                ) : null}
+                              </View>
+                            );
+                          })()}
 
                         <Text style={themedStyles.recurrenceSummary}>
                           {newEvent.date
-                            ? newEvent.recurrenceIndefinite
-                              ? `${newEvent.recurrenceFrequency}, no end date, starting ${newEvent.date}`
-                              : `${newEvent.recurrenceCount} events, ${newEvent.recurrenceFrequency}, starting ${newEvent.date}`
+                            ? newEvent.recurrenceFrequency === 'custom'
+                              ? newEvent.recurrenceIndefinite
+                                ? `Repeats from ${formatScheduleDate(
+                                    newEvent.date,
+                                  )}`
+                                : `${
+                                    newEvent.recurrenceCount
+                                  } events starting ${formatScheduleDate(
+                                    newEvent.date,
+                                  )}`
+                              : newEvent.recurrenceIndefinite
+                                ? `${newEvent.recurrenceFrequency}, no end date, starting ${newEvent.date}`
+                                : `${newEvent.recurrenceCount} events, ${newEvent.recurrenceFrequency}, starting ${newEvent.date}`
                             : 'Select a date above to see the schedule'}
                         </Text>
                       </View>
@@ -7116,6 +7908,100 @@ const EventList: React.FC = () => {
             top of the parent modal. Rendering it as a sibling outside
             the parent <Modal> causes the second modal to be obscured
             entirely on iOS. */}
+        <Modal
+          visible={editScopeModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setEditScopeModalVisible(false)}>
+          <TouchableOpacity
+            style={themedStyles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setEditScopeModalVisible(false)}>
+            <View
+              style={themedStyles.optionsMenuSheet}
+              onStartShouldSetResponder={() => true}>
+              <View style={themedStyles.modalHandle} />
+              <View style={themedStyles.optionsMenuHeaderBlock}>
+                <Text style={themedStyles.optionsMenuTitle}>
+                  {t('events.editRecurringTitle') || 'Apply this edit to…'}
+                </Text>
+                <Text style={themedStyles.optionsMenuSubtitle}>
+                  {t('events.editRecurringMessage') ||
+                    'This event is part of a series. Choose which cards to update.'}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={themedStyles.optionsMenuRow}
+                activeOpacity={0.7}
+                onPress={() => {
+                  pendingEditScopeRef.current = {scope: 'this'};
+                  setEditScopeModalVisible(false);
+                  handleSaveNewEvent();
+                }}>
+                <Text style={themedStyles.optionsMenuLabel}>
+                  {t('events.editThisEvent') || 'Just this event'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={themedStyles.optionsMenuRow}
+                activeOpacity={0.7}
+                onPress={() => {
+                  pendingEditScopeRef.current = {scope: 'series'};
+                  setEditScopeModalVisible(false);
+                  handleSaveNewEvent();
+                }}>
+                <Text style={themedStyles.optionsMenuLabel}>
+                  {t('events.editEntireSeries') || 'Entire series'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={themedStyles.editScopeCountRow}>
+                <TextInput
+                  style={themedStyles.editScopeCountInput}
+                  value={editScopeCountInput}
+                  onChangeText={text =>
+                    setEditScopeCountInput(text.replace(/[^0-9]/g, ''))
+                  }
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <Text style={themedStyles.editScopeCountHint}>
+                  {t('events.editFollowingCountHint', {
+                    count: editingSeriesForwardCount,
+                  }) ||
+                    `This event plus the next ones (max ${editingSeriesForwardCount})`}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={themedStyles.editScopeApplyCount}
+                activeOpacity={0.85}
+                onPress={() => {
+                  const parsed = parseInt(editScopeCountInput, 10) || 1;
+                  const count = Math.min(
+                    Math.max(parsed, 1),
+                    Math.max(editingSeriesForwardCount, 1),
+                  );
+                  pendingEditScopeRef.current = {scope: 'count', count};
+                  setEditScopeModalVisible(false);
+                  handleSaveNewEvent();
+                }}>
+                <Text style={themedStyles.editScopeApplyCountText}>
+                  {t('events.editFollowingCount') || 'Apply to this many'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={themedStyles.optionsMenuCancel}
+                onPress={() => setEditScopeModalVisible(false)}>
+                <Text style={themedStyles.optionsMenuCancelText}>
+                  {t('common.cancel')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
         <GroupPickerModal
           visible={groupPickerVisible}
           onClose={() => setGroupPickerVisible(false)}

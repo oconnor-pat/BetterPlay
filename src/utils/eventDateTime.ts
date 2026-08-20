@@ -208,3 +208,54 @@ export const isEventEnded = (
   durationMinutes?: number,
 ): boolean => !isEventActive(eventDate, eventTime, durationMinutes);
 
+/** Calendar date as YYYY-MM-DD in local time. */
+export const toIsoDateLocal = (dateString: string): string => {
+  const dt = parseEventDateLocal(dateString);
+  if (isNaN(dt.getTime())) {
+    return dateString;
+  }
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+/** Add (or subtract) whole days on a stored event date without UTC day-shift. */
+export const addDaysToEventDate = (dateString: string, days: number): string => {
+  const dt = parseEventDateLocal(dateString);
+  if (isNaN(dt.getTime())) {
+    return dateString;
+  }
+  dt.setDate(dt.getDate() + days);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+/** Whole calendar days from `from` to `to` (can be negative). */
+export const daysBetweenEventDates = (from: string, to: string): number => {
+  const a = parseEventDateLocal(from);
+  const b = parseEventDateLocal(to);
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) {
+    return 0;
+  }
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+};
+
+/**
+ * Dates for a custom series: occurrence 1 is the anchor, each later one is
+ * `offsets[i]` days after the previous.
+ */
+export const customOccurrenceDates = (
+  anchorDate: string,
+  offsets: number[],
+): string[] => {
+  const dates = [toIsoDateLocal(anchorDate)];
+  for (let i = 0; i < offsets.length; i++) {
+    const gap = Number.isFinite(offsets[i]) ? Math.round(offsets[i]) : 7;
+    dates.push(addDaysToEventDate(dates[i], Math.min(Math.max(gap, 1), 365)));
+  }
+  return dates;
+};
+

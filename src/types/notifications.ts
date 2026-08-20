@@ -59,6 +59,7 @@ export type NotificationType =
   | 'event_comment'
   | 'event_join'
   | 'event_leave'
+  | 'event_removed'
   | 'community_note'
   | 'venue_update'
   | 'space_update'

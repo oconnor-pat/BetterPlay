@@ -109,8 +109,11 @@ const PlayerRatingModal: React.FC<Props> = ({
       onClose();
     } catch (error: any) {
       const message =
-        error?.response?.data?.message ||
-        'Could not submit your rating. Please try again.';
+        error?.response?.status === 409
+          ? error?.response?.data?.message ||
+            "You've already rated this player. Each person can leave one review."
+          : error?.response?.data?.message ||
+            'Could not submit your rating. Please try again.';
       Alert.alert('Rating', message);
     } finally {
       setSubmitting(false);

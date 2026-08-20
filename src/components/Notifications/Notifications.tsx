@@ -53,6 +53,7 @@ export interface AppNotification {
     | 'event_comment'
     | 'event_join'
     | 'event_leave'
+    | 'event_removed'
     | 'event_watch_update'
     | 'event_spot_opened'
     | 'event_spot_available'
@@ -330,6 +331,7 @@ const Notifications: React.FC = () => {
       case 'event_roster':
       case 'event_join':
       case 'event_leave':
+      case 'event_removed':
       case 'event_watch_update':
       case 'event_spot_opened':
       case 'event_spot_available':
@@ -458,6 +460,7 @@ const Notifications: React.FC = () => {
         return faComments;
       case 'event_join':
       case 'event_leave':
+      case 'event_removed':
         return faUsers;
       case 'event_spot_opened':
       case 'event_spot_available':
@@ -506,6 +509,7 @@ const Notifications: React.FC = () => {
       case 'event_roster_change':
       case 'event_join':
       case 'event_leave':
+      case 'event_removed':
       case 'event_waitlist_join':
         return colors.primary;
       case 'event_like':
