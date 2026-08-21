@@ -36,7 +36,6 @@ import {
   faIdCard,
   faArrowRight,
   faUserPlus,
-  faSignInAlt,
   faKey,
   faTimes,
   faCheckCircle,
@@ -67,14 +66,19 @@ function LandingPage() {
   }
   const {setUserData} = userContext;
 
-  // Theme
   const {colors} = useTheme();
-
-  // Translation
   const {t} = useTranslation();
 
-  // Tab state: 'login' or 'register'
+  // Branding gate first; form opens from Sign In / Create account.
+  const [showAuthForm, setShowAuthForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+
+  const openAuthForm = (tab: 'login' | 'register') => {
+    setActiveTab(tab);
+    setShowAuthForm(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  };
 
   const themedStyles = useMemo(
     () =>
@@ -90,35 +94,135 @@ function LandingPage() {
         scrollContent: {
           flexGrow: 1,
           justifyContent: 'center',
-          padding: 24,
+          paddingHorizontal: 24,
+          paddingVertical: 20,
         },
-        // Hero Section
+        scrollContentGate: {
+          flexGrow: 1,
+          justifyContent: 'space-between',
+          paddingHorizontal: 24,
+          paddingTop: 36,
+          paddingBottom: 20,
+        },
         heroSection: {
           alignItems: 'center',
-          marginBottom: 28,
+          marginBottom: 20,
         },
-        logoContainer: {
+        heroSectionGate: {
+          alignItems: 'center',
+          flex: 1,
+          justifyContent: 'center',
+          paddingBottom: 12,
+        },
+        brandRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          marginBottom: 20,
+        },
+        brandRowCompact: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 8,
+        },
+        brandMark: {
+          width: 44,
+          height: 44,
+          borderRadius: 12,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.primary,
+        },
+        brandMarkCompact: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.primary,
+        },
+        brandMarkText: {
+          color: colors.buttonText,
+          fontWeight: '700',
+          fontSize: 15,
+          letterSpacing: 0.2,
+        },
+        brandName: {
+          fontSize: 28,
+          fontWeight: '700',
+          color: colors.text,
+          fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+          letterSpacing: 0.2,
+        },
+        brandNameCompact: {
+          fontSize: 22,
+          fontWeight: '700',
+          color: colors.text,
+          fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+        },
+        appName: {
+          fontSize: 32,
+          fontWeight: '700',
+          color: colors.text,
+          textAlign: 'center',
+          lineHeight: 40,
+          fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+          marginBottom: 12,
+        },
+        tagline: {
+          fontSize: 15,
+          color: colors.secondaryText,
+          textAlign: 'center',
+          lineHeight: 22,
+          maxWidth: 320,
+        },
+        gateActions: {
+          width: '100%',
+          gap: 12,
+          marginBottom: 16,
+        },
+        gateSecondaryButton: {
+          backgroundColor: 'transparent',
+          borderRadius: 24,
+          paddingVertical: 14,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          gap: 8,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        gateSecondaryButtonText: {
+          color: colors.text,
+          fontSize: 16,
+          fontWeight: '700',
+        },
+        backToBrand: {
+          paddingVertical: 8,
+          paddingHorizontal: 4,
+          minWidth: 36,
+        },
+        backToBrandText: {
+          color: colors.primary,
+          fontSize: 22,
+          fontWeight: '500',
+          lineHeight: 26,
+        },
+        authHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 16,
+        },
+        authHeaderBrand: {
+          flex: 1,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: 10,
-          gap: 6,
+          gap: 10,
         },
-        logoEmoji: {
-          fontSize: 36,
-        },
-        appName: {
-          fontSize: 30,
-          fontWeight: '800',
-          color: colors.primary,
-          letterSpacing: 0.4,
-          marginBottom: 6,
-        },
-        tagline: {
-          fontSize: 14,
-          color: colors.secondaryText,
-          textAlign: 'center',
-          lineHeight: 20,
+        authHeaderSpacer: {
+          minWidth: 36,
         },
         // Form Card — flat, hairline-bordered (no shadow)
         formCard: {
@@ -127,43 +231,12 @@ function LandingPage() {
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           paddingHorizontal: 20,
-          paddingTop: 16,
-          paddingBottom: 20,
-        },
-        // Tabs — outlined hairline pills, primary fill when active
-        tabContainer: {
-          flexDirection: 'row',
-          gap: 8,
-          marginBottom: 18,
-        },
-        tab: {
-          flex: 1,
-          paddingVertical: 11,
-          borderRadius: 22,
-          alignItems: 'center',
-          flexDirection: 'row',
-          justifyContent: 'center',
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
-          backgroundColor: 'transparent',
-          gap: 6,
-        },
-        tabActive: {
-          backgroundColor: colors.primary,
-          borderColor: colors.primary,
-        },
-        tabText: {
-          fontSize: 14,
-          fontWeight: '600',
-          color: colors.secondaryText,
-        },
-        tabTextActive: {
-          color: colors.buttonText,
-          fontWeight: '700',
+          paddingTop: 18,
+          paddingBottom: 18,
         },
         // Form Title
         formTitle: {
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: '700',
           color: colors.text,
           marginBottom: 4,
@@ -172,12 +245,12 @@ function LandingPage() {
         formSubtitle: {
           fontSize: 13,
           color: colors.secondaryText,
-          marginBottom: 18,
+          marginBottom: 16,
           textAlign: 'center',
         },
         // Input Group
         inputGroup: {
-          marginBottom: 14,
+          marginBottom: 10,
         },
         inputLabel: {
           fontSize: 12,
@@ -275,7 +348,9 @@ function LandingPage() {
         // Forgot Password
         forgotPasswordLink: {
           alignItems: 'center',
-          marginTop: 14,
+          alignSelf: 'stretch',
+          marginTop: 4,
+          marginBottom: 4,
           paddingVertical: 4,
         },
         forgotPasswordText: {
@@ -283,12 +358,33 @@ function LandingPage() {
           fontSize: 13,
           fontWeight: '700',
         },
+        modeSwitch: {
+          alignItems: 'center',
+          marginTop: 16,
+          paddingVertical: 4,
+        },
+        modeSwitchText: {
+          fontSize: 13,
+          color: colors.secondaryText,
+          textAlign: 'center',
+        },
+        modeSwitchAction: {
+          color: colors.primary,
+          fontWeight: '700',
+        },
         socialDividerRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          marginTop: 18,
+          marginTop: 14,
           marginBottom: 4,
           gap: 10,
+        },
+        socialDividerAfterSocial: {
+          marginTop: 14,
+          marginBottom: 10,
+        },
+        socialButtonsLeading: {
+          marginTop: 2,
         },
         socialDividerLine: {
           flex: 1,
@@ -627,72 +723,117 @@ function LandingPage() {
     finishAuthNavigation(user, true);
   };
 
-  const renderSocialButtons = () => {
+  const renderSocialButtons = (options?: {leading?: boolean}) => {
     const googleReady = isGoogleSignInConfigured();
-    return (
-      <>
-        <View style={themedStyles.socialDividerRow}>
-          <View style={themedStyles.socialDividerLine} />
-          <Text style={themedStyles.socialDividerText}>
-            {t('auth.orContinueWith', {defaultValue: 'or continue with'})}
-          </Text>
-          <View style={themedStyles.socialDividerLine} />
-        </View>
-        <View style={themedStyles.socialButtonsColumn}>
-          {Platform.OS === 'ios' && (
-            <TouchableOpacity
-              style={[
-                themedStyles.socialButton,
-                socialLoading !== null && themedStyles.socialButtonDisabled,
-              ]}
-              disabled={socialLoading !== null}
-              onPress={() => handleSocialSignIn('apple')}>
-              {socialLoading === 'apple' ? (
-                <ActivityIndicator size="small" color={colors.text} />
-              ) : (
-                <FontAwesomeIcon icon={faApple} size={18} color={colors.text} />
-              )}
-              <Text style={themedStyles.socialButtonText}>
-                {t('auth.continueWithApple', {
-                  defaultValue: 'Continue with Apple',
-                })}
-              </Text>
-            </TouchableOpacity>
-          )}
+    const dividerLabel = options?.leading
+      ? t('auth.orUseEmail', {defaultValue: 'or use email'})
+      : t('auth.orContinueWith', {defaultValue: 'or continue with'});
+
+    const buttons = (
+      <View
+        style={[
+          themedStyles.socialButtonsColumn,
+          options?.leading && themedStyles.socialButtonsLeading,
+        ]}>
+        {Platform.OS === 'ios' && (
           <TouchableOpacity
             style={[
               themedStyles.socialButton,
-              (!googleReady || socialLoading !== null) &&
-                themedStyles.socialButtonDisabled,
+              socialLoading !== null && themedStyles.socialButtonDisabled,
             ]}
-            disabled={!googleReady || socialLoading !== null}
-            onPress={() => {
-              if (!googleReady) {
-                setErrorMessage(
-                  t('auth.googleNotConfigured', {
-                    defaultValue:
-                      'Google Sign-In is not configured yet. Set GOOGLE_WEB_CLIENT_ID in .env and rebuild.',
-                  }),
-                );
-                return;
-              }
-              handleSocialSignIn('google');
-            }}>
-            {socialLoading === 'google' ? (
+            disabled={socialLoading !== null}
+            onPress={() => handleSocialSignIn('apple')}>
+            {socialLoading === 'apple' ? (
               <ActivityIndicator size="small" color={colors.text} />
             ) : (
-              <FontAwesomeIcon icon={faGoogle} size={16} color={colors.text} />
+              <FontAwesomeIcon icon={faApple} size={18} color={colors.text} />
             )}
             <Text style={themedStyles.socialButtonText}>
-              {t('auth.continueWithGoogle', {
-                defaultValue: 'Continue with Google',
+              {t('auth.continueWithApple', {
+                defaultValue: 'Continue with Apple',
               })}
             </Text>
           </TouchableOpacity>
-        </View>
+        )}
+        <TouchableOpacity
+          style={[
+            themedStyles.socialButton,
+            (!googleReady || socialLoading !== null) &&
+              themedStyles.socialButtonDisabled,
+          ]}
+          disabled={!googleReady || socialLoading !== null}
+          onPress={() => {
+            if (!googleReady) {
+              setErrorMessage(
+                t('auth.googleNotConfigured', {
+                  defaultValue:
+                    'Google Sign-In is not configured yet. Set GOOGLE_WEB_CLIENT_ID in .env and rebuild.',
+                }),
+              );
+              return;
+            }
+            handleSocialSignIn('google');
+          }}>
+          {socialLoading === 'google' ? (
+            <ActivityIndicator size="small" color={colors.text} />
+          ) : (
+            <FontAwesomeIcon icon={faGoogle} size={16} color={colors.text} />
+          )}
+          <Text style={themedStyles.socialButtonText}>
+            {t('auth.continueWithGoogle', {
+              defaultValue: 'Continue with Google',
+            })}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+
+    const divider = (
+      <View
+        style={[
+          themedStyles.socialDividerRow,
+          options?.leading && themedStyles.socialDividerAfterSocial,
+        ]}>
+        <View style={themedStyles.socialDividerLine} />
+        <Text style={themedStyles.socialDividerText}>{dividerLabel}</Text>
+        <View style={themedStyles.socialDividerLine} />
+      </View>
+    );
+
+    return options?.leading ? (
+      <>
+        {buttons}
+        {divider}
+      </>
+    ) : (
+      <>
+        {divider}
+        {buttons}
       </>
     );
   };
+
+  const renderModeSwitch = () => (
+    <TouchableOpacity
+      style={themedStyles.modeSwitch}
+      onPress={() => {
+        setActiveTab(activeTab === 'login' ? 'register' : 'login');
+        setErrorMessage(null);
+        setSuccessMessage(null);
+      }}
+      activeOpacity={0.7}>
+      <Text style={themedStyles.modeSwitchText}>
+        {activeTab === 'login'
+          ? t('auth.dontHaveAccount')
+          : t('auth.alreadyHaveAccount')}{' '}
+        <Text style={themedStyles.modeSwitchAction}>
+          {activeTab === 'login'
+            ? t('landing.createAccount')
+            : t('landing.signIn')}
+        </Text>
+      </Text>
+    </TouchableOpacity>
+  );
 
   const handleRegistration = async () => {
     Keyboard.dismiss();
@@ -1005,9 +1146,7 @@ function LandingPage() {
         {t('landing.signInToContinue')}
       </Text>
 
-      {/* Username */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>{t('auth.username')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -1026,7 +1165,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder={t('landing.enterUsername')}
+            placeholder={t('auth.username')}
             placeholderTextColor={colors.placeholder}
             value={loginData.username}
             onChangeText={text => setLoginData({...loginData, username: text})}
@@ -1040,9 +1179,7 @@ function LandingPage() {
         </View>
       </View>
 
-      {/* Password */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>{t('auth.password')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -1061,7 +1198,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder={t('landing.enterPassword')}
+            placeholder={t('auth.password')}
             placeholderTextColor={colors.placeholder}
             secureTextEntry={!showLoginPassword}
             value={loginData.password}
@@ -1085,23 +1222,6 @@ function LandingPage() {
         </View>
       </View>
 
-      {/* Login Button */}
-      <TouchableOpacity
-        style={themedStyles.primaryButton}
-        onPress={handleLogin}>
-        <Text style={themedStyles.primaryButtonText}>
-          {t('landing.signIn')}
-        </Text>
-        <FontAwesomeIcon
-          icon={faArrowRight}
-          size={16}
-          color={colors.buttonText}
-        />
-      </TouchableOpacity>
-
-      {renderSocialButtons()}
-
-      {/* Forgot Password Link */}
       <TouchableOpacity
         style={themedStyles.forgotPasswordLink}
         onPress={() => setShowForgotPassword(true)}>
@@ -1109,6 +1229,17 @@ function LandingPage() {
           {t('auth.forgotPassword')}
         </Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={themedStyles.primaryButton}
+        onPress={handleLogin}>
+        <Text style={themedStyles.primaryButtonText}>
+          {t('landing.signIn')}
+        </Text>
+      </TouchableOpacity>
+
+      {renderSocialButtons()}
+      {renderModeSwitch()}
     </>
   );
 
@@ -1119,9 +1250,9 @@ function LandingPage() {
         {t('landing.joinBetterPlay')}
       </Text>
 
-      {/* Name */}
+      {renderSocialButtons({leading: true})}
+
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>{t('landing.fullName')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -1140,7 +1271,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder={t('landing.enterFullName')}
+            placeholder={t('landing.fullName')}
             placeholderTextColor={colors.placeholder}
             value={registrationData.name}
             onChangeText={text =>
@@ -1156,9 +1287,7 @@ function LandingPage() {
         </View>
       </View>
 
-      {/* Email */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>{t('auth.email')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -1177,7 +1306,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder={t('landing.enterEmail')}
+            placeholder={t('auth.email')}
             placeholderTextColor={colors.placeholder}
             value={registrationData.email}
             onChangeText={text =>
@@ -1197,9 +1326,7 @@ function LandingPage() {
         </View>
       </View>
 
-      {/* Username */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>{t('auth.username')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -1218,7 +1345,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder={t('landing.chooseUsername')}
+            placeholder={t('auth.username')}
             placeholderTextColor={colors.placeholder}
             value={registrationData.username}
             onChangeText={text =>
@@ -1234,9 +1361,7 @@ function LandingPage() {
         </View>
       </View>
 
-      {/* Password */}
       <View style={themedStyles.inputGroup}>
-        <Text style={themedStyles.inputLabel}>{t('auth.password')}</Text>
         <View
           style={[
             themedStyles.inputContainer,
@@ -1255,7 +1380,7 @@ function LandingPage() {
           />
           <TextInput
             style={themedStyles.input}
-            placeholder={t('landing.createPassword')}
+            placeholder={t('auth.password')}
             placeholderTextColor={colors.placeholder}
             secureTextEntry={!showRegisterPassword}
             value={registrationData.password}
@@ -1281,7 +1406,6 @@ function LandingPage() {
         </View>
       </View>
 
-      {/* Register Button */}
       <TouchableOpacity
         style={themedStyles.primaryButton}
         onPress={handleRegistration}>
@@ -1295,7 +1419,7 @@ function LandingPage() {
         />
       </TouchableOpacity>
 
-      {renderSocialButtons()}
+      {renderModeSwitch()}
     </>
   );
 
@@ -1305,105 +1429,116 @@ function LandingPage() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={themedStyles.container}>
         <ScrollView
-          contentContainerStyle={themedStyles.scrollContent}
+          contentContainerStyle={
+            showAuthForm
+              ? themedStyles.scrollContent
+              : themedStyles.scrollContentGate
+          }
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          {/* Hero Section */}
-          <View style={themedStyles.heroSection}>
-            <View style={themedStyles.logoContainer}>
-              <Text style={themedStyles.logoEmoji}>📅</Text>
-              <Text style={themedStyles.logoEmoji}>🤝</Text>
-              <Text style={themedStyles.logoEmoji}>✨</Text>
-            </View>
-            <Text style={themedStyles.appName}>BetterPlay</Text>
-            <Text style={themedStyles.tagline}>
-              {t('landing.taglineMultiline')}
-            </Text>
-          </View>
-
-          {/* Form Card */}
-          <View style={themedStyles.formCard}>
-            {/* Tab Switcher */}
-            <View style={themedStyles.tabContainer}>
-              <TouchableOpacity
-                style={[
-                  themedStyles.tab,
-                  activeTab === 'login' && themedStyles.tabActive,
-                ]}
-                onPress={() => setActiveTab('login')}>
-                <FontAwesomeIcon
-                  icon={faSignInAlt}
-                  size={14}
-                  color={
-                    activeTab === 'login'
-                      ? colors.buttonText
-                      : colors.secondaryText
-                  }
-                />
-                <Text
-                  style={[
-                    themedStyles.tabText,
-                    activeTab === 'login' && themedStyles.tabTextActive,
-                  ]}>
-                  {t('landing.signIn')}
+          {!showAuthForm ? (
+            <>
+              <View style={themedStyles.heroSectionGate}>
+                <View style={themedStyles.brandRow}>
+                  <View style={themedStyles.brandMark}>
+                    <Text style={themedStyles.brandMarkText}>BP</Text>
+                  </View>
+                  <Text style={themedStyles.brandName}>BetterPlay</Text>
+                </View>
+                <Text style={themedStyles.appName}>
+                  {t('landing.taglineMultiline')}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  themedStyles.tab,
-                  activeTab === 'register' && themedStyles.tabActive,
-                ]}
-                onPress={() => setActiveTab('register')}>
-                <FontAwesomeIcon
-                  icon={faUserPlus}
-                  size={14}
-                  color={
-                    activeTab === 'register'
-                      ? colors.buttonText
-                      : colors.secondaryText
-                  }
-                />
-                <Text
-                  style={[
-                    themedStyles.tabText,
-                    activeTab === 'register' && themedStyles.tabTextActive,
-                  ]}>
-                  {t('auth.register')}
+                <Text style={themedStyles.tagline}>
+                  {t('landing.landingLede')}
                 </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Form Content */}
-            {activeTab === 'login' ? renderLoginForm() : renderRegisterForm()}
-
-            {/* Error Message */}
-            {errorMessage && (
-              <View style={themedStyles.errorContainer}>
-                <FontAwesomeIcon
-                  icon={faExclamationTriangle}
-                  size={14}
-                  color={colors.error}
-                />
-                <Text style={themedStyles.errorText}>{errorMessage}</Text>
               </View>
-            )}
 
-            {/* Success Message */}
-            {successMessage && (
-              <View style={themedStyles.successContainer}>
-                <FontAwesomeIcon icon={faCheck} size={14} color={'#4CAF50'} />
-                <Text style={themedStyles.successText}>{successMessage}</Text>
+              <View>
+                <View style={themedStyles.gateActions}>
+                  <TouchableOpacity
+                    style={themedStyles.primaryButton}
+                    onPress={() => openAuthForm('login')}
+                    activeOpacity={0.85}>
+                    <Text style={themedStyles.primaryButtonText}>
+                      {t('landing.signIn')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={themedStyles.gateSecondaryButton}
+                    onPress={() => openAuthForm('register')}
+                    activeOpacity={0.85}>
+                    <FontAwesomeIcon
+                      icon={faUserPlus}
+                      size={15}
+                      color={colors.text}
+                    />
+                    <Text style={themedStyles.gateSecondaryButtonText}>
+                      {t('landing.createAccount')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={themedStyles.footer}>
+                  <Text style={themedStyles.footerText}>
+                    {t('landing.footerText')}
+                  </Text>
+                </View>
               </View>
-            )}
-          </View>
+            </>
+          ) : (
+            <>
+              <View style={themedStyles.authHeader}>
+                <TouchableOpacity
+                  style={themedStyles.backToBrand}
+                  onPress={() => setShowAuthForm(false)}
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                  <Text style={themedStyles.backToBrandText}>←</Text>
+                </TouchableOpacity>
+                <View style={themedStyles.authHeaderBrand}>
+                  <View style={themedStyles.brandMarkCompact}>
+                    <Text style={themedStyles.brandMarkText}>BP</Text>
+                  </View>
+                  <Text style={themedStyles.brandNameCompact}>BetterPlay</Text>
+                </View>
+                <View style={themedStyles.authHeaderSpacer} />
+              </View>
 
-          {/* Footer */}
-          <View style={themedStyles.footer}>
-            <Text style={themedStyles.footerText}>
-              {t('landing.footerText')}
-            </Text>
-            <Text style={themedStyles.footerEmojis}>📅 🌟 🤝</Text>
-          </View>
+              <View style={themedStyles.formCard}>
+                {activeTab === 'login'
+                  ? renderLoginForm()
+                  : renderRegisterForm()}
+
+                {errorMessage && (
+                  <View style={themedStyles.errorContainer}>
+                    <FontAwesomeIcon
+                      icon={faExclamationTriangle}
+                      size={14}
+                      color={colors.error}
+                    />
+                    <Text style={themedStyles.errorText}>{errorMessage}</Text>
+                  </View>
+                )}
+
+                {successMessage && (
+                  <View style={themedStyles.successContainer}>
+                    <FontAwesomeIcon
+                      icon={faCheck}
+                      size={14}
+                      color={'#4CAF50'}
+                    />
+                    <Text style={themedStyles.successText}>
+                      {successMessage}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={themedStyles.footer}>
+                <Text style={themedStyles.footerText}>
+                  {t('landing.footerText')}
+                </Text>
+              </View>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 

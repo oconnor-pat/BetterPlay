@@ -39,6 +39,7 @@
     "alreadyHaveAccount": "Already have an account?",
     "dontHaveAccount": "Don't have an account?",
     "orContinueWith": "or continue with",
+    "orUseEmail": "or use email",
     "continueWithApple": "Continue with Apple",
     "continueWithGoogle": "Continue with Google",
     "socialSignInError": "Social sign-in failed. Please try again.",
@@ -54,9 +55,12 @@
     "accountsLinked": "Accounts linked. Welcome back!"
   },
   "landing": {
-    "tagline": "Connect. Explore. Enjoy.",
-    "taglineMultiline": "Find events. Join activities.\nDo more of what you love.",
+    "tagline": "Find people. Make plans. Show up.",
+    "taglineMultiline": "Find people.\nMake plans.\nShow up.",
+    "landingLede": "Pickup games, hangouts, and group plans — organized in one place.",
     "getStarted": "Get Started",
+    "createAccount": "Create account",
+    "backToWelcome": "← BetterPlay",
     "footer": "© 2026 BetterPlay. All rights reserved.",
     "footerText": "© 2026 BetterPlay. All rights reserved.",
     "signIn": "Sign In",
