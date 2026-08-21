@@ -700,6 +700,37 @@ class NotificationService {
         }
         break;
 
+      case 'mention': {
+        const channel = data.mentionChannel;
+        if (channel === 'group' && groupId) {
+          navigateToTab('Groups', 'GroupDetail', {
+            groupId,
+            initialTab: 'chat',
+            highlightMessageId: messageId,
+            tabRequestId: Date.now(),
+          });
+        } else if (channel === 'dm' && conversationId) {
+          navigateToTab('Messages', 'DmThread', {
+            conversationId,
+            highlightMessageId: messageId,
+            highlightNonce: Date.now(),
+          });
+        } else if (channel === 'community') {
+          const mentionEventId = eventId || id;
+          if (mentionEventId) {
+            navigateToTab('Events', 'EventList', {
+              highlightEventId: mentionEventId,
+              expandComments: true,
+            });
+          } else {
+            navigateToTab('Events', 'EventList');
+          }
+        } else {
+          navigateToTab('Events', 'EventList');
+        }
+        break;
+      }
+
       // A direct message, or a request to start one -> open the thread.
       // A request lands on the same screen, where the Accept/Decline bar
       // is shown above the composer.

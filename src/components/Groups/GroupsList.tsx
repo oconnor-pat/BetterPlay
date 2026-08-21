@@ -26,6 +26,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
+  faChevronRight,
   faGlobe,
   faLock,
   faPlus,
@@ -42,7 +43,7 @@ import CreateGroupModal from './CreateGroupModal';
 import RosterAvatarStrip from '../shared/RosterAvatarStrip';
 
 const GroupsList: React.FC = () => {
-  const {colors} = useTheme();
+  const {colors, darkMode} = useTheme();
   const {t} = useTranslation();
   const navigation = useNavigation<any>();
   const {subscribe} = useSocket();
@@ -162,19 +163,35 @@ const GroupsList: React.FC = () => {
         },
         header: {
           flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
           paddingHorizontal: 16,
-          paddingTop: 8,
-          paddingBottom: 8,
+          paddingTop: 10,
+          paddingBottom: 14,
+        },
+        headerCopy: {
+          flex: 1,
+          paddingRight: 12,
+        },
+        title: {
+          fontSize: 28,
+          fontWeight: '800',
+          color: colors.text,
+          letterSpacing: -0.4,
+        },
+        subtitle: {
+          marginTop: 4,
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.secondaryText,
         },
         newButton: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 5,
+          gap: 6,
           backgroundColor: colors.primary,
-          borderRadius: 20,
-          paddingVertical: 8,
+          borderRadius: 22,
+          paddingVertical: 10,
           paddingHorizontal: 14,
         },
         newButtonText: {
@@ -182,31 +199,45 @@ const GroupsList: React.FC = () => {
           fontSize: 14,
           fontWeight: '700',
         },
+        listContent: {
+          paddingHorizontal: 16,
+          paddingBottom: 24,
+        },
         loadingWrap: {
-          paddingVertical: 32,
+          paddingVertical: 48,
           alignItems: 'center',
         },
         emptyCard: {
-          margin: 16,
-          padding: 20,
-          borderRadius: 16,
+          marginTop: 24,
+          padding: 24,
+          borderRadius: 18,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           backgroundColor: colors.card,
           alignItems: 'center',
+          overflow: 'hidden',
+        },
+        emptyGlow: {
+          position: 'absolute',
+          width: 140,
+          height: 140,
+          borderRadius: 70,
+          top: -50,
+          right: -40,
+          backgroundColor: colors.primary + '20',
         },
         emptyIcon: {
-          width: 56,
-          height: 56,
-          borderRadius: 28,
+          width: 64,
+          height: 64,
+          borderRadius: 32,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: colors.primary + '15',
-          marginBottom: 14,
+          backgroundColor: colors.primary + '18',
+          marginBottom: 16,
         },
         emptyTitle: {
-          fontSize: 17,
-          fontWeight: '700',
+          fontSize: 18,
+          fontWeight: '800',
           color: colors.text,
           marginBottom: 6,
           textAlign: 'center',
@@ -216,12 +247,12 @@ const GroupsList: React.FC = () => {
           color: colors.secondaryText,
           textAlign: 'center',
           lineHeight: 19,
-          marginBottom: 16,
+          marginBottom: 18,
         },
         emptyCta: {
           backgroundColor: colors.primary,
           borderRadius: 22,
-          paddingVertical: 11,
+          paddingVertical: 12,
           paddingHorizontal: 22,
         },
         emptyCtaText: {
@@ -232,16 +263,19 @@ const GroupsList: React.FC = () => {
         row: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          paddingVertical: 14,
+          paddingHorizontal: 14,
+          marginBottom: 10,
+          borderRadius: 16,
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         rowUnread: {
-          backgroundColor: colors.primary + '12',
-          borderLeftWidth: 3,
-          borderLeftColor: '#FF3B30',
-          paddingLeft: 13,
+          borderColor: colors.primary + '55',
+          backgroundColor: darkMode
+            ? colors.primary + '14'
+            : colors.primary + '10',
         },
         rowAvatars: {
           marginRight: 12,
@@ -249,10 +283,11 @@ const GroupsList: React.FC = () => {
         },
         rowContent: {
           flex: 1,
+          minWidth: 0,
         },
         rowTitle: {
           fontSize: 16,
-          fontWeight: '600',
+          fontWeight: '700',
           color: colors.text,
         },
         rowTitleUnread: {
@@ -262,11 +297,12 @@ const GroupsList: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
-          marginTop: 2,
+          marginTop: 3,
         },
         rowSubtitle: {
           fontSize: 12,
           color: colors.secondaryText,
+          fontWeight: '600',
         },
         rowPreview: {
           fontSize: 13,
@@ -277,6 +313,12 @@ const GroupsList: React.FC = () => {
           color: colors.text,
           fontWeight: '700',
         },
+        rowTrail: {
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+          marginLeft: 8,
+          gap: 8,
+        },
         unreadBadge: {
           minWidth: 22,
           height: 22,
@@ -285,7 +327,6 @@ const GroupsList: React.FC = () => {
           backgroundColor: '#FF3B30',
           alignItems: 'center',
           justifyContent: 'center',
-          marginLeft: 8,
         },
         unreadBadgeText: {
           color: '#FFFFFF',
@@ -293,7 +334,7 @@ const GroupsList: React.FC = () => {
           fontWeight: '800',
         },
       }),
-    [colors],
+    [colors, darkMode],
   );
 
   const renderRow = ({item: g}: {item: Group}) => {
@@ -302,14 +343,14 @@ const GroupsList: React.FC = () => {
     return (
       <TouchableOpacity
         style={[styles.row, unread > 0 && styles.rowUnread]}
-        activeOpacity={0.7}
+        activeOpacity={0.75}
         onPress={() => openGroup(g._id)}>
         <View style={styles.rowAvatars}>
           <RosterAvatarStrip
             members={g.members}
             maxVisible={3}
-            size={28}
-            overlap={10}
+            size={32}
+            overlap={11}
           />
         </View>
         <View style={styles.rowContent}>
@@ -337,13 +378,21 @@ const GroupsList: React.FC = () => {
             </View>
           )}
         </View>
-        {unread > 0 ? (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>
-              {unread > 99 ? '99+' : unread}
-            </Text>
-          </View>
-        ) : null}
+        <View style={styles.rowTrail}>
+          {unread > 0 ? (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>
+                {unread > 99 ? '99+' : unread}
+              </Text>
+            </View>
+          ) : (
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={12}
+              color={colors.secondaryText}
+            />
+          )}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -358,8 +407,9 @@ const GroupsList: React.FC = () => {
     }
     return (
       <View style={styles.emptyCard}>
+        <View style={styles.emptyGlow} pointerEvents="none" />
         <View style={styles.emptyIcon}>
-          <FontAwesomeIcon icon={faUsers} size={22} color={colors.primary} />
+          <FontAwesomeIcon icon={faUsers} size={24} color={colors.primary} />
         </View>
         <Text style={styles.emptyTitle}>
           {t('profile.startAGroup') || 'Start a group'}
@@ -380,9 +430,24 @@ const GroupsList: React.FC = () => {
     );
   };
 
+  const groupCountLabel =
+    groups.length === 1
+      ? '1 group'
+      : `${groups.length} groups`;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <View style={styles.headerCopy}>
+          <Text style={styles.title}>{t('navigation.groups') || 'Groups'}</Text>
+          {!loading && groups.length > 0 ? (
+            <Text style={styles.subtitle}>{groupCountLabel}</Text>
+          ) : (
+            <Text style={styles.subtitle}>
+              {t('profile.groupsSubtitle') || 'Your crews and hangouts'}
+            </Text>
+          )}
+        </View>
         <TouchableOpacity
           style={styles.newButton}
           activeOpacity={0.85}
@@ -400,7 +465,10 @@ const GroupsList: React.FC = () => {
         keyExtractor={g => g._id}
         renderItem={renderRow}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={groups.length === 0 ? {flexGrow: 1} : undefined}
+        contentContainerStyle={[
+          styles.listContent,
+          groups.length === 0 ? {flexGrow: 1} : null,
+        ]}
       />
 
       <CreateGroupModal

@@ -36,8 +36,9 @@ import {Swipeable, RectButton} from 'react-native-gesture-handler';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faBan,
+  faChevronRight,
   faCommentDots,
-  faPenToSquare,
+  faPlus,
   faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
@@ -347,34 +348,59 @@ const MessagesList: React.FC = () => {
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        container: {flex: 1, backgroundColor: colors.background},
+        container: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
         header: {
           flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
           paddingHorizontal: 16,
-          paddingTop: 8,
-          paddingBottom: 8,
+          paddingTop: 10,
+          paddingBottom: 14,
+        },
+        headerCopy: {
+          flex: 1,
+          paddingRight: 12,
+        },
+        title: {
+          fontSize: 28,
+          fontWeight: '800',
+          color: colors.text,
+          letterSpacing: -0.4,
+        },
+        subtitle: {
+          marginTop: 4,
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.secondaryText,
         },
         newButton: {
-          width: 38,
-          height: 38,
-          borderRadius: 19,
+          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
+          gap: 6,
           backgroundColor: colors.primary,
+          borderRadius: 22,
+          paddingVertical: 10,
+          paddingHorizontal: 14,
+        },
+        newButtonText: {
+          color: '#FFFFFF',
+          fontSize: 14,
+          fontWeight: '700',
         },
         segments: {
           flexDirection: 'row',
           gap: 8,
           paddingHorizontal: 16,
-          paddingBottom: 10,
+          paddingBottom: 12,
         },
         segment: {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
-          paddingVertical: 7,
+          paddingVertical: 8,
           paddingHorizontal: 14,
           borderRadius: 18,
           borderWidth: StyleSheet.hairlineWidth,
@@ -406,20 +432,35 @@ const MessagesList: React.FC = () => {
           fontSize: 10,
           fontWeight: '800',
         },
-        loadingWrap: {paddingVertical: 32, alignItems: 'center'},
+        listContent: {
+          paddingHorizontal: 16,
+          paddingBottom: 24,
+        },
+        loadingWrap: {
+          paddingVertical: 48,
+          alignItems: 'center',
+        },
+        rowWrapper: {
+          marginBottom: 10,
+          borderRadius: 16,
+          overflow: 'hidden',
+          backgroundColor: colors.card,
+        },
         row: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          paddingVertical: 14,
+          paddingHorizontal: 14,
+          borderRadius: 16,
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         rowUnread: {
-          backgroundColor: colors.primary + '12',
-          borderLeftWidth: 3,
-          borderLeftColor: '#FF3B30',
-          paddingLeft: 13,
+          borderColor: colors.primary + '55',
+          backgroundColor: darkMode
+            ? colors.primary + '14'
+            : colors.primary + '10',
         },
         avatar: {
           width: 44,
@@ -435,7 +476,7 @@ const MessagesList: React.FC = () => {
         },
         avatarImage: {width: 44, height: 44},
         avatarInitials: {color: colors.text, fontWeight: '700', fontSize: 15},
-        rowContent: {flex: 1},
+        rowContent: {flex: 1, minWidth: 0},
         rowTopLine: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -445,27 +486,31 @@ const MessagesList: React.FC = () => {
         rowTitle: {
           flex: 1,
           fontSize: 16,
-          fontWeight: '600',
+          fontWeight: '700',
           color: colors.text,
         },
         rowTitleUnread: {
           fontWeight: '800',
         },
-        rowTime: {fontSize: 11, color: colors.secondaryText},
-        rowTimeUnread: {color: '#FF3B30', fontWeight: '700'},
+        rowTime: {fontSize: 11, fontWeight: '600', color: colors.secondaryText},
+        rowTimeUnread: {color: colors.primary, fontWeight: '700'},
         rowPreview: {
           fontSize: 13,
           color: colors.secondaryText,
           marginTop: 3,
         },
         rowPreviewUnread: {color: colors.text, fontWeight: '700'},
-        // Only shown on the sender's own unanswered or declined threads,
-        // so a request doesn't read like an ordinary conversation.
         rowStatus: {
           fontSize: 11,
           color: colors.secondaryText,
           fontStyle: 'italic',
           marginTop: 2,
+        },
+        rowTrail: {
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+          marginLeft: 8,
+          gap: 8,
         },
         unreadBadge: {
           minWidth: 22,
@@ -475,14 +520,12 @@ const MessagesList: React.FC = () => {
           backgroundColor: '#FF3B30',
           alignItems: 'center',
           justifyContent: 'center',
-          marginLeft: 8,
         },
         unreadBadgeText: {
           color: '#FFFFFF',
           fontSize: 12,
           fontWeight: '800',
         },
-        // ── Swipe action ──
         swipeAction: {
           backgroundColor: colors.error,
           justifyContent: 'center',
@@ -500,33 +543,37 @@ const MessagesList: React.FC = () => {
           fontSize: 12,
           fontWeight: '700',
         },
-        rowWrapper: {
-          backgroundColor: colors.background,
-        },
-        rowWrapperUnread: {
-          backgroundColor: colors.primary + '12',
-        },
         emptyCard: {
-          margin: 16,
-          padding: 20,
-          borderRadius: 16,
+          marginTop: 24,
+          padding: 24,
+          borderRadius: 18,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
           backgroundColor: colors.card,
           alignItems: 'center',
+          overflow: 'hidden',
+        },
+        emptyGlow: {
+          position: 'absolute',
+          width: 140,
+          height: 140,
+          borderRadius: 70,
+          top: -50,
+          right: -40,
+          backgroundColor: colors.primary + '20',
         },
         emptyIcon: {
-          width: 56,
-          height: 56,
-          borderRadius: 28,
+          width: 64,
+          height: 64,
+          borderRadius: 32,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: colors.primary + '15',
-          marginBottom: 14,
+          backgroundColor: colors.primary + '18',
+          marginBottom: 16,
         },
         emptyTitle: {
-          fontSize: 17,
-          fontWeight: '700',
+          fontSize: 18,
+          fontWeight: '800',
           color: colors.text,
           marginBottom: 6,
           textAlign: 'center',
@@ -536,6 +583,18 @@ const MessagesList: React.FC = () => {
           color: colors.secondaryText,
           textAlign: 'center',
           lineHeight: 19,
+          marginBottom: 18,
+        },
+        emptyCta: {
+          backgroundColor: colors.primary,
+          borderRadius: 22,
+          paddingVertical: 12,
+          paddingHorizontal: 22,
+        },
+        emptyCtaText: {
+          color: '#FFFFFF',
+          fontSize: 14,
+          fontWeight: '700',
         },
       }),
     [colors, darkMode],
@@ -584,7 +643,7 @@ const MessagesList: React.FC = () => {
     const rowContent = (
       <TouchableOpacity
         style={[styles.row, unread > 0 && styles.rowUnread]}
-        activeOpacity={0.7}
+        activeOpacity={0.75}
         onPress={() => openThread(item)}>
         <View style={styles.avatar}>
           {item.otherUser.profilePicUrl ? (
@@ -625,18 +684,26 @@ const MessagesList: React.FC = () => {
             </Text>
           ) : null}
         </View>
-        {unread > 0 ? (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>
-              {unread > 99 ? '99+' : unread}
-            </Text>
-          </View>
-        ) : null}
+        <View style={styles.rowTrail}>
+          {unread > 0 ? (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>
+                {unread > 99 ? '99+' : unread}
+              </Text>
+            </View>
+          ) : (
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              size={12}
+              color={colors.secondaryText}
+            />
+          )}
+        </View>
       </TouchableOpacity>
     );
 
     return (
-      <View style={[styles.rowWrapper, unread > 0 && styles.rowWrapperUnread]}>
+      <View style={styles.rowWrapper}>
         <Swipeable
           ref={ref => {
             if (ref) {
@@ -680,10 +747,11 @@ const MessagesList: React.FC = () => {
     const isRequests = segment === 'requests';
     return (
       <View style={styles.emptyCard}>
+        <View style={styles.emptyGlow} pointerEvents="none" />
         <View style={styles.emptyIcon}>
           <FontAwesomeIcon
             icon={faCommentDots}
-            size={22}
+            size={24}
             color={colors.primary}
           />
         </View>
@@ -699,6 +767,16 @@ const MessagesList: React.FC = () => {
             : t('messages.emptySubtitle') ||
               'Start a conversation from someone\u2019s profile.'}
         </Text>
+        {!isRequests ? (
+          <TouchableOpacity
+            style={styles.emptyCta}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('UserSearch')}>
+            <Text style={styles.emptyCtaText}>
+              {t('messages.newMessage') || 'New message'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     );
   };
@@ -726,16 +804,41 @@ const MessagesList: React.FC = () => {
   };
 
   const unreadThreads = conversations.filter(c => c.unreadCount > 0).length;
+  const subtitle =
+    segment === 'requests'
+      ? requests.length === 1
+        ? t('messages.oneRequest') || '1 request'
+        : t('messages.requestCount', {count: requests.length}) ||
+          `${requests.length} requests`
+      : conversations.length === 1
+        ? t('messages.oneConversation') || '1 conversation'
+        : t('messages.conversationCount', {count: conversations.length}) ||
+          `${conversations.length} conversations`;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <View style={styles.headerCopy}>
+          <Text style={styles.title}>
+            {t('navigation.messages') || 'Messages'}
+          </Text>
+          {!loading && data.length > 0 ? (
+            <Text style={styles.subtitle}>{subtitle}</Text>
+          ) : (
+            <Text style={styles.subtitle}>
+              {t('messages.subtitle') || 'Inbox and requests'}
+            </Text>
+          )}
+        </View>
         <TouchableOpacity
           style={styles.newButton}
           activeOpacity={0.85}
           onPress={() => navigation.navigate('UserSearch')}
           accessibilityLabel={t('messages.newMessage') || 'New message'}>
-          <FontAwesomeIcon icon={faPenToSquare} size={15} color="#FFFFFF" />
+          <FontAwesomeIcon icon={faPlus} size={12} color="#FFFFFF" />
+          <Text style={styles.newButtonText}>
+            {t('messages.newShort') || 'New'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -753,7 +856,10 @@ const MessagesList: React.FC = () => {
         keyExtractor={c => c._id}
         renderItem={renderRow}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={data.length === 0 ? {flexGrow: 1} : undefined}
+        contentContainerStyle={[
+          styles.listContent,
+          data.length === 0 ? {flexGrow: 1} : null,
+        ]}
       />
     </SafeAreaView>
   );

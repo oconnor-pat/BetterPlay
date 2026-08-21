@@ -709,40 +709,64 @@ const Profile: React.FC = () => {
         },
         // ── Social ──
         socialQuickActions: {
-          flexDirection: 'row',
           gap: 10,
         },
-        socialActionBtn: {
-          flex: 1,
+        socialActionCard: {
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'transparent',
-          paddingVertical: 10,
-          paddingHorizontal: 12,
-          borderRadius: 20,
-          gap: 6,
+          paddingVertical: 14,
+          paddingHorizontal: 14,
+          borderRadius: 16,
+          backgroundColor: colors.card,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
+        socialActionCardPending: {
+          borderColor: colors.primary + '55',
+          backgroundColor: colors.primary + '10',
+        },
+        socialActionIcon: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.primary + '18',
+          marginRight: 12,
+        },
+        socialActionCopy: {
+          flex: 1,
+          minWidth: 0,
+        },
         socialActionText: {
-          fontSize: 13,
+          fontSize: 16,
           fontWeight: '700',
           color: colors.text,
         },
+        socialActionHint: {
+          marginTop: 2,
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
+        },
+        socialActionTrail: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginLeft: 8,
+        },
         socialActionBadge: {
-          backgroundColor: '#DC3545',
-          minWidth: 18,
-          height: 18,
-          borderRadius: 9,
+          backgroundColor: '#FF3B30',
+          minWidth: 22,
+          height: 22,
+          borderRadius: 11,
           alignItems: 'center',
           justifyContent: 'center',
-          paddingHorizontal: 4,
-          marginLeft: 4,
+          paddingHorizontal: 7,
         },
         socialActionBadgeText: {
-          fontSize: 10,
-          fontWeight: '700',
+          fontSize: 12,
+          fontWeight: '800',
           color: '#fff',
         },
         // ── Interests chips ──
@@ -1670,27 +1694,77 @@ const Profile: React.FC = () => {
           </View>
           <View style={themedStyles.socialQuickActions}>
             <TouchableOpacity
-              style={themedStyles.socialActionBtn}
+              style={[
+                themedStyles.socialActionCard,
+                pendingRequestsCount > 0 && themedStyles.socialActionCardPending,
+              ]}
+              activeOpacity={0.75}
               onPress={() => navigation.navigate('FriendRequests')}>
-              <FontAwesomeIcon icon={faUserClock} size={13} color="#FF9800" />
-              <Text style={themedStyles.socialActionText}>
-                {t('profile.requests') || 'Requests'}
-              </Text>
-              {pendingRequestsCount > 0 && (
-                <View style={themedStyles.socialActionBadge}>
-                  <Text style={themedStyles.socialActionBadgeText}>
-                    {pendingRequestsCount}
-                  </Text>
-                </View>
-              )}
+              <View style={themedStyles.socialActionIcon}>
+                <FontAwesomeIcon
+                  icon={faUserClock}
+                  size={16}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.socialActionCopy}>
+                <Text style={themedStyles.socialActionText}>
+                  {t('profile.requests') || 'Requests'}
+                </Text>
+                <Text style={themedStyles.socialActionHint} numberOfLines={1}>
+                  {pendingRequestsCount > 0
+                    ? t('profile.requestsHintPending', {
+                        count: pendingRequestsCount,
+                      }) ||
+                      `${pendingRequestsCount} waiting for you`
+                    : t('profile.requestsHint') ||
+                      'Friend requests and invites'}
+                </Text>
+              </View>
+              <View style={themedStyles.socialActionTrail}>
+                {pendingRequestsCount > 0 ? (
+                  <View style={themedStyles.socialActionBadge}>
+                    <Text style={themedStyles.socialActionBadgeText}>
+                      {pendingRequestsCount > 99 ? '99+' : pendingRequestsCount}
+                    </Text>
+                  </View>
+                ) : (
+                  <FontAwesomeIcon
+                    icon={faChevronRight}
+                    size={12}
+                    color={colors.secondaryText}
+                  />
+                )}
+              </View>
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={themedStyles.socialActionBtn}
+              style={themedStyles.socialActionCard}
+              activeOpacity={0.75}
               onPress={() => navigation.navigate('UserSearch')}>
-              <FontAwesomeIcon icon={faUserPlus} size={13} color="#9C27B0" />
-              <Text style={themedStyles.socialActionText}>
-                {t('profile.findPeople') || 'Find'}
-              </Text>
+              <View style={themedStyles.socialActionIcon}>
+                <FontAwesomeIcon
+                  icon={faUserPlus}
+                  size={16}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.socialActionCopy}>
+                <Text style={themedStyles.socialActionText}>
+                  {t('profile.findPeopleFull') || 'Find people'}
+                </Text>
+                <Text style={themedStyles.socialActionHint} numberOfLines={1}>
+                  {t('profile.findPeopleHint') ||
+                    'Search by name or username'}
+                </Text>
+              </View>
+              <View style={themedStyles.socialActionTrail}>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+              </View>
             </TouchableOpacity>
           </View>
         </View>

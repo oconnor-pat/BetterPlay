@@ -44,6 +44,7 @@ import {useTranslation} from 'react-i18next';
 import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
 import locationService from '../../services/LocationService';
+import {promptNearbyVisibilityIfPrivate} from '../../utils/proximityDiscovery';
 import {
   getDefaultMapApp,
   setDefaultMapApp,
@@ -193,7 +194,6 @@ const Settings: React.FC = () => {
       if (newValue) {
         const granted = await locationService.requestPermission();
         if (granted) {
-          Alert.alert(t('common.success'), t('settings.locationEnabled'));
           // Send location to backend in the background
           locationService.getCurrentPosition().then(async coords => {
             try {
@@ -209,6 +209,13 @@ const Settings: React.FC = () => {
               console.log('Failed to sync location to backend:', err);
             }
           });
+          // Default visibility is private — nudge once so Nearby isn't empty.
+          if (proximityVisibility === 'private') {
+            const result = await promptNearbyVisibilityIfPrivate();
+            setProximityVisibility(result.visibility);
+          } else {
+            Alert.alert(t('common.success'), t('settings.locationEnabled'));
+          }
         } else {
           Alert.alert(
             t('settings.permissionDenied'),

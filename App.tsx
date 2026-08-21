@@ -268,7 +268,7 @@ const AppContent = () => {
         if (locEnabled !== 'true') {
           return;
         }
-        const coords = await locationService.getLocation();
+        const coords = await locationService.getLocation({forceRefresh: true});
         if (coords) {
           await fetch(`${API_BASE_URL}/users/me/location`, {
             method: 'PUT',

@@ -63,6 +63,14 @@ import {
 } from '../../types/dm';
 import {MessageReactor} from '../../services/GroupChatService';
 import ReportSheet from '../Moderation/ReportSheet';
+import MentionText from '../Mentions/MentionText';
+import MentionSuggestions from '../Mentions/MentionSuggestions';
+import {
+  applyMention,
+  filterMentionCandidates,
+  getActiveMention,
+  MentionCandidate,
+} from '../../utils/mentions';
 import {
   acceptConversation,
   declineConversation,
@@ -191,6 +199,7 @@ const DmThread: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [input, setInput] = useState('');
+  const [inputCursor, setInputCursor] = useState(0);
   const [sending, setSending] = useState(false);
   const [deciding, setDeciding] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -882,6 +891,94 @@ const DmThread: React.FC = () => {
     });
   }, [conversation, headerAvatar, navigation, otherUserId, route.params]);
 
+  // Candidates for @-suggestions: the other participant, plus any other
+  // local user objects we already have on screen (message senders /
+  // route params). Current user is filtered out below.
+  const mentionCandidates = useMemo(() => {
+    const active = getActiveMention(input, inputCursor);
+    if (!active) {
+      return [] as MentionCandidate[];
+    }
+    const pool: MentionCandidate[] = [];
+    const other = conversation?.otherUser;
+    if (other?.userId) {
+      pool.push({
+        userId: other.userId,
+        username: other.username || '',
+        name: other.name,
+        profilePicUrl: other.profilePicUrl,
+      });
+    } else if (otherUserId) {
+      pool.push({
+        userId: otherUserId,
+        username: route.params?.username || '',
+        name: route.params?.name,
+        profilePicUrl: route.params?.profilePicUrl,
+      });
+    }
+    messages.forEach(m => {
+      if (!m.senderId || m.senderId === currentUserId || !m.username) {
+        return;
+      }
+      pool.push({
+        userId: m.senderId,
+        username: m.username,
+        profilePicUrl: m.profilePicUrl,
+      });
+    });
+    return filterMentionCandidates(pool, active.query, currentUserId);
+  }, [
+    conversation?.otherUser,
+    currentUserId,
+    input,
+    inputCursor,
+    messages,
+    otherUserId,
+    route.params,
+  ]);
+
+  const handleSelectMention = useCallback(
+    (candidate: MentionCandidate) => {
+      const active = getActiveMention(input, inputCursor);
+      if (!active) {
+        return;
+      }
+      const next = applyMention(input, active, candidate.username);
+      setInput(next.text);
+      setInputCursor(next.cursor);
+    },
+    [input, inputCursor],
+  );
+
+  const openMentionProfile = useCallback(
+    (username: string) => {
+      const other = conversation?.otherUser;
+      if (other?.username?.toLowerCase() === username.toLowerCase()) {
+        navigation.navigate('Profile', {
+          screen: 'PublicProfile',
+          params: {
+            userId: other.userId,
+            username: other.username,
+            profilePicUrl: other.profilePicUrl,
+          },
+        });
+        return;
+      }
+      const fromMessage = messages.find(
+        m => m.username?.toLowerCase() === username.toLowerCase(),
+      );
+      navigation.navigate('Profile', {
+        screen: 'PublicProfile',
+        params: {
+          userId: fromMessage?.senderId || otherUserId,
+          username: fromMessage?.username || username,
+          profilePicUrl: fromMessage?.profilePicUrl || headerAvatar,
+        },
+      });
+    },
+    [conversation?.otherUser, headerAvatar, messages, navigation, otherUserId],
+  );
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -1300,18 +1397,23 @@ const DmThread: React.FC = () => {
               isMine ? styles.bubbleMine : styles.bubbleTheirs,
               styles.captionBubble,
             ]}>
-            <Text
-              style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}>
-              {item.text}
-            </Text>
+            <MentionText
+              text={item.text}
+              style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}
+              onAccent={isMine}
+              onPressMention={openMentionProfile}
+            />
           </View>
         ) : null}
       </View>
     ) : (
       <View style={isMine ? styles.bubbleMine : styles.bubbleTheirs}>
-        <Text style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}>
-          {item.text}
-        </Text>
+        <MentionText
+          text={item.text}
+          style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}
+          onAccent={isMine}
+          onPressMention={openMentionProfile}
+        />
       </View>
     );
 
@@ -1550,6 +1652,10 @@ const DmThread: React.FC = () => {
                 </View>
               </View>
             ) : null}
+            <MentionSuggestions
+              candidates={mentionCandidates}
+              onSelect={handleSelectMention}
+            />
             <View style={styles.composer}>
               <TouchableOpacity
                 style={[styles.attachBtn, sending && styles.sendBtnDisabled]}
@@ -1567,7 +1673,13 @@ const DmThread: React.FC = () => {
               <TextInput
                 style={styles.textInput}
                 value={input}
-                onChangeText={setInput}
+                onChangeText={text => {
+                  setInput(text);
+                  setInputCursor(text.length);
+                }}
+                onSelectionChange={e => {
+                  setInputCursor(e.nativeEvent.selection.end);
+                }}
                 placeholder={
                   pendingImage
                     ? t('groupChat.caption') || 'Add a caption'

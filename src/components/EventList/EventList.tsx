@@ -92,6 +92,7 @@ import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
 import GroupPickerModal from '../Groups/GroupPickerModal';
 import RosterAvatarStrip from '../shared/RosterAvatarStrip';
+import {getGroup} from '../../services/GroupsService';
 import {Group} from '../../types/group';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import axios from 'axios';
@@ -106,6 +107,14 @@ import {useNotifications} from '../../Context/NotificationContext';
 import {useSocket} from '../../Context/SocketContext';
 import notificationService from '../../services/NotificationService';
 import locationService, {Coordinates} from '../../services/LocationService';
+import {refreshLocationForNearby} from '../../utils/proximityDiscovery';
+import {
+  defaultJoinDetails,
+  isTeamSportType,
+  JoinDetails,
+  needsJoinDetailsPrompt,
+  positionsForEventType,
+} from '../../utils/eventRoles';
 import {
   formatEventTimeRange,
   getEventDateTime,
@@ -123,9 +132,9 @@ import eventWatchService, {
 } from '../../services/EventWatchService';
 import EmojiPicker, {type EmojiType} from 'rn-emoji-keyboard';
 
-// Optional prefill payload sent from the Venues tab via the "Plan event
-// here" bridge. Any subset of these fields is OK — anything missing falls
-// back to the empty-event defaults so the user can still fill it in.
+// Optional prefill payload sent from Venues ("Plan event here") or Groups
+// ("Plan next event"). Any subset of these fields is OK — anything missing
+// falls back to the empty-event defaults so the user can still fill it in.
 export interface PrefillEvent {
   name?: string;
   location?: string;
@@ -138,6 +147,9 @@ export interface PrefillEvent {
   venueId?: string;
   venueName?: string;
   sourceUrl?: string;
+  // Group hub bridge — attaches the group and snapshots members as invitees.
+  groupId?: string;
+  groupName?: string;
 }
 
 export type RootStackParamList = {
@@ -221,6 +233,8 @@ interface Event {
   longitude?: number;
   isVirtual?: boolean;
   jerseyColors?: string[];
+  // Host opt-in: show Paid/Unpaid on the roster. Default off.
+  trackPayment?: boolean;
   description?: string;
   privacy?: EventPrivacy;
   invitedUsers?: string[];
@@ -249,6 +263,8 @@ interface Event {
     username: string;
     profilePicUrl?: string;
     paidStatus?: string;
+    position?: string;
+    jerseyColor?: string;
   }>;
   // "Maybe"/"can't make it" replies. "Going" is represented by roster
   // membership, so this only ever holds the other two states.
@@ -401,6 +417,7 @@ const createEmptyEvent = () => ({
   longitude: undefined as number | undefined,
   isVirtual: false,
   jerseyColors: [] as string[],
+  trackPayment: false,
   privacy: 'public' as EventPrivacy,
   invitedUsers: [] as string[],
   allowJoinRequests: true,
@@ -802,31 +819,32 @@ const openMapsForEvent = async (
     {
       name,
       address: address || name,
-      latitude: coords.latitude,
-      longitude: coords.longitude,
+      ...(coords
+        ? {latitude: coords.latitude, longitude: coords.longitude}
+        : {}),
     },
     t,
     presentPicker,
   );
 };
 
-// Helper function to get approximate coordinates from common locations
+// Resolve known venue/city names to coords. Returns null when unknown —
+// never invents a city (old SF default sent people to the wrong coast).
 const getCoordinatesFromLocation = (
   location: string,
-): {latitude: number; longitude: number} => {
+): {latitude: number; longitude: number} | null => {
   const normalizedLocation = location.toLowerCase().trim();
+  if (!normalizedLocation) {
+    return null;
+  }
 
-  // Common location coordinates - you can expand this based on your needs
   const locationMap: {[key: string]: {latitude: number; longitude: number}} = {
-    // Sports venues and common locations
     'madison square garden': {latitude: 40.7505, longitude: -73.9934},
     'yankee stadium': {latitude: 40.8296, longitude: -73.9262},
     'central park': {latitude: 40.7829, longitude: -73.9654},
     'golden gate park': {latitude: 37.7694, longitude: -122.4862},
     'griffith observatory': {latitude: 34.1184, longitude: -118.3004},
     'millennium park': {latitude: 41.8826, longitude: -87.6226},
-
-    // Default city centers
     'san francisco': {latitude: 37.7749, longitude: -122.4194},
     'new york': {latitude: 40.7128, longitude: -74.006},
     'los angeles': {latitude: 34.0522, longitude: -118.2437},
@@ -835,20 +853,17 @@ const getCoordinatesFromLocation = (
     seattle: {latitude: 47.6062, longitude: -122.3321},
   };
 
-  // Check for exact matches first
   if (locationMap[normalizedLocation]) {
     return locationMap[normalizedLocation];
   }
 
-  // Check for partial matches (city names within addresses)
   for (const [key, coords] of Object.entries(locationMap)) {
     if (normalizedLocation.includes(key)) {
       return coords;
     }
   }
 
-  // Default to San Francisco if no match found
-  return {latitude: 37.7749, longitude: -122.4194};
+  return null;
 };
 
 interface RecurringDeckProps {
@@ -1075,12 +1090,35 @@ const EventList: React.FC = () => {
         },
         card: {
           backgroundColor: colors.card,
-          paddingHorizontal: 16,
+          marginHorizontal: 12,
+          marginBottom: 12,
+          paddingHorizontal: 14,
           paddingTop: 14,
-          paddingBottom: 10,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          paddingBottom: 12,
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
           overflow: 'hidden',
+        },
+        cardWithAccent: {
+          paddingLeft: 18,
+        },
+        cardAccentRail: {
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+        },
+        cardAccentHalf: {
+          flex: 1,
+        },
+        cardInviteOnly: {
+          borderColor: colors.primary + '66',
+        },
+        cardGated: {
+          borderColor: colors.primary + '88',
+          backgroundColor: colors.primary + '08',
         },
         cardHeader: {
           flexDirection: 'row',
@@ -1184,24 +1222,56 @@ const EventList: React.FC = () => {
           borderColor: colors.border,
         },
         virtualLocationBanner: {
-          borderRadius: 10,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          borderRadius: 12,
           marginTop: 4,
           marginBottom: 4,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          backgroundColor: colors.inputBackground || colors.card,
+          paddingHorizontal: 14,
+          paddingVertical: 14,
+          backgroundColor: colors.primary + '12',
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
+          borderColor: colors.primary + '44',
+        },
+        virtualLocationBannerIcon: {
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.primary + '22',
         },
         virtualLocationBannerText: {
+          flex: 1,
           color: colors.text,
-          fontSize: 13,
+          fontSize: 14,
+          fontWeight: '700',
+          lineHeight: 19,
+        },
+        virtualLocationBannerSub: {
+          color: colors.secondaryText,
+          fontSize: 12,
           fontWeight: '600',
-          lineHeight: 18,
+          marginTop: 2,
         },
         mapEmbedView: {
           height: 140,
           width: '100%',
+        },
+        mapEmbedFallback: {
+          height: 72,
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 16,
+          backgroundColor: colors.inputBackground || colors.card,
+        },
+        mapEmbedFallbackText: {
+          color: colors.secondaryText,
+          fontSize: 13,
+          fontWeight: '600',
+          textAlign: 'center',
         },
         mapEmbedOverlay: {
           position: 'absolute',
@@ -1378,8 +1448,7 @@ const EventList: React.FC = () => {
           fontWeight: '600',
         },
         pastEventCard: {
-          opacity: 0.6,
-          backgroundColor: colors.card,
+          opacity: 0.72,
         },
         pastEventBadge: {
           position: 'absolute' as const,
@@ -2185,6 +2254,7 @@ const EventList: React.FC = () => {
           flex: 1,
         },
         flatListContent: {
+          paddingTop: 8,
           paddingBottom: 120,
         },
         flatListContentEmpty: {
@@ -3279,10 +3349,10 @@ const EventList: React.FC = () => {
         deckBgPlaceholder: {
           position: 'absolute',
           backgroundColor: colors.card,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
-          borderBottomLeftRadius: 12,
-          borderBottomRightRadius: 12,
+          marginHorizontal: 12,
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         flexOne: {
           flex: 1,
@@ -3576,6 +3646,16 @@ const EventList: React.FC = () => {
   const [watchModalVisible, setWatchModalVisible] = useState(false);
   const [watchTargetEvent, setWatchTargetEvent] = useState<Event | null>(null);
   const [optionsMenuEvent, setOptionsMenuEvent] = useState<Event | null>(null);
+
+  // Going / open-join: pick role (and jersey/paid when relevant) before joining.
+  const [joinPrompt, setJoinPrompt] = useState<{
+    event: Event;
+    mode: 'rsvp' | 'openJoin';
+    position: string;
+    jerseyColor: string;
+    paidStatus: string;
+  } | null>(null);
+  const [joinPromptSaving, setJoinPromptSaving] = useState(false);
 
   // Map app picker state
   const [mapPickerApps, setMapPickerApps] = useState<AvailableMapApp[]>([]);
@@ -4232,8 +4312,9 @@ const EventList: React.FC = () => {
 
   // Open the create-event modal prefilled when a venue screen bridges in via
   // `navigate('EventList', {prefillEvent})` (same Events stack — the "Find a
-  // place" flow). We track which prefill payload we've already consumed so
-  // back-navigation doesn't re-open the modal a second time.
+  // place" flow) or when Groups navigates here to plan the next hangout.
+  // We track which prefill payload we've already consumed so back-navigation
+  // doesn't re-open the modal a second time.
   const consumedPrefillRef = useRef<string | null>(null);
   useEffect(() => {
     const prefill = route.params?.prefillEvent;
@@ -4246,32 +4327,80 @@ const EventList: React.FC = () => {
       return;
     }
     consumedPrefillRef.current = sig;
-    setNewEvent({
-      ...createEmptyEvent(),
-      name: prefill.name || '',
-      location: prefill.location || '',
-      latitude: prefill.latitude,
-      longitude: prefill.longitude,
-      // Default to today when a venue bridges in without a date, so the form
-      // is one tap from done. Matches the date picker's toDateString() format
-      // and stays fully editable.
-      date: prefill.date || new Date().toDateString(),
-      time: prefill.time || '',
-      eventType: prefill.eventType || '',
-      venueId: prefill.venueId,
-      venueName: prefill.venueName,
-      sourceUrl: prefill.sourceUrl,
-    });
-    setTempRosterSize('');
-    setTempEventType(prefill.eventType || '');
-    setIsEditing(false);
-    setEditingEventId(null);
-    setEditingRecurrenceGroupId(null);
-    setPlacesApiFailed(false);
-    setModalVisible(true);
-    // Clear the param so navigating away and back doesn't re-pop the modal.
-    navigation.setParams({prefillEvent: undefined} as never);
-  }, [route.params?.prefillEvent, navigation]);
+
+    let cancelled = false;
+
+    const applyPrefill = async () => {
+      let groupId = prefill.groupId;
+      let groupName = prefill.groupName;
+      let invitedUsers: string[] = [];
+      let invitedDetails: LikedByUser[] = [];
+
+      if (prefill.groupId) {
+        try {
+          const g = await getGroup(prefill.groupId);
+          if (g) {
+            groupId = g._id;
+            groupName = g.name || groupName;
+            const currentUserId = userData?._id;
+            invitedDetails = g.members
+              .filter(m => m.userId && m.userId !== currentUserId)
+              .map(m => ({
+                _id: m.userId,
+                username: m.username || 'member',
+                name: m.name,
+                profilePicUrl: m.profilePicUrl,
+              })) as LikedByUser[];
+            invitedUsers = invitedDetails.map(u => u._id);
+          }
+        } catch {
+          // Still open the form with whatever group metadata we have.
+        }
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      setNewEvent({
+        ...createEmptyEvent(),
+        name: prefill.name || '',
+        location: prefill.location || '',
+        latitude: prefill.latitude,
+        longitude: prefill.longitude,
+        // Default to today when a venue/group bridges in without a date, so
+        // the form is one tap from done. Matches the date picker's
+        // toDateString() format and stays fully editable.
+        date: prefill.date || new Date().toDateString(),
+        time: prefill.time || '',
+        eventType: prefill.eventType || '',
+        venueId: prefill.venueId,
+        venueName: prefill.venueName,
+        sourceUrl: prefill.sourceUrl,
+        groupId,
+        groupName,
+        invitedUsers,
+        // Group-planned events default to invite-only — the roster is the
+        // group. User can still switch privacy in the form.
+        privacy: prefill.groupId ? 'invite-only' : 'public',
+      });
+      setInvitedUserDetails(invitedDetails);
+      setTempRosterSize('');
+      setTempEventType(prefill.eventType || '');
+      setIsEditing(false);
+      setEditingEventId(null);
+      setEditingRecurrenceGroupId(null);
+      setPlacesApiFailed(false);
+      setModalVisible(true);
+      // Clear the param so navigating away and back doesn't re-pop the modal.
+      navigation.setParams({prefillEvent: undefined} as never);
+    };
+
+    applyPrefill();
+    return () => {
+      cancelled = true;
+    };
+  }, [route.params?.prefillEvent, navigation, userData?._id]);
 
   // Scroll to highlighted event and optionally expand comments (once per navigation)
   const hasScrolledToHighlight = useRef<string | null>(null);
@@ -4375,7 +4504,7 @@ const EventList: React.FC = () => {
 
     setLocationLoading(true);
     try {
-      const coords = await locationService.getLocation();
+      const coords = await refreshLocationForNearby();
       if (coords) {
         setEventUserLocation(coords);
         setProximityEnabled(true);
@@ -4457,7 +4586,10 @@ const EventList: React.FC = () => {
               isVirtual: newEvent.isVirtual,
               jerseyColors: isTeamSport(newEvent.eventType)
                 ? newEvent.jerseyColors
-                : undefined,
+                : [],
+              trackPayment:
+                isTeamSport(newEvent.eventType) &&
+                newEvent.trackPayment === true,
               privacy: newEvent.privacy,
               invitedUsers: newEvent.invitedUsers,
               allowJoinRequests: newEvent.allowJoinRequests,
@@ -4548,7 +4680,10 @@ const EventList: React.FC = () => {
             isVirtual: newEvent.isVirtual,
             jerseyColors: isTeamSport(newEvent.eventType)
               ? newEvent.jerseyColors
-              : undefined,
+              : [],
+            trackPayment:
+              isTeamSport(newEvent.eventType) &&
+              newEvent.trackPayment === true,
             privacy: newEvent.privacy,
             invitedUsers: newEvent.invitedUsers,
             allowJoinRequests: newEvent.allowJoinRequests,
@@ -4873,6 +5008,7 @@ const EventList: React.FC = () => {
       longitude: event.longitude,
       isVirtual: !!event.isVirtual,
       jerseyColors: event.jerseyColors || [],
+      trackPayment: event.trackPayment === true,
       // 'private' is deprecated (redundant with invite-only); migrate legacy
       // private events to invite-only when they're edited.
       privacy: event.privacy === 'private' ? 'invite-only' : event.privacy || 'public',
@@ -5254,6 +5390,7 @@ const EventList: React.FC = () => {
   const applyRsvpOptimistic = (
     eventId: string,
     next: 'going' | 'maybe' | 'cant' | 'none',
+    details?: JoinDetails,
   ) => {
     if (!userData) {
       return;
@@ -5267,11 +5404,12 @@ const EventList: React.FC = () => {
         const roster = (e.roster || []).filter(p => p.userId !== uid);
         const rsvps = (e.rsvps || []).filter(r => r.userId !== uid);
         if (next === 'going') {
+          const join = details || defaultJoinDetails(e);
           roster.push({
             userId: uid,
             username: userData.username || '',
             profilePicUrl: userData.profilePicUrl,
-            paidStatus: 'Unpaid',
+            ...join,
           });
         } else if (next === 'maybe' || next === 'cant') {
           rsvps.push({
@@ -5291,6 +5429,43 @@ const EventList: React.FC = () => {
     );
   };
 
+  const submitRsvpGoing = async (
+    event: Event,
+    details: JoinDetails,
+  ): Promise<boolean> => {
+    if (!userData) {
+      return false;
+    }
+    applyRsvpOptimistic(event._id, 'going', details);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.put(
+        `${API_BASE_URL}/events/${event._id}/rsvp`,
+        {
+          userId: userData._id,
+          username: userData.username,
+          profilePicUrl: userData.profilePicUrl,
+          status: 'going',
+          position: details.position,
+          jerseyColor: details.jerseyColor,
+          paidStatus: details.paidStatus,
+        },
+        {headers: {Authorization: `Bearer ${token}`}},
+      );
+      return true;
+    } catch (error: any) {
+      if (error?.response?.data?.full) {
+        Alert.alert(
+          t('events.eventFull') || 'Event full',
+          t('events.eventFullMessage') ||
+            'This event is full right now. You can join the waitlist from the event page.',
+        );
+      }
+      fetchLatestEvents();
+      return false;
+    }
+  };
+
   const handleRsvp = async (
     event: Event,
     status: 'going' | 'maybe' | 'cant',
@@ -5300,6 +5475,24 @@ const EventList: React.FC = () => {
     }
     const current = getMyRsvp(event);
     const next = current === status ? 'none' : status;
+
+    // Going: add to roster immediately. If the event has roles/jersey/paid
+    // choices, prompt right away so they can set preferences without leaving
+    // the card.
+    if (next === 'going') {
+      const defaults = defaultJoinDetails(event);
+      const ok = await submitRsvpGoing(event, defaults);
+      if (ok && needsJoinDetailsPrompt(event)) {
+        setJoinPrompt({
+          event,
+          mode: 'rsvp',
+          position: defaults.position,
+          jerseyColor: defaults.jerseyColor,
+          paidStatus: defaults.paidStatus,
+        });
+      }
+      return;
+    }
 
     // Instant feedback; the socket "events:refresh" reconciles with server
     // truth (and rolls us back on failure below).
@@ -5393,9 +5586,12 @@ const EventList: React.FC = () => {
   };
 
   // Open-join public events (`allowJoinRequests === false`): add self to roster.
-  const handleOpenJoin = async (event: Event) => {
+  const submitOpenJoin = async (
+    event: Event,
+    details: JoinDetails,
+  ): Promise<boolean> => {
     if (!userData?._id) {
-      return;
+      return false;
     }
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -5406,11 +5602,16 @@ const EventList: React.FC = () => {
             userId: userData._id,
             username: userData.username,
             profilePicUrl: userData.profilePicUrl,
+            position: details.position,
+            jerseyColor: details.jerseyColor,
+            paidStatus: details.paidStatus,
           },
         },
         {headers: {Authorization: `Bearer ${token}`}},
       );
+      applyRsvpOptimistic(event._id, 'going', details);
       fetchLatestEvents();
+      return true;
     } catch (error: any) {
       if (error?.response?.data?.full) {
         Alert.alert(
@@ -5426,6 +5627,63 @@ const EventList: React.FC = () => {
             'Could not join this event.',
         );
       }
+      return false;
+    }
+  };
+
+  const handleOpenJoin = async (event: Event) => {
+    if (!userData?._id) {
+      return;
+    }
+    const defaults = defaultJoinDetails(event);
+    const ok = await submitOpenJoin(event, defaults);
+    if (ok && needsJoinDetailsPrompt(event)) {
+      setJoinPrompt({
+        event,
+        mode: 'openJoin',
+        position: defaults.position,
+        jerseyColor: defaults.jerseyColor,
+        paidStatus: defaults.paidStatus,
+      });
+    }
+  };
+
+  const closeJoinPrompt = () => {
+    if (joinPromptSaving) {
+      return;
+    }
+    setJoinPrompt(null);
+  };
+
+  const confirmJoinPrompt = async () => {
+    if (!joinPrompt || !userData) {
+      return;
+    }
+    const team = isTeamSportType(joinPrompt.event.eventType);
+    const trackPayment = !!joinPrompt.event.trackPayment;
+    if (!joinPrompt.position) {
+      return;
+    }
+    if (team && (joinPrompt.event.jerseyColors || []).length > 0 && !joinPrompt.jerseyColor) {
+      return;
+    }
+    if (team && trackPayment && !joinPrompt.paidStatus) {
+      return;
+    }
+
+    const details: JoinDetails = {
+      position: joinPrompt.position,
+      jerseyColor: team ? joinPrompt.jerseyColor || 'N/A' : 'N/A',
+      paidStatus: team && trackPayment ? joinPrompt.paidStatus || 'Unpaid' : 'N/A',
+    };
+
+    setJoinPromptSaving(true);
+    try {
+      // Already on the roster from Going/Join — update role/jersey/paid.
+      await submitRsvpGoing(joinPrompt.event, details);
+      setJoinPrompt(null);
+    } finally {
+      setJoinPromptSaving(false);
     }
   };
 
@@ -5515,7 +5773,7 @@ const EventList: React.FC = () => {
     if (item.isGated) {
       const isPending = item.myJoinRequestStatus === 'pending';
       return (
-        <View style={themedStyles.card}>
+        <View style={[themedStyles.card, themedStyles.cardGated]}>
           <View style={themedStyles.cardHeader}>
             <View style={themedStyles.cardHeaderLeft}>
               {creatorProfilePicUrl ? (
@@ -5677,8 +5935,35 @@ const EventList: React.FC = () => {
       );
     }
 
+    const jerseyAccents = (item.jerseyColors || []).filter(Boolean);
+    const hasJerseyAccent = jerseyAccents.length > 0;
+
     return (
-      <View style={[themedStyles.card, isPast && themedStyles.pastEventCard]}>
+      <View
+        style={[
+          themedStyles.card,
+          isPast && themedStyles.pastEventCard,
+          item.privacy === 'invite-only' && themedStyles.cardInviteOnly,
+          hasJerseyAccent && themedStyles.cardWithAccent,
+        ]}>
+        {hasJerseyAccent ? (
+          <View style={themedStyles.cardAccentRail} pointerEvents="none">
+            <View
+              style={[
+                themedStyles.cardAccentHalf,
+                {backgroundColor: jerseyAccents[0]},
+              ]}
+            />
+            {jerseyAccents[1] ? (
+              <View
+                style={[
+                  themedStyles.cardAccentHalf,
+                  {backgroundColor: jerseyAccents[1]},
+                ]}
+              />
+            ) : null}
+          </View>
+        ) : null}
         {/* Header: Avatar + Identity + Options */}
         <View style={themedStyles.cardHeader}>
           <TouchableOpacity
@@ -5875,8 +6160,8 @@ const EventList: React.FC = () => {
           </View>
         </TouchableOpacity>
 
-        {/* Physical events get a map preview; virtual ones already show
-            "Other" (or "Other · …" for legacy labels) in the detail row. */}
+        {/* Physical events get a map preview; virtual ones get a distinct
+            online panel so they don't look like a map-less physical card. */}
         {!item.isVirtual ? (
         <TouchableOpacity
           style={themedStyles.mapEmbed}
@@ -5887,6 +6172,16 @@ const EventList: React.FC = () => {
               item.latitude && item.longitude
                 ? {latitude: item.latitude, longitude: item.longitude}
                 : getCoordinatesFromLocation(item.location || '');
+
+            if (!coords) {
+              return (
+                <View style={themedStyles.mapEmbedFallback}>
+                  <Text style={themedStyles.mapEmbedFallbackText}>
+                    {(item.location || '').trim() || 'Open in Maps'}
+                  </Text>
+                </View>
+              );
+            }
 
             return (
               <MapView
@@ -5920,7 +6215,27 @@ const EventList: React.FC = () => {
             </Text>
           </View>
         </TouchableOpacity>
-        ) : null}
+        ) : (
+          <View style={themedStyles.virtualLocationBanner}>
+            <View style={themedStyles.virtualLocationBannerIcon}>
+              <FontAwesomeIcon icon={faGlobe} size={16} color={colors.primary} />
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={themedStyles.virtualLocationBannerText}>
+                {formatVirtualLocationLabel(
+                  item.location,
+                  t('events.virtualLocationBadge', {defaultValue: 'Other'}),
+                )}
+              </Text>
+              <Text style={themedStyles.virtualLocationBannerSub}>
+                {t('events.virtualLocationHint', {
+                  defaultValue:
+                    'No map pin — meet online or wherever you decide',
+                })}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* RSVP control — Going / Maybe / Can't make it. Only invite-only
             events use the 3-way RSVP: you were invited, so you reply. Public
@@ -7510,6 +7825,9 @@ const EventList: React.FC = () => {
                           ...newEvent,
                           eventType: resolvedType,
                           jerseyColors: [],
+                          trackPayment: isTeamSport(resolvedType)
+                            ? newEvent.trackPayment
+                            : false,
                         });
                         setShowEventTypePicker(false);
                       }}>
@@ -7612,6 +7930,33 @@ const EventList: React.FC = () => {
                     )}
                   </>
                 )}
+
+                {isTeamSport(newEvent.eventType) ? (
+                  <View style={themedStyles.publicControlRow}>
+                    <View style={themedStyles.publicControlText}>
+                      <Text style={themedStyles.publicControlLabel}>
+                        {t('events.trackPayment') || "Track who's paid"}
+                      </Text>
+                      <Text style={themedStyles.publicControlDesc}>
+                        {t('events.trackPaymentDesc') ||
+                          'Optional. Shows Paid/Unpaid on the roster for fee drop-ins.'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={newEvent.trackPayment}
+                      onValueChange={value =>
+                        setNewEvent({...newEvent, trackPayment: value})
+                      }
+                      trackColor={{
+                        false: colors.border,
+                        true: colors.primary + '88',
+                      }}
+                      thumbColor={
+                        newEvent.trackPayment ? colors.primary : '#f4f3f4'
+                      }
+                    />
+                  </View>
+                ) : null}
 
                 {/* Privacy Selector */}
                 <View style={themedStyles.privacyContainer}>
@@ -8105,6 +8450,208 @@ const EventList: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={!!joinPrompt}
+        transparent
+        animationType="slide"
+        onRequestClose={closeJoinPrompt}>
+        <TouchableOpacity
+          style={themedStyles.filterModalOverlay}
+          activeOpacity={1}
+          onPress={closeJoinPrompt}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={e => e.stopPropagation()}
+            style={themedStyles.filterModalContent}>
+            <View style={themedStyles.filterModalHandle} />
+            <View style={themedStyles.filterModalHeader}>
+              <Text style={themedStyles.filterModalTitle}>
+                {t('events.joinDetailsTitle') || "You're going!"}
+              </Text>
+              <TouchableOpacity onPress={closeJoinPrompt} hitSlop={12}>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={18}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {joinPrompt ? (
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{paddingBottom: 24}}>
+                {!!joinPrompt.event.name && (
+                  <Text
+                    style={[
+                      themedStyles.filterSectionTitle,
+                      {paddingHorizontal: 20, marginTop: 4},
+                    ]}>
+                    {joinPrompt.event.name}
+                  </Text>
+                )}
+                <Text
+                  style={{
+                    paddingHorizontal: 20,
+                    marginBottom: 8,
+                    color: colors.secondaryText,
+                    fontSize: 14,
+                    lineHeight: 20,
+                  }}>
+                  {t('events.joinDetailsHint') ||
+                    "You're on the roster. Pick your preferred role so the host knows how you're showing up."}
+                </Text>
+
+                <View style={themedStyles.filterSection}>
+                  <Text style={themedStyles.filterSectionTitle}>
+                    {t('roster.position') || 'Role'}
+                  </Text>
+                  <View style={themedStyles.filterChipsContainer}>
+                    {positionsForEventType(joinPrompt.event.eventType).map(
+                      opt => {
+                        const selected = joinPrompt.position === opt;
+                        return (
+                          <TouchableOpacity
+                            key={opt}
+                            style={[
+                              themedStyles.filterChip,
+                              selected && themedStyles.filterChipSelected,
+                            ]}
+                            onPress={() =>
+                              setJoinPrompt(prev =>
+                                prev ? {...prev, position: opt} : prev,
+                              )
+                            }
+                            activeOpacity={0.8}>
+                            <Text
+                              style={[
+                                themedStyles.filterChipText,
+                                selected && themedStyles.filterChipTextSelected,
+                              ]}>
+                              {opt}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      },
+                    )}
+                  </View>
+                </View>
+
+                {isTeamSportType(joinPrompt.event.eventType) &&
+                (joinPrompt.event.jerseyColors || []).length > 0 ? (
+                  <View style={themedStyles.filterSection}>
+                    <Text style={themedStyles.filterSectionTitle}>
+                      {t('roster.jerseyColor') || 'Jersey Color'}
+                    </Text>
+                    <View style={themedStyles.filterChipsContainer}>
+                      {(joinPrompt.event.jerseyColors || []).map(color => {
+                        const selected = joinPrompt.jerseyColor === color;
+                        return (
+                          <TouchableOpacity
+                            key={color}
+                            style={[
+                              themedStyles.filterChip,
+                              selected && themedStyles.filterChipSelected,
+                            ]}
+                            onPress={() =>
+                              setJoinPrompt(prev =>
+                                prev ? {...prev, jerseyColor: color} : prev,
+                              )
+                            }
+                            activeOpacity={0.8}>
+                            <Text
+                              style={[
+                                themedStyles.filterChipText,
+                                selected && themedStyles.filterChipTextSelected,
+                              ]}>
+                              {color}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
+
+                {isTeamSportType(joinPrompt.event.eventType) &&
+                joinPrompt.event.trackPayment ? (
+                  <View style={themedStyles.filterSection}>
+                    <Text style={themedStyles.filterSectionTitle}>
+                      {t('roster.paidStatus') || 'Paid Status'}
+                    </Text>
+                    <View style={themedStyles.filterChipsContainer}>
+                      {(['Unpaid', 'Paid'] as const).map(status => {
+                        const selected = joinPrompt.paidStatus === status;
+                        return (
+                          <TouchableOpacity
+                            key={status}
+                            style={[
+                              themedStyles.filterChip,
+                              selected && themedStyles.filterChipSelected,
+                            ]}
+                            onPress={() =>
+                              setJoinPrompt(prev =>
+                                prev ? {...prev, paidStatus: status} : prev,
+                              )
+                            }
+                            activeOpacity={0.8}>
+                            <Text
+                              style={[
+                                themedStyles.filterChipText,
+                                selected && themedStyles.filterChipTextSelected,
+                              ]}>
+                              {status === 'Paid'
+                                ? t('roster.paid') || 'Paid'
+                                : t('roster.unpaid') || 'Unpaid'}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
+
+                <View style={{paddingHorizontal: 20, paddingTop: 8, gap: 10}}>
+                  <TouchableOpacity
+                    style={[
+                      themedStyles.rsvpButton,
+                      themedStyles.rsvpButtonGoingActive,
+                      {
+                        justifyContent: 'center',
+                        paddingVertical: 14,
+                        opacity: joinPromptSaving ? 0.7 : 1,
+                      },
+                    ]}
+                    onPress={confirmJoinPrompt}
+                    disabled={joinPromptSaving}
+                    activeOpacity={0.85}>
+                    {joinPromptSaving ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text
+                        style={[
+                          themedStyles.rsvpButtonText,
+                          themedStyles.rsvpButtonTextActive,
+                        ]}>
+                        {t('events.rsvpGoingConfirm') || 'Save preferences'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={closeJoinPrompt}
+                    disabled={joinPromptSaving}
+                    style={{alignItems: 'center', paddingVertical: 8}}>
+                    <Text style={{color: colors.secondaryText, fontWeight: '600'}}>
+                      {t('events.joinDetailsSkip') || 'Not now'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            ) : null}
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 

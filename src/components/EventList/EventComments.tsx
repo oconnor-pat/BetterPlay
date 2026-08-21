@@ -39,6 +39,32 @@ import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
 import {useNavigation, CommonActions} from '@react-navigation/native';
 import {useSocket} from '../../Context/SocketContext';
+import MentionText from '../Mentions/MentionText';
+import MentionSuggestions from '../Mentions/MentionSuggestions';
+import {
+  applyMention,
+  filterMentionCandidates,
+  getActiveMention,
+  MentionCandidate,
+} from '../../utils/mentions';
+
+type MentionComposer =
+  | {type: 'newPost'}
+  | {type: 'comment'; id: string}
+  | {type: 'reply'; id: string};
+
+const sameMentionComposer = (
+  a: MentionComposer | null,
+  b: MentionComposer,
+): boolean => {
+  if (!a || a.type !== b.type) {
+    return false;
+  }
+  if (a.type === 'newPost' || b.type === 'newPost') {
+    return a.type === 'newPost' && b.type === 'newPost';
+  }
+  return a.id === b.id;
+};
 
 interface CommentReaction {
   userId: string;
@@ -265,6 +291,13 @@ const EventComments: React.FC<EventCommentsProps> = ({
     commentId: string;
   } | null>(null);
   const [postingContent, setPostingContent] = useState(false);
+  const [friendCandidates, setFriendCandidates] = useState<MentionCandidate[]>(
+    [],
+  );
+  const [activeComposer, setActiveComposer] = useState<MentionComposer | null>(
+    null,
+  );
+  const [composerCursor, setComposerCursor] = useState(0);
 
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors, darkMode} = useTheme();
@@ -375,6 +408,160 @@ const EventComments: React.FC<EventCommentsProps> = ({
     },
     [navigation, userData],
   );
+
+  // Friends once on mount for @mention suggestions (same endpoint as FriendsList).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await fetch(`${API_BASE_URL}/users/me/friends`, {
+          headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+        });
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : data.friends || [];
+        if (cancelled) {
+          return;
+        }
+        setFriendCandidates(
+          list
+            .map((f: any) => ({
+              userId: String(f._id || f.userId || ''),
+              username: f.username || '',
+              name: f.name,
+              profilePicUrl: f.profilePicUrl,
+            }))
+            .filter((c: MentionCandidate) => c.userId && c.username),
+        );
+      } catch {
+        // Suggestions still work from thread authors alone.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const mentionPool = useMemo(() => {
+    const byId = new Map<string, MentionCandidate>();
+    const add = (
+      userId?: string,
+      username?: string,
+      profilePicUrl?: string,
+      name?: string,
+    ) => {
+      if (!userId || !username) {
+        return;
+      }
+      if (userData?._id && userId === userData._id) {
+        return;
+      }
+      if (byId.has(userId)) {
+        return;
+      }
+      byId.set(userId, {userId, username, profilePicUrl, name});
+    };
+
+    for (const f of friendCandidates) {
+      add(f.userId, f.username, f.profilePicUrl, f.name);
+    }
+    if (post) {
+      add(post.userId, post.username, post.profilePicUrl);
+      for (const comment of post.comments || []) {
+        add(comment.userId, comment.username, comment.profilePicUrl);
+        for (const reply of comment.replies || []) {
+          add(reply.userId, reply.username, reply.profilePicUrl);
+        }
+      }
+    }
+    return [...byId.values()];
+  }, [friendCandidates, post, userData?._id]);
+
+  const activeComposerText = useMemo(() => {
+    if (!activeComposer) {
+      return '';
+    }
+    if (activeComposer.type === 'newPost') {
+      return newPostText;
+    }
+    if (activeComposer.type === 'comment') {
+      return commentText[activeComposer.id] || '';
+    }
+    return replyText[activeComposer.id] || '';
+  }, [activeComposer, newPostText, commentText, replyText]);
+
+  const mentionSuggestions = useMemo(() => {
+    if (!activeComposer) {
+      return [] as MentionCandidate[];
+    }
+    const active = getActiveMention(activeComposerText, composerCursor);
+    if (!active) {
+      return [] as MentionCandidate[];
+    }
+    return filterMentionCandidates(mentionPool, active.query, userData?._id);
+  }, [
+    activeComposer,
+    activeComposerText,
+    composerCursor,
+    mentionPool,
+    userData?._id,
+  ]);
+
+  const handleSelectMention = useCallback(
+    (candidate: MentionCandidate) => {
+      if (!activeComposer) {
+        return;
+      }
+      const active = getActiveMention(activeComposerText, composerCursor);
+      if (!active) {
+        return;
+      }
+      const next = applyMention(activeComposerText, active, candidate.username);
+      if (activeComposer.type === 'newPost') {
+        setNewPostText(next.text);
+      } else if (activeComposer.type === 'comment') {
+        setCommentText(prev => ({
+          ...prev,
+          [activeComposer.id]: next.text,
+        }));
+      } else {
+        setReplyText(prev => ({
+          ...prev,
+          [activeComposer.id]: next.text,
+        }));
+      }
+      setComposerCursor(next.cursor);
+    },
+    [activeComposer, activeComposerText, composerCursor],
+  );
+
+  const openMentionProfile = useCallback(
+    (username: string) => {
+      const match = mentionPool.find(
+        c => c.username.toLowerCase() === username.toLowerCase(),
+      );
+      if (!match) {
+        return;
+      }
+      navigateToProfile(match.userId, match.username, match.profilePicUrl);
+    },
+    [mentionPool, navigateToProfile],
+  );
+
+  const renderComposerSuggestions = (composer: MentionComposer) => {
+    if (!sameMentionComposer(activeComposer, composer)) {
+      return null;
+    }
+    return (
+      <MentionSuggestions
+        candidates={mentionSuggestions}
+        onSelect={handleSelectMention}
+      />
+    );
+  };
 
   const fetchUsersByIds = async (userIds: string[]): Promise<LikedByUser[]> => {
     const unique = Array.from(new Set(userIds.filter(Boolean)));
@@ -1618,6 +1805,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
           </Text>
         </View>
         <View style={styles.composerCard}>
+          {renderComposerSuggestions({type: 'newPost'})}
           <View style={styles.composerRow}>
             {userData?.profilePicUrl ? (
               <Image
@@ -1637,7 +1825,15 @@ const EventComments: React.FC<EventCommentsProps> = ({
               placeholder={t('events.writeDiscussion') || 'Write something...'}
               placeholderTextColor={colors.border}
               value={newPostText}
-              onChangeText={setNewPostText}
+              onFocus={() => setActiveComposer({type: 'newPost'})}
+              onChangeText={text => {
+                setNewPostText(text);
+                setComposerCursor(text.length);
+              }}
+              onSelectionChange={e => {
+                setActiveComposer({type: 'newPost'});
+                setComposerCursor(e.nativeEvent.selection.end);
+              }}
               multiline={false}
             />
             <TouchableOpacity
@@ -1782,7 +1978,11 @@ const EventComments: React.FC<EventCommentsProps> = ({
                   </TouchableOpacity>
                 </View>
               ) : (
-                <Text style={styles.postText}>{post.text}</Text>
+                <MentionText
+                  text={post.text}
+                  style={styles.postText}
+                  onPressMention={openMentionProfile}
+                />
               )}
 
               <View style={styles.socialActionsRow}>
@@ -1822,65 +2022,76 @@ const EventComments: React.FC<EventCommentsProps> = ({
               </View>
 
               {replyingTo === 'post' && (
-                <View style={styles.replyInputRow}>
-                  <TextInput
-                    ref={ref => {
-                      if (ref) {
-                        replyInputRefs.current.post = ref;
+                <View>
+                  {renderComposerSuggestions({type: 'reply', id: 'post'})}
+                  <View style={styles.replyInputRow}>
+                    <TextInput
+                      ref={ref => {
+                        if (ref) {
+                          replyInputRefs.current.post = ref;
+                        }
+                      }}
+                      style={styles.replyInput}
+                      placeholder={
+                        t('communityNotes.writeReply') || 'Write a reply...'
                       }
-                    }}
-                    style={styles.replyInput}
-                    placeholder={
-                      t('communityNotes.writeReply') || 'Write a reply...'
-                    }
-                    placeholderTextColor={colors.border}
-                    value={replyText.post || ''}
-                    onChangeText={text =>
-                      setReplyText(prev => ({...prev, post: text}))
-                    }
-                  />
-                  <TouchableOpacity
-                    style={styles.replySendButton}
-                    onPress={async () => {
-                      const text = replyText.post?.trim();
-                      if (!text || !userData) {
-                        return;
+                      placeholderTextColor={colors.border}
+                      value={replyText.post || ''}
+                      onFocus={() =>
+                        setActiveComposer({type: 'reply', id: 'post'})
                       }
-                      setReplyText(prev => ({...prev, post: ''}));
-                      try {
-                        const response = await axios.post(
-                          `${API_BASE_URL}/community-notes/${post._id}/comments`,
-                          {
-                            text,
-                            username: userData.username,
-                            userId: userData._id,
-                            profilePicUrl: userData.profilePicUrl || '',
-                            replyToPost: true,
-                          },
-                        );
-                        setPost(prev =>
-                          prev
-                            ? normalizePost({
-                                ...prev,
-                                comments: response.data.comments,
-                              })
-                            : prev,
-                        );
-                        setReplyingTo(null);
-                        setReplyingToReply(null);
-                      } catch {
-                        Alert.alert(
-                          t('common.error'),
-                          t('communityNotes.commentError'),
-                        );
-                      }
-                    }}>
-                    <FontAwesomeIcon
-                      icon={faPaperPlane}
-                      size={12}
-                      color="#fff"
+                      onChangeText={text => {
+                        setReplyText(prev => ({...prev, post: text}));
+                        setComposerCursor(text.length);
+                      }}
+                      onSelectionChange={e => {
+                        setActiveComposer({type: 'reply', id: 'post'});
+                        setComposerCursor(e.nativeEvent.selection.end);
+                      }}
                     />
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.replySendButton}
+                      onPress={async () => {
+                        const text = replyText.post?.trim();
+                        if (!text || !userData) {
+                          return;
+                        }
+                        setReplyText(prev => ({...prev, post: ''}));
+                        try {
+                          const response = await axios.post(
+                            `${API_BASE_URL}/community-notes/${post._id}/comments`,
+                            {
+                              text,
+                              username: userData.username,
+                              userId: userData._id,
+                              profilePicUrl: userData.profilePicUrl || '',
+                              replyToPost: true,
+                            },
+                          );
+                          setPost(prev =>
+                            prev
+                              ? normalizePost({
+                                  ...prev,
+                                  comments: response.data.comments,
+                                })
+                              : prev,
+                          );
+                          setReplyingTo(null);
+                          setReplyingToReply(null);
+                        } catch {
+                          Alert.alert(
+                            t('common.error'),
+                            t('communityNotes.commentError'),
+                          );
+                        }
+                      }}>
+                      <FontAwesomeIcon
+                        icon={faPaperPlane}
+                        size={12}
+                        color="#fff"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
@@ -2008,9 +2219,11 @@ const EventComments: React.FC<EventCommentsProps> = ({
                               </View>
                             ) : (
                               <>
-                                <Text style={styles.replyText}>
-                                  {comment.text}
-                                </Text>
+                                <MentionText
+                                  text={comment.text}
+                                  style={styles.replyText}
+                                  onPressMention={openMentionProfile}
+                                />
                                 <View style={styles.commentReactionRow}>
                                   {summarizeReactions(
                                     comment.reactions,
@@ -2079,43 +2292,65 @@ const EventComments: React.FC<EventCommentsProps> = ({
                             )}
 
                             {replyingTo === comment._id && (
-                              <View style={styles.replyInputRow}>
-                                <TextInput
-                                  ref={ref => {
-                                    if (ref) {
-                                      replyInputRefs.current[comment._id!] =
-                                        ref;
+                              <View>
+                                {renderComposerSuggestions({
+                                  type: 'reply',
+                                  id: comment._id!,
+                                })}
+                                <View style={styles.replyInputRow}>
+                                  <TextInput
+                                    ref={ref => {
+                                      if (ref) {
+                                        replyInputRefs.current[comment._id!] =
+                                          ref;
+                                      }
+                                    }}
+                                    style={styles.replyInput}
+                                    placeholder={
+                                      replyingToReply?.username
+                                        ? `${
+                                            t('communityNotes.reply') || 'Reply'
+                                          } @${replyingToReply.username}...`
+                                        : t('communityNotes.writeReply') ||
+                                          'Write a reply...'
                                     }
-                                  }}
-                                  style={styles.replyInput}
-                                  placeholder={
-                                    replyingToReply?.username
-                                      ? `${
-                                          t('communityNotes.reply') || 'Reply'
-                                        } @${replyingToReply.username}...`
-                                      : t('communityNotes.writeReply') ||
-                                        'Write a reply...'
-                                  }
-                                  placeholderTextColor={colors.border}
-                                  value={replyText[comment._id!] || ''}
-                                  onChangeText={text =>
-                                    setReplyText(prev => ({
-                                      ...prev,
-                                      [comment._id!]: text,
-                                    }))
-                                  }
-                                />
-                                <TouchableOpacity
-                                  style={styles.replySendButton}
-                                  onPress={() => {
-                                    addReply(post._id, comment._id!);
-                                  }}>
-                                  <FontAwesomeIcon
-                                    icon={faPaperPlane}
-                                    size={12}
-                                    color="#fff"
+                                    placeholderTextColor={colors.border}
+                                    value={replyText[comment._id!] || ''}
+                                    onFocus={() =>
+                                      setActiveComposer({
+                                        type: 'reply',
+                                        id: comment._id!,
+                                      })
+                                    }
+                                    onChangeText={text => {
+                                      setReplyText(prev => ({
+                                        ...prev,
+                                        [comment._id!]: text,
+                                      }));
+                                      setComposerCursor(text.length);
+                                    }}
+                                    onSelectionChange={e => {
+                                      setActiveComposer({
+                                        type: 'reply',
+                                        id: comment._id!,
+                                      });
+                                      setComposerCursor(
+                                        e.nativeEvent.selection.end,
+                                      );
+                                    }}
                                   />
-                                </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={styles.replySendButton}
+                                    onPress={() => {
+                                      addReply(post._id, comment._id!);
+                                    }}>
+                                    <FontAwesomeIcon
+                                      icon={faPaperPlane}
+                                      size={12}
+                                      color="#fff"
+                                    />
+                                  </TouchableOpacity>
+                                </View>
                               </View>
                             )}
 
@@ -2285,9 +2520,13 @@ const EventComments: React.FC<EventCommentsProps> = ({
                                             </View>
                                           ) : (
                                             <>
-                                              <Text style={styles.replyText}>
-                                                {reply.text}
-                                              </Text>
+                                              <MentionText
+                                                text={reply.text}
+                                                style={styles.replyText}
+                                                onPressMention={
+                                                  openMentionProfile
+                                                }
+                                              />
                                               <View
                                                 style={
                                                   styles.commentReactionRow
@@ -2504,7 +2743,11 @@ const EventComments: React.FC<EventCommentsProps> = ({
                     </View>
                   ) : (
                     <>
-                      <Text style={styles.commentText}>{comment.text}</Text>
+                      <MentionText
+                        text={comment.text}
+                        style={styles.commentText}
+                        onPressMention={openMentionProfile}
+                      />
                       <View style={styles.commentReactionRow}>
                         {summarizeReactions(
                           comment.reactions,
@@ -2559,40 +2802,60 @@ const EventComments: React.FC<EventCommentsProps> = ({
                   )}
 
                   {replyingTo === comment._id && (
-                    <View style={styles.replyInputRow}>
-                      <TextInput
-                        ref={ref => {
-                          if (ref) {
-                            replyInputRefs.current[comment._id!] = ref;
+                    <View>
+                      {renderComposerSuggestions({
+                        type: 'reply',
+                        id: comment._id!,
+                      })}
+                      <View style={styles.replyInputRow}>
+                        <TextInput
+                          ref={ref => {
+                            if (ref) {
+                              replyInputRefs.current[comment._id!] = ref;
+                            }
+                          }}
+                          style={styles.replyInput}
+                          placeholder={
+                            replyingToReply?.username
+                              ? `${t('communityNotes.reply') || 'Reply'} @${
+                                  replyingToReply.username
+                                }...`
+                              : t('communityNotes.writeReply') ||
+                                'Write a reply...'
                           }
-                        }}
-                        style={styles.replyInput}
-                        placeholder={
-                          replyingToReply?.username
-                            ? `${t('communityNotes.reply') || 'Reply'} @${
-                                replyingToReply.username
-                              }...`
-                            : t('communityNotes.writeReply') ||
-                              'Write a reply...'
-                        }
-                        placeholderTextColor={colors.border}
-                        value={replyText[comment._id!] || ''}
-                        onChangeText={text =>
-                          setReplyText(prev => ({
-                            ...prev,
-                            [comment._id!]: text,
-                          }))
-                        }
-                      />
-                      <TouchableOpacity
-                        style={styles.replySendButton}
-                        onPress={() => addReply(post._id, comment._id!)}>
-                        <FontAwesomeIcon
-                          icon={faPaperPlane}
-                          size={12}
-                          color="#fff"
+                          placeholderTextColor={colors.border}
+                          value={replyText[comment._id!] || ''}
+                          onFocus={() =>
+                            setActiveComposer({
+                              type: 'reply',
+                              id: comment._id!,
+                            })
+                          }
+                          onChangeText={text => {
+                            setReplyText(prev => ({
+                              ...prev,
+                              [comment._id!]: text,
+                            }));
+                            setComposerCursor(text.length);
+                          }}
+                          onSelectionChange={e => {
+                            setActiveComposer({
+                              type: 'reply',
+                              id: comment._id!,
+                            });
+                            setComposerCursor(e.nativeEvent.selection.end);
+                          }}
                         />
-                      </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.replySendButton}
+                          onPress={() => addReply(post._id, comment._id!)}>
+                          <FontAwesomeIcon
+                            icon={faPaperPlane}
+                            size={12}
+                            color="#fff"
+                          />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   )}
 
@@ -2735,9 +2998,11 @@ const EventComments: React.FC<EventCommentsProps> = ({
                                   </View>
                                 ) : (
                                   <>
-                                    <Text style={styles.replyText}>
-                                      {reply.text}
-                                    </Text>
+                                    <MentionText
+                                      text={reply.text}
+                                      style={styles.replyText}
+                                      onPressMention={openMentionProfile}
+                                    />
                                     <View style={styles.commentReactionRow}>
                                       {summarizeReactions(
                                         reply.reactions,
@@ -2825,35 +3090,44 @@ const EventComments: React.FC<EventCommentsProps> = ({
           ))}
 
         {/* New independent comment (starts its own thread) */}
-        <View style={styles.commentInputRow}>
-          {userData?.profilePicUrl ? (
-            <Image
-              source={{uri: userData.profilePicUrl}}
-              style={styles.commentInputAvatarImage}
+        <View>
+          {renderComposerSuggestions({type: 'comment', id: post._id})}
+          <View style={styles.commentInputRow}>
+            {userData?.profilePicUrl ? (
+              <Image
+                source={{uri: userData.profilePicUrl}}
+                style={styles.commentInputAvatarImage}
+              />
+            ) : (
+              <View style={styles.commentInputAvatar}>
+                <Text style={styles.commentInputAvatarText}>
+                  {userData ? getInitials(userData.username) : '?'}
+                </Text>
+              </View>
+            )}
+            <TextInput
+              style={styles.commentInput}
+              placeholder={
+                t('communityNotes.writeComment') || 'Write a comment...'
+              }
+              placeholderTextColor={colors.border}
+              value={commentText[post._id] || ''}
+              onFocus={() => setActiveComposer({type: 'comment', id: post._id})}
+              onChangeText={text => {
+                setCommentText(prev => ({...prev, [post._id]: text}));
+                setComposerCursor(text.length);
+              }}
+              onSelectionChange={e => {
+                setActiveComposer({type: 'comment', id: post._id});
+                setComposerCursor(e.nativeEvent.selection.end);
+              }}
             />
-          ) : (
-            <View style={styles.commentInputAvatar}>
-              <Text style={styles.commentInputAvatarText}>
-                {userData ? getInitials(userData.username) : '?'}
-              </Text>
-            </View>
-          )}
-          <TextInput
-            style={styles.commentInput}
-            placeholder={
-              t('communityNotes.writeComment') || 'Write a comment...'
-            }
-            placeholderTextColor={colors.border}
-            value={commentText[post._id] || ''}
-            onChangeText={text =>
-              setCommentText(prev => ({...prev, [post._id]: text}))
-            }
-          />
-          <TouchableOpacity
-            style={styles.commentSendButton}
-            onPress={() => addComment(post._id, false)}>
-            <FontAwesomeIcon icon={faPaperPlane} size={14} color="#fff" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.commentSendButton}
+              onPress={() => addComment(post._id, false)}>
+              <FontAwesomeIcon icon={faPaperPlane} size={14} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 

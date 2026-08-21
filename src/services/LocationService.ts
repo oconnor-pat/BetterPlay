@@ -13,6 +13,7 @@ const CACHE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
 
 class LocationService {
   private lastKnownLocation: Coordinates | null = null;
+  private lastKnownAt = 0;
 
   async requestPermission(): Promise<boolean> {
     if (Platform.OS === 'android') {
@@ -39,11 +40,13 @@ class LocationService {
             longitude: position.coords.longitude,
           };
           this.lastKnownLocation = coords;
+          this.lastKnownAt = Date.now();
           this.cacheLocation(coords);
           resolve(coords);
         },
         error => reject(error),
-        {enableHighAccuracy: true, timeout: 20000, maximumAge: 60000},
+        // Nearby discovery should prefer a fresh fix over a stale one.
+        {enableHighAccuracy: true, timeout: 20000, maximumAge: 15000},
       );
     });
   }
@@ -72,26 +75,49 @@ class LocationService {
     }
   }
 
-  async getLocation(): Promise<Coordinates | null> {
-    if (this.lastKnownLocation) {
+  /**
+   * Resolve the user's coordinates.
+   * - Default: memory (if fresh) → disk cache → GPS
+   * - `forceRefresh: true`: always hit GPS (for Nearby toggles / app sync)
+   */
+  async getLocation(
+    options: {forceRefresh?: boolean} = {},
+  ): Promise<Coordinates | null> {
+    if (options.forceRefresh) {
+      try {
+        return await this.getCurrentPosition();
+      } catch {
+        // Fall through to whatever we still have so Nearby isn't a hard fail.
+      }
+    }
+
+    const memoryAge = Date.now() - this.lastKnownAt;
+    if (
+      this.lastKnownLocation &&
+      this.lastKnownAt > 0 &&
+      memoryAge <= CACHE_MAX_AGE_MS
+    ) {
       return this.lastKnownLocation;
     }
 
     const cached = await this.getCachedLocation();
     if (cached) {
       this.lastKnownLocation = cached;
+      this.lastKnownAt = Date.now();
       return cached;
     }
 
     try {
       return await this.getCurrentPosition();
     } catch {
-      return null;
+      // Last resort: stale memory if GPS fails completely.
+      return this.lastKnownLocation;
     }
   }
 
   async clearLocation(): Promise<void> {
     this.lastKnownLocation = null;
+    this.lastKnownAt = 0;
     await AsyncStorage.multiRemove([
       LOCATION_CACHE_KEY,
       LOCATION_TIMESTAMP_KEY,

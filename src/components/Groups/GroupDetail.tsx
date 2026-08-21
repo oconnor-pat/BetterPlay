@@ -22,12 +22,21 @@ import {
   Alert,
   FlatList,
   Image,
+  LayoutAnimation,
   Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
+
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
@@ -43,7 +52,10 @@ import {
   faUsers,
   faComments,
   faCalendarDay,
+  faChevronDown,
   faChevronRight,
+  faChevronUp,
+  faPlus,
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useTranslation} from 'react-i18next';
@@ -79,6 +91,7 @@ const GroupDetail: React.FC = () => {
   const [tab, setTab] = useState<'members' | 'chat'>(
     route.params?.initialTab === 'chat' ? 'chat' : 'members',
   );
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   // The initializer above only runs on first mount. Notifications route
   // here with initialTab: 'chat', and this screen is often already in the
@@ -103,6 +116,21 @@ const GroupDetail: React.FC = () => {
     },
     [navigation],
   );
+
+  const planNextEvent = useCallback(() => {
+    if (!group) {
+      return;
+    }
+    navigation.navigate('Events', {
+      screen: 'EventList',
+      params: {
+        prefillEvent: {
+          groupId: group._id,
+          groupName: group.name,
+        },
+      },
+    });
+  }, [group, navigation]);
 
   const refresh = useCallback(async () => {
     if (!groupId) return;
@@ -355,10 +383,8 @@ const GroupDetail: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 12,
-          paddingVertical: 12,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
-          backgroundColor: colors.card,
+          paddingVertical: 10,
+          backgroundColor: colors.background,
         },
         backBtn: {padding: 6, marginRight: 4},
         headerTitle: {
@@ -377,18 +403,64 @@ const GroupDetail: React.FC = () => {
           justifyContent: 'center',
         },
         hero: {
+          marginHorizontal: 16,
+          marginBottom: 4,
           paddingHorizontal: 16,
-          paddingTop: 20,
+          paddingTop: 18,
           paddingBottom: 16,
+          borderRadius: 18,
           backgroundColor: colors.card,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          overflow: 'hidden',
+        },
+        heroGlow: {
+          position: 'absolute',
+          width: 160,
+          height: 160,
+          borderRadius: 80,
+          top: -60,
+          right: -40,
+          backgroundColor: colors.primary + '22',
+        },
+        avatarStack: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 14,
+        },
+        stackAvatar: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.1)'
+            : 'rgba(0,0,0,0.06)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: colors.card,
+        },
+        stackAvatarImage: {width: 40, height: 40},
+        stackAvatarInitials: {
+          color: colors.text,
+          fontWeight: '700',
+          fontSize: 13,
+        },
+        stackMore: {
+          backgroundColor: colors.primary + '22',
+        },
+        stackMoreText: {
+          color: colors.primary,
+          fontWeight: '800',
+          fontSize: 12,
         },
         groupName: {
-          fontSize: 24,
-          fontWeight: '700',
+          fontSize: 26,
+          fontWeight: '800',
           color: colors.text,
-          marginBottom: 8,
+          letterSpacing: -0.3,
+          marginBottom: 10,
         },
         metaRow: {
           flexDirection: 'row',
@@ -405,7 +477,7 @@ const GroupDetail: React.FC = () => {
             : 'rgba(0,0,0,0.06)',
           borderRadius: 14,
           paddingHorizontal: 10,
-          paddingVertical: 4,
+          paddingVertical: 5,
         },
         privacyText: {
           fontSize: 12,
@@ -422,11 +494,11 @@ const GroupDetail: React.FC = () => {
           backgroundColor: darkMode
             ? 'rgba(255,255,255,0.07)'
             : 'rgba(0,0,0,0.05)',
-          borderRadius: 12,
-          padding: 3,
+          borderRadius: 14,
+          padding: 4,
           marginHorizontal: 16,
           marginTop: 12,
-          marginBottom: 4,
+          marginBottom: 8,
         },
         segmentBtn: {
           flex: 1,
@@ -434,11 +506,11 @@ const GroupDetail: React.FC = () => {
           alignItems: 'center',
           justifyContent: 'center',
           gap: 6,
-          paddingVertical: 8,
-          borderRadius: 9,
+          paddingVertical: 10,
+          borderRadius: 11,
         },
         segmentBtnActive: {
-          backgroundColor: colors.card,
+          backgroundColor: colors.primary,
         },
         segmentText: {
           fontSize: 13,
@@ -446,33 +518,60 @@ const GroupDetail: React.FC = () => {
           color: colors.secondaryText,
         },
         segmentTextActive: {
-          color: colors.text,
+          color: '#FFFFFF',
         },
         upcomingStrip: {
-          paddingTop: 6,
-          paddingBottom: 2,
+          paddingTop: 8,
+          paddingBottom: 4,
+          paddingHorizontal: 16,
+        },
+        upcomingPanel: {
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+          overflow: 'hidden',
         },
         upcomingRow: {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 10,
-          paddingVertical: 8,
-          paddingHorizontal: 16,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
         },
         upcomingIcon: {
-          width: 34,
-          height: 34,
-          borderRadius: 17,
+          width: 36,
+          height: 36,
+          borderRadius: 12,
           backgroundColor: colors.primary + '18',
           alignItems: 'center',
           justifyContent: 'center',
         },
         upcomingBody: {flex: 1},
-        upcomingName: {fontSize: 14, fontWeight: '600', color: colors.text},
+        upcomingName: {fontSize: 14, fontWeight: '700', color: colors.text},
         upcomingMeta: {
           fontSize: 12,
           color: colors.secondaryText,
-          marginTop: 1,
+          marginTop: 2,
+        },
+        planNextCta: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          marginTop: 4,
+          marginHorizontal: 14,
+          marginBottom: 14,
+          backgroundColor: colors.primary,
+          borderRadius: 14,
+          paddingVertical: 13,
+        },
+        planNextCtaText: {
+          color: '#FFFFFF',
+          fontSize: 15,
+          fontWeight: '700',
         },
         sectionRow: {
           flexDirection: 'row',
@@ -503,8 +602,14 @@ const GroupDetail: React.FC = () => {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 12,
-          paddingVertical: 10,
-          paddingHorizontal: 16,
+          marginHorizontal: 16,
+          marginBottom: 8,
+          paddingVertical: 12,
+          paddingHorizontal: 12,
+          borderRadius: 14,
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         avatar: {
           width: 44,
@@ -526,7 +631,7 @@ const GroupDetail: React.FC = () => {
         memberBody: {flex: 1},
         memberName: {
           fontSize: 15,
-          fontWeight: '600',
+          fontWeight: '700',
           color: colors.text,
         },
         memberUsername: {
@@ -556,22 +661,43 @@ const GroupDetail: React.FC = () => {
           justifyContent: 'center',
         },
         footer: {
-          padding: 16,
-          gap: 10,
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 12,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
+          backgroundColor: colors.background,
+        },
+        actionsToggle: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          paddingVertical: 12,
+          borderRadius: 14,
           backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        actionsToggleText: {
+          color: colors.secondaryText,
+          fontSize: 13,
+          fontWeight: '700',
+        },
+        actionsBody: {
+          gap: 8,
+          marginTop: 10,
         },
         leaveBtn: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
-          backgroundColor: darkMode
-            ? 'rgba(255,255,255,0.06)'
-            : 'rgba(0,0,0,0.05)',
-          borderRadius: 12,
-          paddingVertical: 14,
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          borderRadius: 14,
+          paddingVertical: 13,
         },
         leaveBtnText: {
           color: colors.text,
@@ -584,8 +710,8 @@ const GroupDetail: React.FC = () => {
           justifyContent: 'center',
           gap: 8,
           backgroundColor: colors.error + '15',
-          borderRadius: 12,
-          paddingVertical: 14,
+          borderRadius: 14,
+          paddingVertical: 13,
         },
         destructiveBtnText: {
           color: colors.error,
@@ -595,6 +721,11 @@ const GroupDetail: React.FC = () => {
       }),
     [colors, darkMode],
   );
+
+  const toggleActions = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setActionsOpen(prev => !prev);
+  }, []);
 
   const renderMember = ({item}: {item: GroupMember}) => {
     const isMemberCreator = group && item.userId === group.createdBy;
@@ -693,7 +824,7 @@ const GroupDetail: React.FC = () => {
           <FontAwesomeIcon icon={faArrowLeft} size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {group.name}
+          {tab === 'chat' ? group.name : ''}
         </Text>
         {isAdmin ? (
           <TouchableOpacity
@@ -709,24 +840,61 @@ const GroupDetail: React.FC = () => {
         ) : null}
       </View>
 
-      <View style={styles.hero}>
-        <Text style={styles.groupName}>{group.name}</Text>
-        <View style={styles.metaRow}>
-          <View style={styles.privacyPill}>
-            <FontAwesomeIcon
-              icon={group.privacy === 'public' ? faGlobe : faLock}
-              size={11}
-              color={colors.secondaryText}
-            />
-            <Text style={styles.privacyText}>
-              {group.privacy === 'public' ? 'Public' : 'Private'}
+      {tab === 'members' ? (
+        <View style={styles.hero}>
+          <View style={styles.heroGlow} pointerEvents="none" />
+          <View style={styles.avatarStack}>
+            {sortedMembers.slice(0, 4).map((m, i) => (
+              <View
+                key={m.userId}
+                style={[
+                  styles.stackAvatar,
+                  {marginLeft: i === 0 ? 0 : -12, zIndex: 4 - i},
+                ]}>
+                {m.profilePicUrl ? (
+                  <Image
+                    source={{uri: m.profilePicUrl}}
+                    style={styles.stackAvatarImage}
+                  />
+                ) : (
+                  <Text style={styles.stackAvatarInitials}>
+                    {(m.username || m.name || '?').slice(0, 2).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+            ))}
+            {sortedMembers.length > 4 ? (
+              <View
+                style={[
+                  styles.stackAvatar,
+                  styles.stackMore,
+                  {marginLeft: -12, zIndex: 0},
+                ]}>
+                <Text style={styles.stackMoreText}>
+                  +{sortedMembers.length - 4}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.groupName}>{group.name}</Text>
+          <View style={styles.metaRow}>
+            <View style={styles.privacyPill}>
+              <FontAwesomeIcon
+                icon={group.privacy === 'public' ? faGlobe : faLock}
+                size={11}
+                color={colors.secondaryText}
+              />
+              <Text style={styles.privacyText}>
+                {group.privacy === 'public' ? 'Public' : 'Private'}
+              </Text>
+            </View>
+            <Text style={styles.memberCountText}>
+              {group.memberCount}{' '}
+              {group.memberCount === 1 ? 'member' : 'members'}
             </Text>
           </View>
-          <Text style={styles.memberCountText}>
-            {group.memberCount} {group.memberCount === 1 ? 'member' : 'members'}
-          </Text>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.segment}>
         <TouchableOpacity
@@ -739,7 +907,7 @@ const GroupDetail: React.FC = () => {
           <FontAwesomeIcon
             icon={faUsers}
             size={13}
-            color={tab === 'members' ? colors.text : colors.secondaryText}
+            color={tab === 'members' ? '#FFFFFF' : colors.secondaryText}
           />
           <Text
             style={[
@@ -756,7 +924,7 @@ const GroupDetail: React.FC = () => {
           <FontAwesomeIcon
             icon={faComments}
             size={13}
-            color={tab === 'chat' ? colors.text : colors.secondaryText}
+            color={tab === 'chat' ? '#FFFFFF' : colors.secondaryText}
           />
           <Text
             style={[
@@ -771,6 +939,7 @@ const GroupDetail: React.FC = () => {
       {tab === 'chat' ? (
         <GroupChat
           groupId={group._id}
+          members={group.members}
           highlightMessageId={route.params?.highlightMessageId}
           highlightNonce={tabRequestId}
         />
@@ -780,47 +949,104 @@ const GroupDetail: React.FC = () => {
             data={sortedMembers}
             keyExtractor={item => item.userId}
             renderItem={renderMember}
+            contentContainerStyle={{paddingBottom: 12}}
             ListHeaderComponent={
               <View>
                 {group.upcomingEvents && group.upcomingEvents.length > 0 ? (
                   <View style={styles.upcomingStrip}>
-                    <View style={styles.sectionRow}>
+                    <View style={[styles.sectionRow, {paddingHorizontal: 0}]}>
+                      <Text style={styles.sectionTitle}>
+                        {t('groupChat.upcoming') || 'Upcoming'}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.sectionAction}
+                        onPress={planNextEvent}
+                        hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                        <FontAwesomeIcon
+                          icon={faPlus}
+                          size={12}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.sectionActionText}>
+                          {t('groupChat.planNext') || 'Plan next'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.upcomingPanel}>
+                      {group.upcomingEvents.map(
+                        (ev: GroupUpcomingEvent, idx: number) => (
+                          <TouchableOpacity
+                            key={ev._id}
+                            style={[
+                              styles.upcomingRow,
+                              idx === 0 && {borderTopWidth: 0},
+                            ]}
+                            activeOpacity={0.7}
+                            onPress={() => openEvent(ev._id)}>
+                            <View style={styles.upcomingIcon}>
+                              <FontAwesomeIcon
+                                icon={faCalendarDay}
+                                size={15}
+                                color={colors.primary}
+                              />
+                            </View>
+                            <View style={styles.upcomingBody}>
+                              <Text
+                                style={styles.upcomingName}
+                                numberOfLines={1}>
+                                {ev.name}
+                              </Text>
+                              <Text
+                                style={styles.upcomingMeta}
+                                numberOfLines={1}>
+                                {ev.date}
+                                {ev.time ? ` · ${ev.time}` : ''}
+                                {ev.location ? ` · ${ev.location}` : ''}
+                              </Text>
+                            </View>
+                            <FontAwesomeIcon
+                              icon={faChevronRight}
+                              size={13}
+                              color={colors.secondaryText}
+                            />
+                          </TouchableOpacity>
+                        ),
+                      )}
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.upcomingStrip}>
+                    <View style={[styles.sectionRow, {paddingHorizontal: 0}]}>
                       <Text style={styles.sectionTitle}>
                         {t('groupChat.upcoming') || 'Upcoming'}
                       </Text>
                     </View>
-                    {group.upcomingEvents.map((ev: GroupUpcomingEvent) => (
+                    <View style={styles.upcomingPanel}>
+                      <View style={{paddingHorizontal: 14, paddingTop: 14}}>
+                        <Text style={styles.upcomingName}>
+                          {t('groupChat.planNextEvent') || 'Plan next event'}
+                        </Text>
+                        <Text style={styles.upcomingMeta}>
+                          {t('groupChat.planNextEventHint') ||
+                            'Create a hangout with this group invited'}
+                        </Text>
+                      </View>
                       <TouchableOpacity
-                        key={ev._id}
-                        style={styles.upcomingRow}
-                        activeOpacity={0.7}
-                        onPress={() => openEvent(ev._id)}>
-                        <View style={styles.upcomingIcon}>
-                          <FontAwesomeIcon
-                            icon={faCalendarDay}
-                            size={15}
-                            color={colors.primary}
-                          />
-                        </View>
-                        <View style={styles.upcomingBody}>
-                          <Text style={styles.upcomingName} numberOfLines={1}>
-                            {ev.name}
-                          </Text>
-                          <Text style={styles.upcomingMeta} numberOfLines={1}>
-                            {ev.date}
-                            {ev.time ? ` · ${ev.time}` : ''}
-                            {ev.location ? ` · ${ev.location}` : ''}
-                          </Text>
-                        </View>
+                        style={styles.planNextCta}
+                        onPress={planNextEvent}
+                        activeOpacity={0.85}>
                         <FontAwesomeIcon
-                          icon={faChevronRight}
-                          size={13}
-                          color={colors.secondaryText}
+                          icon={faPlus}
+                          size={14}
+                          color="#FFFFFF"
                         />
+                        <Text style={styles.planNextCtaText}>
+                          {t('groupChat.planNextEvent') || 'Plan next event'}
+                        </Text>
                       </TouchableOpacity>
-                    ))}
+                    </View>
                   </View>
-                ) : null}
+                )}
                 <View style={styles.sectionRow}>
                   <Text style={styles.sectionTitle}>
                     {t('groupChat.tabMembers') || 'Members'}
@@ -844,37 +1070,62 @@ const GroupDetail: React.FC = () => {
           />
 
           <View style={styles.footer}>
-            {myMembership ? (
-              <TouchableOpacity
-                style={styles.leaveBtn}
-                onPress={handleLeave}
-                disabled={busy}>
-                {busy ? (
-                  <ActivityIndicator size="small" color={colors.text} />
-                ) : (
-                  <>
-                    <FontAwesomeIcon
-                      icon={faRightFromBracket}
-                      size={14}
-                      color={colors.text}
-                    />
-                    <Text style={styles.leaveBtnText}>Leave group</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            ) : null}
-            {isCreator ? (
-              <TouchableOpacity
-                style={styles.destructiveBtn}
-                onPress={handleDelete}
-                disabled={busy}>
-                <FontAwesomeIcon
-                  icon={faTrash}
-                  size={14}
-                  color={colors.error}
-                />
-                <Text style={styles.destructiveBtnText}>Delete group</Text>
-              </TouchableOpacity>
+            {myMembership || isCreator ? (
+              <>
+                  <TouchableOpacity
+                  style={styles.actionsToggle}
+                  onPress={toggleActions}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{expanded: actionsOpen}}>
+                  <Text style={styles.actionsToggleText}>
+                    {actionsOpen ? 'Hide group options' : 'Group options'}
+                  </Text>
+                  <FontAwesomeIcon
+                    icon={actionsOpen ? faChevronUp : faChevronDown}
+                    size={12}
+                    color={colors.secondaryText}
+                  />
+                </TouchableOpacity>
+                {actionsOpen ? (
+                  <View style={styles.actionsBody}>
+                    {myMembership ? (
+                      <TouchableOpacity
+                        style={styles.leaveBtn}
+                        onPress={handleLeave}
+                        disabled={busy}>
+                        {busy ? (
+                          <ActivityIndicator size="small" color={colors.text} />
+                        ) : (
+                          <>
+                            <FontAwesomeIcon
+                              icon={faRightFromBracket}
+                              size={14}
+                              color={colors.text}
+                            />
+                            <Text style={styles.leaveBtnText}>Leave group</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    ) : null}
+                    {isCreator ? (
+                      <TouchableOpacity
+                        style={styles.destructiveBtn}
+                        onPress={handleDelete}
+                        disabled={busy}>
+                        <FontAwesomeIcon
+                          icon={faTrash}
+                          size={14}
+                          color={colors.error}
+                        />
+                        <Text style={styles.destructiveBtnText}>
+                          Delete group
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : null}
+              </>
             ) : null}
           </View>
         </>

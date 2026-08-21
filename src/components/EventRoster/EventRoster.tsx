@@ -56,6 +56,7 @@ import {
   faStar,
   faCalendarPlus,
   faEllipsisH,
+  faInfoCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notificationService from '../../services/NotificationService';
@@ -423,10 +424,13 @@ const EventRoster: React.FC = () => {
   const [savingRoster, setSavingRoster] = useState(false);
   const [addPlayerExpanded, setAddPlayerExpanded] = useState(false);
 
-  const [activeTeamTab, setActiveTeamTab] = useState<string>('all');
+  const [activeTeamTab, setActiveTeamTab] = useState<string>('');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>(
     'all',
   );
+  // Details = event info / join / invites / RSVP. Roster = team tabs + players.
+  const [surfaceTab, setSurfaceTab] = useState<'details' | 'roster'>('details');
+  const [trackPayment, setTrackPayment] = useState(false);
 
   // Edit mode state
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -643,32 +647,55 @@ const EventRoster: React.FC = () => {
     return {paidCount, unpaidCount, positionCounts, teamCounts};
   }, [roster]);
 
-  const teamColors = useMemo(() => {
+  const teamColors = useMemo((): string[] => {
     if (!isTeamSport(eventType)) {
       return [];
     }
+    // Prefer the event's declared jersey pair so both teams stay selectable
+    // even when one side is empty (no "All" fallback).
+    if (eventJerseyColors && eventJerseyColors.length === 2) {
+      return eventJerseyColors;
+    }
     return Object.keys(rosterStats.teamCounts).filter(c => c !== 'N/A');
-  }, [rosterStats.teamCounts, eventType]);
+  }, [rosterStats.teamCounts, eventType, eventJerseyColors]);
+
+  // Default / repair the selected team when colors load or change.
+  useEffect(() => {
+    if (teamColors.length < 2) {
+      return;
+    }
+    if (!teamColors.includes(activeTeamTab)) {
+      setActiveTeamTab(teamColors[0]);
+    }
+  }, [teamColors, activeTeamTab]);
 
   const filteredRoster = useMemo(() => {
     let players = roster;
 
-    if (
-      isTeamSport(eventType) &&
-      activeTeamTab !== 'all' &&
-      teamColors.length > 1
-    ) {
+    if (isTeamSport(eventType) && teamColors.length > 1 && activeTeamTab) {
       players = players.filter(p => p.jerseyColor === activeTeamTab);
     }
 
-    if (paymentFilter === 'paid') {
-      players = players.filter(p => p.paidStatus === 'Paid');
-    } else if (paymentFilter === 'unpaid') {
-      players = players.filter(p => p.paidStatus === 'Unpaid');
+    if (
+      trackPayment &&
+      (paymentFilter === 'paid' || paymentFilter === 'unpaid')
+    ) {
+      players = players.filter(p =>
+        paymentFilter === 'paid'
+          ? p.paidStatus === 'Paid'
+          : p.paidStatus === 'Unpaid',
+      );
     }
 
     return players;
-  }, [roster, activeTeamTab, paymentFilter, eventType, teamColors]);
+  }, [
+    roster,
+    activeTeamTab,
+    paymentFilter,
+    eventType,
+    teamColors,
+    trackPayment,
+  ]);
 
   const scaledPositions = useMemo(() => {
     const numTeams = teamColors.length > 1 ? teamColors.length : 1;
@@ -678,7 +705,7 @@ const EventRoster: React.FC = () => {
   const positionSummary = useMemo(() => {
     const positions = positionOptions[eventType] || positionOptions.Default;
     const currentPlayers =
-      isTeamSport(eventType) && activeTeamTab !== 'all' && teamColors.length > 1
+      isTeamSport(eventType) && teamColors.length > 1 && activeTeamTab
         ? roster.filter(p => p.jerseyColor === activeTeamTab)
         : roster;
 
@@ -717,6 +744,34 @@ const EventRoster: React.FC = () => {
         },
         scrollContent: {
           paddingBottom: 32,
+        },
+        surfaceSegment: {
+          flexDirection: 'row',
+          backgroundColor: colors.inputBackground || colors.card,
+          borderRadius: 14,
+          padding: 4,
+          marginHorizontal: 16,
+          marginBottom: 10,
+        },
+        surfaceSegmentBtn: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          paddingVertical: 10,
+          borderRadius: 11,
+        },
+        surfaceSegmentBtnActive: {
+          backgroundColor: colors.primary,
+        },
+        surfaceSegmentText: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.secondaryText,
+        },
+        surfaceSegmentTextActive: {
+          color: '#FFFFFF',
         },
         // Section building blocks
         section: {
@@ -1444,9 +1499,60 @@ const EventRoster: React.FC = () => {
           paddingVertical: 12,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
+          overflow: 'hidden',
         },
         playerCardSelf: {
           backgroundColor: colors.primary + '08',
+        },
+        playerCardTeamRail: {
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+        },
+        playerCardWithTeam: {
+          paddingLeft: 20,
+        },
+        teamPill: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 5,
+          backgroundColor: colors.card,
+          borderRadius: 10,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        teamPillText: {
+          fontSize: 11,
+          fontWeight: '800',
+          color: colors.text,
+        },
+        kebabBtn: {
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        onTeamBanner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          alignSelf: 'center',
+          marginTop: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 8,
+          borderRadius: 16,
+          backgroundColor: colors.primary + '18',
+        },
+        onTeamBannerText: {
+          color: colors.primary,
+          fontSize: 14,
+          fontWeight: '700',
         },
         avatar: {
           width: 42,
@@ -1799,6 +1905,7 @@ const EventRoster: React.FC = () => {
       if (response.data.isVirtual !== undefined) {
         setIsVirtual(!!response.data.isVirtual);
       }
+      setTrackPayment(response.data.trackPayment === true);
       if (response.data.durationMinutes != null) {
         setDurationMinutes(response.data.durationMinutes);
       } else {
@@ -1816,6 +1923,8 @@ const EventRoster: React.FC = () => {
         response.data.jerseyColors.length === 2
       ) {
         setEventJerseyColors(response.data.jerseyColors);
+      } else {
+        setEventJerseyColors([]);
       }
       // Update privacy settings
       setEventPrivacy(response.data.privacy || 'public');
@@ -2138,7 +2247,12 @@ const EventRoster: React.FC = () => {
   // Add player via dedicated endpoint (triggers backend notifications)
   const handleSave = async () => {
     const isSport = isTeamSport(eventType);
-    if (!username || !position || (isSport && (!paidStatus || !jerseyColor))) {
+    if (
+      !username ||
+      !position ||
+      (isSport && !jerseyColor) ||
+      (isSport && trackPayment && !paidStatus)
+    ) {
       setErrorMessage('Please fill out all fields.');
       return;
     }
@@ -2150,7 +2264,7 @@ const EventRoster: React.FC = () => {
     const newPlayer: Player = {
       userId: userData?._id,
       username,
-      paidStatus: isSport ? paidStatus : 'N/A',
+      paidStatus: isSport && trackPayment ? paidStatus : 'N/A',
       jerseyColor: isSport ? jerseyColor : 'N/A',
       position,
       profilePicUrl: userData?.profilePicUrl,
@@ -2188,6 +2302,7 @@ const EventRoster: React.FC = () => {
 
     const updatedRoster = [...roster, newPlayer];
     setRoster(updatedRoster);
+    setSurfaceTab('roster');
     updateRosterSpots(eventId, updatedRoster.length);
     analyticsService.trackJoinEvent(eventId, eventName).catch(() => {});
 
@@ -2679,7 +2794,11 @@ const EventRoster: React.FC = () => {
   // Save edited player info
   const handleSaveEdit = useCallback(async () => {
     const isSport = isTeamSport(eventType);
-    if (!editPosition || (isSport && (!editPaidStatus || !editJerseyColor))) {
+    if (
+      !editPosition ||
+      (isSport && !editJerseyColor) ||
+      (isSport && trackPayment && !editPaidStatus)
+    ) {
       Alert.alert(t('roster.missingFields'), t('roster.missingFieldsMessage'));
       return;
     }
@@ -2687,7 +2806,10 @@ const EventRoster: React.FC = () => {
       player.username === userData?.username
         ? {
             ...player,
-            paidStatus: editPaidStatus,
+            paidStatus:
+              isSport && trackPayment
+                ? editPaidStatus
+                : player.paidStatus || 'N/A',
             jerseyColor: editJerseyColor,
             position: editPosition,
           }
@@ -2704,6 +2826,7 @@ const EventRoster: React.FC = () => {
     t,
     roster,
     eventType,
+    trackPayment,
     persistRoster,
   ]);
 
@@ -2823,13 +2946,105 @@ const EventRoster: React.FC = () => {
       </View>
     );
 
+    const hasTeam =
+      isTeamSport(eventType) &&
+      !!item.jerseyColor &&
+      item.jerseyColor !== 'N/A';
+    const validPositions =
+      positionOptions[eventType] || positionOptions.Default;
+    const displayPosition = validPositions.includes(item.position)
+      ? item.position
+      : validPositions[0];
+
+    const openPlayerMenu = () => {
+      const options: {
+        label: string;
+        style?: 'destructive' | 'cancel';
+        onPress: () => void;
+      }[] = [];
+
+      if (isSelf) {
+        options.push({
+          label: t('roster.editPlayer') || 'Edit',
+          onPress: handleEdit,
+        });
+        options.push({
+          label: t('roster.leaveRoster') || 'Leave',
+          style: 'destructive',
+          onPress: () => handleDelete(item.username),
+        });
+      } else {
+        if (item.userId) {
+          options.push({
+            label: t('roster.message') || 'Message',
+            onPress: () =>
+              messageUser({
+                userId: item.userId,
+                username: item.username,
+                profilePicUrl: item.profilePicUrl,
+              }),
+          });
+        }
+        if (isEventCreator) {
+          options.push({
+            label: t('roster.boot') || 'Remove',
+            style: 'destructive',
+            onPress: () => handleDelete(item.username, {boot: true}),
+          });
+        }
+      }
+      if (options.length === 0) {
+        return;
+      }
+      options.push({
+        label: t('common.cancel') || 'Cancel',
+        style: 'cancel',
+        onPress: () => {},
+      });
+
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: options.map(o => o.label),
+            cancelButtonIndex: options.length - 1,
+            destructiveButtonIndex: options.findIndex(
+              o => o.style === 'destructive',
+            ),
+          },
+          idx => options[idx]?.onPress?.(),
+        );
+      } else {
+        Alert.alert(
+          item.username,
+          undefined,
+          options.map(o => ({
+            text: o.label,
+            style: o.style,
+            onPress: o.onPress,
+          })),
+        );
+      }
+    };
+
+    const showMenu = isSelf || !!item.userId || isEventCreator;
+
     return (
       <View
         key={item.userId || item.username}
         style={[
           themedStyles.playerCard,
           isSelf && themedStyles.playerCardSelf,
+          hasTeam && themedStyles.playerCardWithTeam,
         ]}>
+        {hasTeam ? (
+          <View
+            style={[
+              themedStyles.playerCardTeamRail,
+              {backgroundColor: jerseyColorHex},
+            ]}
+            pointerEvents="none"
+          />
+        ) : null}
         {avatarWithChip}
         <View style={themedStyles.playerInfo}>
           {canNavigateToProfile ? (
@@ -2844,97 +3059,67 @@ const EventRoster: React.FC = () => {
             </Text>
           )}
           <View style={themedStyles.playerDetails}>
-            {/* Position Badge */}
-            <View style={themedStyles.playerBadge}>
-              <FontAwesomeIcon icon={faFutbol} size={10} color={colors.text} />
-              <Text style={themedStyles.playerBadgeText}>{item.position}</Text>
-            </View>
-            {/* Paid Status Badge - Sports only */}
-            {isTeamSport(eventType) && item.paidStatus !== 'N/A' && (
-              <View
-                style={[
-                  themedStyles.playerBadge,
-                  item.paidStatus === 'Paid'
-                    ? themedStyles.paidBadge
-                    : themedStyles.unpaidBadge,
-                ]}>
-                <FontAwesomeIcon
-                  icon={item.paidStatus === 'Paid' ? faCheck : faTimes}
-                  size={10}
-                  color={item.paidStatus === 'Paid' ? '#4CAF50' : colors.error}
-                />
-                <Text
-                  style={[
-                    themedStyles.playerBadgeText,
-                    item.paidStatus === 'Paid'
-                      ? themedStyles.paidBadgeText
-                      : themedStyles.unpaidBadgeText,
-                  ]}>
-                  {item.paidStatus}
-                </Text>
-              </View>
-            )}
-            {/* Jersey Color - Sports only */}
-            {isTeamSport(eventType) && item.jerseyColor !== 'N/A' && (
-              <View style={themedStyles.playerBadge}>
+            {hasTeam ? (
+              <View style={themedStyles.teamPill}>
                 <View
                   style={[
                     themedStyles.jerseyIndicator,
                     {backgroundColor: jerseyColorHex},
                   ]}
                 />
-                <Text style={themedStyles.playerBadgeText}>
+                <Text style={themedStyles.teamPillText}>
                   {item.jerseyColor}
                 </Text>
               </View>
-            )}
+            ) : null}
+            <View style={themedStyles.playerBadge}>
+              <FontAwesomeIcon icon={faFutbol} size={10} color={colors.text} />
+              <Text style={themedStyles.playerBadgeText}>
+                {displayPosition}
+              </Text>
+            </View>
+            {trackPayment &&
+              isTeamSport(eventType) &&
+              item.paidStatus !== 'N/A' && (
+                <View
+                  style={[
+                    themedStyles.playerBadge,
+                    item.paidStatus === 'Paid'
+                      ? themedStyles.paidBadge
+                      : themedStyles.unpaidBadge,
+                  ]}>
+                  <FontAwesomeIcon
+                    icon={item.paidStatus === 'Paid' ? faCheck : faTimes}
+                    size={10}
+                    color={
+                      item.paidStatus === 'Paid' ? '#4CAF50' : colors.error
+                    }
+                  />
+                  <Text
+                    style={[
+                      themedStyles.playerBadgeText,
+                      item.paidStatus === 'Paid'
+                        ? themedStyles.paidBadgeText
+                        : themedStyles.unpaidBadgeText,
+                    ]}>
+                    {item.paidStatus}
+                  </Text>
+                </View>
+              )}
           </View>
         </View>
-        {!isSelf && (!!item.userId || isEventCreator) && (
-          <View style={themedStyles.playerActions}>
-            {!!item.userId && (
-              <TouchableOpacity
-                style={[themedStyles.rsvpRemindBtn, {marginLeft: 0}]}
-                onPress={() =>
-                  messageUser({
-                    userId: item.userId,
-                    username: item.username,
-                    profilePicUrl: item.profilePicUrl,
-                  })
-                }
-                hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}>
-                <FontAwesomeIcon
-                  icon={faComment}
-                  size={13}
-                  color={colors.primary}
-                />
-              </TouchableOpacity>
-            )}
-            {isEventCreator && (
-              <TouchableOpacity
-                style={themedStyles.deleteButton}
-                onPress={() => handleDelete(item.username, {boot: true})}>
-                <Text style={themedStyles.deleteButtonText}>
-                  {t('roster.boot') || 'Remove'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-        {isSelf && (
-          <View style={themedStyles.playerActions}>
-            <TouchableOpacity
-              style={themedStyles.editButton}
-              onPress={handleEdit}>
-              <Text style={themedStyles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={themedStyles.deleteButton}
-              onPress={() => handleDelete(item.username)}>
-              <Text style={themedStyles.deleteButtonText}>Leave</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {showMenu ? (
+          <TouchableOpacity
+            style={themedStyles.kebabBtn}
+            onPress={openPlayerMenu}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            <FontAwesomeIcon
+              icon={faEllipsisH}
+              size={16}
+              color={colors.secondaryText}
+            />
+          </TouchableOpacity>
+        ) : null}
       </View>
     );
   };
@@ -2973,1487 +3158,1625 @@ const EventRoster: React.FC = () => {
             </Text>
           </Animated.View>
 
-          {/* Event Details Card */}
-          <View style={themedStyles.eventCard}>
-            <View style={themedStyles.eventTypeRow}>
-              <View style={themedStyles.eventTypeBadge}>
-                <Text style={themedStyles.eventTypeText}>{eventType}</Text>
-              </View>
-            </View>
+          <View style={themedStyles.surfaceSegment}>
+            <TouchableOpacity
+              style={[
+                themedStyles.surfaceSegmentBtn,
+                surfaceTab === 'details' &&
+                  themedStyles.surfaceSegmentBtnActive,
+              ]}
+              activeOpacity={0.85}
+              onPress={() => setSurfaceTab('details')}>
+              <FontAwesomeIcon
+                icon={faInfoCircle}
+                size={13}
+                color={
+                  surfaceTab === 'details' ? '#FFFFFF' : colors.secondaryText
+                }
+              />
+              <Text
+                style={[
+                  themedStyles.surfaceSegmentText,
+                  surfaceTab === 'details' &&
+                    themedStyles.surfaceSegmentTextActive,
+                ]}>
+                {t('roster.tabDetails') || 'Details'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                themedStyles.surfaceSegmentBtn,
+                surfaceTab === 'roster' && themedStyles.surfaceSegmentBtnActive,
+              ]}
+              activeOpacity={0.85}
+              onPress={() => setSurfaceTab('roster')}>
+              <FontAwesomeIcon
+                icon={faUsers}
+                size={13}
+                color={
+                  surfaceTab === 'roster' ? '#FFFFFF' : colors.secondaryText
+                }
+              />
+              <Text
+                style={[
+                  themedStyles.surfaceSegmentText,
+                  surfaceTab === 'roster' &&
+                    themedStyles.surfaceSegmentTextActive,
+                ]}>
+                {t('roster.tabRoster') || 'Roster'}
+                {roster.length > 0 ? ` · ${roster.length}` : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-            {date && (
-              <Animated.View
-                style={[
-                  themedStyles.eventDetailRow,
-                  highlightedFields.has('date') && {
-                    backgroundColor: highlightBgColor,
-                    borderRadius: 8,
-                    marginHorizontal: -6,
-                    paddingHorizontal: 6,
-                  },
-                ]}>
-                <Text style={themedStyles.eventDetailIcon}>📅</Text>
-                <Text style={themedStyles.eventDetailText}>{date}</Text>
-              </Animated.View>
-            )}
-            {time && (
-              <Animated.View
-                style={[
-                  themedStyles.eventDetailRow,
-                  highlightedFields.has('time') && {
-                    backgroundColor: highlightBgColor,
-                    borderRadius: 8,
-                    marginHorizontal: -6,
-                    paddingHorizontal: 6,
-                  },
-                ]}>
-                <Text style={themedStyles.eventDetailIcon}>🕐</Text>
-                <Text style={themedStyles.eventDetailText}>{time}</Text>
-              </Animated.View>
-            )}
-            {location && (
-              <Animated.View
-                style={[
-                  themedStyles.eventDetailRow,
-                  highlightedFields.has('location') && {
-                    backgroundColor: highlightBgColor,
-                    borderRadius: 8,
-                    marginHorizontal: -6,
-                    paddingHorizontal: 6,
-                  },
-                ]}>
-                <Text style={themedStyles.eventDetailIcon}>📍</Text>
-                <Text style={themedStyles.eventDetailText}>
-                  {isVirtual
-                    ? (() => {
-                        const badge =
-                          t('events.virtualLocationBadge') || 'Other';
-                        const loc = location.trim();
-                        const generic =
-                          !loc ||
-                          loc.toLowerCase() === 'other' ||
-                          loc.toLowerCase() === 'online / other' ||
-                          loc.toLowerCase() === 'online/other';
-                        return generic ? badge : `${badge} · ${loc}`;
-                      })()
-                    : location}
-                </Text>
-              </Animated.View>
-            )}
+          {surfaceTab === 'details' ? (
+            <>
+              {/* Event Details Card */}
+              <View style={themedStyles.eventCard}>
+                <View style={themedStyles.eventTypeRow}>
+                  <View style={themedStyles.eventTypeBadge}>
+                    <Text style={themedStyles.eventTypeText}>{eventType}</Text>
+                  </View>
+                </View>
 
-            {(canAddToCalendar || canRateEvent) && (
-              <View style={themedStyles.eventActionButtons}>
-                {canAddToCalendar && (
-                  <TouchableOpacity
-                    style={themedStyles.rateEventButton}
-                    onPress={() =>
-                      addEventToCalendar(
-                        {
-                          title: eventName || 'BetterPlay event',
-                          date,
-                          time,
-                          durationMinutes,
-                          location,
-                          eventType,
-                        },
-                        t,
-                      )
-                    }>
-                    <FontAwesomeIcon
-                      icon={faCalendarPlus}
-                      size={13}
-                      color={colors.primary}
-                    />
-                    <Text style={themedStyles.rateEventButtonText}>
-                      {t('events.addToCalendar', {
-                        defaultValue: 'Add to calendar',
-                      })}
-                    </Text>
-                  </TouchableOpacity>
+                {date && (
+                  <Animated.View
+                    style={[
+                      themedStyles.eventDetailRow,
+                      highlightedFields.has('date') && {
+                        backgroundColor: highlightBgColor,
+                        borderRadius: 8,
+                        marginHorizontal: -6,
+                        paddingHorizontal: 6,
+                      },
+                    ]}>
+                    <Text style={themedStyles.eventDetailIcon}>📅</Text>
+                    <Text style={themedStyles.eventDetailText}>{date}</Text>
+                  </Animated.View>
                 )}
-                {canRateEvent && (
-                  <TouchableOpacity
-                    style={themedStyles.rateEventButton}
-                    onPress={() => setRatingModalVisible(true)}>
-                    <FontAwesomeIcon
-                      icon={faStar}
-                      size={13}
-                      color={colors.primary}
-                    />
-                    <Text style={themedStyles.rateEventButtonText}>
-                      Rate this event
-                    </Text>
-                  </TouchableOpacity>
+                {time && (
+                  <Animated.View
+                    style={[
+                      themedStyles.eventDetailRow,
+                      highlightedFields.has('time') && {
+                        backgroundColor: highlightBgColor,
+                        borderRadius: 8,
+                        marginHorizontal: -6,
+                        paddingHorizontal: 6,
+                      },
+                    ]}>
+                    <Text style={themedStyles.eventDetailIcon}>🕐</Text>
+                    <Text style={themedStyles.eventDetailText}>{time}</Text>
+                  </Animated.View>
                 )}
-              </View>
-            )}
+                {location && (
+                  <Animated.View
+                    style={[
+                      themedStyles.eventDetailRow,
+                      highlightedFields.has('location') && {
+                        backgroundColor: highlightBgColor,
+                        borderRadius: 8,
+                        marginHorizontal: -6,
+                        paddingHorizontal: 6,
+                      },
+                    ]}>
+                    <Text style={themedStyles.eventDetailIcon}>📍</Text>
+                    <Text style={themedStyles.eventDetailText}>
+                      {isVirtual
+                        ? (() => {
+                            const badge =
+                              t('events.virtualLocationBadge') || 'Other';
+                            const loc = location.trim();
+                            const generic =
+                              !loc ||
+                              loc.toLowerCase() === 'other' ||
+                              loc.toLowerCase() === 'online / other' ||
+                              loc.toLowerCase() === 'online/other';
+                            return generic ? badge : `${badge} · ${loc}`;
+                          })()
+                        : location}
+                    </Text>
+                  </Animated.View>
+                )}
 
-            {/* Group banner — shown whenever an event belongs to a Group.
+                {(canAddToCalendar || canRateEvent) && (
+                  <View style={themedStyles.eventActionButtons}>
+                    {canAddToCalendar && (
+                      <TouchableOpacity
+                        style={themedStyles.rateEventButton}
+                        onPress={() =>
+                          addEventToCalendar(
+                            {
+                              title: eventName || 'BetterPlay event',
+                              date,
+                              time,
+                              durationMinutes,
+                              location,
+                              eventType,
+                            },
+                            t,
+                          )
+                        }>
+                        <FontAwesomeIcon
+                          icon={faCalendarPlus}
+                          size={13}
+                          color={colors.primary}
+                        />
+                        <Text style={themedStyles.rateEventButtonText}>
+                          {t('events.addToCalendar', {
+                            defaultValue: 'Add to calendar',
+                          })}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {canRateEvent && (
+                      <TouchableOpacity
+                        style={themedStyles.rateEventButton}
+                        onPress={() => setRatingModalVisible(true)}>
+                        <FontAwesomeIcon
+                          icon={faStar}
+                          size={13}
+                          color={colors.primary}
+                        />
+                        <Text style={themedStyles.rateEventButtonText}>
+                          Rate this event
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* Group banner — shown whenever an event belongs to a Group.
                 Tappable to jump straight to the group. For recurring series
                 it also explains the live-link (adding a member invites them
                 to future instances automatically). */}
-            {paramGroupName ? (
-              <TouchableOpacity
-                style={themedStyles.groupLinkBanner}
-                activeOpacity={0.7}
-                onPress={() => openGroup(paramGroupId)}
-                disabled={!paramGroupId}>
-                <FontAwesomeIcon
-                  icon={faUsers}
-                  size={13}
-                  color={colors.primary}
-                />
-                <Text style={themedStyles.groupLinkBannerText}>
-                  {paramIsRecurring ? (
-                    <>
-                      This series invites everyone in{' '}
-                      <Text style={themedStyles.groupLinkBannerName}>
-                        {paramGroupName}
+                {paramGroupName ? (
+                  <TouchableOpacity
+                    style={themedStyles.groupLinkBanner}
+                    activeOpacity={0.7}
+                    onPress={() => openGroup(paramGroupId)}
+                    disabled={!paramGroupId}>
+                    <FontAwesomeIcon
+                      icon={faUsers}
+                      size={13}
+                      color={colors.primary}
+                    />
+                    <Text style={themedStyles.groupLinkBannerText}>
+                      {paramIsRecurring ? (
+                        <>
+                          This series invites everyone in{' '}
+                          <Text style={themedStyles.groupLinkBannerName}>
+                            {paramGroupName}
+                          </Text>
+                          .
+                        </>
+                      ) : (
+                        <>
+                          Part of{' '}
+                          <Text style={themedStyles.groupLinkBannerName}>
+                            {paramGroupName}
+                          </Text>
+                        </>
+                      )}
+                    </Text>
+                    {paramGroupId ? (
+                      <FontAwesomeIcon
+                        icon={faChevronRight}
+                        size={12}
+                        color={colors.primary}
+                      />
+                    ) : null}
+                  </TouchableOpacity>
+                ) : null}
+
+                {/* Progress Bar */}
+                <Animated.View
+                  style={[
+                    themedStyles.progressSection,
+                    highlightedFields.has('totalSpots') && {
+                      backgroundColor: highlightBgColor,
+                      borderRadius: 8,
+                      marginHorizontal: -6,
+                      paddingHorizontal: 6,
+                    },
+                  ]}>
+                  <View style={themedStyles.progressHeader}>
+                    <Text style={themedStyles.progressLabel}>
+                      {t('roster.rosterSpots')}
+                    </Text>
+                    <Text style={themedStyles.progressCount}>
+                      {totalSpots > 0
+                        ? `${roster.length} / ${totalSpots}`
+                        : `${roster.length} · ${
+                            t('events.noLimit') || 'No limit'
+                          }`}
+                    </Text>
+                  </View>
+                  <View style={themedStyles.progressBarBg}>
+                    <View
+                      style={[
+                        themedStyles.progressBarFill,
+                        {width: `${progressPercentage}%`},
+                      ]}
+                    />
+                  </View>
+                  <Text style={themedStyles.progressRemaining}>
+                    {spotsRemaining === null
+                      ? t('events.noLimit') || 'No limit'
+                      : spotsRemaining > 0
+                      ? t('roster.spotsRemaining', {count: spotsRemaining})
+                      : t('roster.rosterFull')}
+                    {isEventFull && waitlist.length > 0
+                      ? ` · ${waitlist.length} on waitlist`
+                      : ''}
+                  </Text>
+                </Animated.View>
+              </View>
+
+              {/* Stats Section */}
+              {roster.length > 0 && (
+                <View style={themedStyles.statsSection}>
+                  <Text style={themedStyles.statsSectionTitle}>
+                    📊 {t('roster.rosterStats')}
+                  </Text>
+                  <View style={themedStyles.statsRow}>
+                    <View style={themedStyles.statItem}>
+                      <Text style={themedStyles.statValue}>
+                        {roster.length}
                       </Text>
-                      .
+                      <Text style={themedStyles.statLabel}>
+                        {t('roster.players')}
+                      </Text>
+                    </View>
+                    {isTeamSport(eventType) && trackPayment && (
+                      <View style={themedStyles.statItem}>
+                        <Text style={themedStyles.statValueGreen}>
+                          {rosterStats.paidCount}
+                        </Text>
+                        <Text style={themedStyles.statLabel}>
+                          {t('roster.paid')}
+                        </Text>
+                      </View>
+                    )}
+                    {isTeamSport(eventType) && trackPayment && (
+                      <View style={themedStyles.statItem}>
+                        <Text style={themedStyles.statValueError}>
+                          {rosterStats.unpaidCount}
+                        </Text>
+                        <Text style={themedStyles.statLabel}>
+                          {t('roster.unpaid')}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Team Breakdown - Sports only */}
+                  {isTeamSport(eventType) &&
+                    Object.keys(rosterStats.teamCounts).length > 1 && (
+                      <View style={themedStyles.teamBreakdown}>
+                        <Text style={themedStyles.statsSectionTitleSmall}>
+                          {t('roster.teamsByJersey')}
+                        </Text>
+                        <View style={themedStyles.teamRow}>
+                          {Object.entries(rosterStats.teamCounts).map(
+                            ([color, count]) => (
+                              <View
+                                key={color}
+                                style={[
+                                  themedStyles.teamBadge,
+                                  {
+                                    borderColor:
+                                      jerseyColors[color] || jerseyColors.Other,
+                                  },
+                                ]}>
+                                <View
+                                  style={[
+                                    themedStyles.jerseyIndicator,
+                                    {
+                                      backgroundColor:
+                                        jerseyColors[color] ||
+                                        jerseyColors.Other,
+                                    },
+                                  ]}
+                                />
+                                <Text style={themedStyles.teamBadgeText}>
+                                  {color}: {count}
+                                </Text>
+                              </View>
+                            ),
+                          )}
+                        </View>
+                      </View>
+                    )}
+                </View>
+              )}
+
+              {/* Primary CTAs — Join / Suggest guest / Invite (obvious buttons) */}
+              {((canJoinEvent && !isUserOnRoster) ||
+                canSuggestGuests ||
+                (eventPrivacy === 'invite-only' && isEventCreator)) && (
+                <View style={themedStyles.primaryActionsRow}>
+                  {canJoinEvent && !isUserOnRoster && (
+                    <TouchableOpacity
+                      style={themedStyles.primaryActionButton}
+                      onPress={() => {
+                        if (isEventFull && !isMyReservation) {
+                          if (isUserOnWaitlist) {
+                            handleLeaveWaitlist();
+                          } else {
+                            handleJoinWaitlist();
+                          }
+                          return;
+                        }
+                        setAddPlayerExpanded(true);
+                      }}
+                      activeOpacity={0.85}
+                      disabled={joiningWaitlist}>
+                      {joiningWaitlist ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.buttonText || '#fff'}
+                        />
+                      ) : (
+                        <FontAwesomeIcon
+                          icon={faUserPlus}
+                          size={16}
+                          color={colors.buttonText || '#fff'}
+                        />
+                      )}
+                      <Text style={themedStyles.primaryActionButtonText}>
+                        {isEventFull && !isMyReservation
+                          ? isUserOnWaitlist
+                            ? `Leave Waitlist (#${userWaitlistPosition})`
+                            : t('roster.joinWaitlist') || 'Join Waitlist'
+                          : t('roster.joinEvent')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {canSuggestGuests && (
+                    <TouchableOpacity
+                      style={[
+                        themedStyles.primaryActionButton,
+                        ((canJoinEvent && !isUserOnRoster) ||
+                          (eventPrivacy === 'invite-only' && isEventCreator)) &&
+                          themedStyles.primaryActionButtonSecondary,
+                      ]}
+                      onPress={() => setInviteExpanded(true)}
+                      activeOpacity={0.85}>
+                      <FontAwesomeIcon
+                        icon={faEnvelope}
+                        size={16}
+                        color={
+                          (canJoinEvent && !isUserOnRoster) ||
+                          (eventPrivacy === 'invite-only' && isEventCreator)
+                            ? colors.primary
+                            : colors.buttonText || '#fff'
+                        }
+                      />
+                      <Text
+                        style={[
+                          themedStyles.primaryActionButtonText,
+                          ((canJoinEvent && !isUserOnRoster) ||
+                            (eventPrivacy === 'invite-only' &&
+                              isEventCreator)) &&
+                            themedStyles.primaryActionButtonTextSecondary,
+                        ]}>
+                        {t('roster.suggestGuest') || 'Suggest a guest'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {eventPrivacy === 'invite-only' && isEventCreator && (
+                    <TouchableOpacity
+                      style={[
+                        themedStyles.primaryActionButton,
+                        ((canJoinEvent && !isUserOnRoster) ||
+                          canSuggestGuests) &&
+                          themedStyles.primaryActionButtonSecondary,
+                      ]}
+                      onPress={() => setInviteExpanded(true)}
+                      activeOpacity={0.85}>
+                      <FontAwesomeIcon
+                        icon={faEnvelope}
+                        size={16}
+                        color={
+                          (canJoinEvent && !isUserOnRoster) || canSuggestGuests
+                            ? colors.primary
+                            : colors.buttonText || '#fff'
+                        }
+                      />
+                      <Text
+                        style={[
+                          themedStyles.primaryActionButtonText,
+                          ((canJoinEvent && !isUserOnRoster) ||
+                            canSuggestGuests) &&
+                            themedStyles.primaryActionButtonTextSecondary,
+                        ]}>
+                        {t('roster.invitePlayers') || 'Invite People'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {/* Join form — expands from the primary Join button */}
+              {canJoinEvent && !isUserOnRoster && addPlayerExpanded && (
+                <View style={themedStyles.addPlayerSection}>
+                  <View style={themedStyles.addPlayerContent}>
+                    {errorMessage ? (
+                      <Text style={themedStyles.errorMessage}>
+                        {errorMessage}
+                      </Text>
+                    ) : null}
+
+                    <TextInput
+                      style={themedStyles.input}
+                      placeholder={t('roster.yourName')}
+                      placeholderTextColor={colors.placeholder}
+                      value={username}
+                      onChangeText={setUsername}
+                    />
+
+                    {/* Paid Status Dropdown - only when host opted into tracking */}
+                    {isTeamSport(eventType) && trackPayment && (
+                      <TouchableOpacity
+                        style={themedStyles.dropdown}
+                        onPress={() => setPaidStatusModalVisible(true)}>
+                        <Text
+                          style={
+                            paidStatus
+                              ? themedStyles.dropdownText
+                              : themedStyles.placeholderText
+                          }>
+                          {paidStatus || t('roster.selectPaidStatus')}
+                        </Text>
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          size={14}
+                          color={colors.placeholder}
+                        />
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Jersey Color Dropdown - Sports only */}
+                    {isTeamSport(eventType) && (
+                      <TouchableOpacity
+                        style={themedStyles.dropdown}
+                        onPress={() => setJerseyColorModalVisible(true)}>
+                        <View style={themedStyles.jerseyDropdownRow}>
+                          {jerseyColor && (
+                            <View
+                              style={[
+                                themedStyles.jerseyIndicatorLarge,
+                                {
+                                  backgroundColor:
+                                    jerseyColors[jerseyColor] ||
+                                    jerseyColors.Other,
+                                },
+                              ]}
+                            />
+                          )}
+                          <Text
+                            style={
+                              jerseyColor
+                                ? themedStyles.dropdownText
+                                : themedStyles.placeholderText
+                            }>
+                            {jerseyColor || t('roster.selectJerseyColor')}
+                          </Text>
+                        </View>
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          size={14}
+                          color={colors.placeholder}
+                        />
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Position Dropdown */}
+                    <TouchableOpacity
+                      style={themedStyles.dropdown}
+                      onPress={() => setPositionModalVisible(true)}>
+                      <Text
+                        style={
+                          position
+                            ? themedStyles.dropdownText
+                            : themedStyles.placeholderText
+                        }>
+                        {position || t('roster.selectPosition')}
+                      </Text>
+                      <FontAwesomeIcon
+                        icon={faChevronDown}
+                        size={14}
+                        color={colors.placeholder}
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        themedStyles.saveButton,
+                        ((spotsRemaining === 0 && !isMyReservation) ||
+                          savingRoster) &&
+                          themedStyles.saveButtonDisabled,
+                        isMyReservation && {backgroundColor: colors.primary},
+                      ]}
+                      onPress={handleSave}
+                      disabled={
+                        (spotsRemaining === 0 && !isMyReservation) ||
+                        savingRoster
+                      }>
+                      {savingRoster ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.buttonText}
+                        />
+                      ) : (
+                        <FontAwesomeIcon
+                          icon={
+                            isMyReservation || spotsRemaining === 0
+                              ? faUserPlus
+                              : faCheck
+                          }
+                          size={16}
+                          color={colors.buttonText}
+                        />
+                      )}
+                      <Text style={themedStyles.buttonText}>
+                        {savingRoster
+                          ? t('common.loading') || 'Joining...'
+                          : isMyReservation
+                          ? 'Claim Your Spot!'
+                          : spotsRemaining === 0
+                          ? t('roster.rosterFull')
+                          : t('common.confirm') || 'Confirm'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {isEventFull && !isUserOnRoster && !isMyReservation && (
+                      <TouchableOpacity
+                        style={[
+                          themedStyles.saveButton,
+                          {marginTop: 10},
+                          isUserOnWaitlist && {backgroundColor: colors.error},
+                        ]}
+                        onPress={
+                          isUserOnWaitlist
+                            ? handleLeaveWaitlist
+                            : handleJoinWaitlist
+                        }
+                        disabled={joiningWaitlist}>
+                        {joiningWaitlist ? (
+                          <ActivityIndicator
+                            size="small"
+                            color={colors.buttonText}
+                          />
+                        ) : null}
+                        <Text style={themedStyles.buttonText}>
+                          {joiningWaitlist
+                            ? 'Joining...'
+                            : isUserOnWaitlist
+                            ? `Leave Waitlist (#${userWaitlistPosition})`
+                            : t('roster.joinWaitlist') || 'Join Waitlist'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity
+                      onPress={() => setAddPlayerExpanded(false)}
+                      style={{alignItems: 'center', paddingTop: 12}}>
+                      <Text
+                        style={{
+                          color: colors.secondaryText,
+                          fontWeight: '600',
+                        }}>
+                        {t('common.cancel') || 'Cancel'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {canJoinEvent && isUserOnRoster && (
+                <View style={themedStyles.addPlayerSection}>
+                  <View
+                    style={[
+                      themedStyles.addPlayerContent,
+                      {paddingTop: 12, paddingBottom: 12},
+                    ]}>
+                    <View style={themedStyles.alreadyJoinedBadge}>
+                      <FontAwesomeIcon
+                        icon={faCheck}
+                        size={14}
+                        color={colors.primary}
+                      />
+                      {(() => {
+                        const me = roster.find(
+                          p =>
+                            p.username === userData?.username ||
+                            p.userId === userData?._id,
+                        );
+                        const myTeam =
+                          isTeamSport(eventType) &&
+                          me?.jerseyColor &&
+                          me.jerseyColor !== 'N/A'
+                            ? me.jerseyColor
+                            : null;
+                        return (
+                          <>
+                            {myTeam ? (
+                              <View
+                                style={[
+                                  themedStyles.jerseyIndicator,
+                                  {
+                                    backgroundColor:
+                                      jerseyColors[myTeam] ||
+                                      jerseyColors.Other,
+                                  },
+                                ]}
+                              />
+                            ) : null}
+                            <Text style={themedStyles.alreadyJoinedText}>
+                              {myTeam
+                                ? t('roster.youreOnTeam', {team: myTeam}) ||
+                                  `You're on ${myTeam}`
+                                : t('roster.youreOnTheRoster')}
+                            </Text>
+                          </>
+                        );
+                      })()}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Spot Reservation Banner */}
+              {hasActiveReservation && spotReservation && (
+                <View
+                  style={{
+                    backgroundColor: isMyReservation
+                      ? colors.primary + '12'
+                      : '#FF9800' + '12',
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    borderTopWidth: 2,
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: isMyReservation
+                      ? colors.primary
+                      : '#FF9800',
+                    borderBottomColor: colors.border,
+                  }}>
+                  {isMyReservation ? (
+                    <>
+                      <Text
+                        style={{
+                          color: colors.primary,
+                          fontSize: 15,
+                          fontWeight: '700',
+                          marginBottom: 4,
+                        }}>
+                        A spot is reserved for you!
+                      </Text>
+                      <Text
+                        style={{
+                          color: colors.secondaryText,
+                          fontSize: 13,
+                        }}>
+                        Join the roster before your reservation expires. Use the
+                        "Join This Event" section above to claim your spot.
+                      </Text>
+                      <ReservationCountdown
+                        expiresAt={spotReservation.expiresAt}
+                        colors={colors}
+                      />
                     </>
                   ) : (
                     <>
-                      Part of{' '}
-                      <Text style={themedStyles.groupLinkBannerName}>
-                        {paramGroupName}
+                      <Text
+                        style={{
+                          color: '#FF9800',
+                          fontSize: 14,
+                          fontWeight: '600',
+                        }}>
+                        A spot is being held for {spotReservation.username}
                       </Text>
+                      <ReservationCountdown
+                        expiresAt={spotReservation.expiresAt}
+                        colors={colors}
+                      />
                     </>
                   )}
-                </Text>
-                {paramGroupId ? (
+                </View>
+              )}
+
+              {/* Waitlist Section - visible when there are waitlisted users */}
+              {waitlist.length > 0 && (
+                <View style={themedStyles.statsSection}>
+                  <Text style={themedStyles.statsSectionTitle}>
+                    ⏳ Waitlist ({waitlist.length})
+                  </Text>
+                  {waitlist.map((entry, index) => {
+                    const isMe = entry.userId === userData?._id;
+                    const displayPic = isMe
+                      ? userData?.profilePicUrl || entry.profilePicUrl
+                      : entry.profilePicUrl;
+
+                    return (
+                      <TouchableOpacity
+                        key={entry.userId}
+                        activeOpacity={isMe ? 1.0 : 0.7}
+                        onPress={() => {
+                          if (!isMe && entry.userId) {
+                            navigation.navigate('PublicProfile', {
+                              userId: entry.userId,
+                              username: entry.username,
+                              profilePicUrl: displayPic,
+                            });
+                          }
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 10,
+                          borderBottomWidth:
+                            index < waitlist.length - 1
+                              ? StyleSheet.hairlineWidth
+                              : 0,
+                          borderBottomColor: colors.border,
+                        }}>
+                        {/* Position badge */}
+                        <View
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 11,
+                            backgroundColor: colors.primary + '15',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginRight: 8,
+                          }}>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: '700',
+                              color: colors.primary,
+                            }}>
+                            {index + 1}
+                          </Text>
+                        </View>
+
+                        {/* Avatar — smaller and dashed-border style */}
+                        {displayPic ? (
+                          <Image
+                            source={{uri: displayPic}}
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 18,
+                              marginRight: 12,
+                              borderWidth: 2,
+                              borderColor: colors.primary + '50',
+                              opacity: 0.85,
+                            }}
+                          />
+                        ) : (
+                          <View
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 18,
+                              backgroundColor: colors.primary + '15',
+                              borderWidth: 2,
+                              borderColor: colors.primary + '40',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              marginRight: 12,
+                              opacity: 0.85,
+                            }}>
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                fontWeight: '600',
+                                color: colors.primary,
+                              }}>
+                              {getInitials(entry.username)}
+                            </Text>
+                          </View>
+                        )}
+
+                        {/* Username */}
+                        <Text
+                          style={{
+                            color: colors.text,
+                            fontSize: 14,
+                            fontWeight: '500',
+                            flex: 1,
+                            opacity: 0.85,
+                          }}>
+                          {entry.username}
+                        </Text>
+
+                        {/* "You" badge or "Waiting" label */}
+                        {isMe ? (
+                          <View
+                            style={{
+                              backgroundColor: colors.primary + '20',
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 10,
+                            }}>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: colors.primary,
+                                fontWeight: '600',
+                              }}>
+                              You
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: colors.secondaryText,
+                              fontStyle: 'italic',
+                            }}>
+                            Waiting
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Invite / suggest guests — opened from the primary CTA above. */}
+              {eventPrivacy === 'invite-only' &&
+                (isEventCreator || canSuggestGuests) &&
+                inviteExpanded && (
+                  <View style={themedStyles.inviteSection}>
+                    <View style={themedStyles.inviteContent}>
+                      {/* Search Input */}
+                      <View style={themedStyles.inviteSearchContainer}>
+                        <FontAwesomeIcon
+                          icon={faSearch}
+                          size={16}
+                          color={colors.placeholder}
+                          style={themedStyles.inviteSearchIcon}
+                        />
+                        <TextInput
+                          style={themedStyles.inviteSearchInput}
+                          placeholder={
+                            canSuggestGuests
+                              ? t('roster.searchUsersToSuggest') ||
+                                'Search people to suggest...'
+                              : t('roster.searchUsersToInvite') ||
+                                'Search users to invite...'
+                          }
+                          placeholderTextColor={colors.placeholder}
+                          value={inviteSearchQuery}
+                          onChangeText={text => {
+                            setInviteSearchQuery(text);
+                            searchUsersToInvite(text);
+                          }}
+                          autoFocus
+                        />
+                        {loadingInviteSearch && (
+                          <ActivityIndicator
+                            size="small"
+                            color={colors.primary}
+                          />
+                        )}
+                      </View>
+
+                      {/* Search Results */}
+                      {inviteSearchResults.length > 0 && (
+                        <View style={themedStyles.inviteSearchResults}>
+                          {inviteSearchResults.map(user => (
+                            <TouchableOpacity
+                              key={user._id}
+                              style={themedStyles.inviteSearchResultRow}
+                              onPress={() => inviteUserToEvent(user)}>
+                              {user.profilePicUrl ? (
+                                <Image
+                                  source={{uri: user.profilePicUrl}}
+                                  style={themedStyles.inviteUserAvatar}
+                                />
+                              ) : (
+                                <View
+                                  style={
+                                    themedStyles.inviteUserAvatarPlaceholder
+                                  }>
+                                  <Text
+                                    style={themedStyles.inviteUserAvatarText}>
+                                    {getInitials(user.name || user.username)}
+                                  </Text>
+                                </View>
+                              )}
+                              <View style={themedStyles.inviteUserTextBlock}>
+                                <Text
+                                  style={themedStyles.inviteUserName}
+                                  numberOfLines={1}>
+                                  {user.name || user.username}
+                                </Text>
+                                {user.name ? (
+                                  <Text
+                                    style={themedStyles.inviteUserHandle}
+                                    numberOfLines={1}>
+                                    @{user.username}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <FontAwesomeIcon
+                                icon={faPlus}
+                                size={16}
+                                color={colors.primary}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Invited Users List (creator only) */}
+                      {isEventCreator && invitedUserDetails.length > 0 && (
+                        <View style={themedStyles.invitedUsersList}>
+                          <Text style={themedStyles.invitedUsersLabel}>
+                            {t('roster.invitedUsers') || 'Invited'} (
+                            {invitedUserDetails.length})
+                          </Text>
+                          <View style={themedStyles.invitedUsersChips}>
+                            {invitedUserDetails.map(user => (
+                              <View
+                                key={user._id}
+                                style={themedStyles.invitedUserChip}>
+                                <Text style={themedStyles.invitedUserChipText}>
+                                  {user.name || user.username}
+                                </Text>
+                                <TouchableOpacity
+                                  onPress={() => removeInvite(user._id)}
+                                  hitSlop={{
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10,
+                                  }}>
+                                  <FontAwesomeIcon
+                                    icon={faTimes}
+                                    size={12}
+                                    color={colors.secondaryText}
+                                  />
+                                </TouchableOpacity>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                      {inviteSearchQuery.length === 0 &&
+                        (canSuggestGuests ? (
+                          <Text style={themedStyles.inviteHint}>
+                            {t('roster.suggestGuestHint') ||
+                              'Suggest someone — the host will approve before they get an invite'}
+                          </Text>
+                        ) : (
+                          invitedUserDetails.length === 0 && (
+                            <Text style={themedStyles.inviteHint}>
+                              {t('roster.inviteHint') ||
+                                'Search and add users who can see and join this event'}
+                            </Text>
+                          )
+                        ))}
+
+                      <TouchableOpacity
+                        onPress={() => {
+                          setInviteExpanded(false);
+                          setInviteSearchQuery('');
+                          setInviteSearchResults([]);
+                        }}
+                        style={{alignItems: 'center', paddingTop: 12}}>
+                        <Text
+                          style={{
+                            color: colors.secondaryText,
+                            fontWeight: '600',
+                          }}>
+                          {t('common.done') || 'Done'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+            </>
+          ) : null}
+
+          {surfaceTab === 'roster' ? (
+            <>
+              {/* Rostered Players Section */}
+              <View style={themedStyles.rosterSection}>
+                <View style={themedStyles.sectionHeader}>
                   <FontAwesomeIcon
-                    icon={faChevronRight}
-                    size={12}
+                    icon={faUsers}
+                    size={18}
                     color={colors.primary}
                   />
-                ) : null}
-              </TouchableOpacity>
-            ) : null}
-
-            {/* Progress Bar */}
-            <Animated.View
-              style={[
-                themedStyles.progressSection,
-                highlightedFields.has('totalSpots') && {
-                  backgroundColor: highlightBgColor,
-                  borderRadius: 8,
-                  marginHorizontal: -6,
-                  paddingHorizontal: 6,
-                },
-              ]}>
-              <View style={themedStyles.progressHeader}>
-                <Text style={themedStyles.progressLabel}>
-                  {t('roster.rosterSpots')}
-                </Text>
-                <Text style={themedStyles.progressCount}>
-                  {totalSpots > 0
-                    ? `${roster.length} / ${totalSpots}`
-                    : `${roster.length} · ${t('events.noLimit') || 'No limit'}`}
-                </Text>
-              </View>
-              <View style={themedStyles.progressBarBg}>
-                <View
-                  style={[
-                    themedStyles.progressBarFill,
-                    {width: `${progressPercentage}%`},
-                  ]}
-                />
-              </View>
-              <Text style={themedStyles.progressRemaining}>
-                {spotsRemaining === null
-                  ? t('events.noLimit') || 'No limit'
-                  : spotsRemaining > 0
-                  ? t('roster.spotsRemaining', {count: spotsRemaining})
-                  : t('roster.rosterFull')}
-                {isEventFull && waitlist.length > 0
-                  ? ` · ${waitlist.length} on waitlist`
-                  : ''}
-              </Text>
-            </Animated.View>
-          </View>
-
-          {/* Stats Section */}
-          {roster.length > 0 && (
-            <View style={themedStyles.statsSection}>
-              <Text style={themedStyles.statsSectionTitle}>
-                📊 {t('roster.rosterStats')}
-              </Text>
-              <View style={themedStyles.statsRow}>
-                <View style={themedStyles.statItem}>
-                  <Text style={themedStyles.statValue}>{roster.length}</Text>
-                  <Text style={themedStyles.statLabel}>
-                    {t('roster.players')}
+                  <Text style={themedStyles.sectionTitle}>
+                    {t('roster.rosteredPlayers')} ({roster.length})
                   </Text>
                 </View>
-                {isTeamSport(eventType) && (
-                  <View style={themedStyles.statItem}>
-                    <Text style={themedStyles.statValueGreen}>
-                      {rosterStats.paidCount}
-                    </Text>
-                    <Text style={themedStyles.statLabel}>
-                      {t('roster.paid')}
-                    </Text>
-                  </View>
-                )}
-                {isTeamSport(eventType) && (
-                  <View style={themedStyles.statItem}>
-                    <Text style={themedStyles.statValueError}>
-                      {rosterStats.unpaidCount}
-                    </Text>
-                    <Text style={themedStyles.statLabel}>
-                      {t('roster.unpaid')}
-                    </Text>
-                  </View>
-                )}
-              </View>
 
-              {/* Team Breakdown - Sports only */}
-              {isTeamSport(eventType) &&
-                Object.keys(rosterStats.teamCounts).length > 1 && (
-                  <View style={themedStyles.teamBreakdown}>
-                    <Text style={themedStyles.statsSectionTitleSmall}>
-                      {t('roster.teamsByJersey')}
-                    </Text>
-                    <View style={themedStyles.teamRow}>
-                      {Object.entries(rosterStats.teamCounts).map(
-                        ([color, count]) => (
-                          <View
+                {loading ? (
+                  <RosterListSkeleton count={5} />
+                ) : roster.length === 0 ? (
+                  <Text style={themedStyles.emptyState}>
+                    {t('roster.noPlayersYet')}
+                  </Text>
+                ) : (
+                  <>
+                    {/* Team tabs — one jersey at a time (no All). */}
+                    {isTeamSport(eventType) && teamColors.length > 1 && (
+                      <View style={themedStyles.teamTabsContainer}>
+                        {teamColors.map(color => (
+                          <TouchableOpacity
                             key={color}
                             style={[
-                              themedStyles.teamBadge,
-                              {
-                                borderColor:
-                                  jerseyColors[color] || jerseyColors.Other,
-                              },
-                            ]}>
+                              themedStyles.teamTab,
+                              activeTeamTab === color &&
+                                themedStyles.teamTabActive,
+                            ]}
+                            onPress={() => setActiveTeamTab(color)}
+                            activeOpacity={0.7}>
                             <View
                               style={[
-                                themedStyles.jerseyIndicator,
+                                themedStyles.teamTabDot,
                                 {
                                   backgroundColor:
                                     jerseyColors[color] || jerseyColors.Other,
                                 },
                               ]}
                             />
-                            <Text style={themedStyles.teamBadgeText}>
-                              {color}: {count}
+                            <Text
+                              style={[
+                                themedStyles.teamTabText,
+                                activeTeamTab === color &&
+                                  themedStyles.teamTabTextActive,
+                              ]}
+                              numberOfLines={1}>
+                              {color}
+                            </Text>
+                            <Text
+                              style={[
+                                themedStyles.teamTabCount,
+                                activeTeamTab === color &&
+                                  themedStyles.teamTabCountActive,
+                              ]}>
+                              {rosterStats.teamCounts[color] || 0}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Position Fill Summary */}
+                    {isTeamSport(eventType) && scaledPositions && (
+                      <View style={themedStyles.positionSummaryContainer}>
+                        <Text style={themedStyles.positionSummaryTitle}>
+                          Positions
+                        </Text>
+                        {positionSummary.map(
+                          ({position: pos, filled, expected}) => {
+                            const pct =
+                              expected > 0
+                                ? Math.min((filled / expected) * 100, 100)
+                                : filled > 0
+                                ? 100
+                                : 0;
+                            const isOver = expected > 0 && filled > expected;
+                            return (
+                              <View key={pos} style={themedStyles.positionRow}>
+                                <Text style={themedStyles.positionLabel}>
+                                  {pos}
+                                </Text>
+                                <View style={themedStyles.positionBarBg}>
+                                  <View
+                                    style={[
+                                      themedStyles.positionBarFill,
+                                      {width: `${pct}%`},
+                                      isOver &&
+                                        themedStyles.positionBarOverfill,
+                                    ]}
+                                  />
+                                </View>
+                                <Text style={themedStyles.positionCount}>
+                                  {filled}
+                                  {expected > 0 ? ` / ${expected}` : ''}
+                                </Text>
+                              </View>
+                            );
+                          },
+                        )}
+                      </View>
+                    )}
+
+                    {/* Payment Filter Tabs */}
+                    {trackPayment &&
+                      isTeamSport(eventType) &&
+                      roster.length > 0 && (
+                        <View style={themedStyles.paymentFilterContainer}>
+                          {(['all', 'paid', 'unpaid'] as const).map(filter => {
+                            const count =
+                              filter === 'all'
+                                ? activeTeamTab
+                                  ? roster.filter(
+                                      p => p.jerseyColor === activeTeamTab,
+                                    ).length
+                                  : roster.length
+                                : filter === 'paid'
+                                ? activeTeamTab
+                                  ? roster.filter(
+                                      p =>
+                                        p.jerseyColor === activeTeamTab &&
+                                        p.paidStatus === 'Paid',
+                                    ).length
+                                  : rosterStats.paidCount
+                                : activeTeamTab
+                                ? roster.filter(
+                                    p =>
+                                      p.jerseyColor === activeTeamTab &&
+                                      p.paidStatus === 'Unpaid',
+                                  ).length
+                                : rosterStats.unpaidCount;
+                            const label =
+                              filter === 'all'
+                                ? 'All'
+                                : filter === 'paid'
+                                ? 'Paid'
+                                : 'Unpaid';
+                            return (
+                              <TouchableOpacity
+                                key={filter}
+                                style={[
+                                  themedStyles.paymentFilterTab,
+                                  paymentFilter === filter &&
+                                    themedStyles.paymentFilterTabActive,
+                                ]}
+                                onPress={() => setPaymentFilter(filter)}
+                                activeOpacity={0.7}>
+                                <Text
+                                  style={[
+                                    themedStyles.paymentFilterText,
+                                    paymentFilter === filter &&
+                                      themedStyles.paymentFilterTextActive,
+                                  ]}>
+                                  {label} ({count})
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+
+                    {/* Players grouped by position */}
+                    {isTeamSport(eventType)
+                      ? Object.entries(playersGroupedByPosition).map(
+                          ([pos, players]) => {
+                            if (
+                              players.length === 0 &&
+                              paymentFilter !== 'all'
+                            ) {
+                              return null;
+                            }
+                            const expected = scaledPositions
+                              ? scaledPositions[pos] || 0
+                              : 0;
+                            return (
+                              <View key={pos}>
+                                <View style={themedStyles.positionGroupHeader}>
+                                  <Text style={themedStyles.positionGroupTitle}>
+                                    {pos}
+                                  </Text>
+                                  <Text style={themedStyles.positionGroupCount}>
+                                    {players.length}
+                                    {expected > 0 ? ` / ${expected}` : ''}
+                                  </Text>
+                                </View>
+                                {players.length > 0 ? (
+                                  players.map((player, idx) =>
+                                    renderPlayerCard({
+                                      item: player,
+                                      index: idx,
+                                    }),
+                                  )
+                                ) : (
+                                  <Text style={themedStyles.emptyPositionText}>
+                                    No players yet
+                                  </Text>
+                                )}
+                              </View>
+                            );
+                          },
+                        )
+                      : filteredRoster.map((player, idx) =>
+                          renderPlayerCard({item: player, index: idx}),
+                        )}
+                  </>
+                )}
+              </View>
+            </>
+          ) : null}
+
+          {surfaceTab === 'details' ? (
+            <>
+              {/* Pending join requests (creator-only — the API only returns these
+              to the owner). Approve to add them to the roster, deny to drop
+              the request. */}
+              {joinRequests.length > 0 && (
+                <View style={themedStyles.rsvpSectionWrap}>
+                  <View style={themedStyles.rsvpResponseSection}>
+                    <Text style={themedStyles.rsvpSectionTitle}>
+                      {t('roster.joinRequests') || 'Requests'} (
+                      {joinRequests.length})
+                    </Text>
+                    {joinRequests.map(r => (
+                      <View
+                        key={`req-${r.userId}`}
+                        style={themedStyles.requestRow}>
+                        {r.profilePicUrl ? (
+                          <Image
+                            source={{uri: r.profilePicUrl}}
+                            style={themedStyles.rsvpPersonAvatar}
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              themedStyles.rsvpPersonAvatar,
+                              themedStyles.rsvpPersonAvatarFallback,
+                            ]}>
+                            <Text style={themedStyles.rsvpPersonAvatarText}>
+                              {getInitials(r.username)}
                             </Text>
                           </View>
-                        ),
-                      )}
-                    </View>
+                        )}
+                        <Text
+                          style={themedStyles.rsvpPersonName}
+                          numberOfLines={1}>
+                          {r.username}
+                        </Text>
+                        <TouchableOpacity
+                          style={themedStyles.requestApproveBtn}
+                          onPress={() => handleApproveRequest(r.userId)}
+                          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                          <FontAwesomeIcon
+                            icon={faCheck}
+                            size={14}
+                            color="#fff"
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={themedStyles.requestDenyBtn}
+                          onPress={() => handleDenyRequest(r.userId)}
+                          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                          <FontAwesomeIcon
+                            icon={faTimes}
+                            size={14}
+                            color="#fff"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
                   </View>
-                )}
-            </View>
-          )}
-
-          {/* Primary CTAs — Join / Suggest guest / Invite (obvious buttons) */}
-          {((canJoinEvent && !isUserOnRoster) ||
-            canSuggestGuests ||
-            (eventPrivacy === 'invite-only' && isEventCreator)) && (
-            <View style={themedStyles.primaryActionsRow}>
-              {canJoinEvent && !isUserOnRoster && (
-                <TouchableOpacity
-                  style={themedStyles.primaryActionButton}
-                  onPress={() => {
-                    if (isEventFull && !isMyReservation) {
-                      if (isUserOnWaitlist) {
-                        handleLeaveWaitlist();
-                      } else {
-                        handleJoinWaitlist();
-                      }
-                      return;
-                    }
-                    setAddPlayerExpanded(true);
-                  }}
-                  activeOpacity={0.85}
-                  disabled={joiningWaitlist}>
-                  {joiningWaitlist ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.buttonText || '#fff'}
-                    />
-                  ) : (
-                    <FontAwesomeIcon
-                      icon={faUserPlus}
-                      size={16}
-                      color={colors.buttonText || '#fff'}
-                    />
-                  )}
-                  <Text style={themedStyles.primaryActionButtonText}>
-                    {isEventFull && !isMyReservation
-                      ? isUserOnWaitlist
-                        ? `Leave Waitlist (#${userWaitlistPosition})`
-                        : t('roster.joinWaitlist') || 'Join Waitlist'
-                      : t('roster.joinEvent')}
-                  </Text>
-                </TouchableOpacity>
+                </View>
               )}
-              {canSuggestGuests && (
-                <TouchableOpacity
-                  style={[
-                    themedStyles.primaryActionButton,
-                    ((canJoinEvent && !isUserOnRoster) ||
-                      (eventPrivacy === 'invite-only' && isEventCreator)) &&
-                      themedStyles.primaryActionButtonSecondary,
-                  ]}
-                  onPress={() => setInviteExpanded(true)}
-                  activeOpacity={0.85}>
-                  <FontAwesomeIcon
-                    icon={faEnvelope}
-                    size={16}
-                    color={
-                      (canJoinEvent && !isUserOnRoster) ||
-                      (eventPrivacy === 'invite-only' && isEventCreator)
-                        ? colors.primary
-                        : colors.buttonText || '#fff'
-                    }
-                  />
-                  <Text
-                    style={[
-                      themedStyles.primaryActionButtonText,
-                      ((canJoinEvent && !isUserOnRoster) ||
-                        (eventPrivacy === 'invite-only' && isEventCreator)) &&
-                        themedStyles.primaryActionButtonTextSecondary,
-                    ]}>
-                    {t('roster.suggestGuest') || 'Suggest a guest'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {eventPrivacy === 'invite-only' && isEventCreator && (
-                <TouchableOpacity
-                  style={[
-                    themedStyles.primaryActionButton,
-                    ((canJoinEvent && !isUserOnRoster) || canSuggestGuests) &&
-                      themedStyles.primaryActionButtonSecondary,
-                  ]}
-                  onPress={() => setInviteExpanded(true)}
-                  activeOpacity={0.85}>
-                  <FontAwesomeIcon
-                    icon={faEnvelope}
-                    size={16}
-                    color={
-                      (canJoinEvent && !isUserOnRoster) || canSuggestGuests
-                        ? colors.primary
-                        : colors.buttonText || '#fff'
-                    }
-                  />
-                  <Text
-                    style={[
-                      themedStyles.primaryActionButtonText,
-                      ((canJoinEvent && !isUserOnRoster) || canSuggestGuests) &&
-                        themedStyles.primaryActionButtonTextSecondary,
-                    ]}>
-                    {t('roster.invitePlayers') || 'Invite People'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
 
-          {/* Join form — expands from the primary Join button */}
-          {canJoinEvent && !isUserOnRoster && addPlayerExpanded && (
-            <View style={themedStyles.addPlayerSection}>
-              <View style={themedStyles.addPlayerContent}>
-                {errorMessage ? (
-                  <Text style={themedStyles.errorMessage}>{errorMessage}</Text>
-                ) : null}
-
-                <TextInput
-                  style={themedStyles.input}
-                  placeholder={t('roster.yourName')}
-                  placeholderTextColor={colors.placeholder}
-                  value={username}
-                  onChangeText={setUsername}
-                />
-
-                {/* Paid Status Dropdown - Sports only */}
-                {isTeamSport(eventType) && (
-                  <TouchableOpacity
-                    style={themedStyles.dropdown}
-                    onPress={() => setPaidStatusModalVisible(true)}>
-                    <Text
-                      style={
-                        paidStatus
-                          ? themedStyles.dropdownText
-                          : themedStyles.placeholderText
-                      }>
-                      {paidStatus || t('roster.selectPaidStatus')}
+              {guestAddRequests.length > 0 && isEventCreator && (
+                <View style={themedStyles.rsvpSectionWrap}>
+                  <View style={themedStyles.rsvpResponseSection}>
+                    <Text style={themedStyles.rsvpSectionTitle}>
+                      {t('roster.guestSuggestions') || 'Guest suggestions'} (
+                      {guestAddRequests.length})
                     </Text>
-                    <FontAwesomeIcon
-                      icon={faChevronDown}
-                      size={14}
-                      color={colors.placeholder}
-                    />
-                  </TouchableOpacity>
-                )}
+                    {guestAddRequests.map(r => (
+                      <View
+                        key={`guest-${r.proposedUserId}-${r.requestedBy}`}
+                        style={themedStyles.requestRow}>
+                        {r.proposedProfilePicUrl ? (
+                          <Image
+                            source={{uri: r.proposedProfilePicUrl}}
+                            style={themedStyles.rsvpPersonAvatar}
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              themedStyles.rsvpPersonAvatar,
+                              themedStyles.rsvpPersonAvatarFallback,
+                            ]}>
+                            <Text style={themedStyles.rsvpPersonAvatarText}>
+                              {getInitials(r.proposedUsername)}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={{flex: 1, minWidth: 0}}>
+                          <Text
+                            style={themedStyles.rsvpPersonName}
+                            numberOfLines={1}>
+                            {r.proposedUsername}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: colors.secondaryText,
+                            }}
+                            numberOfLines={1}>
+                            {t('roster.suggestedBy', {
+                              name: r.requestedByUsername,
+                            }) || `Suggested by ${r.requestedByUsername}`}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={themedStyles.requestApproveBtn}
+                          onPress={() =>
+                            handleApproveGuestAdd(r.proposedUserId)
+                          }
+                          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                          <FontAwesomeIcon
+                            icon={faCheck}
+                            size={14}
+                            color="#fff"
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={themedStyles.requestDenyBtn}
+                          onPress={() => handleDenyGuestAdd(r.proposedUserId)}
+                          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                          <FontAwesomeIcon
+                            icon={faTimes}
+                            size={14}
+                            color="#fff"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
 
-                {/* Jersey Color Dropdown - Sports only */}
-                {isTeamSport(eventType) && (
-                  <TouchableOpacity
-                    style={themedStyles.dropdown}
-                    onPress={() => setJerseyColorModalVisible(true)}>
-                    <View style={themedStyles.jerseyDropdownRow}>
-                      {jerseyColor && (
+              {/* RSVP responses beyond "going": who replied Maybe or Can't make
+              it, plus invited people who haven't replied yet. Colored dots
+              differentiate the states (amber = maybe, red = can't). */}
+              {(() => {
+                const maybeList = rsvps.filter(r => r.status === 'maybe');
+                const cantList = rsvps.filter(r => r.status === 'cant');
+                const noReplyList = invitedUserDetails.filter(
+                  u =>
+                    !roster.some(
+                      p => p.userId === u._id || p.username === u.username,
+                    ) && !rsvps.some(r => r.userId === u._id),
+                );
+                if (
+                  maybeList.length === 0 &&
+                  cantList.length === 0 &&
+                  noReplyList.length === 0
+                ) {
+                  return null;
+                }
+                const renderPerson = (
+                  key: string,
+                  name: string,
+                  profilePicUrl: string | undefined,
+                  tint: string,
+                  personUserId?: string,
+                  showRemind?: boolean,
+                  showRemoveInvite?: boolean,
+                ) => {
+                  const isMe = !!personUserId && personUserId === userData?._id;
+                  const canOpen = !!personUserId && !isMe;
+                  return (
+                    <View key={key} style={themedStyles.rsvpPersonRow}>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          flex: 1,
+                        }}
+                        onPress={() =>
+                          canOpen &&
+                          openProfile({
+                            userId: personUserId,
+                            username: name,
+                            profilePicUrl,
+                          })
+                        }
+                        disabled={!canOpen}
+                        activeOpacity={canOpen ? 0.7 : 1}>
+                        {profilePicUrl ? (
+                          <Image
+                            source={{uri: profilePicUrl}}
+                            style={themedStyles.rsvpPersonAvatar}
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              themedStyles.rsvpPersonAvatar,
+                              themedStyles.rsvpPersonAvatarFallback,
+                            ]}>
+                            <Text style={themedStyles.rsvpPersonAvatarText}>
+                              {getInitials(name)}
+                            </Text>
+                          </View>
+                        )}
+                        <Text
+                          style={[
+                            themedStyles.rsvpPersonName,
+                            canOpen && {color: colors.primary},
+                          ]}
+                          numberOfLines={1}>
+                          {name}
+                        </Text>
                         <View
                           style={[
-                            themedStyles.jerseyIndicatorLarge,
-                            {
-                              backgroundColor:
-                                jerseyColors[jerseyColor] || jerseyColors.Other,
-                            },
+                            themedStyles.rsvpDot,
+                            {backgroundColor: tint},
                           ]}
                         />
-                      )}
-                      <Text
-                        style={
-                          jerseyColor
-                            ? themedStyles.dropdownText
-                            : themedStyles.placeholderText
-                        }>
-                        {jerseyColor || t('roster.selectJerseyColor')}
-                      </Text>
-                    </View>
-                    <FontAwesomeIcon
-                      icon={faChevronDown}
-                      size={14}
-                      color={colors.placeholder}
-                    />
-                  </TouchableOpacity>
-                )}
-
-                {/* Position Dropdown */}
-                <TouchableOpacity
-                  style={themedStyles.dropdown}
-                  onPress={() => setPositionModalVisible(true)}>
-                  <Text
-                    style={
-                      position
-                        ? themedStyles.dropdownText
-                        : themedStyles.placeholderText
-                    }>
-                    {position || t('roster.selectPosition')}
-                  </Text>
-                  <FontAwesomeIcon
-                    icon={faChevronDown}
-                    size={14}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    themedStyles.saveButton,
-                    ((spotsRemaining === 0 && !isMyReservation) ||
-                      savingRoster) &&
-                      themedStyles.saveButtonDisabled,
-                    isMyReservation && {backgroundColor: colors.primary},
-                  ]}
-                  onPress={handleSave}
-                  disabled={
-                    (spotsRemaining === 0 && !isMyReservation) || savingRoster
-                  }>
-                  {savingRoster ? (
-                    <ActivityIndicator size="small" color={colors.buttonText} />
-                  ) : (
-                    <FontAwesomeIcon
-                      icon={
-                        isMyReservation || spotsRemaining === 0
-                          ? faUserPlus
-                          : faCheck
-                      }
-                      size={16}
-                      color={colors.buttonText}
-                    />
-                  )}
-                  <Text style={themedStyles.buttonText}>
-                    {savingRoster
-                      ? t('common.loading') || 'Joining...'
-                      : isMyReservation
-                      ? 'Claim Your Spot!'
-                      : spotsRemaining === 0
-                      ? t('roster.rosterFull')
-                      : t('common.confirm') || 'Confirm'}
-                  </Text>
-                </TouchableOpacity>
-
-                {isEventFull && !isUserOnRoster && !isMyReservation && (
-                  <TouchableOpacity
-                    style={[
-                      themedStyles.saveButton,
-                      {marginTop: 10},
-                      isUserOnWaitlist && {backgroundColor: colors.error},
-                    ]}
-                    onPress={
-                      isUserOnWaitlist
-                        ? handleLeaveWaitlist
-                        : handleJoinWaitlist
-                    }
-                    disabled={joiningWaitlist}>
-                    {joiningWaitlist ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={colors.buttonText}
-                      />
-                    ) : null}
-                    <Text style={themedStyles.buttonText}>
-                      {joiningWaitlist
-                        ? 'Joining...'
-                        : isUserOnWaitlist
-                        ? `Leave Waitlist (#${userWaitlistPosition})`
-                        : t('roster.joinWaitlist') || 'Join Waitlist'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  onPress={() => setAddPlayerExpanded(false)}
-                  style={{alignItems: 'center', paddingTop: 12}}>
-                  <Text
-                    style={{color: colors.secondaryText, fontWeight: '600'}}>
-                    {t('common.cancel') || 'Cancel'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {canJoinEvent && isUserOnRoster && (
-            <View style={themedStyles.addPlayerSection}>
-              <View
-                style={[
-                  themedStyles.addPlayerContent,
-                  {paddingTop: 12, paddingBottom: 12},
-                ]}>
-                <View style={themedStyles.alreadyJoinedBadge}>
-                  <FontAwesomeIcon
-                    icon={faCheck}
-                    size={14}
-                    color={colors.primary}
-                  />
-                  <Text style={themedStyles.alreadyJoinedText}>
-                    {t('roster.youreOnTheRoster')}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Spot Reservation Banner */}
-          {hasActiveReservation && spotReservation && (
-            <View
-              style={{
-                backgroundColor: isMyReservation
-                  ? colors.primary + '12'
-                  : '#FF9800' + '12',
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                borderTopWidth: 2,
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderTopColor: isMyReservation ? colors.primary : '#FF9800',
-                borderBottomColor: colors.border,
-              }}>
-              {isMyReservation ? (
-                <>
-                  <Text
-                    style={{
-                      color: colors.primary,
-                      fontSize: 15,
-                      fontWeight: '700',
-                      marginBottom: 4,
-                    }}>
-                    A spot is reserved for you!
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.secondaryText,
-                      fontSize: 13,
-                    }}>
-                    Join the roster before your reservation expires. Use the
-                    "Join This Event" section above to claim your spot.
-                  </Text>
-                  <ReservationCountdown
-                    expiresAt={spotReservation.expiresAt}
-                    colors={colors}
-                  />
-                </>
-              ) : (
-                <>
-                  <Text
-                    style={{
-                      color: '#FF9800',
-                      fontSize: 14,
-                      fontWeight: '600',
-                    }}>
-                    A spot is being held for {spotReservation.username}
-                  </Text>
-                  <ReservationCountdown
-                    expiresAt={spotReservation.expiresAt}
-                    colors={colors}
-                  />
-                </>
-              )}
-            </View>
-          )}
-
-          {/* Waitlist Section - visible when there are waitlisted users */}
-          {waitlist.length > 0 && (
-            <View style={themedStyles.statsSection}>
-              <Text style={themedStyles.statsSectionTitle}>
-                ⏳ Waitlist ({waitlist.length})
-              </Text>
-              {waitlist.map((entry, index) => {
-                const isMe = entry.userId === userData?._id;
-                const displayPic = isMe
-                  ? userData?.profilePicUrl || entry.profilePicUrl
-                  : entry.profilePicUrl;
-
-                return (
-                  <TouchableOpacity
-                    key={entry.userId}
-                    activeOpacity={isMe ? 1.0 : 0.7}
-                    onPress={() => {
-                      if (!isMe && entry.userId) {
-                        navigation.navigate('PublicProfile', {
-                          userId: entry.userId,
-                          username: entry.username,
-                          profilePicUrl: displayPic,
-                        });
-                      }
-                    }}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingVertical: 10,
-                      borderBottomWidth:
-                        index < waitlist.length - 1
-                          ? StyleSheet.hairlineWidth
-                          : 0,
-                      borderBottomColor: colors.border,
-                    }}>
-                    {/* Position badge */}
-                    <View
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: 11,
-                        backgroundColor: colors.primary + '15',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        marginRight: 8,
-                      }}>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: '700',
-                          color: colors.primary,
-                        }}>
-                        {index + 1}
-                      </Text>
-                    </View>
-
-                    {/* Avatar — smaller and dashed-border style */}
-                    {displayPic ? (
-                      <Image
-                        source={{uri: displayPic}}
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 18,
-                          marginRight: 12,
-                          borderWidth: 2,
-                          borderColor: colors.primary + '50',
-                          opacity: 0.85,
-                        }}
-                      />
-                    ) : (
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 18,
-                          backgroundColor: colors.primary + '15',
-                          borderWidth: 2,
-                          borderColor: colors.primary + '40',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          marginRight: 12,
-                          opacity: 0.85,
-                        }}>
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: '600',
-                            color: colors.primary,
-                          }}>
-                          {getInitials(entry.username)}
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Username */}
-                    <Text
-                      style={{
-                        color: colors.text,
-                        fontSize: 14,
-                        fontWeight: '500',
-                        flex: 1,
-                        opacity: 0.85,
-                      }}>
-                      {entry.username}
-                    </Text>
-
-                    {/* "You" badge or "Waiting" label */}
-                    {isMe ? (
-                      <View
-                        style={{
-                          backgroundColor: colors.primary + '20',
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                          borderRadius: 10,
-                        }}>
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            color: colors.primary,
-                            fontWeight: '600',
-                          }}>
-                          You
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: colors.secondaryText,
-                          fontStyle: 'italic',
-                        }}>
-                        Waiting
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          {/* Invite / suggest guests — opened from the primary CTA above. */}
-          {eventPrivacy === 'invite-only' &&
-            (isEventCreator || canSuggestGuests) &&
-            inviteExpanded && (
-              <View style={themedStyles.inviteSection}>
-                <View style={themedStyles.inviteContent}>
-                  {/* Search Input */}
-                  <View style={themedStyles.inviteSearchContainer}>
-                    <FontAwesomeIcon
-                      icon={faSearch}
-                      size={16}
-                      color={colors.placeholder}
-                      style={themedStyles.inviteSearchIcon}
-                    />
-                    <TextInput
-                      style={themedStyles.inviteSearchInput}
-                      placeholder={
-                        canSuggestGuests
-                          ? t('roster.searchUsersToSuggest') ||
-                            'Search people to suggest...'
-                          : t('roster.searchUsersToInvite') ||
-                            'Search users to invite...'
-                      }
-                      placeholderTextColor={colors.placeholder}
-                      value={inviteSearchQuery}
-                      onChangeText={text => {
-                        setInviteSearchQuery(text);
-                        searchUsersToInvite(text);
-                      }}
-                      autoFocus
-                    />
-                    {loadingInviteSearch && (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    )}
-                  </View>
-
-                  {/* Search Results */}
-                  {inviteSearchResults.length > 0 && (
-                    <View style={themedStyles.inviteSearchResults}>
-                      {inviteSearchResults.map(user => (
+                      </TouchableOpacity>
+                      {canOpen ? (
                         <TouchableOpacity
-                          key={user._id}
-                          style={themedStyles.inviteSearchResultRow}
-                          onPress={() => inviteUserToEvent(user)}>
-                          {user.profilePicUrl ? (
-                            <Image
-                              source={{uri: user.profilePicUrl}}
-                              style={themedStyles.inviteUserAvatar}
-                            />
-                          ) : (
-                            <View
-                              style={themedStyles.inviteUserAvatarPlaceholder}>
-                              <Text style={themedStyles.inviteUserAvatarText}>
-                                {getInitials(user.name || user.username)}
-                              </Text>
-                            </View>
-                          )}
-                          <View style={themedStyles.inviteUserTextBlock}>
-                            <Text
-                              style={themedStyles.inviteUserName}
-                              numberOfLines={1}>
-                              {user.name || user.username}
-                            </Text>
-                            {user.name ? (
-                              <Text
-                                style={themedStyles.inviteUserHandle}
-                                numberOfLines={1}>
-                                @{user.username}
-                              </Text>
-                            ) : null}
-                          </View>
+                          style={themedStyles.rsvpRemindBtn}
+                          onPress={() =>
+                            messageUser({
+                              userId: personUserId,
+                              username: name,
+                              profilePicUrl,
+                            })
+                          }
+                          hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}>
                           <FontAwesomeIcon
-                            icon={faPlus}
-                            size={16}
+                            icon={faComment}
+                            size={13}
                             color={colors.primary}
                           />
                         </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Invited Users List (creator only) */}
-                  {isEventCreator && invitedUserDetails.length > 0 && (
-                    <View style={themedStyles.invitedUsersList}>
-                      <Text style={themedStyles.invitedUsersLabel}>
-                        {t('roster.invitedUsers') || 'Invited'} (
-                        {invitedUserDetails.length})
-                      </Text>
-                      <View style={themedStyles.invitedUsersChips}>
-                        {invitedUserDetails.map(user => (
-                          <View
-                            key={user._id}
-                            style={themedStyles.invitedUserChip}>
-                            <Text style={themedStyles.invitedUserChipText}>
-                              {user.name || user.username}
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() => removeInvite(user._id)}
-                              hitSlop={{
-                                top: 10,
-                                bottom: 10,
-                                left: 10,
-                                right: 10,
-                              }}>
-                              <FontAwesomeIcon
-                                icon={faTimes}
-                                size={12}
-                                color={colors.secondaryText}
-                              />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {inviteSearchQuery.length === 0 &&
-                    (canSuggestGuests ? (
-                      <Text style={themedStyles.inviteHint}>
-                        {t('roster.suggestGuestHint') ||
-                          'Suggest someone — the host will approve before they get an invite'}
-                      </Text>
-                    ) : (
-                      invitedUserDetails.length === 0 && (
-                        <Text style={themedStyles.inviteHint}>
-                          {t('roster.inviteHint') ||
-                            'Search and add users who can see and join this event'}
-                        </Text>
-                      )
-                    ))}
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setInviteExpanded(false);
-                      setInviteSearchQuery('');
-                      setInviteSearchResults([]);
-                    }}
-                    style={{alignItems: 'center', paddingTop: 12}}>
-                    <Text
-                      style={{
-                        color: colors.secondaryText,
-                        fontWeight: '600',
-                      }}>
-                      {t('common.done') || 'Done'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-          {/* Rostered Players Section */}
-          <View style={themedStyles.rosterSection}>
-            <View style={themedStyles.sectionHeader}>
-              <FontAwesomeIcon
-                icon={faUsers}
-                size={18}
-                color={colors.primary}
-              />
-              <Text style={themedStyles.sectionTitle}>
-                {t('roster.rosteredPlayers')} ({roster.length})
-              </Text>
-            </View>
-
-            {loading ? (
-              <RosterListSkeleton count={5} />
-            ) : roster.length === 0 ? (
-              <Text style={themedStyles.emptyState}>
-                {t('roster.noPlayersYet')}
-              </Text>
-            ) : (
-              <>
-                {/* Team Tabs - only for team sports with 2+ jersey colors */}
-                {isTeamSport(eventType) && teamColors.length > 1 && (
-                  <View style={themedStyles.teamTabsContainer}>
-                    <TouchableOpacity
-                      style={[
-                        themedStyles.teamTab,
-                        activeTeamTab === 'all' && themedStyles.teamTabActive,
-                      ]}
-                      onPress={() => setActiveTeamTab('all')}
-                      activeOpacity={0.7}>
-                      <Text
-                        style={[
-                          themedStyles.teamTabText,
-                          activeTeamTab === 'all' &&
-                            themedStyles.teamTabTextActive,
-                        ]}>
-                        All
-                      </Text>
-                      <Text
-                        style={[
-                          themedStyles.teamTabCount,
-                          activeTeamTab === 'all' &&
-                            themedStyles.teamTabCountActive,
-                        ]}>
-                        {roster.length}
-                      </Text>
-                    </TouchableOpacity>
-                    {teamColors.map(color => (
-                      <TouchableOpacity
-                        key={color}
-                        style={[
-                          themedStyles.teamTab,
-                          activeTeamTab === color && themedStyles.teamTabActive,
-                        ]}
-                        onPress={() => setActiveTeamTab(color)}
-                        activeOpacity={0.7}>
-                        <View
-                          style={[
-                            themedStyles.teamTabDot,
-                            {
-                              backgroundColor:
-                                jerseyColors[color] || jerseyColors.Other,
-                            },
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            themedStyles.teamTabText,
-                            activeTeamTab === color &&
-                              themedStyles.teamTabTextActive,
-                          ]}
-                          numberOfLines={1}>
-                          {color}
-                        </Text>
-                        <Text
-                          style={[
-                            themedStyles.teamTabCount,
-                            activeTeamTab === color &&
-                              themedStyles.teamTabCountActive,
-                          ]}>
-                          {rosterStats.teamCounts[color] || 0}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Position Fill Summary */}
-                {isTeamSport(eventType) && scaledPositions && (
-                  <View style={themedStyles.positionSummaryContainer}>
-                    <Text style={themedStyles.positionSummaryTitle}>
-                      Positions
-                    </Text>
-                    {positionSummary.map(
-                      ({position: pos, filled, expected}) => {
-                        const pct =
-                          expected > 0
-                            ? Math.min((filled / expected) * 100, 100)
-                            : filled > 0
-                            ? 100
-                            : 0;
-                        const isOver = expected > 0 && filled > expected;
-                        return (
-                          <View key={pos} style={themedStyles.positionRow}>
-                            <Text style={themedStyles.positionLabel}>
-                              {pos}
-                            </Text>
-                            <View style={themedStyles.positionBarBg}>
-                              <View
-                                style={[
-                                  themedStyles.positionBarFill,
-                                  {width: `${pct}%`},
-                                  isOver && themedStyles.positionBarOverfill,
-                                ]}
-                              />
-                            </View>
-                            <Text style={themedStyles.positionCount}>
-                              {filled}
-                              {expected > 0 ? ` / ${expected}` : ''}
-                            </Text>
-                          </View>
-                        );
-                      },
-                    )}
-                  </View>
-                )}
-
-                {/* Payment Filter Tabs */}
-                {isTeamSport(eventType) && roster.length > 0 && (
-                  <View style={themedStyles.paymentFilterContainer}>
-                    {(['all', 'paid', 'unpaid'] as const).map(filter => {
-                      const count =
-                        filter === 'all'
-                          ? activeTeamTab !== 'all' && teamColors.length > 1
-                            ? roster.filter(
-                                p => p.jerseyColor === activeTeamTab,
-                              ).length
-                            : roster.length
-                          : filter === 'paid'
-                          ? activeTeamTab !== 'all' && teamColors.length > 1
-                            ? roster.filter(
-                                p =>
-                                  p.jerseyColor === activeTeamTab &&
-                                  p.paidStatus === 'Paid',
-                              ).length
-                            : rosterStats.paidCount
-                          : activeTeamTab !== 'all' && teamColors.length > 1
-                          ? roster.filter(
-                              p =>
-                                p.jerseyColor === activeTeamTab &&
-                                p.paidStatus === 'Unpaid',
-                            ).length
-                          : rosterStats.unpaidCount;
-                      const label =
-                        filter === 'all'
-                          ? 'All'
-                          : filter === 'paid'
-                          ? 'Paid'
-                          : 'Unpaid';
-                      return (
-                        <TouchableOpacity
-                          key={filter}
-                          style={[
-                            themedStyles.paymentFilterTab,
-                            paymentFilter === filter &&
-                              themedStyles.paymentFilterTabActive,
-                          ]}
-                          onPress={() => setPaymentFilter(filter)}
-                          activeOpacity={0.7}>
-                          <Text
-                            style={[
-                              themedStyles.paymentFilterText,
-                              paymentFilter === filter &&
-                                themedStyles.paymentFilterTextActive,
-                            ]}>
-                            {label} ({count})
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {/* Players grouped by position */}
-                {isTeamSport(eventType)
-                  ? Object.entries(playersGroupedByPosition).map(
-                      ([pos, players]) => {
-                        if (players.length === 0 && paymentFilter !== 'all') {
-                          return null;
-                        }
-                        const expected = scaledPositions
-                          ? scaledPositions[pos] || 0
-                          : 0;
-                        return (
-                          <View key={pos}>
-                            <View style={themedStyles.positionGroupHeader}>
-                              <Text style={themedStyles.positionGroupTitle}>
-                                {pos}
-                              </Text>
-                              <Text style={themedStyles.positionGroupCount}>
-                                {players.length}
-                                {expected > 0 ? ` / ${expected}` : ''}
-                              </Text>
-                            </View>
-                            {players.length > 0 ? (
-                              players.map((player, idx) =>
-                                renderPlayerCard({item: player, index: idx}),
-                              )
-                            ) : (
-                              <Text style={themedStyles.emptyPositionText}>
-                                No players yet
-                              </Text>
-                            )}
-                          </View>
-                        );
-                      },
-                    )
-                  : filteredRoster.map((player, idx) =>
-                      renderPlayerCard({item: player, index: idx}),
-                    )}
-              </>
-            )}
-          </View>
-
-          {/* Pending join requests (creator-only — the API only returns these
-              to the owner). Approve to add them to the roster, deny to drop
-              the request. */}
-          {joinRequests.length > 0 && (
-            <View style={themedStyles.rsvpSectionWrap}>
-              <View style={themedStyles.rsvpResponseSection}>
-                <Text style={themedStyles.rsvpSectionTitle}>
-                  {t('roster.joinRequests') || 'Requests'} (
-                  {joinRequests.length})
-                </Text>
-                {joinRequests.map(r => (
-                  <View key={`req-${r.userId}`} style={themedStyles.requestRow}>
-                    {r.profilePicUrl ? (
-                      <Image
-                        source={{uri: r.profilePicUrl}}
-                        style={themedStyles.rsvpPersonAvatar}
-                      />
-                    ) : (
-                      <View
-                        style={[
-                          themedStyles.rsvpPersonAvatar,
-                          themedStyles.rsvpPersonAvatarFallback,
-                        ]}>
-                        <Text style={themedStyles.rsvpPersonAvatarText}>
-                          {getInitials(r.username)}
-                        </Text>
-                      </View>
-                    )}
-                    <Text style={themedStyles.rsvpPersonName} numberOfLines={1}>
-                      {r.username}
-                    </Text>
-                    <TouchableOpacity
-                      style={themedStyles.requestApproveBtn}
-                      onPress={() => handleApproveRequest(r.userId)}
-                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                      <FontAwesomeIcon icon={faCheck} size={14} color="#fff" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={themedStyles.requestDenyBtn}
-                      onPress={() => handleDenyRequest(r.userId)}
-                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                      <FontAwesomeIcon icon={faTimes} size={14} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {guestAddRequests.length > 0 && isEventCreator && (
-            <View style={themedStyles.rsvpSectionWrap}>
-              <View style={themedStyles.rsvpResponseSection}>
-                <Text style={themedStyles.rsvpSectionTitle}>
-                  {t('roster.guestSuggestions') || 'Guest suggestions'} (
-                  {guestAddRequests.length})
-                </Text>
-                {guestAddRequests.map(r => (
-                  <View
-                    key={`guest-${r.proposedUserId}-${r.requestedBy}`}
-                    style={themedStyles.requestRow}>
-                    {r.proposedProfilePicUrl ? (
-                      <Image
-                        source={{uri: r.proposedProfilePicUrl}}
-                        style={themedStyles.rsvpPersonAvatar}
-                      />
-                    ) : (
-                      <View
-                        style={[
-                          themedStyles.rsvpPersonAvatar,
-                          themedStyles.rsvpPersonAvatarFallback,
-                        ]}>
-                        <Text style={themedStyles.rsvpPersonAvatarText}>
-                          {getInitials(r.proposedUsername)}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={{flex: 1, minWidth: 0}}>
-                      <Text
-                        style={themedStyles.rsvpPersonName}
-                        numberOfLines={1}>
-                        {r.proposedUsername}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: colors.secondaryText,
-                        }}
-                        numberOfLines={1}>
-                        {t('roster.suggestedBy', {
-                          name: r.requestedByUsername,
-                        }) || `Suggested by ${r.requestedByUsername}`}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={themedStyles.requestApproveBtn}
-                      onPress={() => handleApproveGuestAdd(r.proposedUserId)}
-                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                      <FontAwesomeIcon icon={faCheck} size={14} color="#fff" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={themedStyles.requestDenyBtn}
-                      onPress={() => handleDenyGuestAdd(r.proposedUserId)}
-                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                      <FontAwesomeIcon icon={faTimes} size={14} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* RSVP responses beyond "going": who replied Maybe or Can't make
-              it, plus invited people who haven't replied yet. Colored dots
-              differentiate the states (amber = maybe, red = can't). */}
-          {(() => {
-            const maybeList = rsvps.filter(r => r.status === 'maybe');
-            const cantList = rsvps.filter(r => r.status === 'cant');
-            const noReplyList = invitedUserDetails.filter(
-              u =>
-                !roster.some(
-                  p => p.userId === u._id || p.username === u.username,
-                ) && !rsvps.some(r => r.userId === u._id),
-            );
-            if (
-              maybeList.length === 0 &&
-              cantList.length === 0 &&
-              noReplyList.length === 0
-            ) {
-              return null;
-            }
-            const renderPerson = (
-              key: string,
-              name: string,
-              profilePicUrl: string | undefined,
-              tint: string,
-              personUserId?: string,
-              showRemind?: boolean,
-              showRemoveInvite?: boolean,
-            ) => {
-              const isMe = !!personUserId && personUserId === userData?._id;
-              const canOpen = !!personUserId && !isMe;
-              return (
-                <View key={key} style={themedStyles.rsvpPersonRow}>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      flex: 1,
-                    }}
-                    onPress={() =>
-                      canOpen &&
-                      openProfile({
-                        userId: personUserId,
-                        username: name,
-                        profilePicUrl,
-                      })
-                    }
-                    disabled={!canOpen}
-                    activeOpacity={canOpen ? 0.7 : 1}>
-                    {profilePicUrl ? (
-                      <Image
-                        source={{uri: profilePicUrl}}
-                        style={themedStyles.rsvpPersonAvatar}
-                      />
-                    ) : (
-                      <View
-                        style={[
-                          themedStyles.rsvpPersonAvatar,
-                          themedStyles.rsvpPersonAvatarFallback,
-                        ]}>
-                        <Text style={themedStyles.rsvpPersonAvatarText}>
-                          {getInitials(name)}
-                        </Text>
-                      </View>
-                    )}
-                    <Text
-                      style={[
-                        themedStyles.rsvpPersonName,
-                        canOpen && {color: colors.primary},
-                      ]}
-                      numberOfLines={1}>
-                      {name}
-                    </Text>
-                    <View
-                      style={[themedStyles.rsvpDot, {backgroundColor: tint}]}
-                    />
-                  </TouchableOpacity>
-                  {canOpen ? (
-                    <TouchableOpacity
-                      style={themedStyles.rsvpRemindBtn}
-                      onPress={() =>
-                        messageUser({
-                          userId: personUserId,
-                          username: name,
-                          profilePicUrl,
-                        })
-                      }
-                      hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}>
-                      <FontAwesomeIcon
-                        icon={faComment}
-                        size={13}
-                        color={colors.primary}
-                      />
-                    </TouchableOpacity>
-                  ) : null}
-                  {showRemind && personUserId && isEventCreator ? (
-                    <TouchableOpacity
-                      style={[
-                        themedStyles.rsvpRemindBtn,
-                        (pingingRsvpIds.has(personUserId) || pingingAllRsvp) &&
-                          themedStyles.rsvpRemindBtnDisabled,
-                      ]}
-                      onPress={() => pingRsvp([personUserId])}
-                      disabled={
-                        pingingRsvpIds.has(personUserId) || pingingAllRsvp
-                      }
-                      hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}>
-                      {pingingRsvpIds.has(personUserId) ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={colors.primary}
-                        />
-                      ) : (
-                        <FontAwesomeIcon
-                          icon={faBell}
-                          size={13}
-                          color={colors.primary}
-                        />
-                      )}
-                    </TouchableOpacity>
-                  ) : null}
-                  {showRemoveInvite && personUserId && isEventCreator ? (
-                    <TouchableOpacity
-                      style={themedStyles.rsvpRemindBtn}
-                      onPress={() => showInviteeMoreMenu(personUserId, name)}
-                      hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}
-                      accessibilityLabel={
-                        t('roster.moreActions') || 'More actions'
-                      }>
-                      <FontAwesomeIcon
-                        icon={faEllipsisH}
-                        size={13}
-                        color={colors.secondaryText}
-                      />
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              );
-            };
-            return (
-              <View style={themedStyles.rsvpSectionWrap}>
-                {maybeList.length > 0 && (
-                  <View style={themedStyles.rsvpResponseSection}>
-                    <Text style={themedStyles.rsvpSectionTitle}>
-                      {t('events.rsvpMaybe') || 'Maybe'} ({maybeList.length})
-                    </Text>
-                    {maybeList.map(r =>
-                      renderPerson(
-                        `maybe-${r.userId}`,
-                        r.username,
-                        r.profilePicUrl,
-                        '#f1c40f',
-                        r.userId,
-                      ),
-                    )}
-                  </View>
-                )}
-                {cantList.length > 0 && (
-                  <View style={themedStyles.rsvpResponseSection}>
-                    <Text style={themedStyles.rsvpSectionTitle}>
-                      {t('events.rsvpCant') || "Can't make it"} (
-                      {cantList.length})
-                    </Text>
-                    {cantList.map(r =>
-                      renderPerson(
-                        `cant-${r.userId}`,
-                        r.username,
-                        r.profilePicUrl,
-                        '#e74c3c',
-                        r.userId,
-                      ),
-                    )}
-                  </View>
-                )}
-                {noReplyList.length > 0 && (
-                  <View style={themedStyles.rsvpResponseSection}>
-                    <View style={themedStyles.rsvpSectionHeaderRow}>
-                      <Text
-                        style={[
-                          themedStyles.rsvpSectionTitle,
-                          {marginBottom: 0, flex: 1},
-                        ]}>
-                        {t('roster.noReply') || 'Invited · no reply'} (
-                        {noReplyList.length})
-                      </Text>
-                      {isEventCreator ? (
+                      ) : null}
+                      {showRemind && personUserId && isEventCreator ? (
                         <TouchableOpacity
                           style={[
-                            themedStyles.rsvpRemindAllBtn,
-                            pingingAllRsvp &&
+                            themedStyles.rsvpRemindBtn,
+                            (pingingRsvpIds.has(personUserId) ||
+                              pingingAllRsvp) &&
                               themedStyles.rsvpRemindBtnDisabled,
                           ]}
-                          onPress={() => pingRsvp()}
-                          disabled={pingingAllRsvp || pingingRsvpIds.size > 0}
-                          activeOpacity={0.75}>
-                          {pingingAllRsvp ? (
+                          onPress={() => pingRsvp([personUserId])}
+                          disabled={
+                            pingingRsvpIds.has(personUserId) || pingingAllRsvp
+                          }
+                          hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}>
+                          {pingingRsvpIds.has(personUserId) ? (
                             <ActivityIndicator
                               size="small"
                               color={colors.primary}
                             />
                           ) : (
-                            <>
-                              <FontAwesomeIcon
-                                icon={faBell}
-                                size={11}
-                                color={colors.primary}
-                              />
-                              <Text style={themedStyles.rsvpRemindAllText}>
-                                {t('roster.remindAll') || 'Remind all'}
-                              </Text>
-                            </>
+                            <FontAwesomeIcon
+                              icon={faBell}
+                              size={13}
+                              color={colors.primary}
+                            />
                           )}
                         </TouchableOpacity>
                       ) : null}
+                      {showRemoveInvite && personUserId && isEventCreator ? (
+                        <TouchableOpacity
+                          style={themedStyles.rsvpRemindBtn}
+                          onPress={() =>
+                            showInviteeMoreMenu(personUserId, name)
+                          }
+                          hitSlop={{top: 6, bottom: 6, left: 4, right: 4}}
+                          accessibilityLabel={
+                            t('roster.moreActions') || 'More actions'
+                          }>
+                          <FontAwesomeIcon
+                            icon={faEllipsisH}
+                            size={13}
+                            color={colors.secondaryText}
+                          />
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
-                    {noReplyList.map(u =>
-                      renderPerson(
-                        `noreply-${u._id}`,
-                        u.name || u.username,
-                        u.profilePicUrl,
-                        colors.secondaryText,
-                        u._id,
-                        true,
-                        true,
-                      ),
+                  );
+                };
+                return (
+                  <View style={themedStyles.rsvpSectionWrap}>
+                    {maybeList.length > 0 && (
+                      <View style={themedStyles.rsvpResponseSection}>
+                        <Text style={themedStyles.rsvpSectionTitle}>
+                          {t('events.rsvpMaybe') || 'Maybe'} ({maybeList.length}
+                          )
+                        </Text>
+                        {maybeList.map(r =>
+                          renderPerson(
+                            `maybe-${r.userId}`,
+                            r.username,
+                            r.profilePicUrl,
+                            '#f1c40f',
+                            r.userId,
+                          ),
+                        )}
+                      </View>
+                    )}
+                    {cantList.length > 0 && (
+                      <View style={themedStyles.rsvpResponseSection}>
+                        <Text style={themedStyles.rsvpSectionTitle}>
+                          {t('events.rsvpCant') || "Can't make it"} (
+                          {cantList.length})
+                        </Text>
+                        {cantList.map(r =>
+                          renderPerson(
+                            `cant-${r.userId}`,
+                            r.username,
+                            r.profilePicUrl,
+                            '#e74c3c',
+                            r.userId,
+                          ),
+                        )}
+                      </View>
+                    )}
+                    {noReplyList.length > 0 && (
+                      <View style={themedStyles.rsvpResponseSection}>
+                        <View style={themedStyles.rsvpSectionHeaderRow}>
+                          <Text
+                            style={[
+                              themedStyles.rsvpSectionTitle,
+                              {marginBottom: 0, flex: 1},
+                            ]}>
+                            {t('roster.noReply') || 'Invited · no reply'} (
+                            {noReplyList.length})
+                          </Text>
+                          {isEventCreator ? (
+                            <TouchableOpacity
+                              style={[
+                                themedStyles.rsvpRemindAllBtn,
+                                pingingAllRsvp &&
+                                  themedStyles.rsvpRemindBtnDisabled,
+                              ]}
+                              onPress={() => pingRsvp()}
+                              disabled={
+                                pingingAllRsvp || pingingRsvpIds.size > 0
+                              }
+                              activeOpacity={0.75}>
+                              {pingingAllRsvp ? (
+                                <ActivityIndicator
+                                  size="small"
+                                  color={colors.primary}
+                                />
+                              ) : (
+                                <>
+                                  <FontAwesomeIcon
+                                    icon={faBell}
+                                    size={11}
+                                    color={colors.primary}
+                                  />
+                                  <Text style={themedStyles.rsvpRemindAllText}>
+                                    {t('roster.remindAll') || 'Remind all'}
+                                  </Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                        {noReplyList.map(u =>
+                          renderPerson(
+                            `noreply-${u._id}`,
+                            u.name || u.username,
+                            u.profilePicUrl,
+                            colors.secondaryText,
+                            u._id,
+                            true,
+                            true,
+                          ),
+                        )}
+                      </View>
                     )}
                   </View>
-                )}
-              </View>
-            );
-          })()}
+                );
+              })()}
+            </>
+          ) : null}
 
           {/* Paid Status Modal */}
           <Modal
@@ -4633,8 +4956,8 @@ const EventRoster: React.FC = () => {
                 <ScrollView
                   style={{flexGrow: 0}}
                   showsVerticalScrollIndicator={false}>
-                  {/* Edit Paid Status - Sports only */}
-                  {isTeamSport(eventType) && (
+                  {/* Edit Paid Status - only when host opted into tracking */}
+                  {isTeamSport(eventType) && trackPayment && (
                     <>
                       <TouchableOpacity
                         style={themedStyles.dropdown}

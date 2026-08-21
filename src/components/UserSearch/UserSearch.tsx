@@ -24,6 +24,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
 import locationService, {Coordinates} from '../../services/LocationService';
+import {
+  promptNearbyVisibilityIfPrivate,
+  refreshLocationForNearby,
+} from '../../utils/proximityDiscovery';
 import UserSearchCard, {FriendStatus} from './UserSearchCard';
 import UserContext, {UserContextType} from '../UserContext';
 
@@ -198,90 +202,104 @@ const UserSearch: React.FC = () => {
     setFriendStatuses(statuses);
   }, [users, friends, sentRequests, incomingRequests]);
 
-  // Fetch all users from the backend
-  const fetchUsers = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('userToken');
+  // Fetch all users from the backend.
+  // Optional overrides let Nearby enable pass fresh coords immediately so the
+  // first load isn't a non-geo fetch (which omitted distance until radius changed).
+  const fetchUsers = useCallback(
+    async (overrides?: {
+      proximityEnabled?: boolean;
+      userLocation?: Coordinates | null;
+      proximityRadius?: number;
+    }) => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const enabled = overrides?.proximityEnabled ?? proximityEnabled;
+        const location =
+          overrides && 'userLocation' in overrides
+            ? overrides.userLocation
+            : userLocation;
+        const radius = overrides?.proximityRadius ?? proximityRadius;
 
-      let url = `${API_BASE_URL}/users`;
-      if (proximityEnabled && userLocation) {
-        const params = new URLSearchParams({
-          lat: userLocation.latitude.toString(),
-          lng: userLocation.longitude.toString(),
-          maxDistance: proximityRadius.toString(),
+        let url = `${API_BASE_URL}/users`;
+        if (enabled && location) {
+          const params = new URLSearchParams({
+            lat: location.latitude.toString(),
+            lng: location.longitude.toString(),
+            maxDistance: radius.toString(),
+          });
+          url += `?${params.toString()}`;
+        }
+
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
-        url += `?${params.toString()}`;
-      }
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+        if (response.ok) {
+          const data = await response.json();
+          let rawUsers: User[] = [];
+          if (Array.isArray(data)) {
+            rawUsers = data;
+          } else if (data.users && Array.isArray(data.users)) {
+            rawUsers = data.users;
+          } else {
+            console.warn('Unexpected API response format:', data);
+            setUsers([]);
+            setFilteredUsers([]);
+            return;
+          }
 
-      if (response.ok) {
-        const data = await response.json();
-        // Ensure data is an array before filtering
-        let rawUsers: User[] = [];
-        if (Array.isArray(data)) {
-          rawUsers = data;
-        } else if (data.users && Array.isArray(data.users)) {
-          rawUsers = data.users;
+          let otherUsers = rawUsers.filter(
+            (user: User) => user._id !== userData?._id,
+          );
+
+          if (enabled && location) {
+            otherUsers = otherUsers
+              .map(user => {
+                let dist = user.distance;
+                if (
+                  dist == null &&
+                  user.latitude != null &&
+                  user.longitude != null
+                ) {
+                  dist = locationService.haversineDistance(
+                    location,
+                    {latitude: user.latitude, longitude: user.longitude},
+                    'mi',
+                  );
+                }
+                return {...user, distance: dist};
+              })
+              .filter(
+                user => user.distance != null && user.distance <= radius,
+              )
+              .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+          }
+
+          setUsers(otherUsers);
+          setFilteredUsers(otherUsers);
         } else {
-          console.warn('Unexpected API response format:', data);
+          console.warn('Failed to fetch users:', response.status);
           setUsers([]);
           setFilteredUsers([]);
-          return;
         }
-
-        // Filter out the current user
-        let otherUsers = rawUsers.filter(
-          (user: User) => user._id !== userData?._id,
-        );
-
-        // Compute distance client-side if proximity is active
-        if (proximityEnabled && userLocation) {
-          otherUsers = otherUsers
-            .map(user => {
-              // Use backend distance if provided, otherwise calculate from coords
-              let dist = user.distance;
-              if (
-                dist == null &&
-                user.latitude != null &&
-                user.longitude != null
-              ) {
-                dist = locationService.haversineDistance(
-                  userLocation,
-                  {latitude: user.latitude, longitude: user.longitude},
-                  'mi',
-                );
-              }
-              return {...user, distance: dist};
-            })
-            .filter(
-              user => user.distance != null && user.distance <= proximityRadius,
-            )
-            .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
-        }
-
-        setUsers(otherUsers);
-        setFilteredUsers(otherUsers);
-      } else {
-        console.warn('Failed to fetch users:', response.status);
+      } catch (error) {
+        console.error('Error fetching users:', error);
         setUsers([]);
         setFilteredUsers([]);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      setUsers([]);
-      setFilteredUsers([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [userData?._id, proximityEnabled, userLocation, proximityRadius]);
+    },
+    [userData?._id, proximityEnabled, userLocation, proximityRadius],
+  );
 
+  // Keep the list in sync when Nearby / radius / location change.
+  // fetchUsers already closes over those values.
   useEffect(() => {
+    setLoading(true);
     fetchUsers();
     fetchFriendData();
   }, [fetchUsers, fetchFriendData]);
@@ -357,10 +375,19 @@ const UserSearch: React.FC = () => {
 
     setLocationLoading(true);
     try {
-      const coords = await locationService.getLocation();
+      await promptNearbyVisibilityIfPrivate();
+      const coords = await refreshLocationForNearby();
       if (coords) {
         setUserLocation(coords);
         setProximityEnabled(true);
+        setLoading(true);
+        // Fetch immediately with the fresh coords so the first Nearby
+        // paint includes distance + radius (don't wait on a state race).
+        await fetchUsers({
+          proximityEnabled: true,
+          userLocation: coords,
+          proximityRadius,
+        });
       } else {
         Alert.alert(
           'Location Unavailable',
@@ -375,18 +402,7 @@ const UserSearch: React.FC = () => {
     } finally {
       setLocationLoading(false);
     }
-  }, [proximityEnabled]);
-
-  // Re-fetch users when proximity settings change
-  useEffect(() => {
-    if (proximityEnabled && userLocation) {
-      setLoading(true);
-      fetchUsers();
-    } else if (!proximityEnabled) {
-      setLoading(true);
-      fetchUsers();
-    }
-  }, [proximityEnabled, proximityRadius, userLocation, fetchUsers]);
+  }, [proximityEnabled, proximityRadius, fetchUsers]);
 
   // Handle friend action (send request, cancel, accept, etc.)
   const handleFriendAction = useCallback(

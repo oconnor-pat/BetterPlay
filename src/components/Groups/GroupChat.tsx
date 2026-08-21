@@ -37,6 +37,7 @@ import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarDay,
   faChevronRight,
+  faComments,
   faImage,
   faPaperPlane,
   faXmark,
@@ -51,7 +52,15 @@ import {useTheme} from '../ThemeContext/ThemeContext';
 import {useSocket} from '../../Context/SocketContext';
 import UserContext, {UserContextType} from '../UserContext';
 import ReportSheet from '../Moderation/ReportSheet';
-import {GroupMessage, GroupMessageReaction} from '../../types/group';
+import MentionText from '../Mentions/MentionText';
+import MentionSuggestions from '../Mentions/MentionSuggestions';
+import {GroupMember, GroupMessage, GroupMessageReaction} from '../../types/group';
+import {
+  applyMention,
+  filterMentionCandidates,
+  getActiveMention,
+  MentionCandidate,
+} from '../../utils/mentions';
 import {
   deleteGroupMessage,
   fetchGroupMessages,
@@ -65,6 +74,7 @@ import {
 
 interface GroupChatProps {
   groupId: string;
+  members?: GroupMember[];
   // Set when arriving from a reaction notification: the thread scrolls to
   // this message and flashes it. The nonce lets a repeat notification for
   // the same message re-run the effect.
@@ -163,6 +173,7 @@ const imageDisplaySize = (
 
 const GroupChat: React.FC<GroupChatProps> = ({
   groupId,
+  members = [],
   highlightMessageId,
   highlightNonce,
 }) => {
@@ -183,6 +194,7 @@ const GroupChat: React.FC<GroupChatProps> = ({
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [input, setInput] = useState('');
+  const [inputCursor, setInputCursor] = useState(0);
   const [sending, setSending] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   // Message the emoji picker is currently reacting to.
@@ -605,6 +617,50 @@ const GroupChat: React.FC<GroupChatProps> = ({
     [navigation],
   );
 
+  const openMentionProfile = useCallback(
+    (username: string) => {
+      const member = members.find(
+        m => m.username?.toLowerCase() === username.toLowerCase(),
+      );
+      navigation.navigate('Profile', {
+        screen: 'PublicProfile',
+        params: {
+          userId: member?.userId,
+          username: member?.username || username,
+          profilePicUrl: member?.profilePicUrl,
+        },
+      });
+    },
+    [members, navigation],
+  );
+
+  const mentionCandidates = useMemo(() => {
+    const active = getActiveMention(input, inputCursor);
+    if (!active) {
+      return [] as MentionCandidate[];
+    }
+    const pool: MentionCandidate[] = members.map(m => ({
+      userId: m.userId,
+      username: m.username || '',
+      name: m.name,
+      profilePicUrl: m.profilePicUrl,
+    }));
+    return filterMentionCandidates(pool, active.query, currentUserId);
+  }, [members, input, inputCursor, currentUserId]);
+
+  const handleSelectMention = useCallback(
+    (candidate: MentionCandidate) => {
+      const active = getActiveMention(input, inputCursor);
+      if (!active) {
+        return;
+      }
+      const next = applyMention(input, active, candidate.username);
+      setInput(next.text);
+      setInputCursor(next.cursor);
+    },
+    [input, inputCursor],
+  );
+
   const handleDelete = useCallback(
     (message: GroupMessage) => {
       Alert.alert(
@@ -733,9 +789,18 @@ const GroupChat: React.FC<GroupChatProps> = ({
           justifyContent: 'center',
           paddingHorizontal: 40,
         },
+        emptyIcon: {
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.primary + '18',
+          marginBottom: 16,
+        },
         emptyTitle: {
-          fontSize: 16,
-          fontWeight: '700',
+          fontSize: 17,
+          fontWeight: '800',
           color: colors.text,
           marginBottom: 6,
           textAlign: 'center',
@@ -750,17 +815,17 @@ const GroupChat: React.FC<GroupChatProps> = ({
         rowMine: {
           flexDirection: 'row',
           justifyContent: 'flex-end',
-          marginBottom: 10,
+          marginBottom: 12,
         },
         rowTheirs: {
           flexDirection: 'row',
           justifyContent: 'flex-start',
-          marginBottom: 10,
+          marginBottom: 12,
         },
         avatar: {
-          width: 30,
-          height: 30,
-          borderRadius: 15,
+          width: 32,
+          height: 32,
+          borderRadius: 16,
           backgroundColor: darkMode
             ? 'rgba(255,255,255,0.08)'
             : 'rgba(0,0,0,0.06)',
@@ -769,8 +834,10 @@ const GroupChat: React.FC<GroupChatProps> = ({
           overflow: 'hidden',
           marginRight: 8,
           alignSelf: 'flex-end',
+          borderWidth: 1.5,
+          borderColor: colors.primary + '33',
         },
-        avatarImage: {width: 30, height: 30},
+        avatarImage: {width: 32, height: 32},
         avatarInitials: {color: colors.text, fontWeight: '700', fontSize: 11},
         bubbleWrap: {maxWidth: '78%'},
         // Sits behind the bubble and fades out, so a message arrived at
@@ -781,34 +848,36 @@ const GroupChat: React.FC<GroupChatProps> = ({
           bottom: -6,
           left: -8,
           right: -8,
-          borderRadius: 16,
+          borderRadius: 20,
           backgroundColor: colors.primary + '40',
         },
         senderName: {
           fontSize: 11,
           fontWeight: '700',
           color: colors.secondaryText,
-          marginBottom: 3,
-          marginLeft: 4,
+          marginBottom: 4,
+          marginLeft: 6,
         },
         bubbleMine: {
           backgroundColor: colors.primary,
-          borderRadius: 16,
-          borderBottomRightRadius: 4,
-          paddingHorizontal: 13,
-          paddingVertical: 9,
+          borderRadius: 20,
+          borderBottomRightRadius: 6,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
         },
         bubbleTheirs: {
-          backgroundColor: colors.card,
-          borderRadius: 16,
-          borderBottomLeftRadius: 4,
-          paddingHorizontal: 13,
-          paddingVertical: 9,
+          backgroundColor: darkMode
+            ? 'rgba(255,255,255,0.08)'
+            : colors.card,
+          borderRadius: 20,
+          borderBottomLeftRadius: 6,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
         },
-        bubbleTextMine: {color: '#FFFFFF', fontSize: 15, lineHeight: 20},
-        bubbleTextTheirs: {color: colors.text, fontSize: 15, lineHeight: 20},
+        bubbleTextMine: {color: '#FFFFFF', fontSize: 15, lineHeight: 21},
+        bubbleTextTheirs: {color: colors.text, fontSize: 15, lineHeight: 21},
         // A retracted message keeps its slot so the thread doesn't shift,
         // but reads as clearly absent rather than empty.
         bubbleDeleted: {
@@ -994,14 +1063,15 @@ const GroupChat: React.FC<GroupChatProps> = ({
         composerWrap: {
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
-          backgroundColor: colors.card,
+          backgroundColor: colors.background,
+          paddingBottom: 2,
         },
         composer: {
           flexDirection: 'row',
           alignItems: 'flex-end',
           gap: 8,
           paddingHorizontal: 12,
-          paddingVertical: 8,
+          paddingVertical: 10,
         },
         pendingRow: {
           flexDirection: 'row',
@@ -1031,36 +1101,36 @@ const GroupChat: React.FC<GroupChatProps> = ({
         },
         textInput: {
           flex: 1,
-          minHeight: 40,
+          minHeight: 42,
           maxHeight: 120,
-          borderRadius: 20,
-          paddingHorizontal: 15,
-          paddingTop: Platform.OS === 'ios' ? 10 : 6,
-          paddingBottom: Platform.OS === 'ios' ? 10 : 6,
+          borderRadius: 22,
+          paddingHorizontal: 16,
+          paddingTop: Platform.OS === 'ios' ? 11 : 8,
+          paddingBottom: Platform.OS === 'ios' ? 11 : 8,
           fontSize: 15,
           color: colors.text,
-          backgroundColor: darkMode
-            ? 'rgba(255,255,255,0.07)'
-            : 'rgba(0,0,0,0.05)',
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
         sendBtn: {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 42,
+          height: 42,
+          borderRadius: 21,
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: colors.primary,
         },
         sendBtnDisabled: {opacity: 0.4},
         attachBtn: {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 42,
+          height: 42,
+          borderRadius: 21,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: darkMode
-            ? 'rgba(255,255,255,0.07)'
-            : 'rgba(0,0,0,0.05)',
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
         },
       }),
     [colors, darkMode],
@@ -1151,18 +1221,23 @@ const GroupChat: React.FC<GroupChatProps> = ({
               isMine ? styles.bubbleMine : styles.bubbleTheirs,
               styles.captionBubble,
             ]}>
-            <Text
-              style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}>
-              {item.text}
-            </Text>
+            <MentionText
+              text={item.text}
+              style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}
+              onAccent={isMine}
+              onPressMention={openMentionProfile}
+            />
           </View>
         ) : null}
       </View>
     ) : (
       <View style={isMine ? styles.bubbleMine : styles.bubbleTheirs}>
-        <Text style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}>
-          {item.text}
-        </Text>
+        <MentionText
+          text={item.text}
+          style={isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs}
+          onAccent={isMine}
+          onPressMention={openMentionProfile}
+        />
       </View>
     );
 
@@ -1297,6 +1372,13 @@ const GroupChat: React.FC<GroupChatProps> = ({
         }
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
+            <View style={styles.emptyIcon}>
+              <FontAwesomeIcon
+                icon={faComments}
+                size={26}
+                color={colors.primary}
+              />
+            </View>
             <Text style={styles.emptyTitle}>
               {t('groupChat.emptyTitle') || 'No messages yet'}
             </Text>
@@ -1325,6 +1407,10 @@ const GroupChat: React.FC<GroupChatProps> = ({
             </View>
           </View>
         ) : null}
+        <MentionSuggestions
+          candidates={mentionCandidates}
+          onSelect={handleSelectMention}
+        />
         <View style={styles.composer}>
           <TouchableOpacity
             style={[styles.attachBtn, sending && styles.sendBtnDisabled]}
@@ -1340,7 +1426,13 @@ const GroupChat: React.FC<GroupChatProps> = ({
           <TextInput
             style={styles.textInput}
             value={input}
-            onChangeText={setInput}
+            onChangeText={text => {
+              setInput(text);
+              setInputCursor(text.length);
+            }}
+            onSelectionChange={e => {
+              setInputCursor(e.nativeEvent.selection.end);
+            }}
             placeholder={
               pendingImage
                 ? t('groupChat.caption') || 'Add a caption'
