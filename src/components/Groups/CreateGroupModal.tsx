@@ -49,6 +49,10 @@ interface Props {
   onClose: () => void;
   onCreated: (group: Group) => void;
   currentUserId: string;
+  /** Prefill members when creating from an event roster / invitees. */
+  initialMembers?: PickableUser[];
+  /** Optional suggested name (e.g. event name). */
+  initialName?: string;
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -58,6 +62,8 @@ const CreateGroupModal: React.FC<Props> = ({
   onClose,
   onCreated,
   currentUserId,
+  initialMembers,
+  initialName,
 }) => {
   const {colors, darkMode} = useTheme();
   const insets = useSafeAreaInsets();
@@ -72,6 +78,41 @@ const CreateGroupModal: React.FC<Props> = ({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardHeight(0);
+      setName('');
+      setPrivacy('private');
+      setSelected([]);
+      setQuery('');
+      setResults([]);
+      setSearching(false);
+      setSubmitting(false);
+      return;
+    }
+    setName(initialName?.trim() || '');
+    const seed = (initialMembers || []).filter(
+      m => m._id && String(m._id) !== String(currentUserId),
+    );
+    // Dedupe by id
+    const seen = new Set<string>();
+    const unique: PickableUser[] = [];
+    for (const m of seed) {
+      const id = String(m._id);
+      if (seen.has(id)) {
+        continue;
+      }
+      seen.add(id);
+      unique.push({...m, _id: id});
+    }
+    setSelected(unique);
+    setPrivacy('private');
+    setQuery('');
+    setResults([]);
+    setSearching(false);
+    setSubmitting(false);
+  }, [visible, initialMembers, initialName, currentUserId]);
 
   useEffect(() => {
     if (!visible) {
@@ -92,21 +133,6 @@ const CreateGroupModal: React.FC<Props> = ({
       onShow.remove();
       onHide.remove();
     };
-  }, [visible]);
-
-  // Reset all transient state whenever the modal closes/reopens so a
-  // fresh create flow doesn't inherit prior input.
-  useEffect(() => {
-    if (!visible) {
-      setName('');
-      setPrivacy('private');
-      setSelected([]);
-      setQuery('');
-      setResults([]);
-      setSearching(false);
-      setSubmitting(false);
-      setKeyboardHeight(0);
-    }
   }, [visible]);
 
   // Keyboard height already clears the home indicator; don't double-count

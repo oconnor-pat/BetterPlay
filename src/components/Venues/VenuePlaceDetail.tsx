@@ -178,11 +178,13 @@ const VenuePlaceDetail: React.FC = () => {
 
   // ── Actions ───────────────────────────────────────────────────────────
   const handlePlanEvent = useCallback(() => {
+    const address =
+      place.formattedAddress || place.shortFormattedAddress || '';
+    const locationLabel = [place.name, address].filter(Boolean).join(', ');
     const params = {
       prefillEvent: {
         name: '',
-        location:
-          place.formattedAddress || place.shortFormattedAddress || place.name,
+        location: locationLabel || place.name,
         latitude: place.location?.latitude,
         longitude: place.location?.longitude,
         venueId: place.id,

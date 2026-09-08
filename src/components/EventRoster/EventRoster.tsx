@@ -53,6 +53,7 @@ import {
   faPlus,
   faBell,
   faComment,
+  faComments,
   faStar,
   faCalendarPlus,
   faEllipsisH,
@@ -67,6 +68,8 @@ import EventRatingModal from '../EventRating/EventRatingModal';
 import PlayerRatingModal, {
   PlayerRatingTarget,
 } from '../EventRating/PlayerRatingModal';
+import CreateGroupModal from '../Groups/CreateGroupModal';
+import {Group} from '../../types/group';
 
 /** Minimum ratings before showing the roster avatar chip. */
 const ROSTER_RATING_MIN_COUNT = 3;
@@ -128,10 +131,10 @@ const positionOptions: Record<string, string[]> = {
   // General activity roles
   'Trivia Night': ['Player', 'Team Captain', 'Host'],
   'Game Night': ['Player', 'Host'],
+  'Video Games': ['Player', 'Host', 'Spectator'],
   Karaoke: ['Singer', 'Audience'],
   'Open Mic': ['Performer', 'Audience'],
   'Watch Party': ['Attendee', 'Host'],
-  'Live Music': ['Attendee'],
   Hiking: ['Hiker', 'Guide'],
   Cycling: ['Cyclist', 'Guide'],
   Running: ['Runner', 'Pacer'],
@@ -143,8 +146,14 @@ const positionOptions: Record<string, string[]> = {
   Meetup: ['Attendee', 'Organizer'],
   Potluck: ['Guest', 'Host'],
   Volunteer: ['Volunteer', 'Coordinator'],
-  Other: ['Participant'],
-  Default: ['Participant'],
+  'Comedy Show': ['Attendee', 'Performer', 'Host'],
+  Party: ['Guest', 'Host'],
+  Hangout: ['Attendee', 'Host'],
+  Concert: ['Attendee', 'Host'],
+  Food: ['Guest', 'Host'],
+  'Live Music': ['Attendee', 'Host'],
+  Other: ['Participant', 'Host'],
+  Default: ['Participant', 'Host'],
 };
 
 const sportEmojis: Record<string, string> = {
@@ -163,6 +172,7 @@ const sportEmojis: Record<string, string> = {
   // Social & Entertainment
   'Trivia Night': '🧠',
   'Game Night': '🎲',
+  'Video Games': '🎮',
   Karaoke: '🎤',
   'Open Mic': '🎙️',
   'Watch Party': '📺',
@@ -482,6 +492,7 @@ const EventRoster: React.FC = () => {
   const [invitedUserDetails, setInvitedUserDetails] = useState<
     {_id: string; username: string; name?: string; profilePicUrl?: string}[]
   >([]);
+  const [createGroupVisible, setCreateGroupVisible] = useState(false);
 
   // Waitlist state
   const [waitlist, setWaitlist] = useState<
@@ -551,8 +562,8 @@ const EventRoster: React.FC = () => {
   );
 
   const canAddToCalendar = useMemo(
-    () => !!getEventDateTime(date, time),
-    [date, time],
+    () => !eventHasEnded && !!getEventDateTime(date, time),
+    [date, time, eventHasEnded],
   );
 
   const canRateEvent =
@@ -570,7 +581,8 @@ const EventRoster: React.FC = () => {
 
   // Check if current user is invited to the event
   const isUserInvited = useMemo(() => {
-    return invitedUsers.includes(userData?._id || '');
+    const uid = String(userData?._id || '');
+    return invitedUsers.map(String).includes(uid);
   }, [invitedUsers, userData?._id]);
 
   const isUserRemoved = useMemo(() => {
@@ -579,6 +591,9 @@ const EventRoster: React.FC = () => {
 
   // Check if user can join this event
   const canJoinEvent = useMemo(() => {
+    if (eventHasEnded) {
+      return false;
+    }
     if (isUserRemoved && !isEventCreator) {
       return false;
     }
@@ -595,16 +610,29 @@ const EventRoster: React.FC = () => {
       return isEventCreator || isUserInvited;
     }
     return true;
-  }, [eventPrivacy, isEventCreator, isUserInvited, isUserRemoved]);
+  }, [
+    eventHasEnded,
+    eventPrivacy,
+    isEventCreator,
+    isUserInvited,
+    isUserRemoved,
+  ]);
 
   // Invitees / roster members can suggest guests for the creator to approve.
   const canSuggestGuests = useMemo(() => {
     return (
+      !eventHasEnded &&
       eventPrivacy === 'invite-only' &&
       !isEventCreator &&
       (isUserInvited || isUserOnRoster)
     );
-  }, [eventPrivacy, isEventCreator, isUserInvited, isUserOnRoster]);
+  }, [
+    eventHasEnded,
+    eventPrivacy,
+    isEventCreator,
+    isUserInvited,
+    isUserOnRoster,
+  ]);
 
   const isUserOnWaitlist = useMemo(() => {
     return waitlist.some(w => w.userId === userData?._id);
@@ -1331,6 +1359,31 @@ const EventRoster: React.FC = () => {
           fontWeight: '700',
           color: colors.text,
           marginLeft: 8,
+        },
+        createGroupFromEventBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginTop: 4,
+          marginBottom: 8,
+          marginHorizontal: 16,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+        },
+        createGroupFromEventText: {
+          flex: 1,
+          color: colors.text,
+          fontSize: 14,
+          fontWeight: '600',
+        },
+        createGroupFromEventHint: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          marginTop: 2,
         },
         // Team Tabs
         teamTabsContainer: {
@@ -3494,18 +3547,26 @@ const EventRoster: React.FC = () => {
               {/* Primary CTAs — Join / Suggest guest / Invite (obvious buttons) */}
               {((canJoinEvent && !isUserOnRoster) ||
                 canSuggestGuests ||
-                (eventPrivacy === 'invite-only' && isEventCreator)) && (
+                (eventPrivacy === 'invite-only' &&
+                  isEventCreator &&
+                  !eventHasEnded)) && (
                 <View style={themedStyles.primaryActionsRow}>
                   {canJoinEvent && !isUserOnRoster && (
                     <TouchableOpacity
                       style={themedStyles.primaryActionButton}
                       onPress={() => {
-                        if (isEventFull && !isMyReservation) {
+                        // Host invitees always attempt join (BE bumps capacity).
+                        // Non-invitees on a full event go to the waitlist.
+                        if (isEventFull && !isMyReservation && !isUserInvited) {
                           if (isUserOnWaitlist) {
                             handleLeaveWaitlist();
                           } else {
                             handleJoinWaitlist();
                           }
+                          return;
+                        }
+                        if (isEventFull && isUserInvited && !isMyReservation) {
+                          handleJoinWaitlist();
                           return;
                         }
                         setAddPlayerExpanded(true);
@@ -3525,7 +3586,7 @@ const EventRoster: React.FC = () => {
                         />
                       )}
                       <Text style={themedStyles.primaryActionButtonText}>
-                        {isEventFull && !isMyReservation
+                        {isEventFull && !isMyReservation && !isUserInvited
                           ? isUserOnWaitlist
                             ? `Leave Waitlist (#${userWaitlistPosition})`
                             : t('roster.joinWaitlist') || 'Join Waitlist'
@@ -3565,36 +3626,39 @@ const EventRoster: React.FC = () => {
                       </Text>
                     </TouchableOpacity>
                   )}
-                  {eventPrivacy === 'invite-only' && isEventCreator && (
-                    <TouchableOpacity
-                      style={[
-                        themedStyles.primaryActionButton,
-                        ((canJoinEvent && !isUserOnRoster) ||
-                          canSuggestGuests) &&
-                          themedStyles.primaryActionButtonSecondary,
-                      ]}
-                      onPress={() => setInviteExpanded(true)}
-                      activeOpacity={0.85}>
-                      <FontAwesomeIcon
-                        icon={faEnvelope}
-                        size={16}
-                        color={
-                          (canJoinEvent && !isUserOnRoster) || canSuggestGuests
-                            ? colors.primary
-                            : colors.buttonText || '#fff'
-                        }
-                      />
-                      <Text
+                  {eventPrivacy === 'invite-only' &&
+                    isEventCreator &&
+                    !eventHasEnded && (
+                      <TouchableOpacity
                         style={[
-                          themedStyles.primaryActionButtonText,
+                          themedStyles.primaryActionButton,
                           ((canJoinEvent && !isUserOnRoster) ||
                             canSuggestGuests) &&
-                            themedStyles.primaryActionButtonTextSecondary,
-                        ]}>
-                        {t('roster.invitePlayers') || 'Invite People'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                            themedStyles.primaryActionButtonSecondary,
+                        ]}
+                        onPress={() => setInviteExpanded(true)}
+                        activeOpacity={0.85}>
+                        <FontAwesomeIcon
+                          icon={faEnvelope}
+                          size={16}
+                          color={
+                            (canJoinEvent && !isUserOnRoster) ||
+                            canSuggestGuests
+                              ? colors.primary
+                              : colors.buttonText || '#fff'
+                          }
+                        />
+                        <Text
+                          style={[
+                            themedStyles.primaryActionButtonText,
+                            ((canJoinEvent && !isUserOnRoster) ||
+                              canSuggestGuests) &&
+                              themedStyles.primaryActionButtonTextSecondary,
+                          ]}>
+                          {t('roster.invitePlayers') || 'Invite People'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                 </View>
               )}
 
@@ -4030,6 +4094,7 @@ const EventRoster: React.FC = () => {
 
               {/* Invite / suggest guests — opened from the primary CTA above. */}
               {eventPrivacy === 'invite-only' &&
+                !eventHasEnded &&
                 (isEventCreator || canSuggestGuests) &&
                 inviteExpanded && (
                   <View style={themedStyles.inviteSection}>
@@ -4200,6 +4265,35 @@ const EventRoster: React.FC = () => {
                     {t('roster.rosteredPlayers')} ({roster.length})
                   </Text>
                 </View>
+
+                {(roster.length > 0 || invitedUserDetails.length > 0) &&
+                userData?._id ? (
+                  <TouchableOpacity
+                    style={themedStyles.createGroupFromEventBtn}
+                    activeOpacity={0.75}
+                    onPress={() => setCreateGroupVisible(true)}>
+                    <FontAwesomeIcon
+                      icon={faComments}
+                      size={16}
+                      color={colors.primary}
+                    />
+                    <View style={{flex: 1}}>
+                      <Text style={themedStyles.createGroupFromEventText}>
+                        {t('roster.createGroupFromEvent') ||
+                          'Create group chat'}
+                      </Text>
+                      <Text style={themedStyles.createGroupFromEventHint}>
+                        {t('roster.createGroupFromEventHint') ||
+                          'Start a group with people from this event'}
+                      </Text>
+                    </View>
+                    <FontAwesomeIcon
+                      icon={faChevronRight}
+                      size={12}
+                      color={colors.secondaryText}
+                    />
+                  </TouchableOpacity>
+                ) : null}
 
                 {loading ? (
                   <RosterListSkeleton count={5} />
@@ -5212,6 +5306,35 @@ const EventRoster: React.FC = () => {
         }
         onClose={() => setRatingModalVisible(false)}
         onSubmitted={() => setHasRatedEvent(true)}
+      />
+
+      <CreateGroupModal
+        visible={createGroupVisible}
+        onClose={() => setCreateGroupVisible(false)}
+        currentUserId={userData?._id || ''}
+        initialName={eventName ? `${eventName} crew` : undefined}
+        initialMembers={[
+          ...roster
+            .filter(p => p.userId)
+            .map(p => ({
+              _id: String(p.userId),
+              username: p.username,
+              profilePicUrl: p.profilePicUrl,
+            })),
+          ...invitedUserDetails.map(u => ({
+            _id: String(u._id),
+            username: u.username,
+            name: u.name,
+            profilePicUrl: u.profilePicUrl,
+          })),
+        ]}
+        onCreated={(group: Group) => {
+          setCreateGroupVisible(false);
+          navigation.navigate('Groups', {
+            screen: 'GroupDetail',
+            params: {groupId: group._id},
+          });
+        }}
       />
 
       <PlayerRatingModal

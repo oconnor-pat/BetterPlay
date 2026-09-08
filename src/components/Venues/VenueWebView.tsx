@@ -128,10 +128,11 @@ const VenueWebView: React.FC = () => {
   }, [currentUrl]);
 
   const handlePlanEvent = useCallback(() => {
+    const locationLabel = [venueName, venueAddress].filter(Boolean).join(', ');
     const params = {
       prefillEvent: {
         name: '',
-        location: venueAddress || venueName,
+        location: locationLabel || venueName,
         latitude: venueLatitude,
         longitude: venueLongitude,
         venueId,

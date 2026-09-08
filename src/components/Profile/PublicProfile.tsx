@@ -38,6 +38,7 @@ import {
   faEllipsisVertical,
   faUserSlash,
   faTimes,
+  faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 import ProfileRatingBadges from '../EventRating/ProfileRatingBadges';
@@ -125,6 +126,8 @@ const PublicProfile: React.FC = () => {
   const [mutualFriends, setMutualFriends] = useState<
     Array<{_id: string; username: string; profilePicUrl?: string}>
   >([]);
+  const [mutualFriendsSheetVisible, setMutualFriendsSheetVisible] =
+    useState(false);
   const [favoriteSports, setFavoriteSports] = useState<string[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
@@ -767,6 +770,69 @@ const PublicProfile: React.FC = () => {
           color: colors.secondaryText,
           flexShrink: 1,
         },
+        mutualFriendsSheetOverlay: {
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'flex-end',
+        },
+        mutualFriendsSheet: {
+          backgroundColor: colors.card,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingTop: 8,
+          paddingBottom: 28,
+          maxHeight: '70%',
+        },
+        mutualFriendsSheetHandle: {
+          alignSelf: 'center',
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.border,
+          marginBottom: 8,
+        },
+        mutualFriendsSheetHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        mutualFriendsSheetTitle: {
+          fontSize: 17,
+          fontWeight: '800',
+          color: colors.text,
+        },
+        mutualFriendsSheetRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+          gap: 12,
+        },
+        mutualFriendsSheetAvatar: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+        },
+        mutualFriendsSheetAvatarFallback: {
+          backgroundColor: colors.primary + '22',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        mutualFriendsSheetAvatarText: {
+          color: colors.primary,
+          fontWeight: '700',
+          fontSize: 14,
+        },
+        mutualFriendsSheetName: {
+          flex: 1,
+          fontSize: 15,
+          fontWeight: '700',
+          color: colors.text,
+        },
         actionRow: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -996,19 +1062,15 @@ const PublicProfile: React.FC = () => {
             <Text style={themedStyles.userHandle}>@{userData?.username}</Text>
 
             {!isSelf && mutualFriendsCount > 0 ? (
-              <View style={themedStyles.mutualFriendsRow}>
+              <TouchableOpacity
+                style={themedStyles.mutualFriendsRow}
+                activeOpacity={0.75}
+                onPress={() => setMutualFriendsSheetVisible(true)}>
                 {mutualFriends.length > 0 ? (
                   <View style={themedStyles.mutualFriendsAvatars}>
                     {mutualFriends.slice(0, 3).map((friend, index) => (
-                      <TouchableOpacity
+                      <View
                         key={friend._id}
-                        onPress={() =>
-                          navigation.push('PublicProfile', {
-                            userId: friend._id,
-                            username: friend.username,
-                            profilePicUrl: friend.profilePicUrl,
-                          })
-                        }
                         style={{marginLeft: index === 0 ? 0 : -6}}>
                         {friend.profilePicUrl ? (
                           <Image
@@ -1026,7 +1088,7 @@ const PublicProfile: React.FC = () => {
                             </Text>
                           </View>
                         )}
-                      </TouchableOpacity>
+                      </View>
                     ))}
                   </View>
                 ) : null}
@@ -1037,7 +1099,12 @@ const PublicProfile: React.FC = () => {
                         count: mutualFriendsCount,
                       }) || `${mutualFriendsCount} mutual friends`}
                 </Text>
-              </View>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={11}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
             ) : null}
 
             {/* Friend + Message actions */}
@@ -1187,6 +1254,81 @@ const PublicProfile: React.FC = () => {
           </View>
         </ScrollView>
       )}
+
+      <Modal
+        visible={mutualFriendsSheetVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMutualFriendsSheetVisible(false)}>
+        <TouchableOpacity
+          style={themedStyles.mutualFriendsSheetOverlay}
+          activeOpacity={1}
+          onPress={() => setMutualFriendsSheetVisible(false)}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={e => e.stopPropagation()}
+            style={themedStyles.mutualFriendsSheet}>
+            <View style={themedStyles.mutualFriendsSheetHandle} />
+            <View style={themedStyles.mutualFriendsSheetHeader}>
+              <Text style={themedStyles.mutualFriendsSheetTitle}>
+                {t('profile.mutualFriends') || 'Mutual friends'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setMutualFriendsSheetVisible(false)}
+                hitSlop={12}>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  size={18}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {mutualFriends.map(friend => (
+                <TouchableOpacity
+                  key={friend._id}
+                  style={themedStyles.mutualFriendsSheetRow}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    setMutualFriendsSheetVisible(false);
+                    navigation.push('PublicProfile', {
+                      userId: friend._id,
+                      username: friend.username,
+                      profilePicUrl: friend.profilePicUrl,
+                    });
+                  }}>
+                  {friend.profilePicUrl ? (
+                    <Image
+                      source={{uri: friend.profilePicUrl}}
+                      style={themedStyles.mutualFriendsSheetAvatar}
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        themedStyles.mutualFriendsSheetAvatar,
+                        themedStyles.mutualFriendsSheetAvatarFallback,
+                      ]}>
+                      <Text style={themedStyles.mutualFriendsSheetAvatarText}>
+                        {getInitials(friend.username)}
+                      </Text>
+                    </View>
+                  )}
+                  <Text
+                    style={themedStyles.mutualFriendsSheetName}
+                    numberOfLines={1}>
+                    {friend.username}
+                  </Text>
+                  <FontAwesomeIcon
+                    icon={faChevronRight}
+                    size={12}
+                    color={colors.secondaryText}
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <ReportSheet
         visible={reportVisible}

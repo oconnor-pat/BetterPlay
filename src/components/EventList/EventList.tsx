@@ -51,6 +51,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
+import type {GooglePlacesAutocompleteRef} from 'react-native-google-places-autocomplete';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {EventListSkeleton} from '../Skeleton';
 import {
@@ -80,6 +81,7 @@ import {
   faUserPlus,
   faBuilding,
   faQuestion,
+  faThumbtack,
 } from '@fortawesome/free-solid-svg-icons';
 import {
   useNavigation,
@@ -116,9 +118,11 @@ import {
   positionsForEventType,
 } from '../../utils/eventRoles';
 import {
+  formatEventDuration,
   formatEventTimeRange,
   getEventDateTime,
   isEventActive,
+  isEventEnded,
   isEventPast,
   parseEventDateLocal,
   customOccurrenceDates,
@@ -130,6 +134,7 @@ import MapAppPicker from '../MapAppPicker/MapAppPicker';
 import eventWatchService, {
   EventWatchPreferences,
 } from '../../services/EventWatchService';
+import eventPinService from '../../services/EventPinService';
 import EmojiPicker, {type EmojiType} from 'rn-emoji-keyboard';
 
 // Optional prefill payload sent from Venues ("Plan event here") or Groups
@@ -282,6 +287,21 @@ interface Event {
     profilePicUrl?: string;
     requestedAt?: string;
   }>;
+  // Friends of the viewer who are already on the roster. Present even on
+  // gated teasers (full roster stays hidden) so LFG cards can show social proof.
+  friendsOnRoster?: Array<{
+    userId: string;
+    username?: string;
+    name?: string;
+    profilePicUrl?: string;
+  }>;
+  // Friends who requested to join (creator only).
+  friendsInquired?: Array<{
+    userId: string;
+    username?: string;
+    name?: string;
+    profilePicUrl?: string;
+  }>;
   // True when the server redacted this public event's details because the
   // viewer hasn't been approved yet — the card renders a locked teaser.
   isGated?: boolean;
@@ -403,7 +423,26 @@ const DURATION_OPTIONS: {label: string; minutes: number | null}[] = [
   // backend treating a missing duration as "unknown length".
   {label: 'Open', minutes: null},
 ];
+const PRESET_DURATION_MINUTES = new Set(
+  DURATION_OPTIONS.filter(o => o.minutes != null).map(o => o.minutes as number),
+);
+const isPresetDuration = (minutes: number | null | undefined): boolean =>
+  minutes != null && PRESET_DURATION_MINUTES.has(minutes);
 const DEFAULT_DURATION_MINUTES = 60;
+const DEFAULT_CUSTOM_DURATION_MINUTES = 75;
+const MIN_CUSTOM_DURATION_MINUTES = 15;
+const MAX_CUSTOM_DURATION_MINUTES = 12 * 60;
+const CUSTOM_DURATION_STEP_MINUTES = 15;
+const clampCustomDuration = (minutes: number): number =>
+  Math.min(
+    MAX_CUSTOM_DURATION_MINUTES,
+    Math.max(MIN_CUSTOM_DURATION_MINUTES, minutes),
+  );
+const snapCustomDuration = (minutes: number): number =>
+  clampCustomDuration(
+    Math.round(minutes / CUSTOM_DURATION_STEP_MINUTES) *
+      CUSTOM_DURATION_STEP_MINUTES,
+  );
 
 const createEmptyEvent = () => ({
   name: '',
@@ -440,13 +479,7 @@ const createEmptyEvent = () => ({
   sourceUrl: undefined as string | undefined,
 });
 
-// "0" is the unlimited sentinel — kept as a string so it fits the same
-// picker path as 1–30. The backend treats totalSpots === 0 as no cap.
-const rosterSizeOptions: string[] = [
-  ...Array.from({length: 30}, (_, i) => (i + 1).toString()),
-  '0',
-];
-
+// "0" is the unlimited sentinel. The backend treats totalSpots === 0 as no cap.
 const rosterSizeLabel = (value: string, noLimitLabel: string): string =>
   value === '0' ? noLimitLabel : value;
 
@@ -474,7 +507,7 @@ const INTEREST_TO_EVENT_TYPE: Record<string, string> = {
   yoga: 'Yoga',
   swimming: 'Swimming',
   dance: 'Dancing',
-  gaming: 'Game Night',
+  gaming: 'Video Games',
   'sports-bar': 'Watch Party',
   coffee: 'Happy Hour',
 };
@@ -504,6 +537,7 @@ const activityOptions = [
   // Social & Entertainment
   {label: 'Trivia Night', emoji: '🧠', category: 'social'},
   {label: 'Game Night', emoji: '🎲', category: 'social'},
+  {label: 'Video Games', emoji: '🎮', category: 'social'},
   {label: 'Karaoke', emoji: '🎤', category: 'social'},
   {label: 'Open Mic', emoji: '🎙️', category: 'social'},
   {label: 'Watch Party', emoji: '📺', category: 'social'},
@@ -1311,6 +1345,23 @@ const EventList: React.FC = () => {
         engagementSpacer: {
           flex: 1,
         },
+        friendsOnEventRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginTop: 10,
+          flexWrap: 'wrap',
+        },
+        friendsOnEventLabel: {
+          color: colors.secondaryText,
+          fontSize: 12,
+          fontWeight: '500',
+          flexShrink: 1,
+        },
+        cardPinBadge: {
+          marginLeft: 6,
+          marginTop: 2,
+        },
         rsvpContainer: {
           paddingTop: 8,
           paddingBottom: 0,
@@ -1798,6 +1849,198 @@ const EventList: React.FC = () => {
           overflow: 'hidden',
           alignSelf: 'center',
         },
+        pickerActionsRow: {
+          flexDirection: 'row',
+          gap: 10,
+          paddingHorizontal: 12,
+          paddingTop: 10,
+          paddingBottom: 12,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+        },
+        dateTimePickerPanel: {
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          marginBottom: 8,
+          overflow: 'hidden',
+        },
+        dateTimePickerHint: {
+          paddingHorizontal: 14,
+          paddingTop: 12,
+          paddingBottom: 4,
+          fontSize: 13,
+          color: colors.secondaryText,
+        },
+        jerseyPreviewRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          paddingHorizontal: 14,
+          paddingBottom: 10,
+        },
+        jerseyPreviewSwatch: {
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+        },
+        jerseyPreviewText: {
+          fontSize: 14,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        pickerActionBtn: {
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 12,
+          borderRadius: 12,
+        },
+        pickerActionBtnPrimary: {
+          backgroundColor: colors.primary,
+        },
+        pickerActionBtnSecondary: {
+          backgroundColor: colors.card || colors.background,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        pickerActionBtnText: {
+          fontSize: 14,
+          fontWeight: '700',
+          color: colors.buttonText || '#fff',
+        },
+        pickerActionBtnTextSecondary: {
+          fontSize: 14,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        rosterSizePanel: {
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          marginBottom: 8,
+          overflow: 'hidden',
+        },
+        rosterSizeHint: {
+          paddingHorizontal: 14,
+          paddingTop: 12,
+          paddingBottom: 8,
+          fontSize: 13,
+          color: colors.secondaryText,
+        },
+        rosterSizeNoLimitBtn: {
+          marginHorizontal: 12,
+          marginBottom: 12,
+          paddingVertical: 12,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.card || colors.background,
+          alignItems: 'center',
+        },
+        rosterSizeNoLimitBtnSelected: {
+          borderColor: colors.primary,
+          backgroundColor: colors.primary + '18',
+        },
+        rosterSizeNoLimitText: {
+          fontSize: 15,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        rosterSizeNoLimitTextSelected: {
+          color: colors.primary,
+        },
+        rosterSizeStepperRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+          paddingHorizontal: 12,
+          paddingBottom: 14,
+        },
+        rosterSizeStepBtn: {
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.card || colors.background,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        rosterSizeStepBtnDisabled: {
+          opacity: 0.4,
+        },
+        rosterSizeStepBtnText: {
+          fontSize: 22,
+          fontWeight: '600',
+          color: colors.text,
+          lineHeight: 26,
+        },
+        rosterSizeCountWrap: {
+          minWidth: 88,
+          alignItems: 'center',
+        },
+        rosterSizeCount: {
+          fontSize: 28,
+          fontWeight: '800',
+          color: colors.text,
+          letterSpacing: -0.5,
+        },
+        rosterSizeCountInput: {
+          minWidth: 72,
+          fontSize: 28,
+          fontWeight: '800',
+          color: colors.text,
+          letterSpacing: -0.5,
+          textAlign: 'center',
+          paddingVertical: 0,
+          paddingHorizontal: 4,
+        },
+        rosterSizeCountLabel: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
+          marginTop: 2,
+        },
+        rosterSizeChipGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+        },
+        rosterSizeChip: {
+          minWidth: 52,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.card || colors.background,
+          alignItems: 'center',
+        },
+        rosterSizeChipWide: {
+          minWidth: 88,
+        },
+        rosterSizeChipSelected: {
+          borderColor: colors.primary,
+          backgroundColor: colors.primary + '18',
+        },
+        rosterSizeChipText: {
+          fontSize: 14,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        rosterSizeChipTextSelected: {
+          color: colors.primary,
+        },
+        rosterSizeResults: {
+          maxHeight: 220,
+        },
         pickerContainer: {
           backgroundColor: colors.inputBackground || colors.background,
           borderRadius: 12,
@@ -1805,6 +2048,88 @@ const EventList: React.FC = () => {
           borderColor: colors.border,
           marginBottom: 8,
           overflow: 'hidden',
+        },
+        eventTypeSearchPanel: {
+          backgroundColor: colors.inputBackground || colors.background,
+          borderRadius: 12,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          marginBottom: 8,
+          overflow: 'hidden',
+        },
+        eventTypeSearchRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          paddingHorizontal: 12,
+          paddingVertical: Platform.OS === 'ios' ? 10 : 4,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        eventTypeSearchInput: {
+          flex: 1,
+          fontSize: 15,
+          color: colors.text,
+          paddingVertical: Platform.OS === 'ios' ? 4 : 8,
+        },
+        eventTypeCategoryRow: {
+          paddingHorizontal: 10,
+          paddingVertical: 8,
+          gap: 8,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        eventTypeCategoryChip: {
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.card || colors.background,
+        },
+        eventTypeCategoryChipSelected: {
+          borderColor: colors.primary,
+          backgroundColor: colors.primary + '18',
+        },
+        eventTypeCategoryChipText: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
+        },
+        eventTypeCategoryChipTextSelected: {
+          color: colors.primary,
+        },
+        eventTypeResults: {
+          maxHeight: 240,
+        },
+        eventTypeOptionRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
+        eventTypeOptionRowSelected: {
+          backgroundColor: colors.primary + '14',
+        },
+        eventTypeOptionEmoji: {
+          fontSize: 18,
+          width: 28,
+          textAlign: 'center',
+        },
+        eventTypeOptionLabel: {
+          flex: 1,
+          fontSize: 15,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        eventTypeEmpty: {
+          padding: 20,
+          textAlign: 'center',
+          color: colors.secondaryText,
+          fontSize: 14,
         },
         // ── Event card options menu (bottom sheet) ──
         optionsMenuSheet: {
@@ -2284,23 +2609,25 @@ const EventList: React.FC = () => {
           borderRadius: 12,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
-          padding: 14,
-          marginBottom: 12,
+          marginBottom: 8,
+          overflow: 'hidden',
         },
         jerseyColorTitle: {
           color: colors.secondaryText,
-          fontSize: 12,
-          fontWeight: '700',
-          textTransform: 'uppercase',
-          letterSpacing: 0.6,
-          marginBottom: 12,
-          textAlign: 'center',
+          fontSize: 13,
+          fontWeight: '600',
+          paddingHorizontal: 14,
+          paddingTop: 12,
+          paddingBottom: 8,
+          textAlign: 'left',
         },
         jerseyColorGrid: {
           flexDirection: 'row',
           flexWrap: 'wrap',
           justifyContent: 'center',
           gap: 8,
+          paddingHorizontal: 12,
+          paddingBottom: 4,
         },
         jerseyColorOption: {
           flexDirection: 'row',
@@ -3062,6 +3389,45 @@ const EventList: React.FC = () => {
           color: '#fff',
           fontWeight: '700',
         },
+        durationCustomPanel: {
+          marginTop: 12,
+          paddingTop: 10,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          marginHorizontal: -14,
+          marginBottom: -14,
+        },
+        durationCustomHint: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          marginBottom: 10,
+          paddingHorizontal: 14,
+        },
+        durationCustomStepperRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+          paddingBottom: 4,
+        },
+        durationCustomCountWrap: {
+          minWidth: 96,
+          alignItems: 'center',
+        },
+        durationCustomCountInput: {
+          fontSize: 26,
+          fontWeight: '800',
+          color: colors.text,
+          textAlign: 'center',
+          paddingVertical: 0,
+          minWidth: 72,
+        },
+        durationCustomCountLabel: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
+          marginTop: 2,
+        },
         recurrenceToggleRow: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -3458,6 +3824,29 @@ const EventList: React.FC = () => {
 
   // Falls back to manual text input if Google Places API fails (e.g. billing not enabled)
   const [placesApiFailed, setPlacesApiFailed] = useState(false);
+  // GooglePlacesAutocomplete keeps its own controlled text; venue prefills /
+  // edit opens remount it (key) and seed via setAddressText.
+  const [placesInputKey, setPlacesInputKey] = useState(0);
+  const [placesDefaultValue, setPlacesDefaultValue] = useState('');
+  const placesAutocompleteRef = useRef<GooglePlacesAutocompleteRef | null>(
+    null,
+  );
+  const syncPlacesInput = useCallback((location: string) => {
+    setPlacesDefaultValue(location || '');
+    setPlacesInputKey(k => k + 1);
+  }, []);
+
+  // After a Places remount (prefill / edit / mode toggle), push the seeded
+  // address into the library's internal controlled TextInput.
+  useEffect(() => {
+    if (!modalVisible || placesApiFailed) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      placesAutocompleteRef.current?.setAddressText(placesDefaultValue || '');
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [modalVisible, placesInputKey, placesDefaultValue, placesApiFailed]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -3505,9 +3894,23 @@ const EventList: React.FC = () => {
   const [tempEventType, setTempEventType] = useState(newEvent.eventType || '');
   // Free-text value when the "Custom" event style is chosen.
   const [customEventType, setCustomEventType] = useState('');
+  const [eventTypeSearch, setEventTypeSearch] = useState('');
+  const [eventTypeCategory, setEventTypeCategory] = useState<
+    'all' | 'sports' | 'social' | 'outdoor' | 'community' | 'other'
+  >('all');
 
   // Jersey color picker state for team sports
   const [showJerseyColorPicker, setShowJerseyColorPicker] = useState(false);
+  const [tempJerseyColors, setTempJerseyColors] = useState<string[]>([]);
+  // Custom duration keeps its own flag so a typed length that matches a
+  // preset (e.g. 60) stays on "Custom" until the user picks a chip.
+  // The stepper drafts into customDurationInput until Confirm.
+  const [customDurationActive, setCustomDurationActive] = useState(false);
+  const [showCustomDurationPicker, setShowCustomDurationPicker] =
+    useState(false);
+  const [customDurationInput, setCustomDurationInput] = useState(
+    String(DEFAULT_CUSTOM_DURATION_MINUTES),
+  );
 
   // Invite users state (for invite-only events)
   const [inviteSearchQuery, setInviteSearchQuery] = useState('');
@@ -3583,11 +3986,49 @@ const EventList: React.FC = () => {
     }
     if (except !== 'eventType') {
       setShowEventTypePicker(false);
+      setEventTypeSearch('');
+      setEventTypeCategory('all');
     }
     if (except !== 'jerseyColor') {
       setShowJerseyColorPicker(false);
+      setTempJerseyColors([]);
+    }
+    if (except !== 'customDuration') {
+      setShowCustomDurationPicker(false);
     }
   };
+
+  const filteredActivityOptions = useMemo(() => {
+    const q = eventTypeSearch.trim().toLowerCase();
+    return activityOptions.filter(opt => {
+      if (eventTypeCategory !== 'all' && opt.category !== eventTypeCategory) {
+        return false;
+      }
+      if (!q) {
+        return true;
+      }
+      return opt.label.toLowerCase().includes(q);
+    });
+  }, [eventTypeSearch, eventTypeCategory]);
+
+  const applySelectedEventType = useCallback(
+    (rawType: string, customText?: string) => {
+      const resolvedType =
+        rawType === 'Custom'
+          ? (customText ?? customEventType).trim() || 'Other'
+          : rawType;
+      setNewEvent(prev => ({
+        ...prev,
+        eventType: resolvedType,
+        jerseyColors: [],
+        trackPayment: isTeamSport(resolvedType) ? prev.trackPayment : false,
+      }));
+      setShowEventTypePicker(false);
+      setEventTypeSearch('');
+      setEventTypeCategory('all');
+    },
+    [customEventType],
+  );
 
   // Expanded comments state - tracks which event's comments are shown inline
   const [expandedCommentsEventId, setExpandedCommentsEventId] = useState<
@@ -3650,12 +4091,14 @@ const EventList: React.FC = () => {
   // Going / open-join: pick role (and jersey/paid when relevant) before joining.
   const [joinPrompt, setJoinPrompt] = useState<{
     event: Event;
-    mode: 'rsvp' | 'openJoin';
+    mode: 'rsvp' | 'openJoin' | 'createCreator';
     position: string;
     jerseyColor: string;
     paidStatus: string;
   } | null>(null);
   const [joinPromptSaving, setJoinPromptSaving] = useState(false);
+  // Holds the POST /events body while the creator picks their roster role.
+  const pendingCreatePayloadRef = useRef<Record<string, any> | null>(null);
 
   // Map app picker state
   const [mapPickerApps, setMapPickerApps] = useState<AvailableMapApp[]>([]);
@@ -3669,6 +4112,11 @@ const EventList: React.FC = () => {
   const [watchedEventIds, setWatchedEventIds] = useState<Set<string>>(
     new Set(),
   );
+  const [pinnedEventIds, setPinnedEventIds] = useState<Set<string>>(new Set());
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [friendDetailsById, setFriendDetailsById] = useState<
+    Record<string, {_id: string; username: string; profilePicUrl?: string}>
+  >({});
   const [savingWatch, setSavingWatch] = useState(false);
 
   // First-time user onboarding state
@@ -3824,14 +4272,53 @@ const EventList: React.FC = () => {
     })();
   }, [eventData, creatorInfoMap]);
 
-  // Load watched events from persistent storage
+  // Load watched / pinned events and friends (for LFG avatar strips)
   useEffect(() => {
     const loadWatches = async () => {
       const ids = await eventWatchService.getWatchedEventIds();
       setWatchedEventIds(new Set(ids));
     };
-
+    const loadPins = async () => {
+      const ids = await eventPinService.getPinnedIds();
+      setPinnedEventIds(new Set(ids));
+    };
+    const loadFriends = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await fetch(`${API_BASE_URL}/users/me/friends`, {
+          headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+        });
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : data.friends || [];
+        const ids = new Set<string>();
+        const byId: Record<
+          string,
+          {_id: string; username: string; profilePicUrl?: string}
+        > = {};
+        list.forEach((f: any) => {
+          const id = String(f._id || f.id || '');
+          if (!id) {
+            return;
+          }
+          ids.add(id);
+          byId[id] = {
+            _id: id,
+            username: f.username || 'Friend',
+            profilePicUrl: f.profilePicUrl,
+          };
+        });
+        setFriendIds(ids);
+        setFriendDetailsById(byId);
+      } catch {
+        // Non-fatal — LFG friend avatars just stay empty.
+      }
+    };
     loadWatches();
+    loadPins();
+    loadFriends();
   }, []);
 
   // Dismiss hint and save to storage
@@ -4132,18 +4619,24 @@ const EventList: React.FC = () => {
       });
     }
 
-    // Order the list: upcoming events first (soonest first), then any past
-    // events after them (most recent first). Past events are only present when
-    // the user opted into them, and keeping them below the upcoming ones stops
-    // history from burying what's actually actionable. Unparseable dates sort
-    // last rather than returning NaN, which would scramble the whole list.
+    // Order the list: pinned first (still respecting upcoming-before-past
+    // within each group), then unpinned upcoming soonest-first, then past
+    // most-recent first.
     const nowMs = Date.now();
     filtered = [...filtered]
       .map(event => {
         const when = getEventDateTime(event.date, event.time)?.getTime();
-        return {event, when, isPast: when != null && when < nowMs};
+        return {
+          event,
+          when,
+          isPast: when != null && when < nowMs,
+          pinned: pinnedEventIds.has(event._id),
+        };
       })
       .sort((a, b) => {
+        if (a.pinned !== b.pinned) {
+          return a.pinned ? -1 : 1;
+        }
         if (a.when == null || b.when == null) {
           return a.when == null ? (b.when == null ? 0 : 1) : -1;
         }
@@ -4161,6 +4654,7 @@ const EventList: React.FC = () => {
     selectedEventTypes,
     selectedDateFilter,
     showAvailableOnly,
+    pinnedEventIds,
     showMyEventsOnly,
     myUserId,
     hidePastEvents,
@@ -4362,10 +4856,11 @@ const EventList: React.FC = () => {
         return;
       }
 
+      const seededLocation = prefill.location || '';
       setNewEvent({
         ...createEmptyEvent(),
         name: prefill.name || '',
-        location: prefill.location || '',
+        location: seededLocation,
         latitude: prefill.latitude,
         longitude: prefill.longitude,
         // Default to today when a venue/group bridges in without a date, so
@@ -4391,6 +4886,7 @@ const EventList: React.FC = () => {
       setEditingEventId(null);
       setEditingRecurrenceGroupId(null);
       setPlacesApiFailed(false);
+      syncPlacesInput(seededLocation);
       setModalVisible(true);
       // Clear the param so navigating away and back doesn't re-pop the modal.
       navigation.setParams({prefillEvent: undefined} as never);
@@ -4400,7 +4896,7 @@ const EventList: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [route.params?.prefillEvent, navigation, userData?._id]);
+  }, [route.params?.prefillEvent, navigation, userData?._id, syncPlacesInput]);
 
   // Scroll to highlighted event and optionally expand comments (once per navigation)
   const hasScrolledToHighlight = useRef<string | null>(null);
@@ -4662,91 +5158,104 @@ const EventList: React.FC = () => {
           return;
         }
       } else {
-        try {
-          const eventPayload: Record<string, any> = {
-            name: newEvent.name,
-            location: newEvent.isVirtual
-              ? VIRTUAL_LOCATION_VALUE
-              : newEvent.location,
-            time: newEvent.time,
-            durationMinutes: newEvent.durationMinutes,
-            date: newEvent.date,
-            totalSpots: parseInt(newEvent.totalSpots, 10),
-            eventType: newEvent.eventType,
-            createdBy: userData?._id || '',
-            createdByUsername: userData?.username || '',
-            latitude: newEvent.isVirtual ? undefined : newEvent.latitude,
-            longitude: newEvent.isVirtual ? undefined : newEvent.longitude,
-            isVirtual: newEvent.isVirtual,
-            jerseyColors: isTeamSport(newEvent.eventType)
-              ? newEvent.jerseyColors
-              : [],
-            trackPayment:
-              isTeamSport(newEvent.eventType) &&
-              newEvent.trackPayment === true,
-            privacy: newEvent.privacy,
-            invitedUsers: newEvent.invitedUsers,
-            allowJoinRequests: newEvent.allowJoinRequests,
-            showLocationPublicly: newEvent.showLocationPublicly,
-            // Optional venue listing reference (set by the Venues-tab bridge).
-            venueId: newEvent.isVirtual ? undefined : newEvent.venueId,
-            venueName: newEvent.isVirtual ? undefined : newEvent.venueName,
-            // Optional Group reference (set when the user picked "Invite
-            // a group"). BE re-resolves to snapshot members and cache
-            // the display name for the group-name badge on event cards.
-            groupId: newEvent.groupId,
-            sourceUrl: newEvent.sourceUrl,
-            startsAt: getEventDateTime(
-              newEvent.date,
-              newEvent.time,
-            )?.toISOString(),
-            timezoneOffsetMinutes: new Date().getTimezoneOffset(),
-          };
+        // Creating: close the form and prompt the creator for their roster
+        // role (Host / Participant / sport position / etc.) before POST.
+        const eventPayload: Record<string, any> = {
+          name: newEvent.name,
+          location: newEvent.isVirtual
+            ? VIRTUAL_LOCATION_VALUE
+            : newEvent.location,
+          time: newEvent.time,
+          durationMinutes: newEvent.durationMinutes,
+          date: newEvent.date,
+          totalSpots: parseInt(newEvent.totalSpots, 10),
+          eventType: newEvent.eventType,
+          createdBy: userData?._id || '',
+          createdByUsername: userData?.username || '',
+          latitude: newEvent.isVirtual ? undefined : newEvent.latitude,
+          longitude: newEvent.isVirtual ? undefined : newEvent.longitude,
+          isVirtual: newEvent.isVirtual,
+          jerseyColors: isTeamSport(newEvent.eventType)
+            ? newEvent.jerseyColors
+            : [],
+          trackPayment:
+            isTeamSport(newEvent.eventType) &&
+            newEvent.trackPayment === true,
+          privacy: newEvent.privacy,
+          invitedUsers: newEvent.invitedUsers,
+          allowJoinRequests: newEvent.allowJoinRequests,
+          showLocationPublicly: newEvent.showLocationPublicly,
+          venueId: newEvent.isVirtual ? undefined : newEvent.venueId,
+          venueName: newEvent.isVirtual ? undefined : newEvent.venueName,
+          groupId: newEvent.groupId,
+          sourceUrl: newEvent.sourceUrl,
+          startsAt: getEventDateTime(
+            newEvent.date,
+            newEvent.time,
+          )?.toISOString(),
+          timezoneOffsetMinutes: new Date().getTimezoneOffset(),
+        };
 
-          if (newEvent.isRecurring) {
-            const isCustom = newEvent.recurrenceFrequency === 'custom';
-            eventPayload.isRecurring = true;
-            eventPayload.recurrenceFrequency = newEvent.recurrenceFrequency;
-            eventPayload.recurrenceIndefinite = !!newEvent.recurrenceIndefinite;
-            eventPayload.recurrenceCount =
-              isCustom || !newEvent.recurrenceIndefinite
-                ? isCustom
-                  ? customFormEventCount(newEvent)
-                  : newEvent.recurrenceCount
-                : 0;
-            eventPayload.recurrenceOffsetsDays = isCustom
-              ? padRecurrenceOffsets(
-                  newEvent.recurrenceOffsetsDays,
-                  customFormEventCount(newEvent) - 1,
-                )
-              : [];
-          }
-
-          const response = await axios.post(
-            `${API_BASE_URL}/events`,
-            eventPayload,
-          );
-
-          const responseData = response.data;
-          const createdEvents: Event[] = Array.isArray(responseData)
-            ? responseData
-            : [responseData];
-
-          const mergedEvents = createdEvents.map(evt => ({
-            ...evt,
-            privacy: evt.privacy || newEvent.privacy,
-            invitedUsers: evt.invitedUsers || newEvent.invitedUsers,
-          }));
-
-          setEventData(prevData => [...mergedEvents, ...prevData]);
-          for (const evt of mergedEvents) {
-            notificationService.scheduleEventNotifications(evt).catch(() => {});
-          }
-        } catch (error) {
-          Alert.alert(t('common.error'), t('events.createError'));
-          setSavingEvent(false);
-          return;
+        if (newEvent.isRecurring) {
+          const isCustom = newEvent.recurrenceFrequency === 'custom';
+          eventPayload.isRecurring = true;
+          eventPayload.recurrenceFrequency = newEvent.recurrenceFrequency;
+          eventPayload.recurrenceIndefinite = !!newEvent.recurrenceIndefinite;
+          eventPayload.recurrenceCount =
+            isCustom || !newEvent.recurrenceIndefinite
+              ? isCustom
+                ? customFormEventCount(newEvent)
+                : newEvent.recurrenceCount
+              : 0;
+          eventPayload.recurrenceOffsetsDays = isCustom
+            ? padRecurrenceOffsets(
+                newEvent.recurrenceOffsetsDays,
+                customFormEventCount(newEvent) - 1,
+              )
+            : [];
         }
+
+        const promptEvent = {
+          _id: 'pending-create',
+          name: newEvent.name,
+          location: newEvent.location,
+          time: newEvent.time,
+          date: newEvent.date,
+          durationMinutes: newEvent.durationMinutes,
+          totalSpots: parseInt(newEvent.totalSpots, 10) || 0,
+          rosterSpotsFilled: 0,
+          eventType: newEvent.eventType,
+          createdBy: userData?._id || '',
+          createdByUsername: userData?.username || '',
+          jerseyColors: isTeamSport(newEvent.eventType)
+            ? newEvent.jerseyColors
+            : [],
+          trackPayment:
+            isTeamSport(newEvent.eventType) &&
+            newEvent.trackPayment === true,
+          privacy: newEvent.privacy,
+        } as Event;
+
+        const defaults = defaultJoinDetails(promptEvent);
+        const roles = positionsForEventType(promptEvent.eventType);
+        const preferredHost = roles.find(r =>
+          /^(host|organizer|coordinator)$/i.test(r),
+        );
+        if (preferredHost) {
+          defaults.position = preferredHost;
+        }
+
+        pendingCreatePayloadRef.current = eventPayload;
+        setSavingEvent(false);
+        setModalVisible(false);
+        setJoinPrompt({
+          event: promptEvent,
+          mode: 'createCreator',
+          position: defaults.position,
+          jerseyColor: defaults.jerseyColor,
+          paidStatus: defaults.paidStatus,
+        });
+        return;
       }
       setSavingEvent(false);
       setModalVisible(false);
@@ -4778,6 +5287,13 @@ const EventList: React.FC = () => {
   };
 
   const handleEventPress = (event: Event) => {
+    if (isEventEnded(event.date, event.time, event.durationMinutes)) {
+      navigation.navigate('EventWrapUp', {
+        eventId: event._id,
+        eventName: event.name,
+      });
+      return;
+    }
     navigation.navigate('EventRoster', {
       eventId: event._id,
       eventName: event.name,
@@ -5031,9 +5547,22 @@ const EventList: React.FC = () => {
       sourceUrl: event.sourceUrl,
     });
     setPlacesApiFailed(false);
+    syncPlacesInput(event.isVirtual ? '' : event.location || '');
     setModalVisible(true);
     setTempRosterSize(event.totalSpots.toString());
     setTempEventType(event.eventType);
+    const editDuration = event.durationMinutes ?? null;
+    const editIsCustom =
+      editDuration != null && !isPresetDuration(editDuration);
+    setCustomDurationActive(editIsCustom);
+    setShowCustomDurationPicker(false);
+    setCustomDurationInput(
+      String(
+        editIsCustom
+          ? clampCustomDuration(editDuration)
+          : DEFAULT_CUSTOM_DURATION_MINUTES,
+      ),
+    );
     setIsEditing(true);
     setEditingEventId(event._id);
     setEditingRecurrenceGroupId(event.recurrenceGroupId || null);
@@ -5181,6 +5710,15 @@ const EventList: React.FC = () => {
       Alert.alert('Error', 'Unable to remove watch right now.');
     } finally {
       setSavingWatch(false);
+    }
+  };
+
+  const togglePinEvent = async (event: Event) => {
+    try {
+      const {ids} = await eventPinService.togglePin(event._id);
+      setPinnedEventIds(new Set(ids));
+    } catch (error) {
+      console.error('Failed to toggle pin:', error);
     }
   };
 
@@ -5648,8 +6186,82 @@ const EventList: React.FC = () => {
     }
   };
 
+  const resetCreateFormState = () => {
+    setNewEvent(createEmptyEvent());
+    setTempRosterSize('');
+    setTempEventType('');
+    setIsEditing(false);
+    setEditingEventId(null);
+    setEditingRecurrenceGroupId(null);
+    setEditScopeModalVisible(false);
+    setInviteSearchQuery('');
+    setAvailableUsersToInvite([]);
+    setInvitedUserDetails([]);
+    pendingCreatePayloadRef.current = null;
+  };
+
+  const finalizeCreateWithDetails = async (details: JoinDetails) => {
+    const eventPayload = pendingCreatePayloadRef.current;
+    if (!eventPayload || !userData) {
+      return false;
+    }
+    setJoinPromptSaving(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/events`, {
+        ...eventPayload,
+        creatorRoster: details,
+      });
+      const responseData = response.data;
+      const createdEvents: Event[] = Array.isArray(responseData)
+        ? responseData
+        : [responseData];
+      const mergedEvents = createdEvents.map(evt => ({
+        ...evt,
+        privacy: evt.privacy || eventPayload.privacy,
+        invitedUsers: evt.invitedUsers || eventPayload.invitedUsers,
+      }));
+      setEventData(prevData => [...mergedEvents, ...prevData]);
+      for (const evt of mergedEvents) {
+        notificationService.scheduleEventNotifications(evt).catch(() => {});
+      }
+      resetCreateFormState();
+      setJoinPrompt(null);
+      return true;
+    } catch (error) {
+      Alert.alert(t('common.error'), t('events.createError'));
+      return false;
+    } finally {
+      setJoinPromptSaving(false);
+    }
+  };
+
   const closeJoinPrompt = () => {
     if (joinPromptSaving) {
+      return;
+    }
+    // Back out of the create role sheet → reopen the create form.
+    if (joinPrompt?.mode === 'createCreator') {
+      setJoinPrompt(null);
+      setModalVisible(true);
+      return;
+    }
+    setJoinPrompt(null);
+  };
+
+  const skipJoinPrompt = async () => {
+    if (joinPromptSaving || !joinPrompt) {
+      return;
+    }
+    if (joinPrompt.mode === 'createCreator') {
+      const defaults = defaultJoinDetails(joinPrompt.event);
+      const roles = positionsForEventType(joinPrompt.event.eventType);
+      const preferredHost = roles.find(r =>
+        /^(host|organizer|coordinator)$/i.test(r),
+      );
+      if (preferredHost) {
+        defaults.position = preferredHost;
+      }
+      await finalizeCreateWithDetails(defaults);
       return;
     }
     setJoinPrompt(null);
@@ -5664,7 +6276,11 @@ const EventList: React.FC = () => {
     if (!joinPrompt.position) {
       return;
     }
-    if (team && (joinPrompt.event.jerseyColors || []).length > 0 && !joinPrompt.jerseyColor) {
+    if (
+      team &&
+      (joinPrompt.event.jerseyColors || []).length > 0 &&
+      !joinPrompt.jerseyColor
+    ) {
       return;
     }
     if (team && trackPayment && !joinPrompt.paidStatus) {
@@ -5674,8 +6290,14 @@ const EventList: React.FC = () => {
     const details: JoinDetails = {
       position: joinPrompt.position,
       jerseyColor: team ? joinPrompt.jerseyColor || 'N/A' : 'N/A',
-      paidStatus: team && trackPayment ? joinPrompt.paidStatus || 'Unpaid' : 'N/A',
+      paidStatus:
+        team && trackPayment ? joinPrompt.paidStatus || 'Unpaid' : 'N/A',
     };
+
+    if (joinPrompt.mode === 'createCreator') {
+      await finalizeCreateWithDetails(details);
+      return;
+    }
 
     setJoinPromptSaving(true);
     try {
@@ -5708,44 +6330,138 @@ const EventList: React.FC = () => {
     setTime(new Date());
   };
 
-  const onDateChange = (evt: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (selectedDate) {
-      setDate(selectedDate);
-      const isToday = selectedDate.toDateString() === new Date().toDateString();
-      if (isToday && time && time < new Date()) {
-        setTime(undefined);
-        setNewEvent(prev => ({
-          ...prev,
-          date: selectedDate.toDateString(),
-          time: '',
-        }));
-      } else {
-        setNewEvent(prev => ({...prev, date: selectedDate.toDateString()}));
-      }
+  const applySelectedDate = (selectedDate: Date) => {
+    setDate(selectedDate);
+    const isToday = selectedDate.toDateString() === new Date().toDateString();
+    if (isToday && time && time < new Date()) {
+      setTime(undefined);
+      setNewEvent(prev => ({
+        ...prev,
+        date: selectedDate.toDateString(),
+        time: '',
+      }));
+    } else {
+      setNewEvent(prev => ({...prev, date: selectedDate.toDateString()}));
     }
   };
 
+  const onDateChange = (evt: any, selectedDate?: Date) => {
+    if (!selectedDate) {
+      return;
+    }
+    // Android system dialog commits immediately; iOS drafts until Confirm.
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      applySelectedDate(selectedDate);
+      return;
+    }
+    setDate(selectedDate);
+  };
+
+  const confirmSelectedDate = () => {
+    applySelectedDate(date || new Date());
+    setShowDatePicker(false);
+  };
+
+  const cancelDatePicker = () => {
+    if (newEvent.date) {
+      const restored = parseEventDateLocal(newEvent.date);
+      if (!isNaN(restored.getTime())) {
+        setDate(restored);
+      }
+    }
+    setShowDatePicker(false);
+  };
+
+  const applySelectedTime = (selectedTime: Date) => {
+    const roundedTime = new Date(
+      Math.ceil(selectedTime.getTime() / (15 * 60 * 1000)) * (15 * 60 * 1000),
+    );
+    setTime(roundedTime);
+    setNewEvent(prev => ({
+      ...prev,
+      time:
+        roundedTime.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }) ?? '',
+    }));
+  };
+
   const onTimeChange = (evt: any, selectedTime?: Date) => {
+    if (!selectedTime) {
+      return;
+    }
     if (Platform.OS === 'android') {
       setShowTimePicker(false);
+      applySelectedTime(selectedTime);
+      return;
     }
-    if (selectedTime) {
-      const roundedTime = new Date(
-        Math.ceil(selectedTime.getTime() / (15 * 1000)) * 15 * 1000,
+    const roundedTime = new Date(
+      Math.ceil(selectedTime.getTime() / (15 * 60 * 1000)) * (15 * 60 * 1000),
+    );
+    setTime(roundedTime);
+  };
+
+  const confirmSelectedTime = () => {
+    applySelectedTime(time || new Date());
+    setShowTimePicker(false);
+  };
+
+  const cancelTimePicker = () => {
+    if (newEvent.time) {
+      const baseline = getEventDateTime(
+        newEvent.date || new Date().toDateString(),
+        newEvent.time,
       );
-      setTime(roundedTime);
-      setNewEvent(prev => ({
-        ...prev,
-        time:
-          roundedTime.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          }) ?? '',
-      }));
+      if (baseline) {
+        setTime(baseline);
+      }
     }
+    setShowTimePicker(false);
+  };
+
+  const confirmJerseyColors = () => {
+    if (tempJerseyColors.length !== 2) {
+      return;
+    }
+    setNewEvent(prev => ({...prev, jerseyColors: tempJerseyColors}));
+    setShowJerseyColorPicker(false);
+  };
+
+  const cancelJerseyColorPicker = () => {
+    setTempJerseyColors(newEvent.jerseyColors || []);
+    setShowJerseyColorPicker(false);
+  };
+
+  const openCreateEventModal = () => {
+    const now = new Date();
+    const roundedTime = new Date(
+      Math.ceil(now.getTime() / (15 * 60 * 1000)) * (15 * 60 * 1000),
+    );
+    setPlacesApiFailed(false);
+    syncPlacesInput('');
+    setIsEditing(false);
+    setEditingEventId(null);
+    setEditingRecurrenceGroupId(null);
+    setEditScopeModalVisible(false);
+    setDate(now);
+    setTime(roundedTime);
+    setTempRosterSize('');
+    setTempEventType('');
+    setCustomDurationActive(false);
+    setShowCustomDurationPicker(false);
+    setCustomDurationInput(String(DEFAULT_CUSTOM_DURATION_MINUTES));
+    setNewEvent({
+      ...createEmptyEvent(),
+      date: now.toDateString(),
+      time:
+        roundedTime.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }) ?? '',
+    });
+    setModalVisible(true);
   };
 
   const renderEventCard = ({item}: {item: Event}) => {
@@ -5762,6 +6478,98 @@ const EventList: React.FC = () => {
     const creatorInitials = getCreatorInitials(creatorInfo?.name, username);
     const reactionSummary = summarizeReactions(item, myUserId);
     const commentCount = localCommentCounts[item._id] ?? item.commentCount ?? 0;
+    const isPinned = pinnedEventIds.has(item._id);
+
+    const resolveFriendsOnEvent = () => {
+      const fromServer = item.friendsOnRoster || [];
+      if (fromServer.length > 0) {
+        return fromServer.map(f => ({
+          userId: String(f.userId),
+          username: f.username,
+          name: f.name,
+          profilePicUrl: f.profilePicUrl,
+        }));
+      }
+      const seen = new Set<string>();
+      const out: Array<{
+        userId: string;
+        username?: string;
+        name?: string;
+        profilePicUrl?: string;
+      }> = [];
+      for (const r of item.roster || []) {
+        const id = r.userId ? String(r.userId) : '';
+        if (!id || !friendIds.has(id) || seen.has(id)) {
+          continue;
+        }
+        seen.add(id);
+        const detail = friendDetailsById[id];
+        out.push({
+          userId: id,
+          username: detail?.username || r.username,
+          profilePicUrl: detail?.profilePicUrl || r.profilePicUrl,
+        });
+      }
+      return out;
+    };
+    const friendsOnEvent = resolveFriendsOnEvent();
+    const friendsInquired = (
+      item.friendsInquired && item.friendsInquired.length > 0
+        ? item.friendsInquired
+        : isCreator
+          ? (item.joinRequests || []).filter(r =>
+              friendIds.has(String(r.userId)),
+            )
+          : []
+    ).map(f => ({
+      userId: String(f.userId),
+      username: f.username,
+      name: (f as any).name,
+      profilePicUrl: f.profilePicUrl,
+    }));
+
+    const renderFriendsOnEventStrip = () => {
+      if (friendsOnEvent.length === 0 && friendsInquired.length === 0) {
+        return null;
+      }
+      return (
+        <View style={themedStyles.friendsOnEventRow}>
+          {friendsOnEvent.length > 0 ? (
+            <>
+              <RosterAvatarStrip
+                members={friendsOnEvent}
+                maxVisible={4}
+                size={22}
+                overlap={7}
+              />
+              <Text style={themedStyles.friendsOnEventLabel} numberOfLines={1}>
+                {friendsOnEvent.length === 1
+                  ? t('events.friendJoined') || '1 friend joined'
+                  : t('events.friendsJoined', {count: friendsOnEvent.length}) ||
+                    `${friendsOnEvent.length} friends joined`}
+              </Text>
+            </>
+          ) : null}
+          {friendsInquired.length > 0 ? (
+            <>
+              <RosterAvatarStrip
+                members={friendsInquired}
+                maxVisible={3}
+                size={22}
+                overlap={7}
+              />
+              <Text style={themedStyles.friendsOnEventLabel} numberOfLines={1}>
+                {friendsInquired.length === 1
+                  ? t('events.friendInquired') || '1 friend inquired'
+                  : t('events.friendsInquired', {
+                      count: friendsInquired.length,
+                    }) || `${friendsInquired.length} friends inquired`}
+              </Text>
+            </>
+          ) : null}
+        </View>
+      );
+    };
 
     const showOptionsMenu = () => {
       setOptionsMenuEvent(item);
@@ -5806,6 +6614,21 @@ const EventList: React.FC = () => {
                 </View>
               </View>
             </View>
+            <TouchableOpacity
+              style={themedStyles.cardOptionsButton}
+              onPress={() => togglePinEvent(item)}
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+              accessibilityLabel={
+                isPinned
+                  ? t('events.unpinEvent') || 'Unpin event'
+                  : t('events.pinEvent') || 'Pin event'
+              }>
+              <FontAwesomeIcon
+                icon={faThumbtack}
+                size={16}
+                color={isPinned ? colors.primary : colors.secondaryText}
+              />
+            </TouchableOpacity>
           </View>
 
           <View style={themedStyles.cardBody}>
@@ -5816,6 +6639,14 @@ const EventList: React.FC = () => {
               <Text style={themedStyles.cardEventTitle} numberOfLines={2}>
                 {item.name}
               </Text>
+              {isPinned ? (
+                <FontAwesomeIcon
+                  icon={faThumbtack}
+                  size={12}
+                  color={colors.primary}
+                  style={themedStyles.cardPinBadge}
+                />
+              ) : null}
             </View>
 
             <View style={themedStyles.detailRow}>
@@ -5850,6 +6681,8 @@ const EventList: React.FC = () => {
                     )} · ${t('events.noLimit') || 'No limit'}`}
               </Text>
             </View>
+
+            {renderFriendsOnEventStrip()}
 
             {item.showLocationPublicly && item.location ? (
               <View style={themedStyles.detailRow}>
@@ -6096,6 +6929,14 @@ const EventList: React.FC = () => {
               <Text style={themedStyles.cardEventTitle} numberOfLines={2}>
                 {item.name}
               </Text>
+              {isPinned ? (
+                <FontAwesomeIcon
+                  icon={faThumbtack}
+                  size={12}
+                  color={colors.primary}
+                  style={themedStyles.cardPinBadge}
+                />
+              ) : null}
             </View>
 
             <View style={themedStyles.detailRow}>
@@ -6149,6 +6990,8 @@ const EventList: React.FC = () => {
                   : ''}
               </Text>
             </View>
+
+            {renderFriendsOnEventStrip()}
 
             {!isPast && (
               <CountdownTimer
@@ -6490,6 +7333,22 @@ const EventList: React.FC = () => {
           </TouchableOpacity>
 
           <View style={themedStyles.engagementSpacer} />
+
+          <TouchableOpacity
+            style={themedStyles.engagementButton}
+            onPress={() => togglePinEvent(item)}
+            hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}
+            accessibilityLabel={
+              isPinned
+                ? t('events.unpinEvent') || 'Unpin event'
+                : t('events.pinEvent') || 'Pin event'
+            }>
+            <FontAwesomeIcon
+              icon={faThumbtack}
+              size={16}
+              color={isPinned ? colors.primary : colors.secondaryText}
+            />
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={themedStyles.engagementButton}
@@ -6877,8 +7736,7 @@ const EventList: React.FC = () => {
                       style={themedStyles.ctaButton}
                       onPress={() => {
                         dismissFirstTimeHint();
-                        setPlacesApiFailed(false);
-                        setModalVisible(true);
+                        openCreateEventModal();
                       }}>
                       <FontAwesomeIcon
                         icon={faPlus}
@@ -6900,17 +7758,7 @@ const EventList: React.FC = () => {
       <TouchableOpacity
         style={themedStyles.fab}
         activeOpacity={0.85}
-        onPress={() => {
-          setPlacesApiFailed(false);
-          setModalVisible(true);
-          setIsEditing(false);
-          setEditingEventId(null);
-          setEditingRecurrenceGroupId(null);
-          setEditScopeModalVisible(false);
-          setNewEvent(createEmptyEvent());
-          setTempRosterSize('');
-          setTempEventType('');
-        }}>
+        onPress={openCreateEventModal}>
         <FontAwesomeIcon
           icon={faPlus}
           size={24}
@@ -6961,21 +7809,33 @@ const EventList: React.FC = () => {
                           selected && themedStyles.locationModePillSelected,
                         ]}
                         onPress={() =>
-                          setNewEvent(prev => ({
-                            ...prev,
-                            isVirtual: option.value,
-                            ...(option.value
-                              ? {
-                                  latitude: undefined,
-                                  longitude: undefined,
-                                  venueId: undefined,
-                                  venueName: undefined,
-                                  location: VIRTUAL_LOCATION_VALUE,
-                                }
-                              : {
-                                  location: '',
-                                }),
-                          }))
+                          setNewEvent(prev => {
+                            if (option.value) {
+                              syncPlacesInput('');
+                              return {
+                                ...prev,
+                                isVirtual: true,
+                                latitude: undefined,
+                                longitude: undefined,
+                                venueId: undefined,
+                                venueName: undefined,
+                                location: VIRTUAL_LOCATION_VALUE,
+                              };
+                            }
+                            // Switching back to Place: keep any prior place
+                            // text if it wasn't the virtual sentinel.
+                            const nextLocation = isGenericVirtualLocation(
+                              prev.location,
+                            )
+                              ? ''
+                              : prev.location || '';
+                            syncPlacesInput(nextLocation);
+                            return {
+                              ...prev,
+                              isVirtual: false,
+                              location: nextLocation,
+                            };
+                          })
                         }
                         activeOpacity={0.7}>
                         <Text
@@ -6997,6 +7857,8 @@ const EventList: React.FC = () => {
                   <View style={themedStyles.autocompleteContainer}>
                     {isApiKeyConfigured && !placesApiFailed ? (
                       <GooglePlacesAutocomplete
+                        ref={placesAutocompleteRef}
+                        key={`places-${placesInputKey}`}
                         placeholder="Location/Facility"
                         onPress={(data, details = null) => {
                           console.log('Selected place:', data, details);
@@ -7013,6 +7875,7 @@ const EventList: React.FC = () => {
                             longitude: coords?.lng,
                             isVirtual: false,
                           });
+                          setPlacesDefaultValue(location);
                         }}
                         query={{
                           key: GOOGLE_PLACES_API_KEY,
@@ -7059,6 +7922,12 @@ const EventList: React.FC = () => {
                   style={themedStyles.modalInput}
                   onPress={() => {
                     closeAllPickers('date');
+                    if (newEvent.date) {
+                      const restored = parseEventDateLocal(newEvent.date);
+                      if (!isNaN(restored.getTime())) {
+                        setDate(restored);
+                      }
+                    }
                     setShowDatePicker(true);
                   }}>
                   <Text
@@ -7071,7 +7940,10 @@ const EventList: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
                 {showDatePicker && (
-                  <View>
+                  <View style={themedStyles.dateTimePickerPanel}>
+                    <Text style={themedStyles.dateTimePickerHint}>
+                      {t('events.pickEventDate') || 'Pick a date for this event.'}
+                    </Text>
                     <DateTimePicker
                       value={date || new Date()}
                       mode="date"
@@ -7082,14 +7954,33 @@ const EventList: React.FC = () => {
                       accentColor={colors.primary}
                       textColor={colors.text}
                     />
-                    {Platform.OS === 'ios' && (
-                      <TouchableOpacity
-                        onPress={() => setShowDatePicker(false)}>
-                        <Text style={themedStyles.confirmButton}>
-                          {t('events.confirmDate')}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                    {Platform.OS === 'ios' ? (
+                      <View style={themedStyles.pickerActionsRow}>
+                        <TouchableOpacity
+                          style={[
+                            themedStyles.pickerActionBtn,
+                            themedStyles.pickerActionBtnSecondary,
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={cancelDatePicker}>
+                          <Text
+                            style={themedStyles.pickerActionBtnTextSecondary}>
+                            {t('common.cancel') || 'Cancel'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            themedStyles.pickerActionBtn,
+                            themedStyles.pickerActionBtnPrimary,
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={confirmSelectedDate}>
+                          <Text style={themedStyles.pickerActionBtnText}>
+                            {t('events.confirmDate') || 'Confirm'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
                   </View>
                 )}
 
@@ -7098,6 +7989,15 @@ const EventList: React.FC = () => {
                   style={themedStyles.modalInput}
                   onPress={() => {
                     closeAllPickers('time');
+                    if (newEvent.time) {
+                      const baseline = getEventDateTime(
+                        newEvent.date || new Date().toDateString(),
+                        newEvent.time,
+                      );
+                      if (baseline) {
+                        setTime(baseline);
+                      }
+                    }
                     setShowTimePicker(true);
                   }}>
                   <Text
@@ -7110,7 +8010,10 @@ const EventList: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
                 {showTimePicker && (
-                  <View>
+                  <View style={themedStyles.dateTimePickerPanel}>
+                    <Text style={themedStyles.dateTimePickerHint}>
+                      {t('events.pickEventTime') || 'Pick a start time.'}
+                    </Text>
                     <DateTimePicker
                       value={time || new Date()}
                       mode="time"
@@ -7127,20 +8030,40 @@ const EventList: React.FC = () => {
                           : undefined
                       }
                     />
-                    {Platform.OS === 'ios' && (
-                      <TouchableOpacity
-                        onPress={() => setShowTimePicker(false)}>
-                        <Text style={themedStyles.confirmButton}>
-                          {t('events.confirmTime')}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                    {Platform.OS === 'ios' ? (
+                      <View style={themedStyles.pickerActionsRow}>
+                        <TouchableOpacity
+                          style={[
+                            themedStyles.pickerActionBtn,
+                            themedStyles.pickerActionBtnSecondary,
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={cancelTimePicker}>
+                          <Text
+                            style={themedStyles.pickerActionBtnTextSecondary}>
+                            {t('common.cancel') || 'Cancel'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            themedStyles.pickerActionBtn,
+                            themedStyles.pickerActionBtnPrimary,
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={confirmSelectedTime}>
+                          <Text style={themedStyles.pickerActionBtnText}>
+                            {t('events.confirmTime') || 'Confirm'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
                   </View>
                 )}
 
                 {/* How long the event runs. Stored as a duration; the end time
                     shown here is derived so the organizer can sanity-check it.
-                    "Open" clears the duration so the card shows a start only. */}
+                    "Open" clears the duration so the card shows a start only.
+                    "Custom" drafts a length until Cancel / Confirm. */}
                 <View style={themedStyles.durationSection}>
                   <View style={themedStyles.durationHeaderRow}>
                     <Text style={themedStyles.durationLabel}>
@@ -7163,6 +8086,8 @@ const EventList: React.FC = () => {
                   <View style={themedStyles.durationRow}>
                     {DURATION_OPTIONS.map(option => {
                       const selected =
+                        !customDurationActive &&
+                        !showCustomDurationPicker &&
                         newEvent.durationMinutes === option.minutes;
                       return (
                         <TouchableOpacity
@@ -7171,12 +8096,14 @@ const EventList: React.FC = () => {
                             themedStyles.durationPill,
                             selected && themedStyles.durationPillSelected,
                           ]}
-                          onPress={() =>
+                          onPress={() => {
+                            setCustomDurationActive(false);
+                            setShowCustomDurationPicker(false);
                             setNewEvent(prev => ({
                               ...prev,
                               durationMinutes: option.minutes,
-                            }))
-                          }
+                            }));
+                          }}
                           activeOpacity={0.7}>
                           <Text
                             style={[
@@ -7190,7 +8117,204 @@ const EventList: React.FC = () => {
                         </TouchableOpacity>
                       );
                     })}
+                    <TouchableOpacity
+                      style={[
+                        themedStyles.durationPill,
+                        (customDurationActive || showCustomDurationPicker) &&
+                          themedStyles.durationPillSelected,
+                      ]}
+                      onPress={() => {
+                        closeAllPickers('customDuration');
+                        const seed =
+                          customDurationActive &&
+                          newEvent.durationMinutes != null &&
+                          newEvent.durationMinutes > 0
+                            ? clampCustomDuration(newEvent.durationMinutes)
+                            : newEvent.durationMinutes != null &&
+                                newEvent.durationMinutes > 0
+                              ? clampCustomDuration(newEvent.durationMinutes)
+                              : DEFAULT_CUSTOM_DURATION_MINUTES;
+                        setCustomDurationInput(String(seed));
+                        setShowCustomDurationPicker(true);
+                      }}
+                      activeOpacity={0.7}>
+                      <Text
+                        style={[
+                          themedStyles.durationPillText,
+                          (customDurationActive || showCustomDurationPicker) &&
+                            themedStyles.durationPillTextSelected,
+                        ]}>
+                        {customDurationActive && newEvent.durationMinutes
+                          ? formatEventDuration(newEvent.durationMinutes) ||
+                            (t('events.customDuration') || 'Custom')
+                          : t('events.customDuration') || 'Custom'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
+                  {showCustomDurationPicker ? (
+                    <View style={themedStyles.durationCustomPanel}>
+                      <Text style={themedStyles.durationCustomHint}>
+                        {t('events.customDurationHint') ||
+                          'Set any length in 15-minute steps.'}
+                      </Text>
+                      {(() => {
+                        const parsedInput = parseInt(customDurationInput, 10);
+                        const minutes = Number.isFinite(parsedInput)
+                          ? clampCustomDuration(parsedInput)
+                          : DEFAULT_CUSTOM_DURATION_MINUTES;
+                        const atMin = minutes <= MIN_CUSTOM_DURATION_MINUTES;
+                        const atMax = minutes >= MAX_CUSTOM_DURATION_MINUTES;
+                        const draftMinutes = (next: number) => {
+                          setCustomDurationInput(
+                            String(snapCustomDuration(next)),
+                          );
+                        };
+                        const canConfirm =
+                          Number.isFinite(parsedInput) &&
+                          parsedInput >= MIN_CUSTOM_DURATION_MINUTES &&
+                          parsedInput <= MAX_CUSTOM_DURATION_MINUTES;
+                        return (
+                          <>
+                            <View
+                              style={themedStyles.durationCustomStepperRow}>
+                              <TouchableOpacity
+                                style={[
+                                  themedStyles.rosterSizeStepBtn,
+                                  atMin &&
+                                    themedStyles.rosterSizeStepBtnDisabled,
+                                ]}
+                                disabled={atMin}
+                                activeOpacity={0.75}
+                                onPress={() =>
+                                  draftMinutes(
+                                    minutes - CUSTOM_DURATION_STEP_MINUTES,
+                                  )
+                                }>
+                                <Text
+                                  style={themedStyles.rosterSizeStepBtnText}>
+                                  −
+                                </Text>
+                              </TouchableOpacity>
+                              <View
+                                style={themedStyles.durationCustomCountWrap}>
+                                <TextInput
+                                  style={
+                                    themedStyles.durationCustomCountInput
+                                  }
+                                  value={customDurationInput}
+                                  keyboardType="number-pad"
+                                  maxLength={4}
+                                  selectTextOnFocus
+                                  onChangeText={text => {
+                                    setCustomDurationInput(
+                                      text.replace(/[^0-9]/g, ''),
+                                    );
+                                  }}
+                                  onBlur={() => {
+                                    const parsed = parseInt(
+                                      customDurationInput,
+                                      10,
+                                    );
+                                    draftMinutes(
+                                      Number.isFinite(parsed)
+                                        ? parsed
+                                        : DEFAULT_CUSTOM_DURATION_MINUTES,
+                                    );
+                                  }}
+                                />
+                                <Text
+                                  style={
+                                    themedStyles.durationCustomCountLabel
+                                  }>
+                                  {formatEventDuration(minutes) ||
+                                    `${minutes}m`}{' '}
+                                  · {t('events.minutesShort') || 'min'}
+                                </Text>
+                              </View>
+                              <TouchableOpacity
+                                style={[
+                                  themedStyles.rosterSizeStepBtn,
+                                  atMax &&
+                                    themedStyles.rosterSizeStepBtnDisabled,
+                                ]}
+                                disabled={atMax}
+                                activeOpacity={0.75}
+                                onPress={() =>
+                                  draftMinutes(
+                                    minutes + CUSTOM_DURATION_STEP_MINUTES,
+                                  )
+                                }>
+                                <Text
+                                  style={themedStyles.rosterSizeStepBtnText}>
+                                  +
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                            <View style={themedStyles.pickerActionsRow}>
+                              <TouchableOpacity
+                                style={[
+                                  themedStyles.pickerActionBtn,
+                                  themedStyles.pickerActionBtnSecondary,
+                                ]}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                  setShowCustomDurationPicker(false);
+                                  if (
+                                    customDurationActive &&
+                                    newEvent.durationMinutes != null
+                                  ) {
+                                    setCustomDurationInput(
+                                      String(
+                                        clampCustomDuration(
+                                          newEvent.durationMinutes,
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    setCustomDurationInput(
+                                      String(DEFAULT_CUSTOM_DURATION_MINUTES),
+                                    );
+                                  }
+                                }}>
+                                <Text
+                                  style={
+                                    themedStyles.pickerActionBtnTextSecondary
+                                  }>
+                                  {t('common.cancel') || 'Cancel'}
+                                </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[
+                                  themedStyles.pickerActionBtn,
+                                  themedStyles.pickerActionBtnPrimary,
+                                  !canConfirm && {opacity: 0.5},
+                                ]}
+                                activeOpacity={0.8}
+                                disabled={!canConfirm}
+                                onPress={() => {
+                                  const snapped = snapCustomDuration(
+                                    parsedInput,
+                                  );
+                                  setCustomDurationInput(String(snapped));
+                                  setCustomDurationActive(true);
+                                  setShowCustomDurationPicker(false);
+                                  setNewEvent(prev => ({
+                                    ...prev,
+                                    durationMinutes: snapped,
+                                  }));
+                                }}>
+                                <Text
+                                  style={themedStyles.pickerActionBtnText}>
+                                  {t('events.confirmCustomDuration') ||
+                                    'Confirm'}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          </>
+                        );
+                      })()}
+                    </View>
+                  ) : null}
                 </View>
 
                 {/* Recurring Event toggle */}
@@ -7700,7 +8824,7 @@ const EventList: React.FC = () => {
                   onPress={() => {
                     closeAllPickers('rosterSize');
                     setShowRosterSizePicker(true);
-                    setTempRosterSize(newEvent.totalSpots || '');
+                    setTempRosterSize(newEvent.totalSpots || '6');
                   }}>
                   <Text
                     style={{
@@ -7717,37 +8841,173 @@ const EventList: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
                 {showRosterSizePicker && (
-                  <View>
-                    <View style={themedStyles.pickerContainer}>
-                      <Picker
-                        selectedValue={tempRosterSize}
-                        onValueChange={itemValue =>
-                          setTempRosterSize(itemValue)
-                        }
-                        style={themedStyles.picker}
-                        dropdownIconColor={colors.text}>
-                        {rosterSizeOptions.map(value => (
-                          <Picker.Item
-                            key={value}
-                            label={rosterSizeLabel(
-                              value,
-                              t('events.noLimit') || 'No limit',
-                            )}
-                            value={value}
-                            color={colors.text}
-                          />
-                        ))}
-                      </Picker>
-                    </View>
+                  <View style={themedStyles.rosterSizePanel}>
+                    <Text style={themedStyles.rosterSizeHint}>
+                      {t('events.rosterSizeHint') ||
+                        'How many spots should this event have?'}
+                    </Text>
                     <TouchableOpacity
-                      onPress={() => {
-                        setNewEvent({...newEvent, totalSpots: tempRosterSize});
-                        setShowRosterSizePicker(false);
-                      }}>
-                      <Text style={themedStyles.confirmButton}>
-                        {t('events.confirmRosterSize')}
+                      style={[
+                        themedStyles.rosterSizeNoLimitBtn,
+                        tempRosterSize === '0' &&
+                          themedStyles.rosterSizeNoLimitBtnSelected,
+                      ]}
+                      activeOpacity={0.75}
+                      onPress={() => setTempRosterSize('0')}>
+                      <Text
+                        style={[
+                          themedStyles.rosterSizeNoLimitText,
+                          tempRosterSize === '0' &&
+                            themedStyles.rosterSizeNoLimitTextSelected,
+                        ]}>
+                        {t('events.noLimit') || 'No limit'}
                       </Text>
                     </TouchableOpacity>
+                    {(() => {
+                      const count =
+                        tempRosterSize && tempRosterSize !== '0'
+                          ? Math.min(
+                              30,
+                              Math.max(1, parseInt(tempRosterSize, 10) || 1),
+                            )
+                          : 6;
+                      const atMin = tempRosterSize !== '0' && count <= 1;
+                      const atMax = tempRosterSize !== '0' && count >= 30;
+                      return (
+                        <View style={themedStyles.rosterSizeStepperRow}>
+                          <TouchableOpacity
+                            style={[
+                              themedStyles.rosterSizeStepBtn,
+                              atMin && themedStyles.rosterSizeStepBtnDisabled,
+                            ]}
+                            disabled={atMin}
+                            activeOpacity={0.75}
+                            onPress={() => {
+                              if (tempRosterSize === '0') {
+                                setTempRosterSize('5');
+                                return;
+                              }
+                              const current =
+                                parseInt(tempRosterSize, 10) || count;
+                              setTempRosterSize(
+                                String(Math.max(1, current - 1)),
+                              );
+                            }}>
+                            <Text style={themedStyles.rosterSizeStepBtnText}>
+                              −
+                            </Text>
+                          </TouchableOpacity>
+                          <View style={themedStyles.rosterSizeCountWrap}>
+                            <TextInput
+                              style={themedStyles.rosterSizeCountInput}
+                              value={
+                                tempRosterSize === '0' ? '' : tempRosterSize
+                              }
+                              placeholder="∞"
+                              placeholderTextColor={colors.secondaryText}
+                              keyboardType="number-pad"
+                              maxLength={2}
+                              selectTextOnFocus
+                              onChangeText={text => {
+                                const digits = text.replace(/[^0-9]/g, '');
+                                if (!digits) {
+                                  // Allow clearing while typing; Confirm stays
+                                  // disabled until a valid value is set.
+                                  setTempRosterSize('');
+                                  return;
+                                }
+                                const parsed = parseInt(digits, 10);
+                                if (!Number.isFinite(parsed) || parsed < 1) {
+                                  setTempRosterSize('');
+                                  return;
+                                }
+                                setTempRosterSize(
+                                  String(Math.min(30, parsed)),
+                                );
+                              }}
+                              onBlur={() => {
+                                if (
+                                  !tempRosterSize ||
+                                  tempRosterSize === '0'
+                                ) {
+                                  return;
+                                }
+                                const parsed = parseInt(tempRosterSize, 10);
+                                if (!Number.isFinite(parsed) || parsed < 1) {
+                                  setTempRosterSize('6');
+                                  return;
+                                }
+                                setTempRosterSize(
+                                  String(Math.min(30, parsed)),
+                                );
+                              }}
+                            />
+                            <Text style={themedStyles.rosterSizeCountLabel}>
+                              {tempRosterSize === '0'
+                                ? t('events.noLimit') || 'No limit'
+                                : t('events.spots') || 'spots'}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={[
+                              themedStyles.rosterSizeStepBtn,
+                              atMax && themedStyles.rosterSizeStepBtnDisabled,
+                            ]}
+                            disabled={atMax}
+                            activeOpacity={0.75}
+                            onPress={() => {
+                              if (tempRosterSize === '0') {
+                                setTempRosterSize('7');
+                                return;
+                              }
+                              const current =
+                                parseInt(tempRosterSize, 10) || count;
+                              setTempRosterSize(
+                                String(Math.min(30, current + 1)),
+                              );
+                            }}>
+                            <Text style={themedStyles.rosterSizeStepBtnText}>
+                              +
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })()}
+                    <View style={themedStyles.pickerActionsRow}>
+                      <TouchableOpacity
+                        style={[
+                          themedStyles.pickerActionBtn,
+                          themedStyles.pickerActionBtnSecondary,
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => setShowRosterSizePicker(false)}>
+                        <Text style={themedStyles.pickerActionBtnTextSecondary}>
+                          {t('common.cancel') || 'Cancel'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          themedStyles.pickerActionBtn,
+                          themedStyles.pickerActionBtnPrimary,
+                          !tempRosterSize && {opacity: 0.5},
+                        ]}
+                        activeOpacity={0.8}
+                        disabled={!tempRosterSize}
+                        onPress={() => {
+                          if (!tempRosterSize) {
+                            return;
+                          }
+                          setNewEvent({
+                            ...newEvent,
+                            totalSpots: tempRosterSize,
+                          });
+                          setShowRosterSizePicker(false);
+                        }}>
+                        <Text style={themedStyles.pickerActionBtnText}>
+                          {t('events.confirmRosterSize') || 'Confirm'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 )}
 
@@ -7756,6 +9016,8 @@ const EventList: React.FC = () => {
                   style={themedStyles.modalInput}
                   onPress={() => {
                     closeAllPickers('eventType');
+                    setEventTypeSearch('');
+                    setEventTypeCategory('all');
                     setShowEventTypePicker(true);
                     // If the event already has a type that isn't a preset
                     // (e.g. a previously entered custom one), open on "Custom"
@@ -7778,31 +9040,151 @@ const EventList: React.FC = () => {
                         : colors.placeholder,
                     }}>
                     {newEvent.eventType
-                      ? newEvent.eventType
+                      ? `${getEventTypeEmoji(newEvent.eventType)} ${
+                          newEvent.eventType
+                        }`
                       : t('events.selectEventType')}
                   </Text>
                 </TouchableOpacity>
                 {showEventTypePicker && (
-                  <View>
-                    <View style={themedStyles.pickerContainer}>
-                      <Picker
-                        selectedValue={tempEventType}
-                        onValueChange={itemValue => setTempEventType(itemValue)}
-                        style={themedStyles.picker}
-                        dropdownIconColor={colors.text}>
-                        {activityOptions.map(opt => (
-                          <Picker.Item
-                            key={opt.label}
-                            label={`${opt.emoji} ${opt.label}`}
-                            value={opt.label}
-                            color={colors.text}
-                          />
-                        ))}
-                      </Picker>
-                    </View>
-                    {tempEventType === 'Custom' && (
+                  <View style={themedStyles.eventTypeSearchPanel}>
+                    <View style={themedStyles.eventTypeSearchRow}>
+                      <FontAwesomeIcon
+                        icon={faSearch}
+                        size={14}
+                        color={colors.secondaryText}
+                      />
                       <TextInput
-                        style={themedStyles.modalInput}
+                        style={themedStyles.eventTypeSearchInput}
+                        value={eventTypeSearch}
+                        onChangeText={setEventTypeSearch}
+                        placeholder={
+                          t('events.searchEventType') ||
+                          'Search activities…'
+                        }
+                        placeholderTextColor={colors.placeholder || '#888'}
+                        autoCorrect={false}
+                        autoCapitalize="none"
+                        clearButtonMode="while-editing"
+                      />
+                      {eventTypeSearch.length > 0 && Platform.OS !== 'ios' ? (
+                        <TouchableOpacity
+                          onPress={() => setEventTypeSearch('')}
+                          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                          <FontAwesomeIcon
+                            icon={faTimes}
+                            size={14}
+                            color={colors.secondaryText}
+                          />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={themedStyles.eventTypeCategoryRow}
+                      keyboardShouldPersistTaps="handled">
+                      {(
+                        [
+                          {id: 'all', label: t('common.all') || 'All'},
+                          {
+                            id: 'sports',
+                            label: t('events.categorySports') || 'Sports',
+                          },
+                          {
+                            id: 'social',
+                            label: t('events.categorySocial') || 'Social',
+                          },
+                          {
+                            id: 'outdoor',
+                            label: t('events.categoryOutdoor') || 'Outdoor',
+                          },
+                          {
+                            id: 'community',
+                            label: t('events.categoryCommunity') || 'Community',
+                          },
+                          {
+                            id: 'other',
+                            label: t('events.categoryOther') || 'Other',
+                          },
+                        ] as const
+                      ).map(cat => {
+                        const selected = eventTypeCategory === cat.id;
+                        return (
+                          <TouchableOpacity
+                            key={cat.id}
+                            style={[
+                              themedStyles.eventTypeCategoryChip,
+                              selected &&
+                                themedStyles.eventTypeCategoryChipSelected,
+                            ]}
+                            onPress={() => setEventTypeCategory(cat.id)}
+                            activeOpacity={0.75}>
+                            <Text
+                              style={[
+                                themedStyles.eventTypeCategoryChipText,
+                                selected &&
+                                  themedStyles.eventTypeCategoryChipTextSelected,
+                              ]}>
+                              {cat.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+
+                    <ScrollView
+                      style={themedStyles.eventTypeResults}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled">
+                      {filteredActivityOptions.length === 0 ? (
+                        <Text style={themedStyles.eventTypeEmpty}>
+                          {t('events.noEventTypeMatches') ||
+                            'No activities match that search.'}
+                        </Text>
+                      ) : (
+                        filteredActivityOptions.map(opt => {
+                          const selected = tempEventType === opt.label;
+                          return (
+                            <TouchableOpacity
+                              key={opt.label}
+                              style={[
+                                themedStyles.eventTypeOptionRow,
+                                selected &&
+                                  themedStyles.eventTypeOptionRowSelected,
+                              ]}
+                              activeOpacity={0.7}
+                              onPress={() => {
+                                setTempEventType(opt.label);
+                                if (opt.label !== 'Custom') {
+                                  setCustomEventType('');
+                                }
+                              }}>
+                              <Text style={themedStyles.eventTypeOptionEmoji}>
+                                {opt.emoji}
+                              </Text>
+                              <Text
+                                style={themedStyles.eventTypeOptionLabel}
+                                numberOfLines={1}>
+                                {opt.label}
+                              </Text>
+                              {selected ? (
+                                <FontAwesomeIcon
+                                  icon={faCheck}
+                                  size={14}
+                                  color={colors.primary}
+                                />
+                              ) : null}
+                            </TouchableOpacity>
+                          );
+                        })
+                      )}
+                    </ScrollView>
+
+                    {tempEventType === 'Custom' ? (
+                      <TextInput
+                        style={[themedStyles.modalInput, {marginBottom: 0}]}
                         value={customEventType}
                         onChangeText={setCustomEventType}
                         placeholder={
@@ -7811,30 +9193,55 @@ const EventList: React.FC = () => {
                         }
                         placeholderTextColor={colors.placeholder}
                         maxLength={40}
+                        autoFocus
                       />
-                    )}
-                    <TouchableOpacity
-                      onPress={() => {
-                        // Resolve "Custom" to the typed value (falling back to
-                        // "Other" if left blank). Reset jersey colors on change.
-                        const resolvedType =
+                    ) : null}
+
+                    <View style={themedStyles.pickerActionsRow}>
+                      <TouchableOpacity
+                        style={[
+                          themedStyles.pickerActionBtn,
+                          themedStyles.pickerActionBtnSecondary,
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setShowEventTypePicker(false);
+                          setEventTypeSearch('');
+                          setEventTypeCategory('all');
+                        }}>
+                        <Text style={themedStyles.pickerActionBtnTextSecondary}>
+                          {t('common.cancel') || 'Cancel'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          themedStyles.pickerActionBtn,
+                          themedStyles.pickerActionBtnPrimary,
+                          (tempEventType === 'Custom'
+                            ? !customEventType.trim()
+                            : !tempEventType) && {opacity: 0.5},
+                        ]}
+                        activeOpacity={0.8}
+                        disabled={
                           tempEventType === 'Custom'
-                            ? customEventType.trim() || 'Other'
-                            : tempEventType;
-                        setNewEvent({
-                          ...newEvent,
-                          eventType: resolvedType,
-                          jerseyColors: [],
-                          trackPayment: isTeamSport(resolvedType)
-                            ? newEvent.trackPayment
-                            : false,
-                        });
-                        setShowEventTypePicker(false);
-                      }}>
-                      <Text style={themedStyles.confirmButton}>
-                        {t('events.confirmEventType')}
-                      </Text>
-                    </TouchableOpacity>
+                            ? !customEventType.trim()
+                            : !tempEventType
+                        }
+                        onPress={() => {
+                          if (!tempEventType) {
+                            return;
+                          }
+                          if (tempEventType === 'Custom') {
+                            applySelectedEventType('Custom', customEventType);
+                            return;
+                          }
+                          applySelectedEventType(tempEventType);
+                        }}>
+                        <Text style={themedStyles.pickerActionBtnText}>
+                          {t('events.confirmEventType') || 'Confirm'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 )}
 
@@ -7845,6 +9252,7 @@ const EventList: React.FC = () => {
                       style={themedStyles.modalInput}
                       onPress={() => {
                         closeAllPickers('jerseyColor');
+                        setTempJerseyColors(newEvent.jerseyColors || []);
                         setShowJerseyColorPicker(true);
                       }}>
                       <Text
@@ -7864,11 +9272,44 @@ const EventList: React.FC = () => {
                       <View style={themedStyles.jerseyColorPickerContainer}>
                         <Text style={themedStyles.jerseyColorTitle}>
                           {t('events.selectTwoColors') ||
-                            'Select 2 team jersey colors:'}
+                            'Select 2 team jersey colors'}
                         </Text>
+                        {tempJerseyColors.length === 2 ? (
+                          <View style={themedStyles.jerseyPreviewRow}>
+                            {tempJerseyColors.map(label => {
+                              const swatch = jerseyColorOptions.find(
+                                c => c.label === label,
+                              );
+                              return (
+                                <View
+                                  key={label}
+                                  style={[
+                                    themedStyles.jerseyPreviewSwatch,
+                                    {
+                                      backgroundColor:
+                                        swatch?.color || colors.border,
+                                    },
+                                    (label === 'White' || label === 'Yellow') &&
+                                      themedStyles.jerseyColorSwatchLight,
+                                  ]}
+                                />
+                              );
+                            })}
+                            <Text style={themedStyles.jerseyPreviewText}>
+                              {tempJerseyColors[0]} vs {tempJerseyColors[1]}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={themedStyles.dateTimePickerHint}>
+                            {t('events.jerseyPickRemaining', {
+                              count: 2 - tempJerseyColors.length,
+                            }) ||
+                              `Pick ${2 - tempJerseyColors.length} more`}
+                          </Text>
+                        )}
                         <View style={themedStyles.jerseyColorGrid}>
                           {jerseyColorOptions.map(colorOpt => {
-                            const isSelected = newEvent.jerseyColors.includes(
+                            const isSelected = tempJerseyColors.includes(
                               colorOpt.label,
                             );
                             const isLight =
@@ -7883,21 +9324,16 @@ const EventList: React.FC = () => {
                                     themedStyles.jerseyColorOptionSelected,
                                 ]}
                                 onPress={() => {
-                                  let updatedColors = [
-                                    ...newEvent.jerseyColors,
-                                  ];
-                                  if (isSelected) {
-                                    // Remove if already selected
-                                    updatedColors = updatedColors.filter(
-                                      c => c !== colorOpt.label,
-                                    );
-                                  } else if (updatedColors.length < 2) {
-                                    // Add if less than 2 selected
-                                    updatedColors.push(colorOpt.label);
-                                  }
-                                  setNewEvent({
-                                    ...newEvent,
-                                    jerseyColors: updatedColors,
+                                  setTempJerseyColors(prev => {
+                                    if (prev.includes(colorOpt.label)) {
+                                      return prev.filter(
+                                        c => c !== colorOpt.label,
+                                      );
+                                    }
+                                    if (prev.length >= 2) {
+                                      return prev;
+                                    }
+                                    return [...prev, colorOpt.label];
                                   });
                                 }}>
                                 <View
@@ -7911,21 +9347,42 @@ const EventList: React.FC = () => {
                                 <Text style={themedStyles.jerseyColorLabel}>
                                   {colorOpt.label}
                                 </Text>
-                                {isSelected && (
+                                {isSelected ? (
                                   <Text style={themedStyles.jerseyColorCheck}>
                                     ✓
                                   </Text>
-                                )}
+                                ) : null}
                               </TouchableOpacity>
                             );
                           })}
                         </View>
-                        <TouchableOpacity
-                          onPress={() => setShowJerseyColorPicker(false)}>
-                          <Text style={themedStyles.confirmButton}>
-                            {t('common.done') || 'Done'}
-                          </Text>
-                        </TouchableOpacity>
+                        <View style={themedStyles.pickerActionsRow}>
+                          <TouchableOpacity
+                            style={[
+                              themedStyles.pickerActionBtn,
+                              themedStyles.pickerActionBtnSecondary,
+                            ]}
+                            activeOpacity={0.8}
+                            onPress={cancelJerseyColorPicker}>
+                            <Text
+                              style={themedStyles.pickerActionBtnTextSecondary}>
+                              {t('common.cancel') || 'Cancel'}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              themedStyles.pickerActionBtn,
+                              themedStyles.pickerActionBtnPrimary,
+                              tempJerseyColors.length !== 2 && {opacity: 0.5},
+                            ]}
+                            activeOpacity={0.8}
+                            disabled={tempJerseyColors.length !== 2}
+                            onPress={confirmJerseyColors}>
+                            <Text style={themedStyles.pickerActionBtnText}>
+                              {t('events.confirmJerseyColors') || 'Confirm'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     )}
                   </>
@@ -8380,6 +9837,41 @@ const EventList: React.FC = () => {
               )}
             </View>
 
+            {optionsMenuEvent ? (
+              <TouchableOpacity
+                style={themedStyles.optionsMenuRow}
+                activeOpacity={0.7}
+                onPress={() => {
+                  const target = optionsMenuEvent;
+                  setOptionsMenuEvent(null);
+                  if (target) {
+                    togglePinEvent(target);
+                  }
+                }}>
+                <View
+                  style={[
+                    themedStyles.optionsMenuIconContainer,
+                    {backgroundColor: colors.primary + '15'},
+                  ]}>
+                  <FontAwesomeIcon
+                    icon={faThumbtack}
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+                <Text style={themedStyles.optionsMenuLabel}>
+                  {pinnedEventIds.has(optionsMenuEvent._id)
+                    ? t('events.unpinEvent') || 'Unpin from top'
+                    : t('events.pinEvent') || 'Pin to top'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity
               style={themedStyles.optionsMenuRow}
               activeOpacity={0.7}
@@ -8469,7 +9961,9 @@ const EventList: React.FC = () => {
             <View style={themedStyles.filterModalHandle} />
             <View style={themedStyles.filterModalHeader}>
               <Text style={themedStyles.filterModalTitle}>
-                {t('events.joinDetailsTitle') || "You're going!"}
+                {joinPrompt?.mode === 'createCreator'
+                  ? t('events.creatorRosterTitle') || 'Your role on the roster'
+                  : t('events.joinDetailsTitle') || "You're going!"}
               </Text>
               <TouchableOpacity onPress={closeJoinPrompt} hitSlop={12}>
                 <FontAwesomeIcon
@@ -8501,8 +9995,11 @@ const EventList: React.FC = () => {
                     fontSize: 14,
                     lineHeight: 20,
                   }}>
-                  {t('events.joinDetailsHint') ||
-                    "You're on the roster. Pick your preferred role so the host knows how you're showing up."}
+                  {joinPrompt.mode === 'createCreator'
+                    ? t('events.creatorRosterHint') ||
+                      'You will be added to the roster. Pick how you are showing up for this event style.'
+                    : t('events.joinDetailsHint') ||
+                      "You're on the roster. Pick your preferred role so the host knows how you're showing up."}
                 </Text>
 
                 <View style={themedStyles.filterSection}>
@@ -8636,16 +10133,22 @@ const EventList: React.FC = () => {
                           themedStyles.rsvpButtonText,
                           themedStyles.rsvpButtonTextActive,
                         ]}>
-                        {t('events.rsvpGoingConfirm') || 'Save preferences'}
+                        {joinPrompt.mode === 'createCreator'
+                          ? t('events.createEvent') || 'Create Event'
+                          : t('events.rsvpGoingConfirm') ||
+                            'Save preferences'}
                       </Text>
                     )}
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={closeJoinPrompt}
+                    onPress={skipJoinPrompt}
                     disabled={joinPromptSaving}
                     style={{alignItems: 'center', paddingVertical: 8}}>
                     <Text style={{color: colors.secondaryText, fontWeight: '600'}}>
-                      {t('events.joinDetailsSkip') || 'Not now'}
+                      {joinPrompt.mode === 'createCreator'
+                        ? t('events.creatorRosterSkip') ||
+                          'Create with default role'
+                        : t('events.joinDetailsSkip') || 'Not now'}
                     </Text>
                   </TouchableOpacity>
                 </View>

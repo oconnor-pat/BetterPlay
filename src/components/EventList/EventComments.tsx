@@ -37,7 +37,7 @@ import axios from 'axios';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {API_BASE_URL} from '../../config/api';
 import {useTranslation} from 'react-i18next';
-import {useNavigation, CommonActions} from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 import {useSocket} from '../../Context/SocketContext';
 import MentionText from '../Mentions/MentionText';
 import MentionSuggestions from '../Mentions/MentionSuggestions';
@@ -393,18 +393,24 @@ const EventComments: React.FC<EventCommentsProps> = ({
     }
   }, [post, eventId]);
 
-  // Navigate to user's public profile
+  // Navigate to user's public profile (Events stack screen).
   const navigateToProfile = useCallback(
     (userId: string, username: string, profilePicUrl?: string) => {
-      if (userData && userId === userData._id) {
+      if (!userId) {
         return;
       }
-      navigation.dispatch(
-        CommonActions.navigate({
-          name: 'PublicProfile',
-          params: {userId, username, profilePicUrl},
-        }),
-      );
+      if (userData && String(userId) === String(userData._id)) {
+        return;
+      }
+      setLikesModalVisible(false);
+      setReactionTarget(null);
+      // Use the stack navigator directly — CommonActions.navigate can miss
+      // PublicProfile when dispatched from nested comment UI.
+      (navigation as any).navigate('PublicProfile', {
+        userId: String(userId),
+        username,
+        profilePicUrl,
+      });
     },
     [navigation, userData],
   );
@@ -564,7 +570,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
   };
 
   const fetchUsersByIds = async (userIds: string[]): Promise<LikedByUser[]> => {
-    const unique = Array.from(new Set(userIds.filter(Boolean)));
+    const unique = Array.from(new Set(userIds.filter(Boolean).map(String)));
     if (unique.length === 0) {
       return [];
     }
@@ -574,19 +580,26 @@ const EventComments: React.FC<EventCommentsProps> = ({
         headers: token ? {Authorization: `Bearer ${token}`} : undefined,
       });
       const allUsers = response.data?.users || response.data || [];
-      const byId = new Map(
-        allUsers.map((user: LikedByUser) => [String(user._id), user]),
+      const byId = new Map<string, LikedByUser>(
+        allUsers.map((user: any): [string, LikedByUser] => [
+          String(user._id || user.id),
+          {
+            _id: String(user._id || user.id),
+            username: user.username || 'Player',
+            profilePicUrl: user.profilePicUrl,
+          },
+        ]),
       );
-      return unique
-        .map(id => byId.get(String(id)))
-        .filter((user): user is LikedByUser => !!user)
-        .map(user => ({
-          _id: user._id,
-          username: user.username,
-          profilePicUrl: user.profilePicUrl,
-        }));
+      return unique.map(id => {
+        const found = byId.get(id);
+        if (found) {
+          return found;
+        }
+        // Keep a stub so the row stays tappable with the reaction userId.
+        return {_id: id, username: 'Player'};
+      });
     } catch {
-      return [];
+      return unique.map(id => ({_id: id, username: 'Player'}));
     }
   };
 
@@ -605,7 +618,7 @@ const EventComments: React.FC<EventCommentsProps> = ({
     setLikesModalData({
       title: t('events.reactions') || 'Reactions',
       users: usersWithEmoji,
-      anonymousCount: Math.max(0, list.length - users.length),
+      anonymousCount: 0,
     });
     setLikesModalVisible(true);
   };
@@ -3224,14 +3237,12 @@ const EventComments: React.FC<EventCommentsProps> = ({
                       key={index}
                       style={styles.likesModalUserRow}
                       onPress={() => {
-                        if (user._id) {
-                          setLikesModalVisible(false);
-                          navigateToProfile(
-                            user._id,
-                            user.username,
-                            user.profilePicUrl,
-                          );
-                        }
+                        setLikesModalVisible(false);
+                        navigateToProfile(
+                          user._id,
+                          user.username,
+                          user.profilePicUrl,
+                        );
                       }}
                       disabled={!user._id}
                       activeOpacity={user._id ? 0.7 : 1}>

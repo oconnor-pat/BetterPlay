@@ -4,6 +4,7 @@ import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
 import EventList from '../EventList/EventList';
 import EventRoster from '../EventRoster/EventRoster';
+import EventWrapUp from '../EventWrapUp/EventWrapUp';
 import Profile from '../Profile/Profile';
 import PublicProfile from '../Profile/PublicProfile';
 import {VenueList, VenuePlaceDetail, VenueWebView} from '../Venues';
@@ -111,6 +112,13 @@ const LocalEventsStack = () => {
         }}
       />
       <Stack.Screen
+        name="EventWrapUp"
+        component={EventWrapUp}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="PublicProfile"
         component={PublicProfile}
         options={{
@@ -157,6 +165,8 @@ const LocalEventsStack = () => {
 // Stack Navigator for Groups screens. GroupDetail is also registered in
 // ProfileStack (the Profile "My Groups" section still links into it), so
 // it lives in both stacks — each tab navigates within its own stack.
+// EventWrapUp + PublicProfile live here too so chat → concluded-event
+// wrap-up stays in the Groups tab (back returns to the thread).
 const GroupsStack = () => {
   const {colors} = useTheme();
   return (
@@ -173,6 +183,16 @@ const GroupsStack = () => {
       <Stack.Screen
         name="GroupDetail"
         component={GroupDetail}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="EventWrapUp"
+        component={EventWrapUp}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="PublicProfile"
+        component={PublicProfile}
         options={{headerShown: false}}
       />
     </Stack.Navigator>

@@ -71,6 +71,10 @@ import {
   sendGroupMessage,
   uploadChatImage,
 } from '../../services/GroupChatService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import {API_BASE_URL} from '../../config/api';
+import {isEventEnded, isEventPast} from '../../utils/eventDateTime';
 
 interface GroupChatProps {
   groupId: string;
@@ -248,14 +252,56 @@ const GroupChat: React.FC<GroupChatProps> = ({
   }, []);
 
   const openEvent = useCallback(
-    (eventId: string) => {
-      // Cross-tab jump into the Events stack's roster screen.
-      navigation.navigate('Events', {
-        screen: 'EventRoster',
-        params: {eventId},
-      });
+    async (eventId: string, eventDate?: string, eventName?: string) => {
+      const goWrapUp = () => {
+        navigation.navigate('EventWrapUp', {
+          eventId,
+          eventName,
+        });
+      };
+      const goLiveRoster = () => {
+        navigation.navigate('Events', {
+          screen: 'EventRoster',
+          params: {eventId},
+        });
+      };
+
+      const promptWrapUp = () => {
+        Alert.alert(
+          t('events.eventConcludedTitle') || 'Event concluded',
+          t('events.eventConcludedMessage') ||
+            'This event has ended. You can view the wrap-up for who attended and leave ratings.',
+          [
+            {text: t('common.cancel') || 'Cancel', style: 'cancel'},
+            {
+              text: t('events.viewWrapUp') || 'View wrap-up',
+              onPress: goWrapUp,
+            },
+          ],
+        );
+      };
+
+      // Fast path from the chat stamp (date only) — still confirm via API when
+      // possible so same-day events with a duration aren't misclassified.
+      let ended = !!(eventDate && isEventPast(eventDate));
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await axios.get(`${API_BASE_URL}/events/${eventId}`, {
+          headers: token ? {Authorization: `Bearer ${token}`} : {},
+        });
+        const ev = response.data || {};
+        ended = isEventEnded(ev.date, ev.time, ev.durationMinutes);
+      } catch {
+        // Keep the date-based guess if the fetch fails.
+      }
+
+      if (ended) {
+        promptWrapUp();
+        return;
+      }
+      goLiveRoster();
     },
-    [navigation],
+    [navigation, t],
   );
 
   // Initial load + room join + mark read.
@@ -1054,6 +1100,9 @@ const GroupChat: React.FC<GroupChatProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
         },
+        eventIconConcluded: {
+          backgroundColor: colors.border,
+        },
         eventBody: {flexShrink: 1},
         eventName: {fontSize: 14, fontWeight: '700', color: colors.text},
         eventDate: {fontSize: 12, color: colors.secondaryText, marginTop: 1},
@@ -1145,12 +1194,29 @@ const GroupChat: React.FC<GroupChatProps> = ({
             <TouchableOpacity
               style={styles.eventCard}
               activeOpacity={0.8}
-              onPress={() => openEvent(item.eventRef!.eventId)}>
-              <View style={styles.eventIcon}>
+              onPress={() =>
+                openEvent(
+                  item.eventRef!.eventId,
+                  item.eventRef!.eventDate,
+                  item.eventRef!.eventName,
+                )
+              }>
+              <View
+                style={[
+                  styles.eventIcon,
+                  item.eventRef.eventDate &&
+                    isEventPast(item.eventRef.eventDate) &&
+                    styles.eventIconConcluded,
+                ]}>
                 <FontAwesomeIcon
                   icon={faCalendarDay}
                   size={15}
-                  color={colors.primary}
+                  color={
+                    item.eventRef.eventDate &&
+                    isEventPast(item.eventRef.eventDate)
+                      ? colors.secondaryText
+                      : colors.primary
+                  }
                 />
               </View>
               <View style={styles.eventBody}>
@@ -1161,7 +1227,12 @@ const GroupChat: React.FC<GroupChatProps> = ({
                 </Text>
                 {item.eventRef.eventDate ? (
                   <Text style={styles.eventDate}>
-                    {item.eventRef.eventDate}
+                    {isEventPast(item.eventRef.eventDate)
+                      ? t('events.concluded') || 'Concluded'
+                      : item.eventRef.eventDate}
+                    {isEventPast(item.eventRef.eventDate)
+                      ? ` · ${item.eventRef.eventDate}`
+                      : ''}
                   </Text>
                 ) : null}
               </View>
