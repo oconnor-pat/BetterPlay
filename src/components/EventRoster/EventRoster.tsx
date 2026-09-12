@@ -58,18 +58,22 @@ import {
   faCalendarPlus,
   faEllipsisH,
   faInfoCircle,
+  faBuilding,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notificationService from '../../services/NotificationService';
 import {addEventToCalendar} from '../../services/CalendarService';
 import {useSocket} from '../../Context/SocketContext';
 import {getEventDateTime, isEventEnded} from '../../utils/eventDateTime';
+import {joinPositionsForEvent} from '../../utils/eventRoles';
 import EventRatingModal from '../EventRating/EventRatingModal';
 import PlayerRatingModal, {
   PlayerRatingTarget,
 } from '../EventRating/PlayerRatingModal';
 import CreateGroupModal from '../Groups/CreateGroupModal';
 import {Group} from '../../types/group';
+import OfficialVenueChip from '../OfficialVenueChip';
+import {authorDisplayName} from '../../utils/venueDisplay';
 
 /** Minimum ratings before showing the roster avatar chip. */
 const ROSTER_RATING_MIN_COUNT = 3;
@@ -129,7 +133,7 @@ const positionOptions: Record<string, string[]> = {
   Lacrosse: ['Attack', 'Midfield', 'Defense', 'Goalie'],
   Volleyball: ['Setter', 'Outside Hitter', 'Middle Blocker', 'Libero'],
   // General activity roles
-  'Trivia Night': ['Player', 'Team Captain', 'Host'],
+  'Trivia Night': ['Player', 'Team Captain'],
   'Game Night': ['Player', 'Host'],
   'Video Games': ['Player', 'Host', 'Spectator'],
   Karaoke: ['Singer', 'Audience'],
@@ -454,6 +458,9 @@ const EventRoster: React.FC = () => {
     'public' | 'private' | 'invite-only'
   >('public');
   const [eventCreatedBy, setEventCreatedBy] = useState<string>('');
+  const [eventSource, setEventSource] = useState<'user' | 'venue' | undefined>(
+    undefined,
+  );
   const [invitedUsers, setInvitedUsers] = useState<string[]>([]);
   // Host-kicked users — blocked from rejoining until the host re-invites.
   const [removedUserIds, setRemovedUserIds] = useState<string[]>([]);
@@ -545,6 +552,45 @@ const EventRoster: React.FC = () => {
   const isEventCreator = useMemo(() => {
     return userData?._id === eventCreatedBy;
   }, [userData?._id, eventCreatedBy]);
+
+  const isVenueHost = userData?.accountType === 'venue';
+  const isVenueNight = eventSource === 'venue';
+  const isVenueHostingThisNight = isVenueHost && isEventCreator;
+
+  const isRosterHostPlayer = useCallback(
+    (player: Player) => {
+      if (player.userId && eventCreatedBy && player.userId === eventCreatedBy) {
+        return true;
+      }
+      if (
+        eventCreatedByUsername &&
+        player.username === eventCreatedByUsername
+      ) {
+        return true;
+      }
+      return false;
+    },
+    [eventCreatedBy, eventCreatedByUsername],
+  );
+
+  const venueHostPlayer = useMemo(() => {
+    if (!isVenueNight && !isVenueHostingThisNight) {
+      return null;
+    }
+    return roster.find(isRosterHostPlayer) || null;
+  }, [isVenueNight, isVenueHostingThisNight, roster, isRosterHostPlayer]);
+
+  const attendeeRoster = useMemo(() => {
+    if (!venueHostPlayer) {
+      return roster;
+    }
+    return roster.filter(p => !isRosterHostPlayer(p));
+  }, [roster, venueHostPlayer, isRosterHostPlayer]);
+
+  const rosterTabCount =
+    isVenueNight || isVenueHostingThisNight
+      ? attendeeRoster.length
+      : roster.length;
 
   const isUserOnRoster = useMemo(
     () =>
@@ -698,7 +744,8 @@ const EventRoster: React.FC = () => {
   }, [teamColors, activeTeamTab]);
 
   const filteredRoster = useMemo(() => {
-    let players = roster;
+    let players =
+      isVenueNight || isVenueHostingThisNight ? attendeeRoster : roster;
 
     if (isTeamSport(eventType) && teamColors.length > 1 && activeTeamTab) {
       players = players.filter(p => p.jerseyColor === activeTeamTab);
@@ -718,6 +765,9 @@ const EventRoster: React.FC = () => {
     return players;
   }, [
     roster,
+    attendeeRoster,
+    isVenueNight,
+    isVenueHostingThisNight,
     activeTeamTab,
     paymentFilter,
     eventType,
@@ -1983,6 +2033,7 @@ const EventRoster: React.FC = () => {
       setEventPrivacy(response.data.privacy || 'public');
       setEventCreatedBy(response.data.createdBy || '');
       setEventCreatedByUsername(response.data.createdByUsername || '');
+      setEventSource(response.data.source === 'venue' ? 'venue' : 'user');
       setInvitedUsers(response.data.invitedUsers || []);
       setRemovedUserIds(response.data.removedUserIds || []);
       setRsvps(response.data.rsvps || []);
@@ -2662,6 +2713,19 @@ const EventRoster: React.FC = () => {
   const handleDelete = useCallback(
     (playerUsername: string, options?: {boot?: boolean}) => {
       const isBoot = !!options?.boot;
+      // Venue hosts stay attached to their night — no "leave roster".
+      if (
+        !isBoot &&
+        isVenueHostingThisNight &&
+        playerUsername === userData?.username
+      ) {
+        Alert.alert(
+          t('venues.cantLeaveNightTitle') || "You're the venue host",
+          t('venues.cantLeaveNightBody') ||
+            'Venue accounts stay on the night as host. Edit or delete the night from the feed instead.',
+        );
+        return;
+      }
       if (isBoot) {
         if (!isEventCreator) {
           return;
@@ -2773,7 +2837,15 @@ const EventRoster: React.FC = () => {
         },
       ]);
     },
-    [userData?.username, t, eventId, updateRosterSpots, roster, isEventCreator],
+    [
+      userData?.username,
+      t,
+      eventId,
+      updateRosterSpots,
+      roster,
+      isEventCreator,
+      isVenueHostingThisNight,
+    ],
   );
 
   const handleJoinWaitlist = useCallback(async () => {
@@ -2835,6 +2907,9 @@ const EventRoster: React.FC = () => {
 
   // Open edit modal for current user
   const handleEdit = useCallback(() => {
+    if (isVenueHostingThisNight) {
+      return;
+    }
     const currentPlayer = roster.find(p => p.username === userData?.username);
     if (currentPlayer) {
       setEditPaidStatus(currentPlayer.paidStatus);
@@ -2842,7 +2917,7 @@ const EventRoster: React.FC = () => {
       setEditPosition(currentPlayer.position);
       setEditModalVisible(true);
     }
-  }, [roster, userData?.username]);
+  }, [roster, userData?.username, isVenueHostingThisNight]);
 
   // Save edited player info
   const handleSaveEdit = useCallback(async () => {
@@ -3005,9 +3080,9 @@ const EventRoster: React.FC = () => {
       item.jerseyColor !== 'N/A';
     const validPositions =
       positionOptions[eventType] || positionOptions.Default;
-    const displayPosition = validPositions.includes(item.position)
-      ? item.position
-      : validPositions[0];
+    // Keep stored labels (e.g. legacy "Host" on trivia) even if the role
+    // list was renamed — don't silently remap to Player.
+    const displayPosition = item.position || validPositions[0];
 
     const openPlayerMenu = () => {
       const options: {
@@ -3017,6 +3092,10 @@ const EventRoster: React.FC = () => {
       }[] = [];
 
       if (isSelf) {
+        // Venue hosts don't edit player roles or leave their own night.
+        if (isVenueHostingThisNight) {
+          return;
+        }
         options.push({
           label: t('roster.editPlayer') || 'Edit',
           onPress: handleEdit,
@@ -3079,7 +3158,9 @@ const EventRoster: React.FC = () => {
       }
     };
 
-    const showMenu = isSelf || !!item.userId || isEventCreator;
+    const showMenu =
+      (isSelf && !isVenueHostingThisNight) ||
+      (!isSelf && (!!item.userId || isEventCreator));
 
     return (
       <View
@@ -3103,12 +3184,40 @@ const EventRoster: React.FC = () => {
           {canNavigateToProfile ? (
             <TouchableOpacity onPress={() => handlePlayerPress(item)}>
               <Text style={[themedStyles.playerName, {color: colors.primary}]}>
-                {item.username}
+                {isRosterHostPlayer(item) &&
+                (isVenueNight || isVenueHostingThisNight) &&
+                isSelf
+                  ? authorDisplayName({
+                      accountType: 'venue',
+                      name:
+                        userData?.managedVenue?.name ||
+                        userData?.name ||
+                        item.username,
+                      username: item.username,
+                    })
+                  : item.username}
               </Text>
             </TouchableOpacity>
           ) : (
-            <Text style={themedStyles.playerName}>
-              {item.username} {isSelf && '(You)'}
+            <Text
+              style={[
+                themedStyles.playerName,
+                isRosterHostPlayer(item) &&
+                (isVenueNight || isVenueHostingThisNight)
+                  ? {color: colors.primary}
+                  : null,
+              ]}>
+              {isRosterHostPlayer(item) &&
+              (isVenueNight || isVenueHostingThisNight)
+                ? `${authorDisplayName({
+                    accountType: 'venue',
+                    name:
+                      userData?.managedVenue?.name ||
+                      userData?.name ||
+                      item.username,
+                    username: item.username,
+                  })}${isSelf ? ' (You)' : ''}`
+                : `${item.username}${isSelf ? ' (You)' : ''}`}
             </Text>
           )}
           <View style={themedStyles.playerDetails}>
@@ -3125,12 +3234,21 @@ const EventRoster: React.FC = () => {
                 </Text>
               </View>
             ) : null}
-            <View style={themedStyles.playerBadge}>
-              <FontAwesomeIcon icon={faFutbol} size={10} color={colors.text} />
-              <Text style={themedStyles.playerBadgeText}>
-                {displayPosition}
-              </Text>
-            </View>
+            {isRosterHostPlayer(item) &&
+            (isVenueNight || isVenueHostingThisNight) ? (
+              <OfficialVenueChip compact />
+            ) : (
+              <View style={themedStyles.playerBadge}>
+                <FontAwesomeIcon
+                  icon={faFutbol}
+                  size={10}
+                  color={colors.text}
+                />
+                <Text style={themedStyles.playerBadgeText}>
+                  {displayPosition}
+                </Text>
+              </View>
+            )}
             {trackPayment &&
               isTeamSport(eventType) &&
               item.paidStatus !== 'N/A' && (
@@ -3257,7 +3375,7 @@ const EventRoster: React.FC = () => {
                     themedStyles.surfaceSegmentTextActive,
                 ]}>
                 {t('roster.tabRoster') || 'Roster'}
-                {roster.length > 0 ? ` · ${roster.length}` : ''}
+                {rosterTabCount > 0 ? ` · ${rosterTabCount}` : ''}
               </Text>
             </TouchableOpacity>
           </View>
@@ -3439,10 +3557,16 @@ const EventRoster: React.FC = () => {
                     </Text>
                     <Text style={themedStyles.progressCount}>
                       {totalSpots > 0
-                        ? `${roster.length} / ${totalSpots}`
-                        : `${roster.length} · ${
-                            t('events.noLimit') || 'No limit'
-                          }`}
+                        ? `${
+                            isVenueNight || isVenueHostingThisNight
+                              ? attendeeRoster.length
+                              : roster.length
+                          } / ${totalSpots}`
+                        : `${
+                            isVenueNight || isVenueHostingThisNight
+                              ? attendeeRoster.length
+                              : roster.length
+                          } · ${t('events.noLimit') || 'No limit'}`}
                     </Text>
                   </View>
                   <View style={themedStyles.progressBarBg}>
@@ -3475,10 +3599,14 @@ const EventRoster: React.FC = () => {
                   <View style={themedStyles.statsRow}>
                     <View style={themedStyles.statItem}>
                       <Text style={themedStyles.statValue}>
-                        {roster.length}
+                        {isVenueNight || isVenueHostingThisNight
+                          ? attendeeRoster.length
+                          : roster.length}
                       </Text>
                       <Text style={themedStyles.statLabel}>
-                        {t('roster.players')}
+                        {isVenueNight || isVenueHostingThisNight
+                          ? t('venues.joinedLabel') || 'Joined'
+                          : t('roster.players')}
                       </Text>
                     </View>
                     {isTeamSport(eventType) && trackPayment && (
@@ -3879,7 +4007,10 @@ const EventRoster: React.FC = () => {
                               />
                             ) : null}
                             <Text style={themedStyles.alreadyJoinedText}>
-                              {myTeam
+                              {isVenueHostingThisNight
+                                ? t('venues.youreHosting') ||
+                                  "You're hosting this night"
+                                : myTeam
                                 ? t('roster.youreOnTeam', {team: myTeam}) ||
                                   `You're on ${myTeam}`
                                 : t('roster.youreOnTheRoster')}
@@ -4255,6 +4386,22 @@ const EventRoster: React.FC = () => {
             <>
               {/* Rostered Players Section */}
               <View style={themedStyles.rosterSection}>
+                {venueHostPlayer ? (
+                  <View style={{marginBottom: 12}}>
+                    <View style={themedStyles.sectionHeader}>
+                      <FontAwesomeIcon
+                        icon={faBuilding}
+                        size={18}
+                        color={colors.primary}
+                      />
+                      <Text style={themedStyles.sectionTitle}>
+                        {t('venues.hostingSection') || 'Hosting'}
+                      </Text>
+                    </View>
+                    {renderPlayerCard({item: venueHostPlayer, index: 0})}
+                  </View>
+                ) : null}
+
                 <View style={themedStyles.sectionHeader}>
                   <FontAwesomeIcon
                     icon={faUsers}
@@ -4262,7 +4409,11 @@ const EventRoster: React.FC = () => {
                     color={colors.primary}
                   />
                   <Text style={themedStyles.sectionTitle}>
-                    {t('roster.rosteredPlayers')} ({roster.length})
+                    {isVenueNight || isVenueHostingThisNight
+                      ? `${t('venues.joinedLabel') || 'Joined'} (${
+                          attendeeRoster.length
+                        })`
+                      : `${t('roster.rosteredPlayers')} (${roster.length})`}
                   </Text>
                 </View>
 
@@ -4283,8 +4434,11 @@ const EventRoster: React.FC = () => {
                           'Create group chat'}
                       </Text>
                       <Text style={themedStyles.createGroupFromEventHint}>
-                        {t('roster.createGroupFromEventHint') ||
-                          'Start a group with people from this event'}
+                        {isVenueHostingThisNight
+                          ? t('venues.createGroupFromNightHint') ||
+                            'Start a group with people who joined this night'
+                          : t('roster.createGroupFromEventHint') ||
+                            'Start a group with people from this event'}
                       </Text>
                     </View>
                     <FontAwesomeIcon
@@ -4297,9 +4451,15 @@ const EventRoster: React.FC = () => {
 
                 {loading ? (
                   <RosterListSkeleton count={5} />
-                ) : roster.length === 0 ? (
+                ) : (
+                    isVenueNight || isVenueHostingThisNight
+                      ? attendeeRoster.length === 0
+                      : roster.length === 0
+                  ) ? (
                   <Text style={themedStyles.emptyState}>
-                    {t('roster.noPlayersYet')}
+                    {isVenueNight || isVenueHostingThisNight
+                      ? t('venues.noOneJoinedYet') || 'No one has joined yet.'
+                      : t('roster.noPlayersYet')}
                   </Text>
                 ) : (
                   <>
@@ -4988,38 +5148,37 @@ const EventRoster: React.FC = () => {
               <View style={themedStyles.modalContent}>
                 <Text style={themedStyles.modalTitle}>Select Position</Text>
                 <ScrollView style={themedStyles.modalScrollView}>
-                  {(positionOptions[eventType] || positionOptions.Default).map(
-                    pos => (
-                      <TouchableOpacity
-                        key={pos}
+                  {joinPositionsForEvent({
+                    eventType,
+                    source: eventSource,
+                  }).map(pos => (
+                    <TouchableOpacity
+                      key={pos}
+                      style={[
+                        themedStyles.modalOption,
+                        position === pos && themedStyles.modalOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setPosition(pos);
+                        setPositionModalVisible(false);
+                      }}>
+                      <FontAwesomeIcon
+                        icon={faFutbol}
+                        size={16}
+                        color={
+                          position === pos ? colors.primary : colors.placeholder
+                        }
+                      />
+                      <Text
                         style={[
-                          themedStyles.modalOption,
-                          position === pos && themedStyles.modalOptionSelected,
-                        ]}
-                        onPress={() => {
-                          setPosition(pos);
-                          setPositionModalVisible(false);
-                        }}>
-                        <FontAwesomeIcon
-                          icon={faFutbol}
-                          size={16}
-                          color={
-                            position === pos
-                              ? colors.primary
-                              : colors.placeholder
-                          }
-                        />
-                        <Text
-                          style={[
-                            themedStyles.modalOptionTextWithMargin,
-                            position === pos &&
-                              themedStyles.modalOptionTextSelected,
-                          ]}>
-                          {pos}
-                        </Text>
-                      </TouchableOpacity>
-                    ),
-                  )}
+                          themedStyles.modalOptionTextWithMargin,
+                          position === pos &&
+                            themedStyles.modalOptionTextSelected,
+                        ]}>
+                        {pos}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </ScrollView>
                 <TouchableOpacity
                   style={themedStyles.modalClose}
@@ -5226,9 +5385,10 @@ const EventRoster: React.FC = () => {
                   </TouchableOpacity>
                   {expandedSection === 'position' && (
                     <View style={themedStyles.expandedOptions}>
-                      {(
-                        positionOptions[eventType] || positionOptions.Default
-                      ).map(pos => (
+                      {joinPositionsForEvent({
+                        eventType,
+                        source: eventSource,
+                      }).map(pos => (
                         <TouchableOpacity
                           key={pos}
                           style={[

@@ -41,12 +41,14 @@ import {useNavigation} from '@react-navigation/native';
 import {useSocket} from '../../Context/SocketContext';
 import MentionText from '../Mentions/MentionText';
 import MentionSuggestions from '../Mentions/MentionSuggestions';
+import OfficialVenueChip from '../OfficialVenueChip';
 import {
   applyMention,
   filterMentionCandidates,
   getActiveMention,
   MentionCandidate,
 } from '../../utils/mentions';
+import {authorDisplayName, isVenueAuthor} from '../../utils/venueDisplay';
 
 type MentionComposer =
   | {type: 'newPost'}
@@ -77,6 +79,8 @@ interface Reply {
   username: string;
   userId: string;
   profilePicUrl?: string;
+  name?: string;
+  accountType?: 'user' | 'venue';
   createdAt?: string;
   likes?: string[];
   reactions?: CommentReaction[];
@@ -97,6 +101,8 @@ interface Comment {
   username: string;
   userId: string;
   profilePicUrl?: string;
+  name?: string;
+  accountType?: 'user' | 'venue';
   replies?: Reply[];
   likes?: string[];
   likedByUsernames?: string[];
@@ -113,6 +119,8 @@ interface Post {
   userId: string;
   username: string;
   profilePicUrl?: string;
+  name?: string;
+  accountType?: 'user' | 'venue';
   comments: Comment[];
   likes?: string[];
   likedByUsernames?: string[];
@@ -133,6 +141,39 @@ interface EventCommentsProps {
 }
 
 const LIKE_EMOJI = '❤️';
+
+const AuthorNameLabel: React.FC<{
+  author: {
+    username?: string;
+    name?: string;
+    accountType?: 'user' | 'venue';
+  };
+  textStyle: any;
+  venueNameStyle?: any;
+  compact?: boolean;
+  timestamp?: React.ReactNode;
+}> = ({author, textStyle, venueNameStyle, compact, timestamp}) => {
+  const venue = isVenueAuthor(author);
+  return (
+    <View style={{flexShrink: 1, minWidth: 0, gap: 4}}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 4,
+        }}>
+        <Text
+          style={[textStyle, venue ? venueNameStyle : null, {flexShrink: 1}]}
+          numberOfLines={1}>
+          {authorDisplayName(author)}
+        </Text>
+        {timestamp}
+      </View>
+      {venue ? <OfficialVenueChip compact={compact ?? true} /> : null}
+    </View>
+  );
+};
 
 const summarizeReactions = (
   reactions: CommentReaction[] | undefined,
@@ -185,6 +226,31 @@ const normalizePost = (post: Post): Post => ({
       : (post.likes || []).map(userId => ({userId, emoji: LIKE_EMOJI})),
   comments: (post.comments || []).map(normalizeComment),
 });
+
+/** Stamp venue display fields on own optimistic/create payloads. */
+const withSelfVenueAuthor = <
+  T extends {userId?: string; name?: string; accountType?: 'user' | 'venue'},
+>(
+  item: T,
+  user?: {
+    _id?: string;
+    accountType?: 'user' | 'venue';
+    name?: string;
+    managedVenue?: {name?: string} | null;
+  } | null,
+): T => {
+  if (!user?._id || String(item.userId) !== String(user._id)) {
+    return item;
+  }
+  if (user.accountType !== 'venue') {
+    return item;
+  }
+  return {
+    ...item,
+    accountType: 'venue',
+    name: user.managedVenue?.name || user.name || item.name,
+  };
+};
 
 // Badge count: opener + independent top-level comments. Nested replies
 // (and replies-to-the-opener) are not included.
@@ -867,7 +933,9 @@ const EventComments: React.FC<EventCommentsProps> = ({
         eventName,
         eventType,
       });
-      setPost(response.data);
+      setPost(
+        normalizePost(withSelfVenueAuthor(response.data, userData) as Post),
+      );
       setNewPostText('');
     } catch {
       Alert.alert(t('common.error'), t('communityNotes.postError'));
@@ -924,7 +992,12 @@ const EventComments: React.FC<EventCommentsProps> = ({
       );
       setPost(prev =>
         prev
-          ? normalizePost({...prev, comments: response.data.comments})
+          ? normalizePost({
+              ...prev,
+              comments: (response.data.comments || []).map((c: Comment) =>
+                withSelfVenueAuthor(c, userData),
+              ),
+            })
           : prev,
       );
       setCommentText(prev => ({...prev, [postId]: ''}));
@@ -1015,8 +1088,8 @@ const EventComments: React.FC<EventCommentsProps> = ({
                 comment._id === commentId
                   ? {
                       ...comment,
-                      replies: (response.data.replies || []).map(
-                        normalizeReply,
+                      replies: (response.data.replies || []).map((r: Reply) =>
+                        normalizeReply(withSelfVenueAuthor(r, userData)),
                       ),
                     }
                   : comment,
@@ -1262,8 +1335,9 @@ const EventComments: React.FC<EventCommentsProps> = ({
         },
         postUsernameRow: {
           flexDirection: 'row',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'space-between',
+          gap: 8,
         },
         postUsername: {
           color: colors.text,
@@ -1286,12 +1360,15 @@ const EventComments: React.FC<EventCommentsProps> = ({
           color: colors.secondaryText,
           fontSize: 10,
           fontWeight: '400',
-          marginLeft: 5,
+          marginLeft: 6,
         },
         usernameWithTimestamp: {
-          flexDirection: 'row',
-          alignItems: 'center',
           flex: 1,
+          minWidth: 0,
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+          gap: 4,
         },
         postActionsRow: {
           flexDirection: 'row',
@@ -1448,6 +1525,9 @@ const EventComments: React.FC<EventCommentsProps> = ({
           color: colors.text,
           fontSize: 14,
           fontWeight: '700',
+        },
+        venueAuthorName: {
+          color: colors.primary,
         },
         commentActionsRow: {
           flexDirection: 'row',
@@ -1914,29 +1994,37 @@ const EventComments: React.FC<EventCommentsProps> = ({
             <View style={styles.commentContent}>
               <View style={styles.postUsernameRow}>
                 <View style={styles.usernameWithTimestamp}>
-                  <Text style={styles.commentUsername}>{post.username}</Text>
-                  {post.createdAt && (
-                    <Text style={styles.timestampSmall}>
-                      {formatRelativeTime(post.createdAt)}
-                    </Text>
-                  )}
+                  <AuthorNameLabel
+                    author={post}
+                    textStyle={styles.commentUsername}
+                    venueNameStyle={styles.venueAuthorName}
+                    timestamp={
+                      post.createdAt ? (
+                        <Text style={styles.timestampSmall}>
+                          {formatRelativeTime(post.createdAt)}
+                        </Text>
+                      ) : null
+                    }
+                  />
                 </View>
                 <View style={styles.commentActionsRow}>
-                  <TouchableOpacity
-                    style={styles.replyButton}
-                    onPress={() => {
-                      setReplyingTo('post');
-                      setReplyingToReply(null);
-                    }}>
-                    <FontAwesomeIcon
-                      icon={faReply}
-                      size={11}
-                      color={colors.primary}
-                    />
-                    <Text style={styles.replyButtonText}>
-                      {t('communityNotes.reply') || 'Reply'}
-                    </Text>
-                  </TouchableOpacity>
+                  {!(userData && post.userId === userData._id) ? (
+                    <TouchableOpacity
+                      style={styles.replyButton}
+                      onPress={() => {
+                        setReplyingTo('post');
+                        setReplyingToReply(null);
+                      }}>
+                      <FontAwesomeIcon
+                        icon={faReply}
+                        size={11}
+                        color={colors.primary}
+                      />
+                      <Text style={styles.replyButtonText}>
+                        {t('communityNotes.reply') || 'Reply'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
                   {userData && post.userId === userData._id && (
                     <>
                       <TouchableOpacity
@@ -2085,7 +2173,10 @@ const EventComments: React.FC<EventCommentsProps> = ({
                             prev
                               ? normalizePost({
                                   ...prev,
-                                  comments: response.data.comments,
+                                  comments: (response.data.comments || []).map(
+                                    (c: Comment) =>
+                                      withSelfVenueAuthor(c, userData),
+                                  ),
                                 })
                               : prev,
                           );
@@ -2147,30 +2238,39 @@ const EventComments: React.FC<EventCommentsProps> = ({
                           <View style={styles.replyContent}>
                             <View style={styles.postUsernameRow}>
                               <View style={styles.usernameWithTimestamp}>
-                                <Text style={styles.replyUsername}>
-                                  {comment.username}
-                                </Text>
-                                {comment.createdAt && (
-                                  <Text style={styles.timestampTiny}>
-                                    {formatRelativeTime(comment.createdAt)}
-                                  </Text>
-                                )}
+                                <AuthorNameLabel
+                                  author={comment}
+                                  textStyle={styles.replyUsername}
+                                  venueNameStyle={styles.venueAuthorName}
+                                  compact
+                                  timestamp={
+                                    comment.createdAt ? (
+                                      <Text style={styles.timestampTiny}>
+                                        {formatRelativeTime(comment.createdAt)}
+                                      </Text>
+                                    ) : null
+                                  }
+                                />
                               </View>
                               <View style={styles.commentActionsRow}>
-                                <TouchableOpacity
-                                  style={styles.replyButton}
-                                  onPress={() =>
-                                    startReplyToComment(comment._id!)
-                                  }>
-                                  <FontAwesomeIcon
-                                    icon={faReply}
-                                    size={11}
-                                    color={colors.primary}
-                                  />
-                                  <Text style={styles.replyButtonText}>
-                                    {t('communityNotes.reply') || 'Reply'}
-                                  </Text>
-                                </TouchableOpacity>
+                                {!(
+                                  userData && comment.userId === userData._id
+                                ) ? (
+                                  <TouchableOpacity
+                                    style={styles.replyButton}
+                                    onPress={() =>
+                                      startReplyToComment(comment._id!)
+                                    }>
+                                    <FontAwesomeIcon
+                                      icon={faReply}
+                                      size={11}
+                                      color={colors.primary}
+                                    />
+                                    <Text style={styles.replyButtonText}>
+                                      {t('communityNotes.reply') || 'Reply'}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ) : null}
                                 {userData &&
                                   comment.userId === userData._id &&
                                   comment._id && (
@@ -2415,42 +2515,56 @@ const EventComments: React.FC<EventCommentsProps> = ({
                                               style={
                                                 styles.usernameWithTimestamp
                                               }>
-                                              <Text
-                                                style={styles.replyUsername}>
-                                                {reply.username}
-                                              </Text>
-                                              {reply.createdAt && (
-                                                <Text
-                                                  style={styles.timestampTiny}>
-                                                  {formatRelativeTime(
-                                                    reply.createdAt,
-                                                  )}
-                                                </Text>
-                                              )}
+                                              <AuthorNameLabel
+                                                author={reply}
+                                                textStyle={styles.replyUsername}
+                                                venueNameStyle={
+                                                  styles.venueAuthorName
+                                                }
+                                                compact
+                                                timestamp={
+                                                  reply.createdAt ? (
+                                                    <Text
+                                                      style={
+                                                        styles.timestampTiny
+                                                      }>
+                                                      {formatRelativeTime(
+                                                        reply.createdAt,
+                                                      )}
+                                                    </Text>
+                                                  ) : null
+                                                }
+                                              />
                                             </View>
                                             <View
                                               style={styles.replyActionsRow}>
-                                              <TouchableOpacity
-                                                style={styles.replyButton}
-                                                onPress={() =>
-                                                  startReplyToReply(
-                                                    comment._id!,
-                                                    reply,
-                                                  )
-                                                }>
-                                                <FontAwesomeIcon
-                                                  icon={faReply}
-                                                  size={10}
-                                                  color={colors.primary}
-                                                />
-                                                <Text
-                                                  style={
-                                                    styles.replyButtonText
+                                              {!(
+                                                userData &&
+                                                reply.userId === userData._id
+                                              ) ? (
+                                                <TouchableOpacity
+                                                  style={styles.replyButton}
+                                                  onPress={() =>
+                                                    startReplyToReply(
+                                                      comment._id!,
+                                                      reply,
+                                                    )
                                                   }>
-                                                  {t('communityNotes.reply') ||
-                                                    'Reply'}
-                                                </Text>
-                                              </TouchableOpacity>
+                                                  <FontAwesomeIcon
+                                                    icon={faReply}
+                                                    size={10}
+                                                    color={colors.primary}
+                                                  />
+                                                  <Text
+                                                    style={
+                                                      styles.replyButtonText
+                                                    }>
+                                                    {t(
+                                                      'communityNotes.reply',
+                                                    ) || 'Reply'}
+                                                  </Text>
+                                                </TouchableOpacity>
+                                              ) : null}
                                               {userData &&
                                                 reply.userId === userData._id &&
                                                 reply._id && (
@@ -2677,28 +2791,34 @@ const EventComments: React.FC<EventCommentsProps> = ({
                 <View style={styles.commentContent}>
                   <View style={styles.postUsernameRow}>
                     <View style={styles.usernameWithTimestamp}>
-                      <Text style={styles.commentUsername}>
-                        {comment.username}
-                      </Text>
-                      {comment.createdAt && (
-                        <Text style={styles.timestampSmall}>
-                          {formatRelativeTime(comment.createdAt)}
-                        </Text>
-                      )}
+                      <AuthorNameLabel
+                        author={comment}
+                        textStyle={styles.commentUsername}
+                        venueNameStyle={styles.venueAuthorName}
+                        timestamp={
+                          comment.createdAt ? (
+                            <Text style={styles.timestampSmall}>
+                              {formatRelativeTime(comment.createdAt)}
+                            </Text>
+                          ) : null
+                        }
+                      />
                     </View>
                     <View style={styles.commentActionsRow}>
-                      <TouchableOpacity
-                        style={styles.replyButton}
-                        onPress={() => startReplyToComment(comment._id!)}>
-                        <FontAwesomeIcon
-                          icon={faReply}
-                          size={11}
-                          color={colors.primary}
-                        />
-                        <Text style={styles.replyButtonText}>
-                          {t('communityNotes.reply') || 'Reply'}
-                        </Text>
-                      </TouchableOpacity>
+                      {!(userData && comment.userId === userData._id) ? (
+                        <TouchableOpacity
+                          style={styles.replyButton}
+                          onPress={() => startReplyToComment(comment._id!)}>
+                          <FontAwesomeIcon
+                            icon={faReply}
+                            size={11}
+                            color={colors.primary}
+                          />
+                          <Text style={styles.replyButtonText}>
+                            {t('communityNotes.reply') || 'Reply'}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
                       {userData &&
                         comment.userId === userData._id &&
                         comment._id && (
@@ -2911,30 +3031,41 @@ const EventComments: React.FC<EventCommentsProps> = ({
                               <View style={styles.replyContent}>
                                 <View style={styles.postUsernameRow}>
                                   <View style={styles.usernameWithTimestamp}>
-                                    <Text style={styles.replyUsername}>
-                                      {reply.username}
-                                    </Text>
-                                    {reply.createdAt && (
-                                      <Text style={styles.timestampTiny}>
-                                        {formatRelativeTime(reply.createdAt)}
-                                      </Text>
-                                    )}
+                                    <AuthorNameLabel
+                                      author={reply}
+                                      textStyle={styles.replyUsername}
+                                      venueNameStyle={styles.venueAuthorName}
+                                      compact
+                                      timestamp={
+                                        reply.createdAt ? (
+                                          <Text style={styles.timestampTiny}>
+                                            {formatRelativeTime(
+                                              reply.createdAt,
+                                            )}
+                                          </Text>
+                                        ) : null
+                                      }
+                                    />
                                   </View>
                                   <View style={styles.replyActionsRow}>
-                                    <TouchableOpacity
-                                      style={styles.replyButton}
-                                      onPress={() =>
-                                        startReplyToReply(comment._id!, reply)
-                                      }>
-                                      <FontAwesomeIcon
-                                        icon={faReply}
-                                        size={10}
-                                        color={colors.primary}
-                                      />
-                                      <Text style={styles.replyButtonText}>
-                                        {t('communityNotes.reply') || 'Reply'}
-                                      </Text>
-                                    </TouchableOpacity>
+                                    {!(
+                                      userData && reply.userId === userData._id
+                                    ) ? (
+                                      <TouchableOpacity
+                                        style={styles.replyButton}
+                                        onPress={() =>
+                                          startReplyToReply(comment._id!, reply)
+                                        }>
+                                        <FontAwesomeIcon
+                                          icon={faReply}
+                                          size={10}
+                                          color={colors.primary}
+                                        />
+                                        <Text style={styles.replyButtonText}>
+                                          {t('communityNotes.reply') || 'Reply'}
+                                        </Text>
+                                      </TouchableOpacity>
+                                    ) : null}
                                     {userData &&
                                       reply.userId === userData._id &&
                                       reply._id && (

@@ -65,6 +65,7 @@ import {
 import {useTranslation} from 'react-i18next';
 import ProfileRatingBadges from '../EventRating/ProfileRatingBadges';
 import EditProfileModal from './EditProfileModal';
+import VenueHostProfile from './VenueHostProfile';
 
 // Types
 type ProfileScreenRouteProp = RouteProp<
@@ -1372,6 +1373,10 @@ const Profile: React.FC = () => {
       .join('')
       .slice(0, 2);
   };
+
+  if (userData?.accountType === 'venue') {
+    return <VenueHostProfile />;
+  }
 
   return (
     <SafeAreaView style={themedStyles.safeArea} edges={['top']}>

@@ -6,7 +6,7 @@
 // PR 2b will swap this for an in-app WebView once react-native-webview is
 // added and the app is rebuilt.
 
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
@@ -31,10 +31,14 @@ import {
   faStar,
   faClock,
   faChevronRight,
+  faBuilding,
+  faCopy,
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import axios from 'axios';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {useTheme} from '../ThemeContext/ThemeContext';
+import UserContext from '../UserContext';
 import {API_BASE_URL} from '../../config/api';
 import {
   PlaceSummary,
@@ -65,6 +69,8 @@ interface EventCard {
   rosterSpotsFilled: number;
   eventType: string;
   createdByUsername?: string;
+  venueName?: string;
+  source?: 'user' | 'venue';
   privacy?: string;
 }
 
@@ -98,6 +104,12 @@ const VenuePlaceDetail: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteParams>();
   const {place: initialPlace} = route.params;
+  const userContext = useContext(UserContext);
+  const userData = userContext?.userData;
+  const isAdmin = userContext?.isAdmin === true;
+  const managesThisVenue =
+    userData?.accountType === 'venue' &&
+    userData?.managedVenue?.placeId === initialPlace.id;
 
   const [place, setPlace] = useState<PlaceSummary>(initialPlace);
   const [events, setEvents] = useState<EventCard[]>([]);
@@ -221,6 +233,19 @@ const VenuePlaceDetail: React.FC = () => {
       venueLongitude: place.location?.longitude,
     });
   }, [place, navigation]);
+
+  const handleCopyPlaceId = useCallback(() => {
+    const placeId = place.id;
+    if (!placeId) {
+      Alert.alert('Missing Place ID', 'This venue has no Google Place ID.');
+      return;
+    }
+    Clipboard.setString(placeId);
+    Alert.alert(
+      'Place ID copied',
+      `${placeId}\n\nPaste this into Settings → Assign venue partner.`,
+    );
+  }, [place.id]);
 
   const handleCallVenue = useCallback(() => {
     const phone = place.nationalPhoneNumber || place.internationalPhoneNumber;
@@ -373,6 +398,69 @@ const VenuePlaceDetail: React.FC = () => {
           fontSize: 15,
           fontWeight: '700',
         },
+        managerHint: {
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: 8,
+          marginHorizontal: 16,
+          marginTop: 10,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          borderRadius: 12,
+          backgroundColor: colors.primary + '14',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '55',
+        },
+        managerHintText: {
+          flex: 1,
+          fontSize: 12,
+          lineHeight: 17,
+          color: colors.secondaryText,
+        },
+        adminPlaceIdRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          marginHorizontal: 16,
+          marginTop: 10,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          borderRadius: 12,
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        adminPlaceIdTextCol: {
+          flex: 1,
+          minWidth: 0,
+        },
+        adminPlaceIdLabel: {
+          fontSize: 11,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          letterSpacing: 0.4,
+          marginBottom: 2,
+        },
+        adminPlaceIdValue: {
+          fontSize: 13,
+          color: colors.text,
+          fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        },
+        adminPlaceIdCopyBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          paddingVertical: 8,
+          paddingHorizontal: 10,
+          borderRadius: 10,
+          backgroundColor: colors.primary + '18',
+        },
+        adminPlaceIdCopyText: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.primary,
+        },
         section: {
           paddingHorizontal: 16,
           paddingTop: 24,
@@ -492,6 +580,19 @@ const VenuePlaceDetail: React.FC = () => {
       ? dateObj.toLocaleString('en-US', {month: 'short'})
       : '';
     const dayNum = dateObj ? String(dateObj.getDate()) : '';
+    const isVenueNight =
+      e.source === 'venue' || (!!e.venueName && e.venueName === place.name);
+    const rawJoined =
+      typeof e.rosterSpotsFilled === 'number' ? e.rosterSpotsFilled : 0;
+    const joinedCount =
+      isVenueNight && rawJoined > 0 ? Math.max(0, rawJoined - 1) : rawJoined;
+    const hostLabel = isVenueNight
+      ? e.venueName || place.name
+      : e.createdByUsername;
+    const joinedLabel =
+      e.totalSpots > 0
+        ? `${joinedCount}/${e.totalSpots} going`
+        : `${joinedCount} going · No limit`;
     return (
       <TouchableOpacity
         key={e._id}
@@ -511,11 +612,9 @@ const VenuePlaceDetail: React.FC = () => {
           <Text style={styles.eventMeta} numberOfLines={1}>
             {e.time}
             {e.eventType ? ` · ${e.eventType}` : ''}
-            {e.createdByUsername ? ` · by ${e.createdByUsername}` : ''}
+            {hostLabel ? ` · ${hostLabel}` : ''}
           </Text>
-          <Text style={styles.eventStats}>
-            {e.rosterSpotsFilled}/{e.totalSpots} going
-          </Text>
+          <Text style={styles.eventStats}>{joinedLabel}</Text>
         </View>
         <FontAwesomeIcon
           icon={faChevronRight}
@@ -600,7 +699,9 @@ const VenuePlaceDetail: React.FC = () => {
             activeOpacity={0.85}
             onPress={handlePlanEvent}>
             <FontAwesomeIcon icon={faPlus} size={14} color="#FFFFFF" />
-            <Text style={styles.primaryCtaText}>Plan event here</Text>
+            <Text style={styles.primaryCtaText}>
+              {managesThisVenue ? 'Post a night' : 'Plan event here'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.secondaryCta}
@@ -612,9 +713,41 @@ const VenuePlaceDetail: React.FC = () => {
             </Text>
           </TouchableOpacity>
         </View>
+        {managesThisVenue ? (
+          <View style={styles.managerHint}>
+            <FontAwesomeIcon
+              icon={faBuilding}
+              size={12}
+              color={colors.primary}
+            />
+            <Text style={styles.managerHintText}>
+              You manage this venue — posts show as official nights in the
+              Events feed.
+            </Text>
+          </View>
+        ) : null}
+        {isAdmin ? (
+          <TouchableOpacity
+            style={styles.adminPlaceIdRow}
+            onPress={handleCopyPlaceId}
+            activeOpacity={0.75}>
+            <View style={styles.adminPlaceIdTextCol}>
+              <Text style={styles.adminPlaceIdLabel}>Google Place ID</Text>
+              <Text style={styles.adminPlaceIdValue} numberOfLines={1}>
+                {place.id}
+              </Text>
+            </View>
+            <View style={styles.adminPlaceIdCopyBtn}>
+              <FontAwesomeIcon icon={faCopy} size={13} color={colors.primary} />
+              <Text style={styles.adminPlaceIdCopyText}>Copy</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Happening Here</Text>
+          <Text style={styles.sectionTitle}>
+            {managesThisVenue ? 'Upcoming nights' : 'Happening Here'}
+          </Text>
           {eventsLoading ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : events.length > 0 ? (
@@ -622,12 +755,16 @@ const VenuePlaceDetail: React.FC = () => {
           ) : (
             <View style={styles.emptyEvents}>
               <Text style={styles.emptyEventsText}>
-                No events here yet. Be the first to plan one with friends.
+                {managesThisVenue
+                  ? 'No nights posted here yet. Share your first official night with locals.'
+                  : 'No events here yet. Be the first to plan one with friends.'}
               </Text>
               <TouchableOpacity
                 style={styles.emptyEventsCta}
                 onPress={handlePlanEvent}>
-                <Text style={styles.emptyEventsCtaText}>Plan event here</Text>
+                <Text style={styles.emptyEventsCtaText}>
+                  {managesThisVenue ? 'Post your first night' : 'Plan event here'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}

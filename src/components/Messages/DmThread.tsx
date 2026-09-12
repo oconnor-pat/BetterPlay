@@ -71,6 +71,8 @@ import {
   getActiveMention,
   MentionCandidate,
 } from '../../utils/mentions';
+import OfficialVenueChip from '../OfficialVenueChip';
+import {isVenueAuthor} from '../../utils/venueDisplay';
 import {
   acceptConversation,
   declineConversation,
@@ -230,6 +232,9 @@ const DmThread: React.FC = () => {
   const headerAvatar =
     conversation?.otherUser.profilePicUrl || route.params?.profilePicUrl;
   const otherUserId = conversation?.otherUser.userId || routeUserId;
+  const otherIsVenue = isVenueAuthor({
+    accountType: conversation?.otherUser.accountType,
+  });
 
   // Same deterministic keyboard handling as group chat:
   // KeyboardAvoidingView mis-measures inside the nested tab→stack
@@ -1021,6 +1026,12 @@ const DmThread: React.FC = () => {
         headerAvatarImage: {width: 34, height: 34},
         headerInitials: {color: colors.text, fontWeight: '700', fontSize: 12},
         headerName: {fontSize: 16, fontWeight: '700', color: colors.text},
+        headerNameVenue: {color: colors.primary},
+        headerTitleCol: {flex: 1, minWidth: 0, gap: 4},
+        headerAvatarVenue: {
+          borderWidth: 2,
+          borderColor: colors.primary,
+        },
         listContent: {paddingVertical: 12, paddingHorizontal: 12},
         emptyWrap: {
           flex: 1,
@@ -1509,7 +1520,11 @@ const DmThread: React.FC = () => {
         style={styles.headerUser}
         activeOpacity={0.7}
         onPress={openProfile}>
-        <View style={styles.headerAvatar}>
+        <View
+          style={[
+            styles.headerAvatar,
+            otherIsVenue ? styles.headerAvatarVenue : null,
+          ]}>
           {headerAvatar ? (
             <Image
               source={{uri: headerAvatar}}
@@ -1521,9 +1536,17 @@ const DmThread: React.FC = () => {
             </Text>
           )}
         </View>
-        <Text style={styles.headerName} numberOfLines={1}>
-          {headerName}
-        </Text>
+        <View style={styles.headerTitleCol}>
+          <Text
+            style={[
+              styles.headerName,
+              otherIsVenue ? styles.headerNameVenue : null,
+            ]}
+            numberOfLines={1}>
+            {headerName}
+          </Text>
+          {otherIsVenue ? <OfficialVenueChip compact /> : null}
+        </View>
       </TouchableOpacity>
     </View>
   );

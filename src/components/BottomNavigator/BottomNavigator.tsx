@@ -21,6 +21,7 @@ import {
   faUser,
   faUserGroup,
   faQuestion,
+  faBuilding,
 } from '@fortawesome/free-solid-svg-icons';
 import {UserContextType} from '../UserContext';
 import UserContext from '../UserContext';
@@ -53,7 +54,10 @@ const TabBarIconPill = ({
   );
 };
 
-function createTabBarIcon(colors: {primary: string; secondaryText: string}) {
+function createTabBarIcon(
+  colors: {primary: string; secondaryText: string},
+  isVenueHost: boolean,
+) {
   return function tabBarIcon({
     route,
     focused,
@@ -65,7 +69,7 @@ function createTabBarIcon(colors: {primary: string; secondaryText: string}) {
       Events: faCalendarAlt,
       Groups: faUserGroup,
       Messages: faComment,
-      Profile: faUser,
+      Profile: isVenueHost ? faBuilding : faUser,
     };
     const icon = iconMap[route.name] || faQuestion;
     const iconColor = focused ? colors.primary : colors.secondaryText;
@@ -320,6 +324,8 @@ const BottomNavigator: React.FC = () => {
   }
 
   const userId = userData?._id;
+  const isVenueHost =
+    userData?.accountType === 'venue' && !!userData?.managedVenue?.placeId;
 
   const themedTabBarIcon = ({
     route,
@@ -327,13 +333,17 @@ const BottomNavigator: React.FC = () => {
   }: {
     route: {name: string};
     focused: boolean;
-  }) => createTabBarIcon(colors)({route, focused});
+  }) => createTabBarIcon(colors, isVenueHost)({route, focused});
 
   const tabLabels: Record<string, string> = {
-    Events: t('navigation.events') || 'Events',
+    Events: isVenueHost
+      ? t('venues.nightsTab') || 'Nights'
+      : t('navigation.events') || 'Events',
     Groups: t('navigation.groups') || 'Groups',
     Messages: t('navigation.messages') || 'Messages',
-    Profile: t('navigation.profile') || 'Profile',
+    Profile: isVenueHost
+      ? t('venues.hostProfileTitle') || 'Venue'
+      : t('navigation.profile') || 'Profile',
   };
 
   const bottomInset = Platform.OS === 'ios' ? insets.bottom : 0;
@@ -389,7 +399,18 @@ const BottomNavigator: React.FC = () => {
   return (
     <Tab.Navigator screenOptions={screenOptions}>
       <Tab.Screen name="Events" component={LocalEventsStack} />
-      <Tab.Screen name="Groups" component={GroupsStack} />
+      <Tab.Screen
+        name="Groups"
+        component={GroupsStack}
+        options={
+          isVenueHost
+            ? {
+                tabBarButton: () => null,
+                tabBarItemStyle: {display: 'none'},
+              }
+            : undefined
+        }
+      />
       <Tab.Screen name="Messages" component={MessagesStack} />
       <Tab.Screen name="Profile">
         {() => <ProfileStack userId={userId} />}

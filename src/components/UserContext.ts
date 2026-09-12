@@ -1,5 +1,14 @@
 import React from 'react';
 
+export type ManagedVenue = {
+  placeId: string;
+  name: string;
+  photoUrl?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+};
+
 export type UserData = {
   _id: string;
   username: string;
@@ -7,6 +16,8 @@ export type UserData = {
   name?: string;
   profilePicUrl?: string;
   isAdmin?: boolean;
+  accountType?: 'user' | 'venue';
+  managedVenue?: ManagedVenue | null;
 };
 
 export interface UserContextType {

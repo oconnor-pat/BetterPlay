@@ -53,7 +53,18 @@ type UserData = {
   _id: string;
   username: string;
   email: string;
+  name?: string;
+  profilePicUrl?: string;
   isAdmin?: boolean;
+  accountType?: 'user' | 'venue';
+  managedVenue?: {
+    placeId: string;
+    name: string;
+    photoUrl?: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+  } | null;
 };
 
 type RootStackParamList = {

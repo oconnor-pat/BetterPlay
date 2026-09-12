@@ -17,6 +17,7 @@ export interface ConversationUser {
   username?: string;
   name?: string;
   profilePicUrl?: string;
+  accountType?: 'user' | 'venue';
 }
 
 // Compact preview for the inbox row.

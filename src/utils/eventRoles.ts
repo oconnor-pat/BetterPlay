@@ -31,7 +31,7 @@ export const POSITION_OPTIONS: Record<string, string[]> = {
   Softball: ['Pitcher', 'Catcher', 'Infield', 'Outfield'],
   Lacrosse: ['Attack', 'Midfield', 'Defense', 'Goalie'],
   Volleyball: ['Setter', 'Outside Hitter', 'Middle Blocker', 'Libero'],
-  'Trivia Night': ['Player', 'Team Captain', 'Host'],
+  'Trivia Night': ['Player', 'Team Captain'],
   'Game Night': ['Player', 'Host'],
   'Video Games': ['Player', 'Host', 'Spectator'],
   Karaoke: ['Singer', 'Audience'],
@@ -69,6 +69,24 @@ export const positionsForEventType = (eventType?: string | null): string[] => {
   return POSITION_OPTIONS[eventType] || POSITION_OPTIONS.Default;
 };
 
+/** Roles that mean "I'm running this" — reserved for the venue on official nights. */
+const HOST_LIKE_ROLES = /^(host|organizer|coordinator)$/i;
+
+/**
+ * Roles offered when joining. On venue-hosted nights, Host/Organizer-style
+ * roles are reserved for the venue account so locals don't claim "Host."
+ */
+export const joinPositionsForEvent = (event: {
+  eventType?: string | null;
+  source?: string | null;
+}): string[] => {
+  const roles = positionsForEventType(event.eventType);
+  if (event.source === 'venue') {
+    return roles.filter(r => !HOST_LIKE_ROLES.test(r));
+  }
+  return roles;
+};
+
 export type JoinDetails = {
   position: string;
   jerseyColor: string;
@@ -80,8 +98,9 @@ export const defaultJoinDetails = (event: {
   eventType?: string;
   jerseyColors?: string[];
   trackPayment?: boolean;
+  source?: string | null;
 }): JoinDetails => {
-  const positions = positionsForEventType(event.eventType);
+  const positions = joinPositionsForEvent(event);
   const team = isTeamSportType(event.eventType);
   const jerseys = (event.jerseyColors || []).filter(Boolean);
   return {
@@ -99,8 +118,9 @@ export const needsJoinDetailsPrompt = (event: {
   eventType?: string;
   jerseyColors?: string[];
   trackPayment?: boolean;
+  source?: string | null;
 }): boolean => {
-  const positions = positionsForEventType(event.eventType);
+  const positions = joinPositionsForEvent(event);
   if (positions.length > 1) {
     return true;
   }

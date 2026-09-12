@@ -47,6 +47,7 @@ try {
   Config = {};
 }
 import MapView, {Marker, PROVIDER_GOOGLE} from 'react-native-maps';
+import {getPlaceDetails} from '../../services/PlacesService';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
@@ -114,6 +115,7 @@ import {
   defaultJoinDetails,
   isTeamSportType,
   JoinDetails,
+  joinPositionsForEvent,
   needsJoinDetailsPrompt,
   positionsForEventType,
 } from '../../utils/eventRoles';
@@ -165,6 +167,8 @@ export type RootStackParamList = {
         profileFilter?: 'created' | 'joined' | 'upcoming';
         userId?: string;
         prefillEvent?: PrefillEvent;
+        /** Venue host profile CTA — open create modal once. */
+        openCreate?: boolean;
       }
     | undefined;
   EventRoster: {
@@ -311,6 +315,8 @@ interface Event {
   // the Venues tab). Mirrors the BE Event model fields added in PR 1.
   venueId?: string;
   venueName?: string;
+  // `venue` = official night from a business account; default/missing = user.
+  source?: 'user' | 'venue';
   // Optional Group attached at event creation. Drives the group-name
   // badge on event cards and (for recurring events) the live link that
   // re-pulls members per instance — see PR 3.
@@ -844,10 +850,14 @@ const openMapsForEvent = async (
   const name = event?.name || 'Destination';
   const address = event?.location || '';
 
-  const coords =
+  let coords =
     event?.latitude && event?.longitude
       ? {latitude: event.latitude, longitude: event.longitude}
       : getCoordinatesFromLocation(address);
+
+  if (!coords && event?.venueId) {
+    coords = await resolvePlaceCoords(event.venueId);
+  }
 
   await openDirections(
     {
@@ -862,17 +872,50 @@ const openMapsForEvent = async (
   );
 };
 
+type LatLng = {latitude: number; longitude: number};
+
+// Shared cache so feed cards + directions don't re-hit Places for the same
+// venueId. Venue nights often lack lat/lng when managedVenue was assigned
+// without coords — resolve from Google Place ID instead.
+const placeCoordsCache = new Map<string, LatLng | null>();
+
+const resolvePlaceCoords = async (
+  placeId: string,
+): Promise<LatLng | null> => {
+  if (!placeId) {
+    return null;
+  }
+  if (placeCoordsCache.has(placeId)) {
+    return placeCoordsCache.get(placeId) ?? null;
+  }
+  try {
+    const place = await getPlaceDetails(placeId);
+    const next =
+      place.location?.latitude != null && place.location?.longitude != null
+        ? {
+            latitude: place.location.latitude,
+            longitude: place.location.longitude,
+          }
+        : null;
+    placeCoordsCache.set(placeId, next);
+    return next;
+  } catch {
+    placeCoordsCache.set(placeId, null);
+    return null;
+  }
+};
+
 // Resolve known venue/city names to coords. Returns null when unknown —
 // never invents a city (old SF default sent people to the wrong coast).
 const getCoordinatesFromLocation = (
   location: string,
-): {latitude: number; longitude: number} | null => {
+): LatLng | null => {
   const normalizedLocation = location.toLowerCase().trim();
   if (!normalizedLocation) {
     return null;
   }
 
-  const locationMap: {[key: string]: {latitude: number; longitude: number}} = {
+  const locationMap: {[key: string]: LatLng} = {
     'madison square garden': {latitude: 40.7505, longitude: -73.9934},
     'yankee stadium': {latitude: 40.8296, longitude: -73.9262},
     'central park': {latitude: 40.7829, longitude: -73.9654},
@@ -898,6 +941,92 @@ const getCoordinatesFromLocation = (
   }
 
   return null;
+};
+
+const EventCardMapEmbed: React.FC<{
+  item: Event;
+  themedStyles: any;
+  colors: {primary: string};
+}> = ({item, themedStyles, colors}) => {
+  const seedCoords = (): LatLng | null => {
+    if (item.latitude != null && item.longitude != null) {
+      return {latitude: item.latitude, longitude: item.longitude};
+    }
+    const fromName = getCoordinatesFromLocation(item.location || '');
+    if (fromName) {
+      return fromName;
+    }
+    if (item.venueId && placeCoordsCache.has(item.venueId)) {
+      return placeCoordsCache.get(item.venueId) ?? null;
+    }
+    return null;
+  };
+
+  const [coords, setCoords] = useState<LatLng | null>(seedCoords);
+  const [resolving, setResolving] = useState(false);
+
+  useEffect(() => {
+    if (coords) {
+      return;
+    }
+    const venueId = item.venueId;
+    if (!venueId) {
+      return;
+    }
+    let cancelled = false;
+    setResolving(true);
+    resolvePlaceCoords(venueId)
+      .then(next => {
+        if (!cancelled && next) {
+          setCoords(next);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setResolving(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.venueId, coords]);
+
+  if (!coords) {
+    return (
+      <View style={themedStyles.mapEmbedFallback}>
+        {resolving ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Text style={themedStyles.mapEmbedFallbackText}>
+            {(item.location || '').trim() || 'Open in Maps'}
+          </Text>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <MapView
+      provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+      liteMode={Platform.OS === 'android'}
+      style={themedStyles.mapEmbedView}
+      initialRegion={{
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }}
+      scrollEnabled={false}
+      zoomEnabled={false}
+      rotateEnabled={false}
+      pitchEnabled={false}>
+      <Marker
+        coordinate={coords}
+        title={item.name}
+        description={item.location}
+      />
+    </MapView>
+  );
 };
 
 interface RecurringDeckProps {
@@ -1084,6 +1213,9 @@ const RecurringDeck: React.FC<RecurringDeckProps> = ({
 const EventList: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const myUserId = userData?._id;
+  const isVenueHost =
+    userData?.accountType === 'venue' && !!userData?.managedVenue?.placeId;
+  const managedVenue = userData?.managedVenue;
   const {colors, darkMode} = useTheme();
   const {t} = useTranslation();
   const {badgeCount, hasPermission, requestPermission, settings} =
@@ -1153,6 +1285,55 @@ const EventList: React.FC = () => {
         cardGated: {
           borderColor: colors.primary + '88',
           backgroundColor: colors.primary + '08',
+        },
+        // Venue-hosted nights: stronger chrome so they don't blend with
+        // neighbor posts in the All feed.
+        cardVenue: {
+          borderColor: colors.primary + 'AA',
+          borderWidth: 1,
+          backgroundColor: colors.primary + '10',
+        },
+        avatarWrap: {
+          width: 40,
+          height: 40,
+          position: 'relative',
+        },
+        avatarVenueRing: {
+          borderWidth: 2,
+          borderColor: colors.primary,
+        },
+        venueAvatarBadge: {
+          position: 'absolute',
+          right: -2,
+          bottom: -2,
+          width: 16,
+          height: 16,
+          borderRadius: 8,
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 2,
+          borderColor: colors.card,
+        },
+        venueHostChip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 5,
+          alignSelf: 'flex-start',
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: 10,
+          backgroundColor: colors.primary + '22',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '88',
+          marginTop: 4,
+          marginBottom: 2,
+        },
+        venueHostChipText: {
+          color: colors.primary,
+          fontSize: 11,
+          fontWeight: '700',
+          letterSpacing: 0.2,
         },
         cardHeader: {
           flexDirection: 'row',
@@ -2688,6 +2869,113 @@ const EventList: React.FC = () => {
           fontWeight: '600',
         },
         // Horizontal filter chip bar (compact pills)
+        venueHostBanner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          marginHorizontal: 12,
+          marginBottom: 10,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderRadius: 14,
+          backgroundColor: colors.primary + '16',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '66',
+        },
+        venueHostBannerTextCol: {flex: 1, minWidth: 0},
+        venueHostBannerTitle: {
+          fontSize: 14,
+          fontWeight: '800',
+          color: colors.text,
+        },
+        venueHostBannerDesc: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          marginTop: 2,
+        },
+        venueHostBannerBtn: {
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderRadius: 10,
+          backgroundColor: colors.primary,
+        },
+        venueHostBannerBtnText: {
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: '700',
+        },
+        hostSourceRow: {
+          flexDirection: 'row',
+          gap: 8,
+          paddingHorizontal: 16,
+          paddingBottom: 4,
+        },
+        hostSourceChip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          paddingVertical: 7,
+          paddingHorizontal: 12,
+          borderRadius: 16,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          backgroundColor: colors.inputBackground || colors.background,
+        },
+        hostSourceChipActive: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        hostSourceChipText: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.secondaryText,
+        },
+        hostSourceChipTextActive: {
+          color: '#fff',
+        },
+        venuePostingBanner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 12,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          borderRadius: 12,
+          backgroundColor: colors.primary + '18',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary,
+        },
+        venuePostingBannerText: {
+          flex: 1,
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        venueLockedLocation: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 10,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          borderRadius: 12,
+          backgroundColor: colors.inputBackground || colors.background,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.primary + '66',
+        },
+        venueLockedLocationLabel: {
+          fontSize: 11,
+          fontWeight: '700',
+          color: colors.primary,
+          textTransform: 'uppercase',
+          letterSpacing: 0.4,
+          marginBottom: 2,
+        },
+        venueLockedLocationValue: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.text,
+        },
         chipBarContainer: {
           marginBottom: 12,
           height: 44,
@@ -3857,6 +4145,10 @@ const EventList: React.FC = () => {
   const [selectedDateFilter, setSelectedDateFilter] = useState('all');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [showMyEventsOnly, setShowMyEventsOnly] = useState(false);
+  // Feed split: neighbor hangs vs official venue nights.
+  const [hostSourceFilter, setHostSourceFilter] = useState<
+    'all' | 'people' | 'venues'
+  >('all');
   // Opt-in: when true, activity chips default from profile interests. Persisted;
   // defaults off so opening Events shows the full feed.
   const [filterByInterests, setFilterByInterests] = useState(false);
@@ -4572,6 +4864,17 @@ const EventList: React.FC = () => {
       );
     }
 
+    // Venue host home: only nights this business account posted.
+    if (isVenueHost && myUserId) {
+      filtered = filtered.filter(event => event.createdBy === myUserId);
+    }
+
+    if (hostSourceFilter === 'venues') {
+      filtered = filtered.filter(event => event.source === 'venue');
+    } else if (hostSourceFilter === 'people') {
+      filtered = filtered.filter(event => event.source !== 'venue');
+    }
+
     // Hide past events filter
     if (hidePastEvents) {
       filtered = filtered.filter(event => !isEventPast(event.date, event.time));
@@ -4656,6 +4959,8 @@ const EventList: React.FC = () => {
     showAvailableOnly,
     pinnedEventIds,
     showMyEventsOnly,
+    hostSourceFilter,
+    isVenueHost,
     myUserId,
     hidePastEvents,
     profileFilter,
@@ -4856,28 +5161,48 @@ const EventList: React.FC = () => {
         return;
       }
 
-      const seededLocation = prefill.location || '';
+      const managed = userData?.managedVenue;
+      const postingAsVenue =
+        userData?.accountType === 'venue' && !!managed?.placeId;
+      const seededLocation = postingAsVenue
+        ? [managed?.name, managed?.address].filter(Boolean).join(', ') ||
+          managed?.name ||
+          prefill.location ||
+          ''
+        : prefill.location || '';
       setNewEvent({
         ...createEmptyEvent(),
         name: prefill.name || '',
         location: seededLocation,
-        latitude: prefill.latitude,
-        longitude: prefill.longitude,
+        latitude: postingAsVenue ? managed?.latitude : prefill.latitude,
+        longitude: postingAsVenue ? managed?.longitude : prefill.longitude,
         // Default to today when a venue/group bridges in without a date, so
         // the form is one tap from done. Matches the date picker's
         // toDateString() format and stays fully editable.
         date: prefill.date || new Date().toDateString(),
         time: prefill.time || '',
         eventType: prefill.eventType || '',
-        venueId: prefill.venueId,
-        venueName: prefill.venueName,
+        venueId: postingAsVenue ? managed?.placeId : prefill.venueId,
+        venueName: postingAsVenue ? managed?.name : prefill.venueName,
         sourceUrl: prefill.sourceUrl,
         groupId,
         groupName,
         invitedUsers,
         // Group-planned events default to invite-only — the roster is the
         // group. User can still switch privacy in the form.
-        privacy: prefill.groupId ? 'invite-only' : 'public',
+        // Venue hosts always post public nights with open join.
+        privacy: postingAsVenue
+          ? ('public' as EventPrivacy)
+          : prefill.groupId
+            ? 'invite-only'
+            : 'public',
+        ...(postingAsVenue
+          ? {
+              isVirtual: false,
+              allowJoinRequests: false,
+              showLocationPublicly: true,
+            }
+          : {}),
       });
       setInvitedUserDetails(invitedDetails);
       setTempRosterSize('');
@@ -4888,6 +5213,27 @@ const EventList: React.FC = () => {
       setPlacesApiFailed(false);
       syncPlacesInput(seededLocation);
       setModalVisible(true);
+      if (
+        postingAsVenue &&
+        managed?.placeId &&
+        (managed.latitude == null || managed.longitude == null)
+      ) {
+        resolvePlaceCoords(managed.placeId).then(coords => {
+          if (cancelled || !coords) {
+            return;
+          }
+          setNewEvent(prev =>
+            prev.venueId === managed.placeId &&
+            (prev.latitude == null || prev.longitude == null)
+              ? {
+                  ...prev,
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                }
+              : prev,
+          );
+        });
+      }
       // Clear the param so navigating away and back doesn't re-pop the modal.
       navigation.setParams({prefillEvent: undefined} as never);
     };
@@ -4896,7 +5242,7 @@ const EventList: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [route.params?.prefillEvent, navigation, userData?._id, syncPlacesInput]);
+  }, [route.params?.prefillEvent, navigation, userData?._id, userData?.accountType, userData?.managedVenue, syncPlacesInput]);
 
   // Scroll to highlighted event and optionally expand comments (once per navigation)
   const hasScrolledToHighlight = useRef<string | null>(null);
@@ -5061,6 +5407,23 @@ const EventList: React.FC = () => {
       }
 
       setSavingEvent(true);
+
+      // Venue nights may lack lat/lng if assign skipped Place details —
+      // resolve from venueId so the feed map and directions work.
+      let saveLatitude = newEvent.latitude;
+      let saveLongitude = newEvent.longitude;
+      if (
+        !newEvent.isVirtual &&
+        (saveLatitude == null || saveLongitude == null) &&
+        newEvent.venueId
+      ) {
+        const resolved = await resolvePlaceCoords(newEvent.venueId);
+        if (resolved) {
+          saveLatitude = resolved.latitude;
+          saveLongitude = resolved.longitude;
+        }
+      }
+
       if (isEditing && editingEventId) {
         try {
           const token = await AsyncStorage.getItem('userToken');
@@ -5077,8 +5440,8 @@ const EventList: React.FC = () => {
               totalSpots: parseInt(newEvent.totalSpots, 10),
               eventType: newEvent.eventType,
               createdByUsername: userData?.username || '',
-              latitude: newEvent.isVirtual ? undefined : newEvent.latitude,
-              longitude: newEvent.isVirtual ? undefined : newEvent.longitude,
+              latitude: newEvent.isVirtual ? undefined : saveLatitude,
+              longitude: newEvent.isVirtual ? undefined : saveLongitude,
               isVirtual: newEvent.isVirtual,
               jerseyColors: isTeamSport(newEvent.eventType)
                 ? newEvent.jerseyColors
@@ -5172,8 +5535,8 @@ const EventList: React.FC = () => {
           eventType: newEvent.eventType,
           createdBy: userData?._id || '',
           createdByUsername: userData?.username || '',
-          latitude: newEvent.isVirtual ? undefined : newEvent.latitude,
-          longitude: newEvent.isVirtual ? undefined : newEvent.longitude,
+          latitude: newEvent.isVirtual ? undefined : saveLatitude,
+          longitude: newEvent.isVirtual ? undefined : saveLongitude,
           isVirtual: newEvent.isVirtual,
           jerseyColors: isTeamSport(newEvent.eventType)
             ? newEvent.jerseyColors
@@ -5243,11 +5606,22 @@ const EventList: React.FC = () => {
         );
         if (preferredHost) {
           defaults.position = preferredHost;
+        } else if (isVenueHost) {
+          // Venue accounts always roster as Host, even if the activity
+          // type's role list is sport-oriented.
+          defaults.position = 'Host';
         }
 
         pendingCreatePayloadRef.current = eventPayload;
         setSavingEvent(false);
         setModalVisible(false);
+
+        // Venue hosts shouldn't pick Player/Captain — post as Host immediately.
+        if (isVenueHost) {
+          await finalizeCreateWithDetails(defaults);
+          return;
+        }
+
         setJoinPrompt({
           event: promptEvent,
           mode: 'createCreator',
@@ -6452,6 +6826,9 @@ const EventList: React.FC = () => {
     setCustomDurationActive(false);
     setShowCustomDurationPicker(false);
     setCustomDurationInput(String(DEFAULT_CUSTOM_DURATION_MINUTES));
+    const managed = userData?.managedVenue;
+    const postingAsVenue =
+      userData?.accountType === 'venue' && !!managed?.placeId;
     setNewEvent({
       ...createEmptyEvent(),
       date: now.toDateString(),
@@ -6460,9 +6837,65 @@ const EventList: React.FC = () => {
           hour: '2-digit',
           minute: '2-digit',
         }) ?? '',
+      ...(postingAsVenue
+        ? {
+            location:
+              [managed?.name, managed?.address]
+                .filter(Boolean)
+                .join(', ') ||
+              managed?.name ||
+              '',
+            latitude: managed?.latitude,
+            longitude: managed?.longitude,
+            venueId: managed?.placeId,
+            venueName: managed?.name,
+            isVirtual: false,
+            privacy: 'public' as EventPrivacy,
+            allowJoinRequests: false,
+            showLocationPublicly: true,
+          }
+        : {}),
     });
+    if (
+      postingAsVenue &&
+      managed?.placeId &&
+      (managed.latitude == null || managed.longitude == null)
+    ) {
+      resolvePlaceCoords(managed.placeId).then(coords => {
+        if (!coords) {
+          return;
+        }
+        setNewEvent(prev =>
+          prev.venueId === managed.placeId &&
+          (prev.latitude == null || prev.longitude == null)
+            ? {
+                ...prev,
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+              }
+            : prev,
+        );
+      });
+    }
+    if (postingAsVenue) {
+      const seeded =
+        [managed?.name, managed?.address].filter(Boolean).join(', ') ||
+        managed?.name ||
+        '';
+      syncPlacesInput(seeded);
+    }
     setModalVisible(true);
   };
+
+  useEffect(() => {
+    if (!route.params?.openCreate || !isVenueHost) {
+      return;
+    }
+    openCreateEventModal();
+    navigation.setParams({openCreate: undefined} as never);
+    // One-shot navigation param; intentionally omits openCreateEventModal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.openCreate, isVenueHost, navigation]);
 
   const renderEventCard = ({item}: {item: Event}) => {
     const isPast = isEventPast(item.date, item.time);
@@ -6476,6 +6909,23 @@ const EventList: React.FC = () => {
     const creatorProfilePicUrl =
       item.createdByProfilePicUrl || creatorInfo?.profilePicUrl;
     const creatorInitials = getCreatorInitials(creatorInfo?.name, username);
+    const isVenueHosted = item.source === 'venue';
+    const hostDisplayName = isVenueHosted
+      ? item.venueName || creatorInfo?.name || username
+      : username || t('events.anonymous') || 'Unknown';
+    const hostInitials = isVenueHosted
+      ? getCreatorInitials(hostDisplayName, hostDisplayName)
+      : creatorInitials;
+    const rawJoinedCount =
+      typeof item.rosterSpotsFilled === 'number'
+        ? item.rosterSpotsFilled
+        : (item.roster || []).length;
+    // Venue host is on the roster for ops, but locals shouldn't count them
+    // as a "person joined."
+    const joinedDisplayCount =
+      isVenueHosted && rawJoinedCount > 0
+        ? Math.max(0, rawJoinedCount - 1)
+        : rawJoinedCount;
     const reactionSummary = summarizeReactions(item, myUserId);
     const commentCount = localCommentCounts[item._id] ?? item.commentCount ?? 0;
     const isPinned = pinnedEventIds.has(item._id);
@@ -6581,37 +7031,81 @@ const EventList: React.FC = () => {
     if (item.isGated) {
       const isPending = item.myJoinRequestStatus === 'pending';
       return (
-        <View style={[themedStyles.card, themedStyles.cardGated]}>
+        <View
+          style={[
+            themedStyles.card,
+            themedStyles.cardGated,
+            isVenueHosted && themedStyles.cardVenue,
+            isVenueHosted && themedStyles.cardWithAccent,
+          ]}>
+          {isVenueHosted ? (
+            <View style={themedStyles.cardAccentRail} pointerEvents="none">
+              <View
+                style={[
+                  themedStyles.cardAccentHalf,
+                  {backgroundColor: colors.primary},
+                ]}
+              />
+            </View>
+          ) : null}
           <View style={themedStyles.cardHeader}>
             <View style={themedStyles.cardHeaderLeft}>
-              {creatorProfilePicUrl ? (
-                <Image
-                  source={{uri: creatorProfilePicUrl}}
-                  style={themedStyles.avatar}
-                />
-              ) : (
-                <View
-                  style={[
-                    themedStyles.avatar,
-                    {backgroundColor: getAvatarColor(username)},
-                  ]}>
-                  <Text style={themedStyles.avatarText}>{creatorInitials}</Text>
-                </View>
-              )}
+              <View style={themedStyles.avatarWrap}>
+                {creatorProfilePicUrl ? (
+                  <Image
+                    source={{uri: creatorProfilePicUrl}}
+                    style={[
+                      themedStyles.avatar,
+                      isVenueHosted && themedStyles.avatarVenueRing,
+                    ]}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      themedStyles.avatar,
+                      isVenueHosted && themedStyles.avatarVenueRing,
+                      {
+                        backgroundColor: getAvatarColor(
+                          isVenueHosted ? hostDisplayName : username,
+                        ),
+                      },
+                    ]}>
+                    <Text style={themedStyles.avatarText}>{hostInitials}</Text>
+                  </View>
+                )}
+                {isVenueHosted ? (
+                  <View style={themedStyles.venueAvatarBadge}>
+                    <FontAwesomeIcon icon={faBuilding} size={8} color="#fff" />
+                  </View>
+                ) : null}
+              </View>
               <View style={themedStyles.cardHeaderIdentity}>
                 <Text style={themedStyles.cardHeaderUsername} numberOfLines={1}>
-                  {username || t('events.anonymous') || 'Unknown'}
+                  {hostDisplayName}
                 </Text>
-                <View style={themedStyles.cardHeaderMetaRow}>
-                  <FontAwesomeIcon
-                    icon={faUserGroup}
-                    size={10}
-                    color={colors.secondaryText}
-                  />
-                  <Text style={themedStyles.cardHeaderMeta}>
-                    {t('events.lfgBadge') || 'Looking for group'}
-                  </Text>
-                </View>
+                {isVenueHosted ? (
+                  <View style={themedStyles.venueHostChip}>
+                    <FontAwesomeIcon
+                      icon={faBuilding}
+                      size={10}
+                      color={colors.primary}
+                    />
+                    <Text style={themedStyles.venueHostChipText}>
+                      {t('events.venueOfficialBadge') || 'Official venue'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={themedStyles.cardHeaderMetaRow}>
+                    <FontAwesomeIcon
+                      icon={faUserGroup}
+                      size={10}
+                      color={colors.secondaryText}
+                    />
+                    <Text style={themedStyles.cardHeaderMeta}>
+                      {t('events.lfgBadge') || 'Looking for group'}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
             <TouchableOpacity
@@ -6672,13 +7166,19 @@ const EventList: React.FC = () => {
                 color={colors.secondaryText}
               />
               <Text style={themedStyles.detailText}>
-                {item.totalSpots > 0
-                  ? `${item.rosterSpotsFilled}/${item.totalSpots} ${t(
-                      'events.playersJoined',
-                    )}`
-                  : `${item.rosterSpotsFilled} ${t(
-                      'events.playersJoined',
-                    )} · ${t('events.noLimit') || 'No limit'}`}
+                {(() => {
+                  const joinedLabel =
+                    joinedDisplayCount === 1
+                      ? t('events.playersJoined_one') || 'person joined'
+                      : t('events.playersJoined_other') ||
+                        t('events.playersJoined') ||
+                        'people joined';
+                  return item.totalSpots > 0
+                    ? `${joinedDisplayCount}/${item.totalSpots} ${joinedLabel}`
+                    : `${joinedDisplayCount} ${joinedLabel} · ${
+                        t('events.noLimit') || 'No limit'
+                      }`;
+                })()}
               </Text>
             </View>
 
@@ -6724,7 +7224,9 @@ const EventList: React.FC = () => {
                 color={colors.text}
               />
               <Text style={themedStyles.messageHostButtonText} numberOfLines={1}>
-                {t('events.messageHost') || 'Message host'}
+                {isVenueHosted
+                  ? t('events.messageVenue') || 'Message venue'
+                  : t('events.messageHost') || 'Message host'}
               </Text>
             </TouchableOpacity>
             {item.allowJoinRequests === false ? (
@@ -6770,6 +7272,7 @@ const EventList: React.FC = () => {
 
     const jerseyAccents = (item.jerseyColors || []).filter(Boolean);
     const hasJerseyAccent = jerseyAccents.length > 0;
+    const showVenueChrome = isVenueHosted;
 
     return (
       <View
@@ -6777,7 +7280,8 @@ const EventList: React.FC = () => {
           themedStyles.card,
           isPast && themedStyles.pastEventCard,
           item.privacy === 'invite-only' && themedStyles.cardInviteOnly,
-          hasJerseyAccent && themedStyles.cardWithAccent,
+          showVenueChrome && themedStyles.cardVenue,
+          (hasJerseyAccent || showVenueChrome) && themedStyles.cardWithAccent,
         ]}>
         {hasJerseyAccent ? (
           <View style={themedStyles.cardAccentRail} pointerEvents="none">
@@ -6796,6 +7300,15 @@ const EventList: React.FC = () => {
               />
             ) : null}
           </View>
+        ) : showVenueChrome ? (
+          <View style={themedStyles.cardAccentRail} pointerEvents="none">
+            <View
+              style={[
+                themedStyles.cardAccentHalf,
+                {backgroundColor: colors.primary},
+              ]}
+            />
+          </View>
         ) : null}
         {/* Header: Avatar + Identity + Options */}
         <View style={themedStyles.cardHeader}>
@@ -6803,59 +7316,95 @@ const EventList: React.FC = () => {
             onPress={() => handleEventPress(item)}
             activeOpacity={0.7}
             style={themedStyles.cardHeaderLeft}>
-            {creatorProfilePicUrl ? (
-              <Image
-                source={{uri: creatorProfilePicUrl}}
-                style={themedStyles.avatar}
-              />
-            ) : (
-              <View
-                style={[
-                  themedStyles.avatar,
-                  {backgroundColor: getAvatarColor(username)},
-                ]}>
-                <Text style={themedStyles.avatarText}>{creatorInitials}</Text>
-              </View>
-            )}
+            <View style={themedStyles.avatarWrap}>
+              {creatorProfilePicUrl ? (
+                <Image
+                  source={{uri: creatorProfilePicUrl}}
+                  style={[
+                    themedStyles.avatar,
+                    showVenueChrome && themedStyles.avatarVenueRing,
+                  ]}
+                />
+              ) : (
+                <View
+                  style={[
+                    themedStyles.avatar,
+                    showVenueChrome && themedStyles.avatarVenueRing,
+                    {
+                      backgroundColor: getAvatarColor(
+                        isVenueHosted ? hostDisplayName : username,
+                      ),
+                    },
+                  ]}>
+                  <Text style={themedStyles.avatarText}>{hostInitials}</Text>
+                </View>
+              )}
+              {showVenueChrome ? (
+                <View style={themedStyles.venueAvatarBadge}>
+                  <FontAwesomeIcon icon={faBuilding} size={8} color="#fff" />
+                </View>
+              ) : null}
+            </View>
             <View style={themedStyles.cardHeaderIdentity}>
               <Text style={themedStyles.cardHeaderUsername} numberOfLines={1}>
-                {username || t('events.anonymous') || 'Unknown'}
+                {hostDisplayName}
               </Text>
+              {showVenueChrome ? (
+                <View style={themedStyles.venueHostChip}>
+                  <FontAwesomeIcon
+                    icon={faBuilding}
+                    size={10}
+                    color={colors.primary}
+                  />
+                  <Text style={themedStyles.venueHostChipText}>
+                    {t('events.venueOfficialBadge') || 'Official venue'}
+                  </Text>
+                </View>
+              ) : null}
               <View style={themedStyles.cardHeaderMetaRow}>
-                {item.createdAt && (
+                {item.createdAt ? (
                   <Text style={themedStyles.cardHeaderMeta}>
                     {formatRelativeTime(item.createdAt)}
                   </Text>
-                )}
-                {item.privacy && item.privacy !== 'public' && (
-                  <>
-                    <Text style={themedStyles.cardHeaderMetaDot}>·</Text>
-                    <FontAwesomeIcon
-                      icon={item.privacy === 'private' ? faLock : faEnvelope}
-                      size={10}
-                      color={colors.secondaryText}
-                    />
-                    <Text style={themedStyles.cardHeaderMeta}>
-                      {item.privacy === 'private' ? 'Private' : 'Invite Only'}
-                    </Text>
-                  </>
-                )}
+                ) : null}
+                {!showVenueChrome &&
+                  item.privacy &&
+                  item.privacy !== 'public' && (
+                    <>
+                      <Text style={themedStyles.cardHeaderMetaDot}>·</Text>
+                      <FontAwesomeIcon
+                        icon={
+                          item.privacy === 'private' ? faLock : faEnvelope
+                        }
+                        size={10}
+                        color={colors.secondaryText}
+                      />
+                      <Text style={themedStyles.cardHeaderMeta}>
+                        {item.privacy === 'private'
+                          ? 'Private'
+                          : 'Invite Only'}
+                      </Text>
+                    </>
+                  )}
                 {item.isRecurring &&
-                  eventData.filter(
-                    e =>
-                      e.recurrenceGroupId &&
-                      e.recurrenceGroupId === item.recurrenceGroupId,
-                  ).length >= 2 && (
-                  <>
-                    <Text style={themedStyles.cardHeaderMetaDot}>·</Text>
-                    <FontAwesomeIcon
-                      icon={faRotate}
-                      size={10}
-                      color={colors.secondaryText}
-                    />
-                    <Text style={themedStyles.cardHeaderMeta}>Recurring</Text>
-                  </>
-                )}
+                  (showVenueChrome ||
+                    eventData.filter(
+                      e =>
+                        e.recurrenceGroupId &&
+                        e.recurrenceGroupId === item.recurrenceGroupId,
+                    ).length >= 2) && (
+                    <>
+                      <Text style={themedStyles.cardHeaderMetaDot}>·</Text>
+                      <FontAwesomeIcon
+                        icon={faRotate}
+                        size={10}
+                        color={colors.secondaryText}
+                      />
+                      <Text style={themedStyles.cardHeaderMeta}>
+                        Recurring
+                      </Text>
+                    </>
+                  )}
                 {isPast && (
                   <>
                     <Text style={themedStyles.cardHeaderMetaDot}>·</Text>
@@ -6978,13 +7527,19 @@ const EventList: React.FC = () => {
                 color={colors.secondaryText}
               />
               <Text style={themedStyles.detailText}>
-                {item.totalSpots > 0
-                  ? `${item.rosterSpotsFilled}/${item.totalSpots} ${t(
-                      'events.playersJoined',
-                    )}`
-                  : `${item.rosterSpotsFilled} ${t(
-                      'events.playersJoined',
-                    )} · ${t('events.noLimit') || 'No limit'}`}
+                {(() => {
+                  const joinedLabel =
+                    joinedDisplayCount === 1
+                      ? t('events.playersJoined_one') || 'person joined'
+                      : t('events.playersJoined_other') ||
+                        t('events.playersJoined') ||
+                        'people joined';
+                  return item.totalSpots > 0
+                    ? `${joinedDisplayCount}/${item.totalSpots} ${joinedLabel}`
+                    : `${joinedDisplayCount} ${joinedLabel} · ${
+                        t('events.noLimit') || 'No limit'
+                      }`;
+                })()}
                 {isEventFull && item.waitlist && item.waitlist.length > 0
                   ? ` · ${item.waitlist.length} waitlisted`
                   : ''}
@@ -7010,47 +7565,12 @@ const EventList: React.FC = () => {
           style={themedStyles.mapEmbed}
           onPress={() => openMapsForEvent(item, t, presentMapPicker)}
           activeOpacity={0.85}>
-          {(() => {
-            const coords =
-              item.latitude && item.longitude
-                ? {latitude: item.latitude, longitude: item.longitude}
-                : getCoordinatesFromLocation(item.location || '');
-
-            if (!coords) {
-              return (
-                <View style={themedStyles.mapEmbedFallback}>
-                  <Text style={themedStyles.mapEmbedFallbackText}>
-                    {(item.location || '').trim() || 'Open in Maps'}
-                  </Text>
-                </View>
-              );
-            }
-
-            return (
-              <MapView
-                provider={
-                  Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined
-                }
-                liteMode={Platform.OS === 'android'}
-                style={themedStyles.mapEmbedView}
-                initialRegion={{
-                  latitude: coords.latitude,
-                  longitude: coords.longitude,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }}
-                scrollEnabled={false}
-                zoomEnabled={false}
-                rotateEnabled={false}
-                pitchEnabled={false}>
-                <Marker
-                  coordinate={coords}
-                  title={item.name}
-                  description={item.location}
-                />
-              </MapView>
-            );
-          })()}
+          <EventCardMapEmbed
+            key={item._id}
+            item={item}
+            themedStyles={themedStyles}
+            colors={colors}
+          />
           <View style={themedStyles.mapEmbedOverlay}>
             <FontAwesomeIcon icon={faLocationArrow} size={11} color="#fff" />
             <Text style={themedStyles.mapEmbedOverlayText}>
@@ -7184,16 +7704,16 @@ const EventList: React.FC = () => {
           : null}
 
         {/* Public (ungated — you're the creator or already approved): a single
-            Join/Going toggle. Requesters see the locked teaser instead. */}
+            Join/Going toggle. Requesters see the locked teaser instead.
+            Venue hosts managing their own night get a manage CTA instead of
+            a consumer Going toggle. */}
         {!isPast && item.privacy === 'public'
           ? (() => {
               const isGoing = getMyRsvp(item) === 'going';
-              const goingCount =
-                typeof item.rosterSpotsFilled === 'number'
-                  ? item.rosterSpotsFilled
-                  : (item.roster || []).length;
+              const goingCount = joinedDisplayCount;
               const canMessageHost =
                 !isCreator && !!item.createdBy && item.createdBy !== myUserId;
+              const isVenueManagingOwnNight = isVenueHost && isCreator;
               return (
                 <View style={themedStyles.rsvpContainer}>
                   <View
@@ -7211,37 +7731,71 @@ const EventList: React.FC = () => {
                         <Text
                           style={themedStyles.messageHostButtonText}
                           numberOfLines={1}>
-                          {t('events.messageHost') || 'Message host'}
+                          {isVenueHosted
+                            ? t('events.messageVenue') || 'Message venue'
+                            : t('events.messageHost') || 'Message host'}
                         </Text>
                       </TouchableOpacity>
                     ) : null}
-                    <TouchableOpacity
-                      style={[
-                        themedStyles.publicJoinButton,
-                        isGoing && themedStyles.rsvpButtonGoingActive,
-                        canMessageHost ? {flex: 1, alignSelf: 'stretch'} : null,
-                      ]}
-                      onPress={() => handleRsvp(item, 'going')}
-                      activeOpacity={0.8}>
-                      <FontAwesomeIcon
-                        icon={faCheck}
-                        size={14}
-                        color={isGoing ? '#fff' : colors.secondaryText}
-                      />
-                      <Text
+                    {isVenueManagingOwnNight ? (
+                      <TouchableOpacity
                         style={[
-                          themedStyles.rsvpButtonText,
-                          isGoing && themedStyles.rsvpButtonTextActive,
-                        ]}>
-                        {isGoing
-                          ? t('events.rsvpGoing') || 'Going'
-                          : t('events.joinEvent') || 'Join'}
-                      </Text>
-                    </TouchableOpacity>
+                          themedStyles.publicJoinButton,
+                          themedStyles.rsvpButtonGoingActive,
+                          canMessageHost
+                            ? {flex: 1, alignSelf: 'stretch'}
+                            : null,
+                        ]}
+                        onPress={() => handleEventPress(item)}
+                        activeOpacity={0.8}>
+                        <FontAwesomeIcon
+                          icon={faBuilding}
+                          size={14}
+                          color="#fff"
+                        />
+                        <Text
+                          style={[
+                            themedStyles.rsvpButtonText,
+                            themedStyles.rsvpButtonTextActive,
+                          ]}>
+                          {t('venues.manageNight') || 'Manage night'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={[
+                          themedStyles.publicJoinButton,
+                          isGoing && themedStyles.rsvpButtonGoingActive,
+                          canMessageHost
+                            ? {flex: 1, alignSelf: 'stretch'}
+                            : null,
+                        ]}
+                        onPress={() => handleRsvp(item, 'going')}
+                        activeOpacity={0.8}>
+                        <FontAwesomeIcon
+                          icon={faCheck}
+                          size={14}
+                          color={isGoing ? '#fff' : colors.secondaryText}
+                        />
+                        <Text
+                          style={[
+                            themedStyles.rsvpButtonText,
+                            isGoing && themedStyles.rsvpButtonTextActive,
+                          ]}>
+                          {isGoing
+                            ? t('events.rsvpGoing') || 'Going'
+                            : t('events.joinEvent') || 'Join'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                   {goingCount > 0 ? (
                     <Text style={themedStyles.rsvpSummary}>
-                      {`${goingCount} ${t('events.rsvpGoing') || 'Going'}`}
+                      {isVenueManagingOwnNight
+                        ? `${goingCount} ${
+                            t('venues.joinedCount') || 'joined'
+                          }`
+                        : `${goingCount} ${t('events.rsvpGoing') || 'Going'}`}
                     </Text>
                   ) : null}
                 </View>
@@ -7507,8 +8061,32 @@ const EventList: React.FC = () => {
         <View style={themedStyles.headerRight}>
           <TouchableOpacity
             style={themedStyles.findPlaceButton}
-            onPress={() => navigation.navigate('VenueList' as never)}
-            accessibilityLabel={t('events.findAPlace') || 'Find a place'}>
+            onPress={() => {
+              if (isVenueHost && managedVenue?.placeId) {
+                navigation.navigate('VenuePlaceDetail' as never, {
+                  place: {
+                    id: managedVenue.placeId,
+                    name: managedVenue.name,
+                    formattedAddress: managedVenue.address,
+                    location:
+                      managedVenue.latitude != null &&
+                      managedVenue.longitude != null
+                        ? {
+                            latitude: managedVenue.latitude,
+                            longitude: managedVenue.longitude,
+                          }
+                        : undefined,
+                  },
+                } as never);
+                return;
+              }
+              navigation.navigate('VenueList' as never);
+            }}
+            accessibilityLabel={
+              isVenueHost
+                ? t('venues.viewVenuePage') || 'View venue page'
+                : t('events.findAPlace') || 'Find a place'
+            }>
             <FontAwesomeIcon
               icon={faBuilding}
               size={18}
@@ -7537,7 +8115,80 @@ const EventList: React.FC = () => {
         style={themedStyles.contentWrapper}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
+        {/* Host source: All / People / Venues (consumer only) */}
+        {isVenueHost ? (
+          <View style={themedStyles.venueHostBanner}>
+            <FontAwesomeIcon
+              icon={faBuilding}
+              size={16}
+              color={colors.primary}
+            />
+            <View style={themedStyles.venueHostBannerTextCol}>
+              <Text style={themedStyles.venueHostBannerTitle} numberOfLines={1}>
+                {t('venues.hostingAs', {
+                  name: managedVenue?.name || userData?.name || 'your venue',
+                }) || `Hosting as ${managedVenue?.name || 'your venue'}`}
+              </Text>
+              <Text style={themedStyles.venueHostBannerDesc}>
+                {t('venues.hostNightsDesc') ||
+                  'These are your official nights. Locals see them in the Events feed.'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={themedStyles.venueHostBannerBtn}
+              activeOpacity={0.85}
+              onPress={openCreateEventModal}>
+              <Text style={themedStyles.venueHostBannerBtnText}>
+                {t('venues.post') || 'Post'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={themedStyles.hostSourceRow}>
+            {(
+              [
+                {key: 'all', label: t('events.hostFilterAll') || 'All'},
+                {
+                  key: 'people',
+                  label: t('events.hostFilterPeople') || 'People',
+                },
+                {
+                  key: 'venues',
+                  label: t('events.hostFilterVenues') || 'Venues',
+                },
+              ] as const
+            ).map(option => {
+              const active = hostSourceFilter === option.key;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[
+                    themedStyles.hostSourceChip,
+                    active && themedStyles.hostSourceChipActive,
+                  ]}
+                  onPress={() => setHostSourceFilter(option.key)}
+                  activeOpacity={0.75}>
+                  {option.key === 'venues' ? (
+                    <FontAwesomeIcon
+                      icon={faBuilding}
+                      size={11}
+                      color={active ? '#fff' : colors.secondaryText}
+                    />
+                  ) : null}
+                  <Text
+                    style={[
+                      themedStyles.hostSourceChipText,
+                      active && themedStyles.hostSourceChipTextActive,
+                    ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
         {/* Horizontal Activity Filter Chips */}
+        {!isVenueHost ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -7563,6 +8214,7 @@ const EventList: React.FC = () => {
             );
           })}
         </ScrollView>
+        ) : null}
         {/* Profile Filter Banner */}
         {profileFilter && (
           <View style={themedStyles.profileFilterBanner}>
@@ -7699,11 +8351,14 @@ const EventList: React.FC = () => {
                   />
                 </View>
                 <Text style={themedStyles.noResultsText}>
-                  {searchQuery
-                    ? t('common.noResults')
-                    : activeFilterCount > 0
-                    ? t('events.noMatchingEvents')
-                    : t('events.noEvents')}
+                  {isVenueHost
+                    ? t('venues.noNightsYet') ||
+                      'No nights posted yet. Tap + to create your first official night.'
+                    : searchQuery
+                      ? t('common.noResults')
+                      : activeFilterCount > 0
+                        ? t('events.noMatchingEvents')
+                        : t('events.noEvents')}
                 </Text>
                 {searchQuery ? (
                   <Text style={themedStyles.noResultsSubtext}>
@@ -7724,6 +8379,25 @@ const EventList: React.FC = () => {
                       />
                       <Text style={themedStyles.ctaButtonText}>
                         {t('events.clearFilters')}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : isVenueHost ? (
+                  <>
+                    <Text style={themedStyles.noResultsSubtext}>
+                      {t('venues.noNightsSubtext') ||
+                        'Post an official night so locals can find it in the Events feed.'}
+                    </Text>
+                    <TouchableOpacity
+                      style={themedStyles.ctaButton}
+                      onPress={openCreateEventModal}>
+                      <FontAwesomeIcon
+                        icon={faPlus}
+                        size={14}
+                        color={colors.buttonText || '#fff'}
+                      />
+                      <Text style={themedStyles.ctaButtonText}>
+                        {t('venues.postFirstNight') || 'Post your first night'}
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -7777,8 +8451,29 @@ const EventList: React.FC = () => {
             <View style={themedStyles.modalView}>
               <View style={themedStyles.modalHandle} />
               <Text style={themedStyles.modalHeader}>
-                {isEditing ? t('events.editEvent') : t('events.createEvent')}
+                {isEditing
+                  ? t('events.editEvent')
+                  : userData?.accountType === 'venue' &&
+                      userData?.managedVenue?.name
+                    ? t('events.postVenueEvent') || 'Post Venue Event'
+                    : t('events.createEvent')}
               </Text>
+              {!isEditing &&
+              userData?.accountType === 'venue' &&
+              userData?.managedVenue?.name ? (
+                <View style={themedStyles.venuePostingBanner}>
+                  <FontAwesomeIcon
+                    icon={faBuilding}
+                    size={14}
+                    color={colors.primary}
+                  />
+                  <Text style={themedStyles.venuePostingBannerText}>
+                    {t('events.postingAsVenue', {
+                      name: userData.managedVenue.name,
+                    }) || `Posting as ${userData.managedVenue.name}`}
+                  </Text>
+                </View>
+              ) : null}
 
               <ScrollView
                 style={themedStyles.modalFormScroll}
@@ -7792,6 +8487,30 @@ const EventList: React.FC = () => {
                   value={newEvent.name}
                   onChangeText={text => setNewEvent({...newEvent, name: text})}
                 />
+                {/* Venue hosts post at their managed place — lock location. */}
+                {isVenueHost ? (
+                  <View style={themedStyles.venueLockedLocation}>
+                    <FontAwesomeIcon
+                      icon={faBuilding}
+                      size={14}
+                      color={colors.primary}
+                    />
+                    <View style={{flex: 1, minWidth: 0}}>
+                      <Text style={themedStyles.venueLockedLocationLabel}>
+                        {t('venues.eventLocationLocked') || 'At your venue'}
+                      </Text>
+                      <Text
+                        style={themedStyles.venueLockedLocationValue}
+                        numberOfLines={2}>
+                        {newEvent.location ||
+                          managedVenue?.name ||
+                          t('venues.managedVenue') ||
+                          'Managed venue'}
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <>
                 {/* Location: Place (maps) or Other (no address / no second name field). */}
                 <View style={themedStyles.locationModeRow}>
                   {(
@@ -7915,6 +8634,8 @@ const EventList: React.FC = () => {
                       />
                     )}
                   </View>
+                )}
+                  </>
                 )}
 
                 {/* Event Date selector */}
@@ -9418,10 +10139,15 @@ const EventList: React.FC = () => {
                 {/* Privacy Selector */}
                 <View style={themedStyles.privacyContainer}>
                   <Text style={themedStyles.privacyLabel}>
-                    {t('events.eventPrivacy') || 'Event Privacy'}
+                    {isVenueHost
+                      ? t('venues.nightVisibility') || 'Night visibility'
+                      : t('events.eventPrivacy') || 'Event Privacy'}
                   </Text>
                   <View style={themedStyles.privacyOptions}>
-                    {privacyOptions.map(option => (
+                    {(isVenueHost
+                      ? privacyOptions.filter(o => o.value === 'public')
+                      : privacyOptions
+                    ).map(option => (
                       <TouchableOpacity
                         key={option.value}
                         style={[
@@ -9451,7 +10177,10 @@ const EventList: React.FC = () => {
                             {option.label}
                           </Text>
                           <Text style={themedStyles.privacyOptionDescription}>
-                            {option.description}
+                            {isVenueHost && option.value === 'public'
+                              ? t('venues.publicNightDesc') ||
+                                'Locals can find this night in the Events feed'
+                              : option.description}
                           </Text>
                         </View>
                       </TouchableOpacity>
@@ -9465,12 +10194,18 @@ const EventList: React.FC = () => {
                     <View style={themedStyles.publicControlRow}>
                       <View style={themedStyles.publicControlText}>
                         <Text style={themedStyles.publicControlLabel}>
-                          {t('events.requireApproval') ||
-                            'Require approval to join'}
+                          {isVenueHost
+                            ? t('venues.requireApproval') ||
+                              'Require approval to join'
+                            : t('events.requireApproval') ||
+                              'Require approval to join'}
                         </Text>
                         <Text style={themedStyles.publicControlDesc}>
-                          {t('events.requireApprovalDesc') ||
-                            'On: people request and you approve. Off: anyone can join.'}
+                          {isVenueHost
+                            ? t('venues.requireApprovalDesc') ||
+                              'Off (recommended): anyone can join. On: you approve each request.'
+                            : t('events.requireApprovalDesc') ||
+                              'On: people request and you approve. Off: anyone can join.'}
                         </Text>
                       </View>
                       <Switch
@@ -9482,6 +10217,7 @@ const EventList: React.FC = () => {
                       />
                     </View>
 
+                    {!isVenueHost ? (
                     <View style={themedStyles.publicControlRow}>
                       <View style={themedStyles.publicControlText}>
                         <Text style={themedStyles.publicControlLabel}>
@@ -9504,6 +10240,7 @@ const EventList: React.FC = () => {
                         trackColor={{false: colors.border, true: colors.primary}}
                       />
                     </View>
+                    ) : null}
                   </View>
                 )}
 
@@ -9686,7 +10423,9 @@ const EventList: React.FC = () => {
                     <Text style={themedStyles.buttonText}>
                       {isEditing
                         ? t('events.saveChanges')
-                        : t('events.createEvent')}
+                        : isVenueHost
+                          ? t('venues.postNight') || 'Post Night'
+                          : t('events.createEvent')}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -10007,7 +10746,7 @@ const EventList: React.FC = () => {
                     {t('roster.position') || 'Role'}
                   </Text>
                   <View style={themedStyles.filterChipsContainer}>
-                    {positionsForEventType(joinPrompt.event.eventType).map(
+                    {joinPositionsForEvent(joinPrompt.event).map(
                       opt => {
                         const selected = joinPrompt.position === opt;
                         return (

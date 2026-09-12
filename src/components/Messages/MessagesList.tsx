@@ -47,6 +47,8 @@ import {useTheme} from '../ThemeContext/ThemeContext';
 import {useSocket} from '../../Context/SocketContext';
 import UserContext, {UserContextType} from '../UserContext';
 import {Conversation, ConversationStatus, DmActivity} from '../../types/dm';
+import OfficialVenueChip from '../OfficialVenueChip';
+import {isVenueAuthor} from '../../utils/venueDisplay';
 import {
   declineConversation,
   deleteConversation,
@@ -489,8 +491,20 @@ const MessagesList: React.FC = () => {
           fontWeight: '700',
           color: colors.text,
         },
+        rowTitleVenue: {
+          color: colors.primary,
+        },
+        rowTitleBlock: {
+          flex: 1,
+          minWidth: 0,
+          gap: 3,
+        },
         rowTitleUnread: {
           fontWeight: '800',
+        },
+        avatarVenue: {
+          borderWidth: 2,
+          borderColor: colors.primary,
         },
         rowTime: {fontSize: 11, fontWeight: '600', color: colors.secondaryText},
         rowTimeUnread: {color: colors.primary, fontWeight: '700'},
@@ -640,12 +654,13 @@ const MessagesList: React.FC = () => {
     const unread = item.unreadCount || 0;
     const displayName =
       item.otherUser.name || item.otherUser.username || 'Someone';
+    const venue = isVenueAuthor(item.otherUser);
     const rowContent = (
       <TouchableOpacity
         style={[styles.row, unread > 0 && styles.rowUnread]}
         activeOpacity={0.75}
         onPress={() => openThread(item)}>
-        <View style={styles.avatar}>
+        <View style={[styles.avatar, venue ? styles.avatarVenue : null]}>
           {item.otherUser.profilePicUrl ? (
             <Image
               source={{uri: item.otherUser.profilePicUrl}}
@@ -659,11 +674,18 @@ const MessagesList: React.FC = () => {
         </View>
         <View style={styles.rowContent}>
           <View style={styles.rowTopLine}>
-            <Text
-              style={[styles.rowTitle, unread > 0 && styles.rowTitleUnread]}
-              numberOfLines={1}>
-              {displayName}
-            </Text>
+            <View style={styles.rowTitleBlock}>
+              <Text
+                style={[
+                  styles.rowTitle,
+                  unread > 0 && styles.rowTitleUnread,
+                  venue && styles.rowTitleVenue,
+                ]}
+                numberOfLines={1}>
+                {displayName}
+              </Text>
+              {venue ? <OfficialVenueChip compact /> : null}
+            </View>
             <Text
               style={[styles.rowTime, unread > 0 && styles.rowTimeUnread]}>
               {relativeTime(item.lastMessageAt)}
