@@ -114,6 +114,7 @@ const EventWrapUp: React.FC = () => {
   const [isVirtual, setIsVirtual] = useState(false);
   const [createdBy, setCreatedBy] = useState('');
   const [createdByUsername, setCreatedByUsername] = useState('');
+  const [eventSource, setEventSource] = useState<'user' | 'venue'>('user');
   const [roster, setRoster] = useState<Attendee[]>([]);
   const [hasRatedEvent, setHasRatedEvent] = useState(false);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
@@ -344,6 +345,7 @@ const EventWrapUp: React.FC = () => {
       setIsVirtual(!!ev.isVirtual);
       setCreatedBy(ev.createdBy || '');
       setCreatedByUsername(ev.createdByUsername || '');
+      setEventSource(ev.source === 'venue' ? 'venue' : 'user');
       setRoster(
         (ev.roster || []).map((p: any) => ({
           userId: p.userId ? String(p.userId) : undefined,
@@ -408,11 +410,16 @@ const EventWrapUp: React.FC = () => {
   };
 
   const renderAttendee = ({item}: {item: Attendee}) => {
+    const isVenueHost =
+      eventSource === 'venue' &&
+      !!item.userId &&
+      item.userId === createdBy;
     const canRatePlayer =
       !!item.userId &&
       item.userId !== userData?._id &&
       isOnRoster &&
       ended &&
+      !isVenueHost &&
       !ratedPlayerIds.has(item.userId);
 
     return (

@@ -7,10 +7,15 @@ import {useTheme} from './ThemeContext/ThemeContext';
 
 type Props = {
   compact?: boolean;
+  /** Center the chip in its parent (e.g. public venue profile hero). */
+  centered?: boolean;
 };
 
 /** Small Official venue marker — reuse in cards, comments, DMs, roster. */
-const OfficialVenueChip: React.FC<Props> = ({compact = false}) => {
+const OfficialVenueChip: React.FC<Props> = ({
+  compact = false,
+  centered = false,
+}) => {
   const {colors} = useTheme();
   const {t} = useTranslation();
   const styles = StyleSheet.create({
@@ -18,7 +23,7 @@ const OfficialVenueChip: React.FC<Props> = ({compact = false}) => {
       flexDirection: 'row',
       alignItems: 'center',
       gap: compact ? 3 : 5,
-      alignSelf: 'flex-start',
+      alignSelf: centered ? 'center' : 'flex-start',
       paddingHorizontal: compact ? 6 : 8,
       paddingVertical: compact ? 2 : 3,
       borderRadius: 10,

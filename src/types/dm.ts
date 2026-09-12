@@ -18,6 +18,8 @@ export interface ConversationUser {
   name?: string;
   profilePicUrl?: string;
   accountType?: 'user' | 'venue';
+  /** Google Place ID when the other party is a venue account. */
+  placeId?: string;
 }
 
 // Compact preview for the inbox row.

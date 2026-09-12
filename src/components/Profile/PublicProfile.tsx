@@ -39,19 +39,24 @@ import {
   faUserSlash,
   faTimes,
   faChevronRight,
+  faBuilding,
+  faMapMarkerAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 import ProfileRatingBadges from '../EventRating/ProfileRatingBadges';
 import PlayerRatingModal, {
   PlayerRatingTarget,
 } from '../EventRating/PlayerRatingModal';
-import UserContext, {UserContextType} from '../UserContext';
+import UserContext, {ManagedVenue, UserContextType} from '../UserContext';
 import ReportSheet from '../Moderation/ReportSheet';
 import {
   blockUser,
   fetchBlockStatus,
   unblockUser,
 } from '../../services/ModerationService';
+import OfficialVenueChip from '../OfficialVenueChip';
+import {isEventPast, parseEventDateLocal} from '../../utils/eventDateTime';
+import {resolveVenuePhotoUrl} from '../../utils/venuePhoto';
 
 type FriendStatus = 'none' | 'friends' | 'pending' | 'incoming' | 'loading';
 
@@ -72,6 +77,8 @@ interface PublicUserData {
   name?: string;
   profilePicUrl?: string;
   favoriteSports?: string[];
+  accountType?: 'user' | 'venue';
+  managedVenue?: ManagedVenue | null;
 }
 
 // Interest display map
@@ -115,7 +122,7 @@ const PublicProfile: React.FC = () => {
   const navigation = useNavigation<any>();
   const {userId, username, profilePicUrl} = route.params;
   const {colors} = useTheme();
-  const {events} = useEventContext();
+  const {events, fetchEvents} = useEventContext();
   const {t} = useTranslation();
   const {userData: currentUser} = useContext(UserContext) as UserContextType;
 
@@ -143,9 +150,13 @@ const PublicProfile: React.FC = () => {
       .catch(err => console.error('Failed to fetch block status:', err));
   }, [userId, isSelf]);
 
-  // Fetch friend status
+  // Fetch friend status (venues aren't friendable)
   const fetchFriendStatus = useCallback(async () => {
     if (userId === currentUser?._id) {
+      return;
+    }
+    if (userData?.accountType === 'venue') {
+      setFriendStatus('none');
       return;
     }
 
@@ -197,14 +208,18 @@ const PublicProfile: React.FC = () => {
     } catch (error) {
       console.error('Error fetching friend status:', error);
     }
-  }, [userId, currentUser?._id]);
+  }, [userId, currentUser?._id, userData?.accountType]);
 
   useEffect(() => {
     fetchFriendStatus();
   }, [fetchFriendStatus]);
 
   useEffect(() => {
-    if (!currentUser?._id || userId === currentUser._id) {
+    if (
+      !currentUser?._id ||
+      userId === currentUser._id ||
+      userData?.accountType === 'venue'
+    ) {
       setMutualFriendsCount(0);
       setMutualFriends([]);
       return;
@@ -233,10 +248,14 @@ const PublicProfile: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [userId, currentUser?._id]);
+  }, [userId, currentUser?._id, userData?.accountType]);
 
   // Fetch favorite sports for this user
   useEffect(() => {
+    if (userData?.accountType === 'venue') {
+      setFavoriteSports([]);
+      return;
+    }
     const loadFavoriteSports = async () => {
       try {
         const token = await AsyncStorage.getItem('userToken');
@@ -255,7 +274,7 @@ const PublicProfile: React.FC = () => {
       }
     };
     loadFavoriteSports();
-  }, [userId]);
+  }, [userId, userData?.accountType]);
 
   // Handle friend action
   const handleFriendAction = useCallback(async () => {
@@ -388,11 +407,87 @@ const PublicProfile: React.FC = () => {
       screen: 'DmThread',
       params: {
         userId,
-        username: userData?.username,
-        profilePicUrl: userData?.profilePicUrl,
+        username:
+          userData?.accountType === 'venue'
+            ? userData?.managedVenue?.name ||
+              userData?.name ||
+              userData?.username
+            : userData?.username,
+        profilePicUrl:
+          userData?.managedVenue?.photoUrl || userData?.profilePicUrl,
       },
     });
   }, [navigation, userData, userId]);
+
+  const openVenuePage = useCallback(() => {
+    const managed = userData?.managedVenue;
+    if (!managed?.placeId) {
+      return;
+    }
+    navigation.navigate('Events', {
+      screen: 'VenuePlaceDetail',
+      params: {
+        place: {
+          id: managed.placeId,
+          name: managed.name,
+          formattedAddress: managed.address,
+          location:
+            managed.latitude != null && managed.longitude != null
+              ? {
+                  latitude: managed.latitude,
+                  longitude: managed.longitude,
+                }
+              : undefined,
+        },
+      },
+    });
+  }, [navigation, userData?.managedVenue]);
+
+  const isVenueProfile = userData?.accountType === 'venue';
+  const venueDisplayName =
+    userData?.managedVenue?.name ||
+    userData?.name ||
+    userData?.username ||
+    username;
+
+  const upcomingVenueNights = useMemo(() => {
+    if (!isVenueProfile || !userId) {
+      return [];
+    }
+    return (events || [])
+      .filter(
+        e =>
+          String(e.createdBy) === String(userId) &&
+          !isEventPast(e.date, e.time),
+      )
+      .slice()
+      .sort((a, b) => {
+        const aTs = parseEventDateLocal(a.date).getTime();
+        const bTs = parseEventDateLocal(b.date).getTime();
+        if (aTs !== bTs) {
+          return aTs - bTs;
+        }
+        return (a.time || '').localeCompare(b.time || '');
+      })
+      .slice(0, 3);
+  }, [events, isVenueProfile, userId]);
+
+  useEffect(() => {
+    if (!isVenueProfile) {
+      return;
+    }
+    fetchEvents().catch(() => {});
+  }, [isVenueProfile, fetchEvents]);
+
+  const openVenueNight = useCallback(
+    (eventId: string) => {
+      navigation.navigate('Events', {
+        screen: 'EventList',
+        params: {highlightEventId: eventId},
+      });
+    },
+    [navigation],
+  );
 
   const handleBlock = useCallback(() => {
     Alert.alert(
@@ -555,29 +650,78 @@ const PublicProfile: React.FC = () => {
     };
   }, [userId, currentUser?._id]);
 
-  // Fetch user data if needed
+  // Always load the full public user so venue accounts get accountType +
+  // managedVenue (route params alone aren't enough).
   useEffect(() => {
+    let cancelled = false;
     const fetchUserData = async () => {
-      if (username) {
-        setUserData({
-          _id: userId,
-          username: username,
-          profilePicUrl: profilePicUrl,
-        });
-        return;
-      }
-
+      setUserData({
+        _id: userId,
+        username: username || '',
+        profilePicUrl: profilePicUrl,
+      });
       setLoading(true);
       try {
-        const response = await axios.get(`${API_BASE_URL}/users/${userId}`);
-        setUserData(response.data);
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await axios.get(`${API_BASE_URL}/user/${userId}`, {
+          headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+        });
+        const raw = response.data?.user || response.data;
+        if (cancelled || !raw) {
+          return;
+        }
+        const isVenue = raw.accountType === 'venue';
+        const managed = raw.managedVenue || null;
+        setUserData({
+          _id: raw._id || userId,
+          username: raw.username || username || '',
+          name: isVenue
+            ? managed?.name || raw.name || raw.username
+            : raw.name,
+          profilePicUrl:
+            managed?.photoUrl || raw.profilePicUrl || profilePicUrl,
+          favoriteSports: raw.favoriteSports,
+          accountType: isVenue ? 'venue' : 'user',
+          managedVenue: managed,
+        });
+        if (isVenue) {
+          setCanRatePlayer(false);
+        }
+        const existingPhoto =
+          managed?.photoUrl || raw.profilePicUrl || profilePicUrl;
+        if (isVenue && !existingPhoto && managed?.placeId) {
+          resolveVenuePhotoUrl(managed.placeId, {maxWidthPx: 600}).then(
+            url => {
+              if (cancelled || !url) {
+                return;
+              }
+              setUserData(prev =>
+                prev && prev._id === (raw._id || userId) && !prev.profilePicUrl
+                  ? {
+                      ...prev,
+                      profilePicUrl: url,
+                      managedVenue: prev.managedVenue
+                        ? {...prev.managedVenue, photoUrl: url}
+                        : prev.managedVenue,
+                    }
+                  : prev,
+              );
+            },
+          );
+        }
       } catch (error) {
         console.error('Error fetching user data:', error);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     };
 
     fetchUserData();
+    return () => {
+      cancelled = true;
+    };
   }, [userId, username, profilePicUrl]);
 
   const getInitials = (name: string | undefined) => {
@@ -918,6 +1062,133 @@ const PublicProfile: React.FC = () => {
           fontWeight: '500',
           marginTop: 2,
         },
+        venueChipWrap: {
+          marginTop: 6,
+          marginBottom: 10,
+          alignSelf: 'stretch',
+          alignItems: 'center',
+        },
+        venueAddressRow: {
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          gap: 6,
+          paddingHorizontal: 28,
+          marginTop: 2,
+        },
+        venueAddress: {
+          flexShrink: 1,
+          fontSize: 13,
+          lineHeight: 18,
+          color: colors.secondaryText,
+          textAlign: 'center',
+        },
+        venueActions: {
+          alignSelf: 'stretch',
+          paddingHorizontal: 16,
+          marginTop: 16,
+          gap: 10,
+        },
+        venuePrimaryBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          backgroundColor: colors.primary,
+          borderRadius: 12,
+          paddingVertical: 13,
+        },
+        venuePrimaryBtnText: {
+          color: '#fff',
+          fontSize: 15,
+          fontWeight: '700',
+        },
+        venueSecondaryBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          borderRadius: 12,
+          paddingVertical: 12,
+          borderWidth: 1,
+          borderColor: colors.primary + '55',
+          backgroundColor: colors.primary + '10',
+        },
+        venueSecondaryBtnText: {
+          color: colors.primary,
+          fontSize: 14,
+          fontWeight: '700',
+        },
+        venueNightCard: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          paddingVertical: 12,
+          paddingHorizontal: 12,
+          marginBottom: 8,
+          borderRadius: 12,
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        venueNightDate: {
+          width: 44,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 6,
+          borderRadius: 10,
+          backgroundColor: colors.primary + '14',
+        },
+        venueNightMonth: {
+          fontSize: 10,
+          fontWeight: '700',
+          color: colors.primary,
+          textTransform: 'uppercase',
+          letterSpacing: 0.4,
+        },
+        venueNightDay: {
+          fontSize: 18,
+          fontWeight: '800',
+          color: colors.text,
+          lineHeight: 20,
+        },
+        venueNightBody: {flex: 1, minWidth: 0},
+        venueNightName: {
+          fontSize: 15,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        venueNightMeta: {
+          marginTop: 2,
+          fontSize: 12,
+          color: colors.secondaryText,
+        },
+        venueNightEmpty: {
+          paddingVertical: 16,
+          paddingHorizontal: 12,
+          borderRadius: 12,
+          backgroundColor: colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        venueNightEmptyText: {
+          fontSize: 13,
+          lineHeight: 18,
+          color: colors.secondaryText,
+          textAlign: 'center',
+        },
+        venueSeeAll: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          paddingVertical: 8,
+        },
+        venueSeeAllText: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.primary,
+        },
         // ── Interests ──
         sportsContainer: {
           flexDirection: 'row',
@@ -971,7 +1242,11 @@ const PublicProfile: React.FC = () => {
           onPress={() => navigation.goBack()}>
           <FontAwesomeIcon icon={faArrowLeft} size={18} color={colors.text} />
         </TouchableOpacity>
-        <Text style={themedStyles.title}>{t('profile.playerProfile')}</Text>
+        <Text style={themedStyles.title}>
+          {isVenueProfile
+            ? t('venues.hostProfileTitle') || 'Venue'
+            : t('profile.playerProfile')}
+        </Text>
         <View style={themedStyles.headerSpacer} />
         {!isSelf && (
           <TouchableOpacity
@@ -1014,6 +1289,165 @@ const PublicProfile: React.FC = () => {
             </Text>
           </TouchableOpacity>
         </View>
+      ) : isVenueProfile ? (
+        <ScrollView
+          style={themedStyles.container}
+          contentContainerStyle={themedStyles.scrollContent}
+          showsVerticalScrollIndicator={false}>
+          <View style={themedStyles.profileSection}>
+            <TouchableOpacity
+              style={themedStyles.avatarContainer}
+              activeOpacity={userData?.profilePicUrl ? 0.85 : 1}
+              disabled={!userData?.profilePicUrl}
+              onPress={() => {
+                if (userData?.profilePicUrl) {
+                  setPhotoPreviewVisible(true);
+                }
+              }}
+              accessibilityRole="imagebutton"
+              accessibilityLabel="View venue photo">
+              {userData?.profilePicUrl ? (
+                <Image
+                  source={{uri: userData.profilePicUrl}}
+                  style={themedStyles.avatar}
+                />
+              ) : (
+                <View style={themedStyles.avatarPlaceholder}>
+                  <Text style={themedStyles.avatarInitials}>
+                    {getInitials(venueDisplayName)}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <Text style={themedStyles.userName}>{venueDisplayName}</Text>
+            <View style={themedStyles.venueChipWrap}>
+              <OfficialVenueChip centered />
+            </View>
+            {userData?.managedVenue?.address ? (
+              <View style={themedStyles.venueAddressRow}>
+                <FontAwesomeIcon
+                  icon={faMapMarkerAlt}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+                <Text style={themedStyles.venueAddress}>
+                  {userData.managedVenue.address}
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={themedStyles.venueActions}>
+              {userData?.managedVenue?.placeId ? (
+                <TouchableOpacity
+                  style={themedStyles.venuePrimaryBtn}
+                  onPress={openVenuePage}
+                  activeOpacity={0.85}>
+                  <FontAwesomeIcon icon={faBuilding} size={14} color="#fff" />
+                  <Text style={themedStyles.venuePrimaryBtnText}>
+                    {t('venues.viewVenuePage') || 'View venue page'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {!isSelf ? (
+                <TouchableOpacity
+                  style={themedStyles.venueSecondaryBtn}
+                  onPress={handleMessage}
+                  activeOpacity={0.85}>
+                  <FontAwesomeIcon
+                    icon={faComment}
+                    size={13}
+                    color={colors.primary}
+                  />
+                  <Text style={themedStyles.venueSecondaryBtnText}>
+                    {t('venues.messageVenue') || 'Message venue'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+
+          <View style={themedStyles.section}>
+            <View style={themedStyles.sectionHeaderRow}>
+              <Text style={themedStyles.sectionLabel}>
+                {t('venues.upcomingNights') || 'Upcoming nights'}
+              </Text>
+            </View>
+            {upcomingVenueNights.length === 0 ? (
+              <View style={themedStyles.venueNightEmpty}>
+                <Text style={themedStyles.venueNightEmptyText}>
+                  {t('venues.noUpcomingNightsPublic') ||
+                    'No upcoming nights posted yet.'}
+                </Text>
+              </View>
+            ) : (
+              upcomingVenueNights.map(night => {
+                const dateObj = parseEventDateLocal(night.date);
+                const monthAbbr = dateObj.toLocaleString('en-US', {
+                  month: 'short',
+                });
+                const dayNum = String(dateObj.getDate());
+                const rawJoined =
+                  typeof night.rosterSpotsFilled === 'number'
+                    ? night.rosterSpotsFilled
+                    : 0;
+                const joinedCount = Math.max(0, rawJoined - 1);
+                const joinedLabel =
+                  night.totalSpots > 0
+                    ? `${joinedCount}/${night.totalSpots} going`
+                    : `${joinedCount} going`;
+                return (
+                  <TouchableOpacity
+                    key={night._id}
+                    style={themedStyles.venueNightCard}
+                    activeOpacity={0.8}
+                    onPress={() => openVenueNight(night._id)}>
+                    <View style={themedStyles.venueNightDate}>
+                      <Text style={themedStyles.venueNightMonth}>
+                        {monthAbbr}
+                      </Text>
+                      <Text style={themedStyles.venueNightDay}>{dayNum}</Text>
+                    </View>
+                    <View style={themedStyles.venueNightBody}>
+                      <Text
+                        style={themedStyles.venueNightName}
+                        numberOfLines={1}>
+                        {night.name}
+                      </Text>
+                      <Text
+                        style={themedStyles.venueNightMeta}
+                        numberOfLines={1}>
+                        {[night.time, night.eventType, joinedLabel]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                    </View>
+                    <FontAwesomeIcon
+                      icon={faChevronRight}
+                      size={13}
+                      color={colors.secondaryText}
+                    />
+                  </TouchableOpacity>
+                );
+              })
+            )}
+            {userData?.managedVenue?.placeId ? (
+              <TouchableOpacity
+                style={themedStyles.venueSeeAll}
+                onPress={openVenuePage}
+                activeOpacity={0.75}>
+                <Text style={themedStyles.venueSeeAllText}>
+                  {t('venues.seeAllOnVenuePage') || 'See all on venue page'}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={11}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView
           style={themedStyles.container}
@@ -1153,7 +1587,7 @@ const PublicProfile: React.FC = () => {
                 </TouchableOpacity>
               </View>
             )}
-            {canRatePlayer && (
+            {canRatePlayer && !isVenueProfile && (
               <TouchableOpacity
                 style={[
                   themedStyles.messageButton,

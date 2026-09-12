@@ -49,8 +49,13 @@ interface Props {
   onClose: () => void;
   onCreated: (group: Group) => void;
   currentUserId: string;
-  /** Prefill members when creating from an event roster / invitees. */
+  /** Prefill members when creating from elsewhere (auto-selected). */
   initialMembers?: PickableUser[];
+  /**
+   * Roster / night attendees to pick from — shown as a checklist, not
+   * auto-selected. Venue hosts should be filtered out by the caller.
+   */
+  rosterCandidates?: PickableUser[];
   /** Optional suggested name (e.g. event name). */
   initialName?: string;
 }
@@ -63,6 +68,7 @@ const CreateGroupModal: React.FC<Props> = ({
   onCreated,
   currentUserId,
   initialMembers,
+  rosterCandidates,
   initialName,
 }) => {
   const {colors, darkMode} = useTheme();
@@ -79,6 +85,20 @@ const CreateGroupModal: React.FC<Props> = ({
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
+  const candidateList = useMemo(() => {
+    const seen = new Set<string>();
+    const out: PickableUser[] = [];
+    for (const m of rosterCandidates || []) {
+      const id = String(m._id || '');
+      if (!id || id === String(currentUserId) || seen.has(id)) {
+        continue;
+      }
+      seen.add(id);
+      out.push({...m, _id: id});
+    }
+    return out;
+  }, [rosterCandidates, currentUserId]);
+
   useEffect(() => {
     if (!visible) {
       setKeyboardHeight(0);
@@ -92,10 +112,11 @@ const CreateGroupModal: React.FC<Props> = ({
       return;
     }
     setName(initialName?.trim() || '');
+    // Only auto-select explicit initialMembers — roster candidates stay
+    // unchecked so the creator picks who to include.
     const seed = (initialMembers || []).filter(
       m => m._id && String(m._id) !== String(currentUserId),
     );
-    // Dedupe by id
     const seen = new Set<string>();
     const unique: PickableUser[] = [];
     for (const m of seed) {
@@ -199,6 +220,29 @@ const CreateGroupModal: React.FC<Props> = ({
       return [...prev, user];
     });
   }, []);
+
+  const selectAllCandidates = useCallback(() => {
+    setSelected(prev => {
+      const seen = new Set(prev.map(p => p._id));
+      const next = [...prev];
+      for (const c of candidateList) {
+        if (!seen.has(c._id)) {
+          seen.add(c._id);
+          next.push(c);
+        }
+      }
+      return next;
+    });
+  }, [candidateList]);
+
+  const clearCandidateSelections = useCallback(() => {
+    const candidateIds = new Set(candidateList.map(c => c._id));
+    setSelected(prev => prev.filter(p => !candidateIds.has(p._id)));
+  }, [candidateList]);
+
+  const allCandidatesSelected =
+    candidateList.length > 0 &&
+    candidateList.every(c => selectedIds.has(c._id));
 
   const canCreate = name.trim().length > 0 && !submitting;
 
@@ -455,6 +499,31 @@ const CreateGroupModal: React.FC<Props> = ({
           paddingVertical: 16,
           paddingHorizontal: 8,
         },
+        rosterSectionHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 4,
+          marginTop: 4,
+        },
+        rosterSectionTitle: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+        },
+        rosterSectionAction: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.primary,
+        },
+        rosterHint: {
+          fontSize: 12,
+          color: colors.secondaryText,
+          marginBottom: 6,
+          lineHeight: 16,
+        },
         footer: {
           paddingHorizontal: 16,
           paddingTop: 18,
@@ -666,6 +735,33 @@ const CreateGroupModal: React.FC<Props> = ({
                 </View>
               ) : null}
 
+              {candidateList.length > 0 ? (
+                <View>
+                  <View style={styles.rosterSectionHeader}>
+                    <Text style={styles.rosterSectionTitle}>
+                      From this event
+                    </Text>
+                    <TouchableOpacity
+                      onPress={
+                        allCandidatesSelected
+                          ? clearCandidateSelections
+                          : selectAllCandidates
+                      }
+                      hitSlop={8}>
+                      <Text style={styles.rosterSectionAction}>
+                        {allCandidatesSelected ? 'Clear' : 'Select all'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.rosterHint}>
+                    Tap people to add them. Venue hosts aren't included.
+                  </Text>
+                  {candidateList.map(item => (
+                    <View key={item._id}>{renderUser({item})}</View>
+                  ))}
+                </View>
+              ) : null}
+
               <View style={styles.searchBar}>
                 <FontAwesomeIcon
                   icon={faSearch}
@@ -704,8 +800,9 @@ const CreateGroupModal: React.FC<Props> = ({
                     <Text style={styles.emptyHint}>Keep typing…</Text>
                   ) : (
                     <Text style={styles.emptyHint}>
-                      You can add anyone with an account — they don't have to be
-                      your friend.
+                      {candidateList.length > 0
+                        ? 'Or search for anyone else with an account.'
+                        : "You can add anyone with an account — they don't have to be your friend."}
                     </Text>
                   )
                 }

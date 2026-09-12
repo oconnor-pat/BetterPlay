@@ -73,6 +73,10 @@ import {
 } from '../../utils/mentions';
 import OfficialVenueChip from '../OfficialVenueChip';
 import {isVenueAuthor} from '../../utils/venueDisplay';
+import {resolveVenuePhotoUrl} from '../../utils/venuePhoto';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {API_BASE_URL} from '../../config/api';
 import {
   acceptConversation,
   declineConversation,
@@ -220,6 +224,9 @@ const DmThread: React.FC = () => {
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const listRef = useRef<FlatList<DirectMessage>>(null);
+  const [resolvedVenuePhoto, setResolvedVenuePhoto] = useState<
+    string | undefined
+  >(undefined);
 
   // Header details can come in on the route so the screen has something
   // to show while the thread itself is still loading.
@@ -229,12 +236,71 @@ const DmThread: React.FC = () => {
     route.params?.name ||
     route.params?.username ||
     '';
-  const headerAvatar =
-    conversation?.otherUser.profilePicUrl || route.params?.profilePicUrl;
   const otherUserId = conversation?.otherUser.userId || routeUserId;
-  const otherIsVenue = isVenueAuthor({
-    accountType: conversation?.otherUser.accountType,
-  });
+  const otherIsVenue =
+    isVenueAuthor({
+      accountType: conversation?.otherUser.accountType,
+    }) || !!route.params?.placeId;
+  const headerAvatar =
+    conversation?.otherUser.profilePicUrl ||
+    route.params?.profilePicUrl ||
+    resolvedVenuePhoto;
+
+  useEffect(() => {
+    const existing =
+      conversation?.otherUser.profilePicUrl || route.params?.profilePicUrl;
+    if (existing) {
+      setResolvedVenuePhoto(undefined);
+      return;
+    }
+    let cancelled = false;
+    const resolve = async () => {
+      let placeId =
+        conversation?.otherUser.placeId || route.params?.placeId;
+      if (
+        !placeId &&
+        otherIsVenue &&
+        (conversation?.otherUser.userId || routeUserId)
+      ) {
+        try {
+          const token = await AsyncStorage.getItem('userToken');
+          const userId = conversation?.otherUser.userId || routeUserId;
+          const res = await axios.get(`${API_BASE_URL}/user/${userId}`, {
+            headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+          });
+          const raw = res.data?.user || res.data;
+          placeId = raw?.managedVenue?.placeId;
+          const savedPhoto =
+            raw?.managedVenue?.photoUrl || raw?.profilePicUrl;
+          if (!cancelled && savedPhoto) {
+            setResolvedVenuePhoto(savedPhoto);
+            return;
+          }
+        } catch {
+          // best-effort
+        }
+      }
+      if (!placeId) {
+        return;
+      }
+      const url = await resolveVenuePhotoUrl(placeId, {maxWidthPx: 200});
+      if (!cancelled && url) {
+        setResolvedVenuePhoto(url);
+      }
+    };
+    resolve();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    otherIsVenue,
+    conversation?.otherUser.profilePicUrl,
+    conversation?.otherUser.placeId,
+    conversation?.otherUser.userId,
+    route.params?.profilePicUrl,
+    route.params?.placeId,
+    routeUserId,
+  ]);
 
   // Same deterministic keyboard handling as group chat:
   // KeyboardAvoidingView mis-measures inside the nested tab→stack

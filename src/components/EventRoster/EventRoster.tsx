@@ -74,6 +74,7 @@ import CreateGroupModal from '../Groups/CreateGroupModal';
 import {Group} from '../../types/group';
 import OfficialVenueChip from '../OfficialVenueChip';
 import {authorDisplayName} from '../../utils/venueDisplay';
+import {resolveVenuePhotoUrl} from '../../utils/venuePhoto';
 
 /** Minimum ratings before showing the roster avatar chip. */
 const ROSTER_RATING_MIN_COUNT = 3;
@@ -461,6 +462,15 @@ const EventRoster: React.FC = () => {
   const [eventSource, setEventSource] = useState<'user' | 'venue' | undefined>(
     undefined,
   );
+  const [eventVenueName, setEventVenueName] = useState<string | undefined>(
+    undefined,
+  );
+  const [eventVenueId, setEventVenueId] = useState<string | undefined>(
+    undefined,
+  );
+  const [venueHostPhotoUrl, setVenueHostPhotoUrl] = useState<
+    string | undefined
+  >(undefined);
   const [invitedUsers, setInvitedUsers] = useState<string[]>([]);
   // Host-kicked users — blocked from rejoining until the host re-invites.
   const [removedUserIds, setRemovedUserIds] = useState<string[]>([]);
@@ -579,6 +589,43 @@ const EventRoster: React.FC = () => {
     }
     return roster.find(isRosterHostPlayer) || null;
   }, [isVenueNight, isVenueHostingThisNight, roster, isRosterHostPlayer]);
+
+  useEffect(() => {
+    if (!isVenueNight && !isVenueHostingThisNight) {
+      setVenueHostPhotoUrl(undefined);
+      return;
+    }
+    const managedPhoto = userData?.managedVenue?.photoUrl;
+    if (isVenueHostingThisNight && managedPhoto) {
+      setVenueHostPhotoUrl(managedPhoto);
+      return;
+    }
+    const placeId =
+      eventVenueId ||
+      (isVenueHostingThisNight ? userData?.managedVenue?.placeId : undefined);
+    if (!placeId) {
+      if (managedPhoto) {
+        setVenueHostPhotoUrl(managedPhoto);
+      }
+      return;
+    }
+    let cancelled = false;
+    resolveVenuePhotoUrl(placeId, {maxWidthPx: 200}).then(url => {
+      if (cancelled) {
+        return;
+      }
+      setVenueHostPhotoUrl(url || managedPhoto || undefined);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isVenueNight,
+    isVenueHostingThisNight,
+    eventVenueId,
+    userData?.managedVenue?.photoUrl,
+    userData?.managedVenue?.placeId,
+  ]);
 
   const attendeeRoster = useMemo(() => {
     if (!venueHostPlayer) {
@@ -2034,6 +2081,16 @@ const EventRoster: React.FC = () => {
       setEventCreatedBy(response.data.createdBy || '');
       setEventCreatedByUsername(response.data.createdByUsername || '');
       setEventSource(response.data.source === 'venue' ? 'venue' : 'user');
+      setEventVenueName(
+        response.data.source === 'venue'
+          ? response.data.venueName || undefined
+          : undefined,
+      );
+      setEventVenueId(
+        response.data.source === 'venue'
+          ? response.data.venueId || undefined
+          : undefined,
+      );
       setInvitedUsers(response.data.invitedUsers || []);
       setRemovedUserIds(response.data.removedUserIds || []);
       setRsvps(response.data.rsvps || []);
@@ -2966,16 +3023,29 @@ const EventRoster: React.FC = () => {
     index: number;
   }) => {
     const isSelf = item.username === userData?.username;
+    const isVenueHostRow =
+      isRosterHostPlayer(item) && (isVenueNight || isVenueHostingThisNight);
     const jerseyColorHex = jerseyColors[item.jerseyColor] || jerseyColors.Other;
     const isLight = isLightColor(item.jerseyColor);
     // Allow navigation to any other user's profile (not just those with userId)
     const canNavigateToProfile = !isSelf;
 
-    // For the current user, use their latest profilePicUrl from context
-    // For other users, use the stored profilePicUrl from roster
-    const displayProfilePicUrl = isSelf
+    // Venue host rows prefer the Place photo over the account's personal avatar.
+    const displayProfilePicUrl = isVenueHostRow
+      ? venueHostPhotoUrl ||
+        (isSelf
+          ? userData?.managedVenue?.photoUrl || userData?.profilePicUrl
+          : undefined) ||
+        item.profilePicUrl
+      : isSelf
       ? userData?.profilePicUrl || item.profilePicUrl
       : item.profilePicUrl;
+
+    const avatarLabel = isVenueHostRow
+      ? eventVenueName ||
+        (isSelf ? userData?.managedVenue?.name : undefined) ||
+        item.username
+      : item.username;
 
     const avatarContent = displayProfilePicUrl ? (
       <Image
@@ -2997,7 +3067,7 @@ const EventRoster: React.FC = () => {
             themedStyles.avatarText,
             isLight && themedStyles.avatarTextDark,
           ]}>
-          {getInitials(item.username)}
+          {getInitials(avatarLabel)}
         </Text>
       </View>
     );
@@ -3017,7 +3087,7 @@ const EventRoster: React.FC = () => {
       : false;
 
     const openPlayerRating = () => {
-      if (!item.userId || isSelf || !isUserOnRoster) {
+      if (!item.userId || isSelf || !isUserOnRoster || isVenueHostRow) {
         return;
       }
       if (alreadyRated) {
@@ -3046,7 +3116,7 @@ const EventRoster: React.FC = () => {
         ) : (
           avatarContent
         )}
-        {chipInfo && (
+        {chipInfo && !isVenueHostRow && (
           <View style={themedStyles.ratingChip} pointerEvents="none">
             <FontAwesomeIcon
               icon={faStar}
@@ -3058,7 +3128,7 @@ const EventRoster: React.FC = () => {
             </Text>
           </View>
         )}
-        {!isSelf && isUserOnRoster && !!item.userId && (
+        {!isSelf && isUserOnRoster && !!item.userId && !isVenueHostRow && (
           <TouchableOpacity
             style={themedStyles.ratePlayerFab}
             onPress={openPlayerRating}
@@ -3184,14 +3254,14 @@ const EventRoster: React.FC = () => {
           {canNavigateToProfile ? (
             <TouchableOpacity onPress={() => handlePlayerPress(item)}>
               <Text style={[themedStyles.playerName, {color: colors.primary}]}>
-                {isRosterHostPlayer(item) &&
-                (isVenueNight || isVenueHostingThisNight) &&
-                isSelf
+                {isVenueHostRow
                   ? authorDisplayName({
                       accountType: 'venue',
                       name:
-                        userData?.managedVenue?.name ||
-                        userData?.name ||
+                        (isSelf
+                          ? userData?.managedVenue?.name || userData?.name
+                          : undefined) ||
+                        eventVenueName ||
                         item.username,
                       username: item.username,
                     })
@@ -3207,13 +3277,14 @@ const EventRoster: React.FC = () => {
                   ? {color: colors.primary}
                   : null,
               ]}>
-              {isRosterHostPlayer(item) &&
-              (isVenueNight || isVenueHostingThisNight)
+              {isVenueHostRow
                 ? `${authorDisplayName({
                     accountType: 'venue',
                     name:
-                      userData?.managedVenue?.name ||
-                      userData?.name ||
+                      (isSelf
+                        ? userData?.managedVenue?.name || userData?.name
+                        : undefined) ||
+                      eventVenueName ||
                       item.username,
                     username: item.username,
                   })}${isSelf ? ' (You)' : ''}`
@@ -5473,20 +5544,36 @@ const EventRoster: React.FC = () => {
         onClose={() => setCreateGroupVisible(false)}
         currentUserId={userData?._id || ''}
         initialName={eventName ? `${eventName} crew` : undefined}
-        initialMembers={[
-          ...roster
-            .filter(p => p.userId)
+        rosterCandidates={[
+          ...(isVenueNight || isVenueHostingThisNight ? attendeeRoster : roster)
+            .filter(p => !!p.userId)
             .map(p => ({
               _id: String(p.userId),
               username: p.username,
               profilePicUrl: p.profilePicUrl,
             })),
-          ...invitedUserDetails.map(u => ({
-            _id: String(u._id),
-            username: u.username,
-            name: u.name,
-            profilePicUrl: u.profilePicUrl,
-          })),
+          ...invitedUserDetails
+            .filter(u => {
+              if (!u._id) {
+                return false;
+              }
+              // Don't offer the venue host account as a group member.
+              if (
+                (isVenueNight || isVenueHostingThisNight) &&
+                ((eventCreatedBy && String(u._id) === String(eventCreatedBy)) ||
+                  (eventCreatedByUsername &&
+                    u.username === eventCreatedByUsername))
+              ) {
+                return false;
+              }
+              return true;
+            })
+            .map(u => ({
+              _id: String(u._id),
+              username: u.username,
+              name: u.name,
+              profilePicUrl: u.profilePicUrl,
+            })),
         ]}
         onCreated={(group: Group) => {
           setCreateGroupVisible(false);

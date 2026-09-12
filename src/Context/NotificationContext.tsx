@@ -98,13 +98,26 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   );
   const [settings, setSettings] =
     useState<NotificationSettings>(DEFAULT_SETTINGS);
-  const [badgeCount, setBadgeCount] = useState(0);
+  const [badgeCount, setBadgeCountState] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Computed permission state
   const hasPermission =
     permissionStatus === AuthorizationStatus.AUTHORIZED ||
     permissionStatus === AuthorizationStatus.PROVISIONAL;
+
+  /**
+   * Keep the in-app bell and the OS home-screen icon badge in sync.
+   * APNs can set the icon badge while the app is killed; without writing
+   * back here, a stale "1" sticks forever after the inbox is empty.
+   */
+  const setBadgeCount = useCallback((count: number) => {
+    const safe = Math.max(0, Math.floor(Number(count) || 0));
+    setBadgeCountState(safe);
+    notificationService.setBadgeCount(safe).catch(() => {
+      // Notifee unavailable (e.g. web / missing native module)
+    });
+  }, []);
 
   /**
    * Set navigation reference (called from within NavigationContainer)
@@ -129,7 +142,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       const savedSettings = await notificationService.getNotificationSettings();
       setSettings(savedSettings);
 
-      // Get unread count from backend (source of truth)
+      // Get unread count from backend (source of truth) and mirror to OS badge
       try {
         const token = await AsyncStorage.getItem('userToken');
         if (token) {
@@ -149,9 +162,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           setBadgeCount(0);
         }
       } catch {
-        // Fallback to OS badge count if backend is unreachable
-        const count = await notificationService.getBadgeCount();
-        setBadgeCount(count);
+        // Backend unreachable — clear a stuck OS badge rather than keeping
+        // a stale APNs "1" that may not match any unread inbox items.
+        setBadgeCount(0);
       }
 
       setIsInitialized(true);
@@ -159,7 +172,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       console.error('Error initializing notifications:', error);
       setIsInitialized(true); // Set to true even on error to prevent infinite loading
     }
-  }, []);
+  }, [setBadgeCount]);
 
   /**
    * Request notification permission
@@ -211,12 +224,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
    */
   const clearBadge = useCallback(async (): Promise<void> => {
     try {
-      await notificationService.clearBadgeCount();
       setBadgeCount(0);
     } catch (error) {
       console.error('Error clearing badge:', error);
     }
-  }, []);
+  }, [setBadgeCount]);
 
   /**
    * Fetch unread count from the backend
@@ -225,6 +237,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
+        setBadgeCount(0);
         return;
       }
       const response = await fetch(
@@ -240,7 +253,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     } catch {
       // Silently fail — badge will update on next poll
     }
-  }, []);
+  }, [setBadgeCount]);
 
   // Initialize on mount
   useEffect(() => {
@@ -262,7 +275,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     const unsubBadge = subscribe(
       'notification:badge',
       (data: {count: number}) => {
-        setBadgeCount(data.count);
+        setBadgeCount(data.count || 0);
       },
     );
 
@@ -278,7 +291,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       unsubBadge();
       subscription.remove();
     };
-  }, [isInitialized, refreshBadgeCount, subscribe]);
+  }, [isInitialized, refreshBadgeCount, setBadgeCount, subscribe]);
 
   // Context value
   const contextValue: NotificationContextType = {

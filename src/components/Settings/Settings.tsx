@@ -44,7 +44,7 @@ import Geolocation from '@react-native-community/geolocation';
 import {useTranslation} from 'react-i18next';
 import axios from 'axios';
 import {API_BASE_URL} from '../../config/api';
-import {getPlaceDetails} from '../../services/PlacesService';
+import {getPlaceDetails, buildPhotoUrl} from '../../services/PlacesService';
 import locationService from '../../services/LocationService';
 import {promptNearbyVisibilityIfPrivate} from '../../utils/proximityDiscovery';
 import {
@@ -1517,6 +1517,11 @@ const Settings: React.FC = () => {
                         }
                         if (!address && place.formattedAddress) {
                           address = place.formattedAddress;
+                        }
+                        if (!photoUrl && place.photos?.[0]?.name) {
+                          photoUrl = buildPhotoUrl(place.photos[0].name, {
+                            maxWidthPx: 600,
+                          });
                         }
                       } catch {
                         // Assign still works without coords; map resolve

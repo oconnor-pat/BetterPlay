@@ -48,6 +48,7 @@ try {
 }
 import MapView, {Marker, PROVIDER_GOOGLE} from 'react-native-maps';
 import {getPlaceDetails} from '../../services/PlacesService';
+import {resolveVenuePhotoUrl} from '../../utils/venuePhoto';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
@@ -71,6 +72,8 @@ import {
   faEnvelope,
   faBell,
   faChevronRight,
+  faChevronDown,
+  faChevronUp,
   faRotate,
   faEllipsisH,
   faMapMarkerAlt,
@@ -2906,16 +2909,18 @@ const EventList: React.FC = () => {
         },
         hostSourceRow: {
           flexDirection: 'row',
-          gap: 8,
+          gap: 6,
           paddingHorizontal: 16,
-          paddingBottom: 4,
+          paddingBottom: 6,
         },
         hostSourceChip: {
+          flex: 1,
           flexDirection: 'row',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: 6,
-          paddingVertical: 7,
-          paddingHorizontal: 12,
+          paddingVertical: 8,
+          paddingHorizontal: 8,
           borderRadius: 16,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border,
@@ -2977,7 +2982,7 @@ const EventList: React.FC = () => {
           color: colors.text,
         },
         chipBarContainer: {
-          marginBottom: 12,
+          marginBottom: 4,
           height: 44,
           flexGrow: 0,
           flexShrink: 0,
@@ -2991,6 +2996,56 @@ const EventList: React.FC = () => {
           paddingVertical: 6,
           gap: 8,
           alignItems: 'center',
+        },
+        activityChipsToggle: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingVertical: 6,
+          marginBottom: 4,
+        },
+        activityChipsToggleLeft: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          flexShrink: 1,
+        },
+        activityChipsToggleLabel: {
+          fontSize: 13,
+          fontWeight: '700',
+          color: colors.secondaryText,
+          letterSpacing: 0.2,
+        },
+        activityChipsToggleLabelActive: {
+          color: colors.primary,
+        },
+        activityChipsCountBadge: {
+          minWidth: 20,
+          height: 20,
+          borderRadius: 10,
+          paddingHorizontal: 6,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.primary,
+        },
+        activityChipsCountBadgeText: {
+          color: '#fff',
+          fontSize: 11,
+          fontWeight: '700',
+        },
+        activityChipsClear: {
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 12,
+          backgroundColor: colors.inputBackground || colors.background,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+        },
+        activityChipsClearText: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.secondaryText,
         },
         eventList: {
           flex: 1,
@@ -4142,6 +4197,7 @@ const EventList: React.FC = () => {
   // Filter state
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
+  const [activityChipsExpanded, setActivityChipsExpanded] = useState(false);
   const [selectedDateFilter, setSelectedDateFilter] = useState('all');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [showMyEventsOnly, setShowMyEventsOnly] = useState(false);
@@ -4149,6 +4205,9 @@ const EventList: React.FC = () => {
   const [hostSourceFilter, setHostSourceFilter] = useState<
     'all' | 'people' | 'venues'
   >('all');
+  const [venuePhotoByPlaceId, setVenuePhotoByPlaceId] = useState<
+    Record<string, string>
+  >({});
   // Opt-in: when true, activity chips default from profile interests. Persisted;
   // defaults off so opening Events shows the full feed.
   const [filterByInterests, setFilterByInterests] = useState(false);
@@ -4492,6 +4551,35 @@ const EventList: React.FC = () => {
       };
     }, [myUserId]),
   );
+
+  // Prefetch Place photos for venue-hosted nights so feed avatars aren't
+  // stuck on username initials when managedVenue.photoUrl was never saved.
+  useEffect(() => {
+    const placeIds = Array.from(
+      new Set(
+        eventData
+          .filter(e => e.source === 'venue' && e.venueId)
+          .map(e => e.venueId as string),
+      ),
+    ).filter(id => !venuePhotoByPlaceId[id]);
+    if (placeIds.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    placeIds.forEach(placeId => {
+      resolveVenuePhotoUrl(placeId, {maxWidthPx: 200}).then(url => {
+        if (cancelled || !url) {
+          return;
+        }
+        setVenuePhotoByPlaceId(prev =>
+          prev[placeId] ? prev : {...prev, [placeId]: url},
+        );
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [eventData, venuePhotoByPlaceId]);
 
   // Pre-seed creator cache with the current user so events they create
   // optimistically render with their avatar before /users resolves.
@@ -6458,12 +6546,18 @@ const EventList: React.FC = () => {
     if (!event.createdBy || event.createdBy === userData?._id) {
       return;
     }
+    const isVenue = event.source === 'venue';
     navigation.navigate('Messages', {
       screen: 'DmThread',
       params: {
         userId: event.createdBy,
         username: event.createdByUsername,
-        profilePicUrl: event.createdByProfilePicUrl,
+        name: isVenue ? event.venueName : undefined,
+        profilePicUrl:
+          (isVenue && event.venueId
+            ? venuePhotoByPlaceId[event.venueId]
+            : undefined) || event.createdByProfilePicUrl,
+        placeId: isVenue ? event.venueId : undefined,
       },
     });
   };
@@ -6906,10 +7000,16 @@ const EventList: React.FC = () => {
     const isCreator = userData?._id === item.createdBy;
     const username = item.createdByUsername || '';
     const creatorInfo = creatorInfoMap[username];
-    const creatorProfilePicUrl =
-      item.createdByProfilePicUrl || creatorInfo?.profilePicUrl;
-    const creatorInitials = getCreatorInitials(creatorInfo?.name, username);
     const isVenueHosted = item.source === 'venue';
+    const creatorProfilePicUrl = isVenueHosted
+      ? (item.venueId && venuePhotoByPlaceId[item.venueId]) ||
+        (isVenueHost && isCreator
+          ? managedVenue?.photoUrl || userData?.profilePicUrl
+          : undefined) ||
+        item.createdByProfilePicUrl ||
+        creatorInfo?.profilePicUrl
+      : item.createdByProfilePicUrl || creatorInfo?.profilePicUrl;
+    const creatorInitials = getCreatorInitials(creatorInfo?.name, username);
     const hostDisplayName = isVenueHosted
       ? item.venueName || creatorInfo?.name || username
       : username || t('events.anonymous') || 'Unknown';
@@ -7185,16 +7285,72 @@ const EventList: React.FC = () => {
             {renderFriendsOnEventStrip()}
 
             {item.showLocationPublicly && item.location ? (
-              <View style={themedStyles.detailRow}>
-                <FontAwesomeIcon
-                  icon={faMapMarkerAlt}
-                  size={12}
-                  color={colors.secondaryText}
+              isVenueHosted && !item.isVirtual ? (
+                <TouchableOpacity
+                  style={themedStyles.detailRow}
+                  onPress={() => openMapsForEvent(item, t, presentMapPicker)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    t('events.getDirections') || 'Get directions'
+                  }>
+                  <FontAwesomeIcon
+                    icon={faMapMarkerAlt}
+                    size={12}
+                    color={colors.primary}
+                  />
+                  <Text
+                    style={[themedStyles.detailText, {color: colors.primary}]}
+                    numberOfLines={2}>
+                    {item.location}
+                  </Text>
+                  <FontAwesomeIcon
+                    icon={faLocationArrow}
+                    size={11}
+                    color={colors.primary}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View style={themedStyles.detailRow}>
+                  <FontAwesomeIcon
+                    icon={faMapMarkerAlt}
+                    size={12}
+                    color={colors.secondaryText}
+                  />
+                  <Text style={themedStyles.detailText} numberOfLines={2}>
+                    {item.location}
+                  </Text>
+                </View>
+              )
+            ) : null}
+
+            {/* Directions are venue-night only — LFG / public user teasers
+                can show an address, but not map navigation. */}
+            {isVenueHosted &&
+            item.showLocationPublicly &&
+            item.location &&
+            !item.isVirtual ? (
+              <TouchableOpacity
+                style={themedStyles.mapEmbed}
+                onPress={() => openMapsForEvent(item, t, presentMapPicker)}
+                activeOpacity={0.85}>
+                <EventCardMapEmbed
+                  key={`${item._id}-gated-map`}
+                  item={item}
+                  themedStyles={themedStyles}
+                  colors={colors}
                 />
-                <Text style={themedStyles.detailText} numberOfLines={2}>
-                  {item.location}
-                </Text>
-              </View>
+                <View style={themedStyles.mapEmbedOverlay}>
+                  <FontAwesomeIcon
+                    icon={faLocationArrow}
+                    size={11}
+                    color="#fff"
+                  />
+                  <Text style={themedStyles.mapEmbedOverlayText}>
+                    {t('events.getDirections')}
+                  </Text>
+                </View>
+              </TouchableOpacity>
             ) : null}
 
             <View style={themedStyles.gatedHintRow}>
@@ -7488,21 +7644,48 @@ const EventList: React.FC = () => {
               ) : null}
             </View>
 
-            <View style={themedStyles.detailRow}>
-              <FontAwesomeIcon
-                icon={faMapMarkerAlt}
-                size={12}
-                color={colors.secondaryText}
-              />
-              <Text style={themedStyles.detailText} numberOfLines={2}>
-                {item.isVirtual
-                  ? formatVirtualLocationLabel(
-                      item.location,
-                      t('events.virtualLocationBadge') || 'Other',
-                    )
-                  : item.location}
-              </Text>
-            </View>
+            {isVenueHosted && !item.isVirtual && item.location ? (
+              <TouchableOpacity
+                style={themedStyles.detailRow}
+                onPress={() => openMapsForEvent(item, t, presentMapPicker)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  t('events.getDirections') || 'Get directions'
+                }>
+                <FontAwesomeIcon
+                  icon={faMapMarkerAlt}
+                  size={12}
+                  color={colors.primary}
+                />
+                <Text
+                  style={[themedStyles.detailText, {color: colors.primary}]}
+                  numberOfLines={2}>
+                  {item.location}
+                </Text>
+                <FontAwesomeIcon
+                  icon={faLocationArrow}
+                  size={11}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            ) : (
+              <View style={themedStyles.detailRow}>
+                <FontAwesomeIcon
+                  icon={faMapMarkerAlt}
+                  size={12}
+                  color={colors.secondaryText}
+                />
+                <Text style={themedStyles.detailText} numberOfLines={2}>
+                  {item.isVirtual
+                    ? formatVirtualLocationLabel(
+                        item.location,
+                        t('events.virtualLocationBadge') || 'Other',
+                      )
+                    : item.location}
+                </Text>
+              </View>
+            )}
 
             <View style={themedStyles.detailRow}>
               <FontAwesomeIcon
@@ -7558,9 +7741,9 @@ const EventList: React.FC = () => {
           </View>
         </TouchableOpacity>
 
-        {/* Physical events get a map preview; virtual ones get a distinct
-            online panel so they don't look like a map-less physical card. */}
-        {!item.isVirtual ? (
+        {/* Map + Get Directions is venue-night only. Community / LFG physical
+            events keep the address row; virtual ones get the online panel. */}
+        {isVenueHosted && !item.isVirtual ? (
         <TouchableOpacity
           style={themedStyles.mapEmbed}
           onPress={() => openMapsForEvent(item, t, presentMapPicker)}
@@ -7578,7 +7761,7 @@ const EventList: React.FC = () => {
             </Text>
           </View>
         </TouchableOpacity>
-        ) : (
+        ) : item.isVirtual ? (
           <View style={themedStyles.virtualLocationBanner}>
             <View style={themedStyles.virtualLocationBannerIcon}>
               <FontAwesomeIcon icon={faGlobe} size={16} color={colors.primary} />
@@ -7598,7 +7781,7 @@ const EventList: React.FC = () => {
               </Text>
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* RSVP control — Going / Maybe / Can't make it. Only invite-only
             events use the 3-way RSVP: you were invited, so you reply. Public
@@ -7805,7 +7988,9 @@ const EventList: React.FC = () => {
 
         {/* Reactions. One pill per distinct emoji: tap to add or remove your
             own, long-press to see who reacted. The "+" is always present so
-            there's an entry point on a card nobody has reacted to yet. */}
+            there's an entry point on a card nobody has reacted to yet —
+            except venue hosts managing their own night (Manage night CTA). */}
+        {(reactionSummary.length > 0 || !(isVenueHost && isCreator)) && (
         <View style={themedStyles.reactionRow}>
           {reactionSummary.map(entry => (
             <TouchableOpacity
@@ -7827,17 +8012,20 @@ const EventList: React.FC = () => {
               </Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity
-            style={themedStyles.reactionAddButton}
-            onPress={() => setReactionPickerEvent(item)}
-            hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
-            <FontAwesomeIcon
-              icon={faPlus}
-              size={11}
-              color={colors.secondaryText}
-            />
-          </TouchableOpacity>
+          {!(isVenueHost && isCreator) ? (
+            <TouchableOpacity
+              style={themedStyles.reactionAddButton}
+              onPress={() => setReactionPickerEvent(item)}
+              hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
+              <FontAwesomeIcon
+                icon={faPlus}
+                size={11}
+                color={colors.secondaryText}
+              />
+            </TouchableOpacity>
+          ) : null}
         </View>
+        )}
 
         {/* Engagement Footer */}
         <View style={themedStyles.engagementRow}>
@@ -8150,7 +8338,7 @@ const EventList: React.FC = () => {
                 {key: 'all', label: t('events.hostFilterAll') || 'All'},
                 {
                   key: 'people',
-                  label: t('events.hostFilterPeople') || 'People',
+                  label: t('events.hostFilterPeople') || 'Community',
                 },
                 {
                   key: 'venues',
@@ -8187,33 +8375,87 @@ const EventList: React.FC = () => {
             })}
           </View>
         )}
-        {/* Horizontal Activity Filter Chips */}
+        {/* Activity type chips — collapsed by default to free card space;
+            expand to filter by Basketball / Trivia / etc. */}
         {!isVenueHost ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={themedStyles.chipBarContainer}
-          contentContainerStyle={themedStyles.chipBarContent}>
-          {activityOptions.map(option => {
-            const isActive = selectedEventTypes.includes(option.label);
-            return (
+          <View>
+            <View style={themedStyles.activityChipsToggle}>
               <TouchableOpacity
-                key={option.label}
-                style={[themedStyles.chip, isActive && themedStyles.chipActive]}
-                onPress={() => toggleEventType(option.label)}
-                activeOpacity={0.7}>
-                <Text style={themedStyles.chipEmoji}>{option.emoji}</Text>
+                style={themedStyles.activityChipsToggleLeft}
+                onPress={() => setActivityChipsExpanded(prev => !prev)}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityState={{expanded: activityChipsExpanded}}
+                accessibilityLabel={
+                  t('events.activitiesFilter') || 'Activity filters'
+                }>
                 <Text
                   style={[
-                    themedStyles.chipText,
-                    isActive && themedStyles.chipTextActive,
+                    themedStyles.activityChipsToggleLabel,
+                    selectedEventTypes.length > 0 &&
+                      themedStyles.activityChipsToggleLabelActive,
                   ]}>
-                  {option.label}
+                  {t('events.activitiesFilter') || 'Activities'}
                 </Text>
+                {selectedEventTypes.length > 0 ? (
+                  <View style={themedStyles.activityChipsCountBadge}>
+                    <Text style={themedStyles.activityChipsCountBadgeText}>
+                      {selectedEventTypes.length}
+                    </Text>
+                  </View>
+                ) : null}
+                <FontAwesomeIcon
+                  icon={activityChipsExpanded ? faChevronUp : faChevronDown}
+                  size={11}
+                  color={
+                    selectedEventTypes.length > 0
+                      ? colors.primary
+                      : colors.secondaryText
+                  }
+                />
               </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+              {selectedEventTypes.length > 0 ? (
+                <TouchableOpacity
+                  style={themedStyles.activityChipsClear}
+                  onPress={() => setSelectedEventTypes([])}
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                  <Text style={themedStyles.activityChipsClearText}>
+                    {t('events.clearActivityFilters') || 'Clear'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            {activityChipsExpanded ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={themedStyles.chipBarContainer}
+                contentContainerStyle={themedStyles.chipBarContent}>
+                {activityOptions.map(option => {
+                  const isActive = selectedEventTypes.includes(option.label);
+                  return (
+                    <TouchableOpacity
+                      key={option.label}
+                      style={[
+                        themedStyles.chip,
+                        isActive && themedStyles.chipActive,
+                      ]}
+                      onPress={() => toggleEventType(option.label)}
+                      activeOpacity={0.7}>
+                      <Text style={themedStyles.chipEmoji}>{option.emoji}</Text>
+                      <Text
+                        style={[
+                          themedStyles.chipText,
+                          isActive && themedStyles.chipTextActive,
+                        ]}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
+          </View>
         ) : null}
         {/* Profile Filter Banner */}
         {profileFilter && (

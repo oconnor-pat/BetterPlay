@@ -49,6 +49,7 @@ import UserContext, {UserContextType} from '../UserContext';
 import {Conversation, ConversationStatus, DmActivity} from '../../types/dm';
 import OfficialVenueChip from '../OfficialVenueChip';
 import {isVenueAuthor} from '../../utils/venueDisplay';
+import {resolveVenuePhotoUrl} from '../../utils/venuePhoto';
 import {
   declineConversation,
   deleteConversation,
@@ -98,6 +99,9 @@ const MessagesList: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [requests, setRequests] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [venuePhotoByPlaceId, setVenuePhotoByPlaceId] = useState<
+    Record<string, string>
+  >({});
   // Which threads we already have rows for. Held in a ref so the socket
   // subscriptions below don't have to list the lists as dependencies —
   // otherwise every incoming message would tear down and rebuild the
@@ -139,6 +143,39 @@ const MessagesList: React.FC = () => {
       ...requests.map(c => c._id),
     ]);
   }, [conversations, requests]);
+
+  // Resolve Place photos for venue threads missing a saved photoUrl.
+  useEffect(() => {
+    const placeIds = Array.from(
+      new Set(
+        [...conversations, ...requests]
+          .filter(
+            c =>
+              isVenueAuthor(c.otherUser) &&
+              !c.otherUser.profilePicUrl &&
+              c.otherUser.placeId,
+          )
+          .map(c => c.otherUser.placeId as string),
+      ),
+    ).filter(id => !venuePhotoByPlaceId[id]);
+    if (placeIds.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    placeIds.forEach(placeId => {
+      resolveVenuePhotoUrl(placeId, {maxWidthPx: 200}).then(url => {
+        if (cancelled || !url) {
+          return;
+        }
+        setVenuePhotoByPlaceId(prev =>
+          prev[placeId] ? prev : {...prev, [placeId]: url},
+        );
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [conversations, requests, venuePhotoByPlaceId]);
 
   useEffect(() => {
     const unsubActivity = subscribe('dm:activity', (payload: DmActivity) => {
@@ -257,10 +294,15 @@ const MessagesList: React.FC = () => {
         conversationId: conv._id,
         username: conv.otherUser.username,
         name: conv.otherUser.name,
-        profilePicUrl: conv.otherUser.profilePicUrl,
+        profilePicUrl:
+          conv.otherUser.profilePicUrl ||
+          (conv.otherUser.placeId
+            ? venuePhotoByPlaceId[conv.otherUser.placeId]
+            : undefined),
+        placeId: conv.otherUser.placeId,
       });
     },
-    [navigation],
+    [navigation, venuePhotoByPlaceId],
   );
 
   const closeSwipe = useCallback((id: string) => {
@@ -655,17 +697,19 @@ const MessagesList: React.FC = () => {
     const displayName =
       item.otherUser.name || item.otherUser.username || 'Someone';
     const venue = isVenueAuthor(item.otherUser);
+    const avatarUrl =
+      item.otherUser.profilePicUrl ||
+      (item.otherUser.placeId
+        ? venuePhotoByPlaceId[item.otherUser.placeId]
+        : undefined);
     const rowContent = (
       <TouchableOpacity
         style={[styles.row, unread > 0 && styles.rowUnread]}
         activeOpacity={0.75}
         onPress={() => openThread(item)}>
         <View style={[styles.avatar, venue ? styles.avatarVenue : null]}>
-          {item.otherUser.profilePicUrl ? (
-            <Image
-              source={{uri: item.otherUser.profilePicUrl}}
-              style={styles.avatarImage}
-            />
+          {avatarUrl ? (
+            <Image source={{uri: avatarUrl}} style={styles.avatarImage} />
           ) : (
             <Text style={styles.avatarInitials}>
               {displayName.slice(0, 2).toUpperCase()}
