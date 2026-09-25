@@ -38,6 +38,7 @@ import {useTheme} from '../ThemeContext/ThemeContext';
 import {Group, GroupLastMessage} from '../../types/group';
 import {listMyGroups} from '../../services/GroupsService';
 import {useSocket} from '../../Context/SocketContext';
+import analyticsService from '../../services/AnalyticsService';
 import UserContext, {UserContextType} from '../UserContext';
 import CreateGroupModal from './CreateGroupModal';
 import RosterAvatarStrip from '../shared/RosterAvatarStrip';
@@ -70,6 +71,7 @@ const GroupsList: React.FC = () => {
 
   useFocusEffect(
     useCallback(() => {
+      analyticsService.trackOpenGroups().catch(() => {});
       loadGroups();
     }, [loadGroups]),
   );

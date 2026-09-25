@@ -45,6 +45,7 @@ import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useTranslation} from 'react-i18next';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {useSocket} from '../../Context/SocketContext';
+import analyticsService from '../../services/AnalyticsService';
 import UserContext, {UserContextType} from '../UserContext';
 import {Conversation, ConversationStatus, DmActivity} from '../../types/dm';
 import OfficialVenueChip from '../OfficialVenueChip';
@@ -133,6 +134,7 @@ const MessagesList: React.FC = () => {
   // reflected when the user comes back to the list.
   useFocusEffect(
     useCallback(() => {
+      analyticsService.trackOpenMessages().catch(() => {});
       load();
     }, [load]),
   );

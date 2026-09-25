@@ -46,7 +46,7 @@ const PrivacyPolicy: React.FC = () => {
   });
 
   return (
-    <LegalDocument title="Privacy Policy" lastUpdated="January 2, 2026">
+    <LegalDocument title="Privacy Policy" lastUpdated="September 25, 2026">
       <Text style={styles.heading}>Introduction</Text>
       <Text style={styles.paragraph}>
         BetterPlay ("we," "our," or "us") is committed to protecting your
@@ -167,7 +167,10 @@ const PrivacyPolicy: React.FC = () => {
         If you have questions about this Privacy Policy, please contact us at:
       </Text>
       <Text style={styles.paragraph}>
-        <Text style={styles.bold}>Email:</Text> support@betterplay.app
+        <Text style={styles.bold}>Email:</Text> hello@joinbetterplay.com
+      </Text>
+      <Text style={styles.paragraph}>
+        Also published at https://joinbetterplay.com/privacy.html
       </Text>
 
       <Text style={styles.footer}>

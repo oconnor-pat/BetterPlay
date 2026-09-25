@@ -33,3 +33,11 @@ The app shares:
 `https://joinbetterplay.com/?e=<eventId>&name=<eventName>`
 
 People without the app see Get iOS / Get Android. People who already have it can tap “Open this event in the app” (`betterplay://event/<id>`).
+
+## 4. Legal URLs (App Store / Play Console)
+
+After deploy, use these public URLs in store listings:
+
+- Privacy Policy: `https://joinbetterplay.com/privacy.html`
+- Terms of Service: `https://joinbetterplay.com/terms.html`
+- Support: `mailto:hello@joinbetterplay.com`

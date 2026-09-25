@@ -14,6 +14,7 @@ import LandingPage from './src/components/Landingpage/LandingPage';
 import BottomNavigator from './src/components/BottomNavigator/BottomNavigator';
 import Settings from './src/components/Settings/Settings';
 import ResetPassword from './src/components/ResetPassword/ResetPassword';
+import VerifyEmail from './src/components/ResetPassword/VerifyEmail';
 import {
   PrivacyPolicy,
   TermsOfService,
@@ -72,6 +73,7 @@ type RootStackParamList = {
   BottomNavigator: undefined;
   Settings: undefined;
   ResetPassword: {token: string};
+  VerifyEmail: {token: string};
   PrivacyPolicy: undefined;
   TermsOfService: undefined;
   YourData: undefined;
@@ -87,6 +89,12 @@ const linking: LinkingOptions<RootStackParamList> = {
     screens: {
       ResetPassword: {
         path: 'reset-password',
+        parse: {
+          token: (token: string) => token,
+        },
+      },
+      VerifyEmail: {
+        path: 'verify-email',
         parse: {
           token: (token: string) => token,
         },
@@ -453,6 +461,14 @@ const AppContent = () => {
                     options={{
                       headerShown: true,
                       title: 'Reset Password',
+                    }}
+                  />
+                  <Stack.Screen
+                    name="VerifyEmail"
+                    component={VerifyEmail}
+                    options={{
+                      headerShown: true,
+                      title: 'Verify Email',
                     }}
                   />
                   <Stack.Screen

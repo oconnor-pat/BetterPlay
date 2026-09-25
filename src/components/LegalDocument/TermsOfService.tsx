@@ -39,7 +39,7 @@ const TermsOfService: React.FC = () => {
   });
 
   return (
-    <LegalDocument title="Terms of Service" lastUpdated="January 10, 2026">
+    <LegalDocument title="Terms of Service" lastUpdated="September 25, 2026">
       <Text style={styles.paragraph}>
         This End User License Agreement ("Agreement") is a legal agreement
         between you ("User" or "you") and Patrick O'Connor ("Developer," "we,"
@@ -159,7 +159,10 @@ const TermsOfService: React.FC = () => {
         If you have questions about this Agreement, please contact us at:
       </Text>
       <Text style={styles.paragraph}>
-        <Text style={styles.bold}>Email:</Text> support@betterplay.app
+        <Text style={styles.bold}>Email:</Text> hello@joinbetterplay.com
+      </Text>
+      <Text style={styles.paragraph}>
+        Also published at https://joinbetterplay.com/terms.html
       </Text>
 
       <Text style={styles.footer}>

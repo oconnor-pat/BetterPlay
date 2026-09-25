@@ -24,9 +24,15 @@ class LocationService {
     }
 
     return new Promise(resolve => {
-      Geolocation.requestAuthorization(
+      // Types for this package lag the runtime config arg; When In Use matches Info.plist.
+      (Geolocation.requestAuthorization as (
+        success?: () => void,
+        error?: () => void,
+        config?: {authorizationLevel?: 'always' | 'whenInUse'},
+      ) => void)(
         () => resolve(true),
         () => resolve(false),
+        {authorizationLevel: 'whenInUse'},
       );
     });
   }

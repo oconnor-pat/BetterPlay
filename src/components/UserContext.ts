@@ -18,6 +18,8 @@ export type UserData = {
   isAdmin?: boolean;
   accountType?: 'user' | 'venue';
   managedVenue?: ManagedVenue | null;
+  emailVerified?: boolean;
+  authProviders?: string[];
 };
 
 export interface UserContextType {

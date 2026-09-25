@@ -178,6 +178,17 @@ class NotificationService {
    */
   async checkPermissionStatus(): Promise<AuthorizationStatus> {
     try {
+      // Prefer Firebase Messaging — requestPermission() goes through FCM/APNs,
+      // and Notifee's cached settings can lag right after the OS dialog.
+      const firebaseStatus = await messaging().hasPermission();
+      if (
+        firebaseStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        firebaseStatus === messaging.AuthorizationStatus.PROVISIONAL ||
+        firebaseStatus === messaging.AuthorizationStatus.DENIED ||
+        firebaseStatus === messaging.AuthorizationStatus.NOT_DETERMINED
+      ) {
+        return firebaseStatus as unknown as AuthorizationStatus;
+      }
       const settings = await notifee.getNotificationSettings();
       return settings.authorizationStatus;
     } catch (error) {

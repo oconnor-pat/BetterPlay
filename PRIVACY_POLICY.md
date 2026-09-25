@@ -1,6 +1,6 @@
 # Privacy Policy for BetterPlay
 
-**Last Updated: January 2, 2026**
+**Last Updated: September 25, 2026**
 
 ## Introduction
 
@@ -64,7 +64,9 @@ We may update this Privacy Policy from time to time. We will notify you of any c
 
 If you have questions about this Privacy Policy or our practices, please contact us at:
 
-**Email**: support@betterplay.app
+**Email**: hello@joinbetterplay.com
+
+Public web copy: https://joinbetterplay.com/privacy.html
 
 ---
 

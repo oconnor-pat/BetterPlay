@@ -1,4 +1,4 @@
-import React, {useState, useMemo, useEffect, useContext} from 'react';
+import React, {useState, useMemo, useEffect, useContext, useCallback} from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useNavigation, CommonActions} from '@react-navigation/native';
+import {useNavigation, CommonActions, useFocusEffect} from '@react-navigation/native';
 import {useTheme} from '../ThemeContext/ThemeContext';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
@@ -38,6 +38,7 @@ import {
   faMapLocationDot,
   faLink,
   faBuilding,
+  faEnvelope,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
@@ -159,6 +160,14 @@ const Settings: React.FC = () => {
   useEffect(() => {
     loadPreferences();
   }, []);
+
+  // Re-read prefs when returning from onboarding / OS settings so the
+  // Location toggle matches what the user just granted.
+  useFocusEffect(
+    useCallback(() => {
+      loadPreferences();
+    }, []),
+  );
 
   const loadPreferences = async () => {
     try {
@@ -1315,6 +1324,60 @@ const Settings: React.FC = () => {
               </View>
             </TouchableOpacity>
             )}
+
+            {userData?.emailVerified === false &&
+            (userData?.authProviders || []).includes('password') ? (
+              <TouchableOpacity
+                style={themedStyles.settingRow}
+                activeOpacity={0.7}
+                onPress={async () => {
+                  try {
+                    const token = await AsyncStorage.getItem('userToken');
+                    if (!token) {
+                      return;
+                    }
+                    await axios.post(
+                      `${API_BASE_URL}/auth/resend-verification`,
+                      {},
+                      {headers: {Authorization: `Bearer ${token}`}},
+                    );
+                    Alert.alert(
+                      t('auth.verifyEmailSentTitle') || 'Check your email',
+                      t('auth.verifyEmailSentBody') ||
+                        'We sent another verification link to your inbox.',
+                    );
+                  } catch {
+                    Alert.alert(
+                      t('common.error'),
+                      t('auth.verifyResendFailed') ||
+                        'Could not resend verification email.',
+                    );
+                  }
+                }}>
+                <View style={themedStyles.iconContainer}>
+                  <FontAwesomeIcon
+                    icon={faEnvelope}
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={themedStyles.settingContent}>
+                  <Text style={themedStyles.settingTitle}>
+                    {t('auth.verifyBannerTitle') || 'Verify your email'}
+                  </Text>
+                  <Text style={themedStyles.settingDescription}>
+                    {t('auth.resendVerification') || 'Resend email'}
+                  </Text>
+                </View>
+                <View style={themedStyles.chevronContainer}>
+                  <FontAwesomeIcon
+                    icon={faChevronRight}
+                    size={13}
+                    color={colors.secondaryText}
+                  />
+                </View>
+              </TouchableOpacity>
+            ) : null}
 
             <TouchableOpacity
               style={themedStyles.settingRow}

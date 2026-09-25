@@ -605,7 +605,8 @@ function LandingPage() {
   ) => {
     await AsyncStorage.setItem('userToken', token);
     await AsyncStorage.setItem('cachedUserData', JSON.stringify(user));
-    await notificationService.requestPermission();
+    // Don't call requestPermission here — first-run onboarding (or Settings)
+    // owns the iOS notification dialog so users aren't double-prompted.
     await notificationService.ensureTokenRegistered();
     setUserData(user);
     if (isNew) {
@@ -851,7 +852,10 @@ function LandingPage() {
           'email',
           true,
         );
-        setSuccessMessage('Account created successfully!');
+        setSuccessMessage(
+          t('auth.checkEmailAfterSignup') ||
+            'Account created! Check your email to verify your address.',
+        );
         setErrorMessage(null);
         navigation.navigate('BottomNavigator', {
           screen: 'Profile',

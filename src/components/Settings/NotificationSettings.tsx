@@ -4,7 +4,7 @@
  * Component for managing notification preferences
  */
 
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -32,9 +32,16 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = () => {
     settings,
     updateSettings,
     requestPermission,
+    checkPermission,
   } = useNotifications();
   const {colors} = useTheme();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Always re-read OS permission when this panel opens — onboarding may have
+  // changed it without remounting NotificationContext consumers.
+  useEffect(() => {
+    checkPermission().catch(() => {});
+  }, [checkPermission]);
 
   const handleRequestPermission = async () => {
     setIsLoading(true);

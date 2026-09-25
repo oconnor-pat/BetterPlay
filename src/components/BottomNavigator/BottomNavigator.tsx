@@ -1,5 +1,6 @@
-import React, {useContext, useEffect, useRef} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import {Platform, StyleSheet, View} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
 import EventList from '../EventList/EventList';
@@ -14,6 +15,7 @@ import {Notifications} from '../Notifications';
 import GroupDetail from '../Groups/GroupDetail';
 import GroupsList from '../Groups/GroupsList';
 import {MessagesList, DmThread} from '../Messages';
+import OnboardingModal from '../Onboarding/OnboardingModal';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarAlt,
@@ -27,7 +29,6 @@ import {UserContextType} from '../UserContext';
 import UserContext from '../UserContext';
 import {IconDefinition} from '@fortawesome/fontawesome-svg-core';
 import {useTheme} from '../ThemeContext/ThemeContext';
-import {useNotifications} from '../../Context/NotificationContext';
 import {useDmBadge} from '../../hooks/useDmBadge';
 import {useGroupBadge} from '../../hooks/useGroupBadge';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -291,32 +292,37 @@ const ProfileStack = ({userId}: {userId: string}) => {
 const BottomNavigator: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
   const {colors} = useTheme();
-  const {hasPermission, isInitialized, requestPermission} = useNotifications();
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
-  const hasPromptedRef = useRef(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   // Counts threads waiting on the user (unread conversations + pending
   // message requests), so the tab can say how many people need a reply.
   const dmBadge = useDmBadge(!!userData);
   // Same idea for Groups: how many group chats have unread messages.
   const groupBadge = useGroupBadge(!!userData);
 
-  // Request notification permission after login (once per session)
+  // First-run coach marks live here (not on EventList) because new accounts
+  // land on Profile after signup — they would never see an Events-only modal.
   useEffect(() => {
-    if (
-      isInitialized &&
-      !hasPermission &&
-      !hasPromptedRef.current &&
-      userData
-    ) {
-      hasPromptedRef.current = true;
-      // Small delay to let the user see the main screen first
-      const timer = setTimeout(() => {
-        requestPermission();
-      }, 1500);
-      return () => clearTimeout(timer);
+    if (!userData) {
+      return;
     }
-  }, [isInitialized, hasPermission, requestPermission, userData]);
+    let cancelled = false;
+    AsyncStorage.getItem('hasSeenOnboarding').then(seen => {
+      if (cancelled) {
+        return;
+      }
+      setShowOnboarding(!seen);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userData?._id]);
+
+  const dismissOnboarding = async () => {
+    await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+    setShowOnboarding(false);
+  };
 
   if (!userData) {
     // Prevent crash during sign out navigation transition
@@ -397,25 +403,31 @@ const BottomNavigator: React.FC = () => {
   });
 
   return (
-    <Tab.Navigator screenOptions={screenOptions}>
-      <Tab.Screen name="Events" component={LocalEventsStack} />
-      <Tab.Screen
-        name="Groups"
-        component={GroupsStack}
-        options={
-          isVenueHost
-            ? {
-                tabBarButton: () => null,
-                tabBarItemStyle: {display: 'none'},
-              }
-            : undefined
-        }
+    <>
+      <OnboardingModal
+        visible={showOnboarding}
+        onDone={dismissOnboarding}
       />
-      <Tab.Screen name="Messages" component={MessagesStack} />
-      <Tab.Screen name="Profile">
-        {() => <ProfileStack userId={userId} />}
-      </Tab.Screen>
-    </Tab.Navigator>
+      <Tab.Navigator screenOptions={screenOptions}>
+        <Tab.Screen name="Events" component={LocalEventsStack} />
+        <Tab.Screen
+          name="Groups"
+          component={GroupsStack}
+          options={
+            isVenueHost
+              ? {
+                  tabBarButton: () => null,
+                  tabBarItemStyle: {display: 'none'},
+                }
+              : undefined
+          }
+        />
+        <Tab.Screen name="Messages" component={MessagesStack} />
+        <Tab.Screen name="Profile">
+          {() => <ProfileStack userId={userId} />}
+        </Tab.Screen>
+      </Tab.Navigator>
+    </>
   );
 };
 

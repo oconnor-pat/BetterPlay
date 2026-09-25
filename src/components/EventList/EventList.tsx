@@ -113,6 +113,7 @@ import {useNotifications} from '../../Context/NotificationContext';
 import {useSocket} from '../../Context/SocketContext';
 import notificationService from '../../services/NotificationService';
 import locationService, {Coordinates} from '../../services/LocationService';
+import analyticsService from '../../services/AnalyticsService';
 import {refreshLocationForNearby} from '../../utils/proximityDiscovery';
 import {
   defaultJoinDetails,
@@ -873,6 +874,9 @@ const openMapsForEvent = async (
     t,
     presentPicker,
   );
+  if (event?._id && event?.source === 'venue') {
+    analyticsService.trackVenueDirections(event._id).catch(() => {});
+  }
 };
 
 type LatLng = {latitude: number; longitude: number};
@@ -4472,6 +4476,8 @@ const EventList: React.FC = () => {
 
   // First-time user onboarding state
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
+  const [showVerifyBanner, setShowVerifyBanner] = useState(false);
+  const [resendingVerify, setResendingVerify] = useState(false);
 
   // Post-event rating prompt (one at a time)
   const [pendingRating, setPendingRating] = useState<PendingRating | null>(
@@ -4510,7 +4516,7 @@ const EventList: React.FC = () => {
     }
   }, [initialLoadDone, t]);
 
-  // Check if user has seen the events onboarding - non-blocking
+  // Check if user has seen the events empty-state hint - non-blocking
   useEffect(() => {
     AsyncStorage.getItem('hasSeenEventsHint').then(hasSeenHint => {
       if (!hasSeenHint) {
@@ -4518,6 +4524,13 @@ const EventList: React.FC = () => {
       }
     });
   }, [fetchEvents]);
+
+  useEffect(() => {
+    const needsVerify =
+      userData?.emailVerified === false &&
+      (userData?.authProviders || []).includes('password');
+    setShowVerifyBanner(!!needsVerify);
+  }, [userData?.emailVerified, userData?.authProviders]);
 
   // After attending an ended event, prompt to rate (one at a time per session).
   useFocusEffect(
@@ -4705,6 +4718,42 @@ const EventList: React.FC = () => {
   const dismissFirstTimeHint = async () => {
     await AsyncStorage.setItem('hasSeenEventsHint', 'true');
     setShowFirstTimeHint(false);
+  };
+
+  const resendVerificationEmail = async () => {
+    if (resendingVerify) {
+      return;
+    }
+    setResendingVerify(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        return;
+      }
+      const response = await axios.post(
+        `${API_BASE_URL}/auth/resend-verification`,
+        {},
+        {headers: {Authorization: `Bearer ${token}`}},
+      );
+      if (response.data?.alreadyVerified) {
+        setShowVerifyBanner(false);
+        return;
+      }
+      analyticsService.trackEmailVerificationResent().catch(() => {});
+      Alert.alert(
+        t('auth.verifyEmailSentTitle') || 'Check your email',
+        t('auth.verifyEmailSentBody') ||
+          'We sent another verification link to your inbox.',
+      );
+    } catch {
+      Alert.alert(
+        t('common.error'),
+        t('auth.verifyResendFailed') ||
+          'Could not resend verification email. Try again later.',
+      );
+    } finally {
+      setResendingVerify(false);
+    }
   };
 
   // Fetch events from backend - OPTIMIZED with caching
@@ -6691,6 +6740,12 @@ const EventList: React.FC = () => {
       setEventData(prevData => [...mergedEvents, ...prevData]);
       for (const evt of mergedEvents) {
         notificationService.scheduleEventNotifications(evt).catch(() => {});
+        analyticsService
+          .trackCreateEvent(
+            evt.name || eventPayload.name || 'event',
+            evt.source === 'venue' ? 'venue' : 'user',
+          )
+          .catch(() => {});
       }
       resetCreateFormState();
       setJoinPrompt(null);
@@ -8298,6 +8353,50 @@ const EventList: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
+      {showVerifyBanner ? (
+        <View
+          style={{
+            marginHorizontal: 16,
+            marginTop: 10,
+            marginBottom: 4,
+            padding: 12,
+            borderRadius: 12,
+            backgroundColor: colors.primary + '18',
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: colors.primary + '55',
+          }}>
+          <Text style={{color: colors.text, fontWeight: '700', marginBottom: 4}}>
+            {t('auth.verifyBannerTitle') || 'Verify your email'}
+          </Text>
+          <Text
+            style={{
+              color: colors.secondaryText,
+              fontSize: 13,
+              lineHeight: 18,
+              marginBottom: 10,
+            }}>
+            {t('auth.verifyBannerBody') ||
+              'Confirm your email so we can recover your account and keep it secure.'}
+          </Text>
+          <TouchableOpacity
+            onPress={resendVerificationEmail}
+            disabled={resendingVerify}
+            style={{
+              alignSelf: 'flex-start',
+              backgroundColor: colors.primary,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 8,
+              opacity: resendingVerify ? 0.7 : 1,
+            }}>
+            <Text style={{color: colors.buttonText || '#fff', fontWeight: '700'}}>
+              {resendingVerify
+                ? t('common.loading') || 'Sending…'
+                : t('auth.resendVerification') || 'Resend email'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       {/* Content wrapper: pills + filters + event list */}
       <KeyboardAvoidingView
         style={themedStyles.contentWrapper}
