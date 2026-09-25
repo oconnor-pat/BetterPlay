@@ -1283,6 +1283,9 @@ function LandingPage() {
             }
             ref={registerNameInputRef}
             autoCapitalize="words"
+            autoComplete="name"
+            textContentType="name"
+            secureTextEntry={false}
             onFocus={() => setFocusedField('registerName')}
             onBlur={() => setFocusedField(null)}
             returnKeyType="next"
@@ -1357,6 +1360,9 @@ function LandingPage() {
             }
             ref={registerUsernameInputRef}
             autoCapitalize="none"
+            autoComplete="username"
+            textContentType="username"
+            secureTextEntry={false}
             onFocus={() => setFocusedField('registerUsername')}
             onBlur={() => setFocusedField(null)}
             returnKeyType="next"
@@ -1393,6 +1399,8 @@ function LandingPage() {
             }
             ref={registerPasswordInputRef}
             autoCapitalize="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
             onFocus={() => setFocusedField('registerPassword')}
             onBlur={() => setFocusedField(null)}
             returnKeyType="go"
