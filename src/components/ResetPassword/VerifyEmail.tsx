@@ -29,10 +29,17 @@ const VerifyEmail: React.FC<VerifyEmailProps> = ({route, navigation}) => {
     'loading',
   );
   const [message, setMessage] = useState('');
+  const verifyStarted = React.useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     const verify = async () => {
+      // Guard against React Strict Mode double-mount firing two POSTs.
+      if (verifyStarted.current) {
+        return;
+      }
+      verifyStarted.current = true;
+
       if (!token) {
         setStatus('error');
         setMessage(
