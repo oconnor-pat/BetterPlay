@@ -1,12 +1,35 @@
 (function () {
   var links = window.BETTERPLAY_LINKS || {};
+  var appStoreUrl = (links.appStoreUrl || '').trim();
+  var playStoreUrl = (links.playStoreUrl || '').trim();
   var testFlightUrl = (links.testFlightUrl || '').trim();
   var firebaseUrl = (links.firebaseUrl || '').trim();
-  var testerEmail = (links.testerEmail || 'hello@joinbetterplay.com').trim();
+  // Prefer public store links when live; fall back to beta distribution.
+  var iosUrl = appStoreUrl || testFlightUrl;
+  var androidUrl = playStoreUrl || firebaseUrl;
+  var testerEmail = (links.testerEmail || 'betterplay.application@gmail.com').trim();
+  var isLive = !!(appStoreUrl && playStoreUrl);
 
   var year = document.getElementById('year');
   if (year) {
     year.textContent = String(new Date().getFullYear());
+  }
+
+  var eyebrow = document.getElementById('eyebrow');
+  var lede = document.getElementById('lede');
+  var getHeading = document.querySelector('.get h2');
+  var getLede = document.querySelector('.get-lede');
+  if (isLive) {
+    if (eyebrow) eyebrow.textContent = 'Now on the App Store & Google Play';
+    if (lede) {
+      lede.textContent =
+        'Pickup games, hangouts, and group plans — organized in one place. Download BetterPlay and show up.';
+    }
+    if (getHeading) getHeading.textContent = 'Get the app';
+    if (getLede) {
+      getLede.textContent =
+        'Available on iPhone and Android. Pick your phone and you’re in.';
+    }
   }
 
   function setMail(id) {
@@ -20,7 +43,7 @@
   setMail('mail-ios');
   setMail('mail-android');
 
-  function wirePlatform(buttonId, noteId, url) {
+  function wirePlatform(buttonId, noteId, url, liveLabel) {
     var button = document.getElementById(buttonId);
     var note = document.getElementById(noteId);
     if (!button) {
@@ -31,6 +54,9 @@
       button.href = url;
       button.target = '_blank';
       button.rel = 'noopener noreferrer';
+      if (liveLabel && (appStoreUrl || playStoreUrl)) {
+        button.textContent = liveLabel;
+      }
       if (note) {
         note.hidden = true;
       }
@@ -42,24 +68,26 @@
     }
   }
 
-  wirePlatform('link-ios', 'note-ios', testFlightUrl);
-  wirePlatform('link-android', 'note-android', firebaseUrl);
+  wirePlatform('link-ios', 'note-ios', iosUrl, 'Download on the App Store');
+  wirePlatform(
+    'link-android',
+    'note-android',
+    androidUrl,
+    'Get it on Google Play',
+  );
 
-  // Hero CTAs jump to the matching panel, or straight to the store/invite link.
   document.querySelectorAll('[data-platform]').forEach(function (btn) {
     btn.addEventListener('click', function (event) {
       var platform = btn.getAttribute('data-platform');
-      var url = platform === 'ios' ? testFlightUrl : firebaseUrl;
+      var url = platform === 'ios' ? iosUrl : androidUrl;
       if (url) {
         event.preventDefault();
         window.open(url, '_blank', 'noopener,noreferrer');
         return;
       }
-      // Fall through to #get-the-app anchor for email fallback copy.
     });
   });
 
-  // Soft-highlight the likely platform.
   var ua = navigator.userAgent || '';
   var isIOS = /iPhone|iPad|iPod/i.test(ua);
   var isAndroid = /Android/i.test(ua);
@@ -69,31 +97,24 @@
     document.getElementById('panel-android')?.classList.add('is-likely');
   }
 
-  // Event share support: https://joinbetterplay.com/?e=<eventId>
-  // Optional: &name= for a friendlier blurb (URL-encoded).
   var params = new URLSearchParams(window.location.search);
   var eventId = params.get('e') || params.get('event');
   var eventName = params.get('name');
 
   if (eventId) {
-    var eyebrow = document.getElementById('eyebrow');
-    var lede = document.getElementById('lede');
+    var eyebrowEl = document.getElementById('eyebrow');
+    var ledeEl = document.getElementById('lede');
     var hint = document.getElementById('event-hint');
-
-    if (eyebrow) {
-      eyebrow.textContent = "You're invited";
-    }
-    if (lede) {
-      lede.textContent = eventName
-        ? 'Someone shared "' +
-          eventName +
-          '" on BetterPlay. Get the app to RSVP and see the details.'
-        : 'Someone shared an event on BetterPlay. Get the app to RSVP and see the details.';
+    if (eyebrowEl) eyebrowEl.textContent = 'You’re invited';
+    if (ledeEl) {
+      ledeEl.textContent = eventName
+        ? 'Open BetterPlay to view “' + decodeURIComponent(eventName) + '”.'
+        : 'Open BetterPlay to view this event.';
     }
     if (hint) {
       hint.hidden = false;
       hint.textContent =
-        'Install BetterPlay below, then open the app and find the event on your Events tab.';
+        'Already have the app? Deep links open the event once you’re signed in.';
     }
   }
 })();

@@ -1,5 +1,5 @@
 import React, {useContext, useEffect, useState} from 'react';
-import {Platform, StyleSheet, View} from 'react-native';
+import {Platform, StyleSheet, View, Text, TouchableOpacity} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
@@ -16,6 +16,10 @@ import GroupDetail from '../Groups/GroupDetail';
 import GroupsList from '../Groups/GroupsList';
 import {MessagesList, DmThread} from '../Messages';
 import OnboardingModal from '../Onboarding/OnboardingModal';
+import AppTour, {
+  APP_TOUR_STORAGE_KEY,
+} from '../Onboarding/AppTour';
+import {useVenueActing} from '../VenueActingContext';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {
   faCalendarAlt,
@@ -291,10 +295,13 @@ const ProfileStack = ({userId}: {userId: string}) => {
 
 const BottomNavigator: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
+  const {actingAs, pendingInvites, acceptInvite, declineInvite, activeVenue} =
+    useVenueActing();
   const {colors} = useTheme();
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showAppTour, setShowAppTour] = useState(false);
   // Counts threads waiting on the user (unread conversations + pending
   // message requests), so the tab can say how many people need a reply.
   const dmBadge = useDmBadge(!!userData);
@@ -313,6 +320,13 @@ const BottomNavigator: React.FC = () => {
         return;
       }
       setShowOnboarding(!seen);
+      if (seen) {
+        AsyncStorage.getItem(APP_TOUR_STORAGE_KEY).then(tourSeen => {
+          if (!cancelled && !tourSeen) {
+            setShowAppTour(true);
+          }
+        });
+      }
     });
     return () => {
       cancelled = true;
@@ -322,6 +336,15 @@ const BottomNavigator: React.FC = () => {
   const dismissOnboarding = async () => {
     await AsyncStorage.setItem('hasSeenOnboarding', 'true');
     setShowOnboarding(false);
+    const tourSeen = await AsyncStorage.getItem(APP_TOUR_STORAGE_KEY);
+    if (!tourSeen) {
+      setShowAppTour(true);
+    }
+  };
+
+  const dismissAppTour = async () => {
+    await AsyncStorage.setItem(APP_TOUR_STORAGE_KEY, 'true');
+    setShowAppTour(false);
   };
 
   if (!userData) {
@@ -331,7 +354,8 @@ const BottomNavigator: React.FC = () => {
 
   const userId = userData?._id;
   const isVenueHost =
-    userData?.accountType === 'venue' && !!userData?.managedVenue?.placeId;
+    (userData?.accountType === 'venue' && !!userData?.managedVenue?.placeId) ||
+    !!activeVenue;
 
   const themedTabBarIcon = ({
     route,
@@ -408,6 +432,80 @@ const BottomNavigator: React.FC = () => {
         visible={showOnboarding}
         onDone={dismissOnboarding}
       />
+      <AppTour
+        visible={showAppTour && !showOnboarding}
+        onDone={dismissAppTour}
+        variant={
+          actingAs.some(a => a.role === 'owner' || a.role === 'admin')
+            ? 'venue'
+            : 'consumer'
+        }
+      />
+      {pendingInvites.length > 0 ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: insets.top + 4,
+            left: 12,
+            right: 12,
+            zIndex: 50,
+            backgroundColor: colors.card || colors.background,
+            borderRadius: 12,
+            padding: 12,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: colors.border,
+          }}>
+          {pendingInvites.slice(0, 2).map(inv => (
+            <View key={inv.venueUserId} style={{marginBottom: 8}}>
+              <Text
+                style={{
+                  color: colors.text,
+                  fontWeight: '600',
+                  marginBottom: 8,
+                  fontSize: 13,
+                }}>
+                {t('venues.staffInvite', {
+                  defaultValue: 'Staff invite from {{name}}',
+                  name: inv.managedVenue?.name || inv.name,
+                })}
+              </Text>
+              <View style={{flexDirection: 'row', gap: 8}}>
+                <TouchableOpacity
+                  onPress={() => declineInvite(inv.venueUserId)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    alignItems: 'center',
+                    borderRadius: 10,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: colors.border,
+                  }}>
+                  <Text style={{color: colors.secondaryText, fontWeight: '600'}}>
+                    {t('common.decline', {defaultValue: 'Decline'})}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => acceptInvite(inv.venueUserId)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    alignItems: 'center',
+                    borderRadius: 10,
+                    backgroundColor: colors.primary,
+                  }}>
+                  <Text
+                    style={{
+                      color: colors.buttonText || '#fff',
+                      fontWeight: '700',
+                    }}>
+                    {t('common.accept', {defaultValue: 'Accept'})}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
       <Tab.Navigator screenOptions={screenOptions}>
         <Tab.Screen name="Events" component={LocalEventsStack} />
         <Tab.Screen

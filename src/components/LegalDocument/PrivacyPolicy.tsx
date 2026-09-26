@@ -167,7 +167,7 @@ const PrivacyPolicy: React.FC = () => {
         If you have questions about this Privacy Policy, please contact us at:
       </Text>
       <Text style={styles.paragraph}>
-        <Text style={styles.bold}>Email:</Text> hello@joinbetterplay.com
+        <Text style={styles.bold}>Email:</Text> betterplay.application@gmail.com
       </Text>
       <Text style={styles.paragraph}>
         Also published at https://joinbetterplay.com/privacy.html

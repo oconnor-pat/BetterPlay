@@ -110,9 +110,15 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig project.hasProperty('BETTERPLAY_UPLOAD_STORE_FILE')
-                    ? signingConfigs.release
-                    : signingConfigs.debug
+            // Require a real upload keystore for release — never ship a
+            // debug-signed APK/AAB to Play (it will be rejected).
+            if (!project.hasProperty('BETTERPLAY_UPLOAD_STORE_FILE')) {
+                throw new GradleException(
+                    "Missing BETTERPLAY_UPLOAD_* signing properties in ~/.gradle/gradle.properties. " +
+                    "Release builds cannot use the debug keystore."
+                )
+            }
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

@@ -96,6 +96,7 @@ import {
 } from '@react-navigation/native';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import UserContext, {UserContextType} from '../UserContext';
+import {useVenueActing} from '../VenueActingContext';
 import GroupPickerModal from '../Groups/GroupPickerModal';
 import RosterAvatarStrip from '../shared/RosterAvatarStrip';
 import {getGroup} from '../../services/GroupsService';
@@ -1219,6 +1220,7 @@ const RecurringDeck: React.FC<RecurringDeckProps> = ({
 
 const EventList: React.FC = () => {
   const {userData} = useContext(UserContext) as UserContextType;
+  const {activeVenue} = useVenueActing();
   const myUserId = userData?._id;
   const isVenueHost =
     userData?.accountType === 'venue' && !!userData?.managedVenue?.placeId;
@@ -5670,8 +5672,13 @@ const EventList: React.FC = () => {
           date: newEvent.date,
           totalSpots: parseInt(newEvent.totalSpots, 10),
           eventType: newEvent.eventType,
-          createdBy: userData?._id || '',
-          createdByUsername: userData?.username || '',
+          createdBy: activeVenue?.venueUserId || userData?._id || '',
+          createdByUsername:
+            activeVenue?.username || userData?.username || '',
+          asVenueUserId:
+            activeVenue && activeVenue.venueUserId !== userData?._id
+              ? activeVenue.venueUserId
+              : undefined,
           latitude: newEvent.isVirtual ? undefined : saveLatitude,
           longitude: newEvent.isVirtual ? undefined : saveLongitude,
           isVirtual: newEvent.isVirtual,

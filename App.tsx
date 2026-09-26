@@ -24,6 +24,7 @@ import AdminReports from './src/components/Moderation/AdminReports';
 import {StatusBar, ActivityIndicator, View, StyleSheet} from 'react-native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import UserContext from './src/components/UserContext';
+import {VenueActingProvider} from './src/components/VenueActingContext';
 import {
   ThemeProvider,
   useTheme,
@@ -398,6 +399,7 @@ const AppContent = () => {
       />
       <UserContext.Provider
         value={{userData, setUserData, isAdmin, checkAdminStatus}}>
+        <VenueActingProvider>
         <SocketProvider>
           <NotificationProvider>
             <EventProvider>
@@ -499,6 +501,7 @@ const AppContent = () => {
             </EventProvider>
           </NotificationProvider>
         </SocketProvider>
+        </VenueActingProvider>
       </UserContext.Provider>
     </>
   );

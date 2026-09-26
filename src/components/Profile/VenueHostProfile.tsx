@@ -1,4 +1,4 @@
-import React, {useCallback, useContext, useMemo} from 'react';
+import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import {
   faGear,
   faMapMarkerAlt,
   faRightFromBracket,
+  faUserPlus,
 } from '@fortawesome/free-solid-svg-icons';
 import {useTranslation} from 'react-i18next';
 import UserContext, {UserContextType} from '../UserContext';
@@ -26,6 +27,7 @@ import {useTheme} from '../ThemeContext/ThemeContext';
 import HamburgerMenu from '../HamburgerMenu/HamburgerMenu';
 import {useEventContext} from '../../Context/EventContext';
 import {isEventPast} from '../../utils/eventDateTime';
+import ManageVenueAdminsModal from './ManageVenueAdminsModal';
 
 /**
  * Host-mode profile for venue business accounts. Replaces the personal
@@ -37,6 +39,7 @@ const VenueHostProfile: React.FC = () => {
   const navigation = useNavigation<any>();
   const {userData, setUserData} = useContext(UserContext) as UserContextType;
   const {events, fetchEvents} = useEventContext();
+  const [staffModalVisible, setStaffModalVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -352,6 +355,33 @@ const VenueHostProfile: React.FC = () => {
         <TouchableOpacity
           style={styles.row}
           activeOpacity={0.75}
+          onPress={() => setStaffModalVisible(true)}>
+          <View style={styles.rowIcon}>
+            <FontAwesomeIcon
+              icon={faUserPlus}
+              size={14}
+              color={colors.primary}
+            />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>
+              {t('settings.venueStaff') || 'Venue staff'}
+            </Text>
+            <Text style={styles.rowDesc}>
+              {t('settings.venueStaffDescription') ||
+                'Invite managers who can post as your venue'}
+            </Text>
+          </View>
+          <FontAwesomeIcon
+            icon={faChevronRight}
+            size={13}
+            color={colors.secondaryText}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.row}
+          activeOpacity={0.75}
           onPress={openVenuePage}>
           <View style={styles.rowIcon}>
             <FontAwesomeIcon
@@ -421,6 +451,14 @@ const VenueHostProfile: React.FC = () => {
             'This is a venue host account. Locals see your nights in the Events feed with an Official venue badge.'}
         </Text>
       </ScrollView>
+      {userData?._id ? (
+        <ManageVenueAdminsModal
+          visible={staffModalVisible}
+          venueUserId={userData._id}
+          venueName={venueName}
+          onClose={() => setStaffModalVisible(false)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 };

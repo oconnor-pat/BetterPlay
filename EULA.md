@@ -114,7 +114,7 @@ If any provision of this Agreement is held to be invalid or unenforceable, the r
 
 If you have questions about this Agreement, please contact us at:
 
-**Email**: hello@joinbetterplay.com
+**Email**: betterplay.application@gmail.com
 
 Public web copy: https://joinbetterplay.com/terms.html
 

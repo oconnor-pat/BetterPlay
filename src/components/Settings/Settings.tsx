@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, CommonActions, useFocusEffect} from '@react-navigation/native';
@@ -39,6 +40,8 @@ import {
   faLink,
   faBuilding,
   faEnvelope,
+  faBookOpen,
+  faHeadset,
 } from '@fortawesome/free-solid-svg-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from '@react-native-community/geolocation';
@@ -58,6 +61,16 @@ import {version as appVersion} from '../../../package.json';
 import NotificationSettings from './NotificationSettings';
 import BlockedAndDeclined from './BlockedAndDeclined';
 import LinkAccountModal from '../Landingpage/LinkAccountModal';
+import AppTour, {
+  APP_TOUR_STORAGE_KEY,
+} from '../Onboarding/AppTour';
+import {useVenueActing} from '../VenueActingContext';
+import ManageVenueAdminsModal from '../Profile/ManageVenueAdminsModal';
+
+const SUPPORT_EMAIL = 'betterplay.application@gmail.com';
+const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+  'BetterPlay support',
+)}`;
 
 interface Language {
   code: string;
@@ -116,7 +129,12 @@ const Settings: React.FC = () => {
   const {setUserData, userData, isAdmin} = useContext(
     UserContext,
   ) as UserContextType;
+  const {actingAs} = useVenueActing();
   const isVenueHost = userData?.accountType === 'venue';
+  const ownedVenueId =
+    isVenueHost && userData?._id
+      ? userData._id
+      : actingAs.find(a => a.role === 'owner')?.venueUserId;
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -135,6 +153,8 @@ const Settings: React.FC = () => {
     setNotificationSettingsModalVisible,
   ] = useState(false);
   const [blockedModalVisible, setBlockedModalVisible] = useState(false);
+  const [showAppTour, setShowAppTour] = useState(false);
+  const [manageAdminsVisible, setManageAdminsVisible] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [defaultMapApp, setDefaultMapAppState] = useState<MapAppName | null>(
@@ -1382,6 +1402,101 @@ const Settings: React.FC = () => {
             <TouchableOpacity
               style={themedStyles.settingRow}
               activeOpacity={0.7}
+              onPress={() => Linking.openURL(SUPPORT_MAILTO)}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={faHeadset}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('settings.contactSupport', {defaultValue: 'Contact support'})}
+                </Text>
+                <Text style={themedStyles.settingDescription}>
+                  {SUPPORT_EMAIL}
+                </Text>
+              </View>
+              <View style={themedStyles.chevronContainer}>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={themedStyles.settingRow}
+              activeOpacity={0.7}
+              onPress={async () => {
+                await AsyncStorage.removeItem(APP_TOUR_STORAGE_KEY);
+                setShowAppTour(true);
+              }}>
+              <View style={themedStyles.iconContainer}>
+                <FontAwesomeIcon
+                  icon={faBookOpen}
+                  size={14}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={themedStyles.settingContent}>
+                <Text style={themedStyles.settingTitle}>
+                  {t('settings.appTour', {
+                    defaultValue: 'How BetterPlay works',
+                  })}
+                </Text>
+                <Text style={themedStyles.settingDescription}>
+                  {t('settings.appTourDescription', {
+                    defaultValue: 'Replay the app tour',
+                  })}
+                </Text>
+              </View>
+              <View style={themedStyles.chevronContainer}>
+                <FontAwesomeIcon
+                  icon={faChevronRight}
+                  size={13}
+                  color={colors.secondaryText}
+                />
+              </View>
+            </TouchableOpacity>
+
+            {ownedVenueId ? (
+              <TouchableOpacity
+                style={themedStyles.settingRow}
+                activeOpacity={0.7}
+                onPress={() => setManageAdminsVisible(true)}>
+                <View style={themedStyles.iconContainer}>
+                  <FontAwesomeIcon
+                    icon={faBuilding}
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={themedStyles.settingContent}>
+                  <Text style={themedStyles.settingTitle}>
+                    {t('settings.venueStaff', {defaultValue: 'Venue staff'})}
+                  </Text>
+                  <Text style={themedStyles.settingDescription}>
+                    {t('settings.venueStaffDescription', {
+                      defaultValue: 'Invite managers who can post as your venue',
+                    })}
+                  </Text>
+                </View>
+                <View style={themedStyles.chevronContainer}>
+                  <FontAwesomeIcon
+                    icon={faChevronRight}
+                    size={13}
+                    color={colors.secondaryText}
+                  />
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity
+              style={themedStyles.settingRow}
+              activeOpacity={0.7}
               onPress={() => setAboutModalVisible(true)}>
               <View style={themedStyles.iconContainer}>
                 <FontAwesomeIcon
@@ -1956,6 +2071,22 @@ const Settings: React.FC = () => {
       </Modal>
 
       {/* About Modal */}
+      <AppTour
+        visible={showAppTour}
+        onDone={async () => {
+          await AsyncStorage.setItem(APP_TOUR_STORAGE_KEY, 'true');
+          setShowAppTour(false);
+        }}
+        variant={actingAs.length > 0 || isVenueHost ? 'venue' : 'consumer'}
+      />
+      {ownedVenueId ? (
+        <ManageVenueAdminsModal
+          visible={manageAdminsVisible}
+          venueUserId={ownedVenueId}
+          venueName={userData?.managedVenue?.name || userData?.name}
+          onClose={() => setManageAdminsVisible(false)}
+        />
+      ) : null}
       <Modal
         visible={aboutModalVisible}
         transparent

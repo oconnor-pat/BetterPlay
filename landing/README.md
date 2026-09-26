@@ -10,7 +10,7 @@ Edit `index.html` and set:
 window.BETTERPLAY_LINKS = {
   testFlightUrl: "https://testflight.apple.com/join/YOUR_CODE",
   firebaseUrl: "https://appdistribution.firebase.google.com/...",
-  testerEmail: "hello@joinbetterplay.com",
+  testerEmail: "betterplay.application@gmail.com",
 };
 ```
 
@@ -40,4 +40,4 @@ After deploy, use these public URLs in store listings:
 
 - Privacy Policy: `https://joinbetterplay.com/privacy.html`
 - Terms of Service: `https://joinbetterplay.com/terms.html`
-- Support: `mailto:hello@joinbetterplay.com`
+- Support: `mailto:betterplay.application@gmail.com`

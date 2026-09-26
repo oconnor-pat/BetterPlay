@@ -7,6 +7,8 @@ export type ManagedVenue = {
   address?: string;
   latitude?: number;
   longitude?: number;
+  adminUserIds?: string[];
+  pendingAdminUserIds?: string[];
 };
 
 export type UserData = {

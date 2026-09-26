@@ -597,7 +597,7 @@ const YourData: React.FC = () => {
 
           <Text style={styles.footer}>
             {t('settings.dataFooter') ||
-              'To request deletion of your data, use the "Delete Account" option in Settings. For questions, contact support@betterplay.app'}
+              'To request deletion of your data, use the "Delete Account" option in Settings. For questions, contact betterplay.application@gmail.com'}
           </Text>
         </View>
       </ScrollView>
