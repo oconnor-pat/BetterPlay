@@ -595,6 +595,59 @@ const Settings: React.FC = () => {
         modalScrollContent: {
           paddingBottom: insets.bottom + 16,
         },
+        venueAssignBody: {
+          paddingHorizontal: 16,
+          paddingTop: 10,
+          paddingBottom: 8,
+        },
+        venueAssignHint: {
+          color: colors.secondaryText,
+          fontSize: 13,
+          lineHeight: 18,
+          marginBottom: 14,
+        },
+        venueAssignField: {
+          marginBottom: 10,
+        },
+        venueAssignLabel: {
+          color: colors.secondaryText,
+          fontSize: 11,
+          fontWeight: '700',
+          letterSpacing: 0.4,
+          textTransform: 'uppercase',
+          marginBottom: 5,
+        },
+        venueAssignInput: {
+          backgroundColor: colors.inputBackground || colors.card || colors.background,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 11,
+          color: colors.text,
+          fontSize: 15,
+        },
+        venueAssignFooter: {
+          paddingHorizontal: 16,
+          paddingTop: 10,
+          paddingBottom: Math.max(insets.bottom, 12) + 4,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          backgroundColor: colors.background,
+        },
+        venueAssignButton: {
+          backgroundColor: colors.primary,
+          borderRadius: 12,
+          paddingVertical: 14,
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 48,
+        },
+        venueAssignButtonText: {
+          color: colors.buttonText || '#fff',
+          fontWeight: '700',
+          fontSize: 15,
+        },
         modalHandle: {
           alignSelf: 'center',
           width: 36,
@@ -1564,210 +1617,193 @@ const Settings: React.FC = () => {
         transparent
         animationType="slide"
         onRequestClose={() => setVenueAssignVisible(false)}>
-        <View style={themedStyles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={themedStyles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <TouchableOpacity
             style={themedStyles.modalBackdrop}
             activeOpacity={1}
             onPress={() => setVenueAssignVisible(false)}
           />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{width: '100%'}}>
-            <View style={themedStyles.modalContent}>
-              <View style={themedStyles.modalHandle} />
-              <View style={themedStyles.modalHeader}>
-                <Text style={themedStyles.modalTitle}>
-                  {t('venues.assignPartner') || 'Assign venue partner'}
-                </Text>
-                <TouchableOpacity
-                  style={themedStyles.modalCloseButton}
-                  onPress={() => setVenueAssignVisible(false)}>
-                  <FontAwesomeIcon
-                    icon={faXmark}
-                    size={16}
-                    color={colors.text}
-                  />
-                </TouchableOpacity>
-              </View>
-              <ScrollView
-                contentContainerStyle={themedStyles.modalScrollContent}
-                keyboardShouldPersistTaps="handled">
-                <Text style={{color: colors.secondaryText, marginBottom: 10}}>
-                  Turns an existing user into a venue account linked to a
-                  Google Place ID. Their posts become official venue nights in
-                  the Events feed.
-                </Text>
-                {(
-                  [
-                    {
-                      label: 'Username',
-                      value: venueAssignUsername,
-                      set: setVenueAssignUsername,
-                      placeholder: 'polos_bar',
-                    },
-                    {
-                      label: 'Google Place ID',
-                      value: venueAssignPlaceId,
-                      set: setVenueAssignPlaceId,
-                      placeholder: 'ChIJ...',
-                    },
-                    {
-                      label: 'Venue display name',
-                      value: venueAssignName,
-                      set: setVenueAssignName,
-                      placeholder: "Polo's Bar & Grill",
-                    },
-                    {
-                      label: 'Logo / photo URL (optional)',
-                      value: venueAssignPhotoUrl,
-                      set: setVenueAssignPhotoUrl,
-                      placeholder: 'https://...',
-                    },
-                    {
-                      label: 'Address (optional)',
-                      value: venueAssignAddress,
-                      set: setVenueAssignAddress,
-                      placeholder: '140 Ledgewood Ave…',
-                    },
-                  ] as const
-                ).map(field => (
-                  <View key={field.label} style={{marginBottom: 12}}>
-                    <Text
-                      style={{
-                        color: colors.secondaryText,
-                        fontSize: 12,
-                        marginBottom: 6,
-                        fontWeight: '600',
-                      }}>
-                      {field.label}
-                    </Text>
-                    <TextInput
-                      value={field.value}
-                      onChangeText={field.set}
-                      placeholder={field.placeholder}
-                      placeholderTextColor={colors.placeholder || '#888'}
-                      autoCapitalize="none"
-                      style={{
-                        backgroundColor:
-                          colors.inputBackground || colors.background,
-                        borderWidth: StyleSheet.hairlineWidth,
-                        borderColor: colors.border,
-                        borderRadius: 12,
-                        paddingHorizontal: 12,
-                        paddingVertical: 12,
-                        color: colors.text,
-                      }}
-                    />
-                  </View>
-                ))}
-                <TouchableOpacity
-                  disabled={venueAssignSaving}
-                  activeOpacity={0.85}
-                  onPress={async () => {
-                    if (
-                      !venueAssignUsername.trim() ||
-                      !venueAssignPlaceId.trim() ||
-                      !venueAssignName.trim()
-                    ) {
-                      Alert.alert(
-                        'Missing fields',
-                        'Username, Place ID, and venue name are required.',
-                      );
-                      return;
-                    }
-                    setVenueAssignSaving(true);
-                    try {
-                      const placeId = venueAssignPlaceId.trim();
-                      let latitude: number | undefined;
-                      let longitude: number | undefined;
-                      let address =
-                        venueAssignAddress.trim() || undefined;
-                      let photoUrl =
-                        venueAssignPhotoUrl.trim() || undefined;
-                      try {
-                        const place = await getPlaceDetails(placeId);
-                        if (
-                          place.location?.latitude != null &&
-                          place.location?.longitude != null
-                        ) {
-                          latitude = place.location.latitude;
-                          longitude = place.location.longitude;
-                        }
-                        if (!address && place.formattedAddress) {
-                          address = place.formattedAddress;
-                        }
-                        if (!photoUrl && place.photos?.[0]?.name) {
-                          photoUrl = buildPhotoUrl(place.photos[0].name, {
-                            maxWidthPx: 600,
-                          });
-                        }
-                      } catch {
-                        // Assign still works without coords; map resolve
-                        // can fill them later from placeId on the card.
-                      }
-                      const token = await AsyncStorage.getItem('userToken');
-                      await axios.post(
-                        `${API_BASE_URL}/admin/venues/assign`,
-                        {
-                          username: venueAssignUsername.trim(),
-                          placeId,
-                          name: venueAssignName.trim(),
-                          photoUrl,
-                          address,
-                          latitude,
-                          longitude,
-                        },
-                        {
-                          headers: token
-                            ? {Authorization: `Bearer ${token}`}
-                            : undefined,
-                        },
-                      );
-                      Alert.alert(
-                        'Assigned',
-                        `${venueAssignUsername.trim()} can now post as ${venueAssignName.trim()}.`,
-                      );
-                      setVenueAssignVisible(false);
-                      setVenueAssignUsername('');
-                      setVenueAssignPlaceId('');
-                      setVenueAssignName('');
-                      setVenueAssignPhotoUrl('');
-                      setVenueAssignAddress('');
-                    } catch (err: any) {
-                      Alert.alert(
-                        'Assign failed',
-                        err?.response?.data?.message ||
-                          'Could not assign venue partner.',
-                      );
-                    } finally {
-                      setVenueAssignSaving(false);
-                    }
-                  }}
-                  style={{
-                    marginTop: 8,
-                    backgroundColor: colors.primary,
-                    borderRadius: 12,
-                    paddingVertical: 14,
-                    alignItems: 'center',
-                    opacity: venueAssignSaving ? 0.6 : 1,
-                  }}>
-                  {venueAssignSaving ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text
-                      style={{
-                        color: '#fff',
-                        fontWeight: '700',
-                        fontSize: 15,
-                      }}>
-                      Assign partner
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </ScrollView>
+          <View style={[themedStyles.modalContent, {paddingBottom: 0}]}>
+            <View style={themedStyles.modalHandle} />
+            <View style={themedStyles.modalHeader}>
+              <Text style={themedStyles.modalTitle}>
+                {t('venues.assignPartner') || 'Assign venue partner'}
+              </Text>
+              <TouchableOpacity
+                style={themedStyles.modalCloseButton}
+                onPress={() => setVenueAssignVisible(false)}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <FontAwesomeIcon
+                  icon={faXmark}
+                  size={16}
+                  color={colors.text}
+                />
+              </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
-        </View>
+
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              contentContainerStyle={themedStyles.venueAssignBody}>
+              <Text style={themedStyles.venueAssignHint}>
+                Link an existing username to a Google Place. Their posts show
+                as official venue nights.
+              </Text>
+
+              {(
+                [
+                  {
+                    label: 'Username',
+                    value: venueAssignUsername,
+                    set: setVenueAssignUsername,
+                    placeholder: 'polos_bar',
+                    autoCapitalize: 'none' as const,
+                  },
+                  {
+                    label: 'Google Place ID',
+                    value: venueAssignPlaceId,
+                    set: setVenueAssignPlaceId,
+                    placeholder: 'ChIJ…',
+                    autoCapitalize: 'none' as const,
+                  },
+                  {
+                    label: 'Display name',
+                    value: venueAssignName,
+                    set: setVenueAssignName,
+                    placeholder: "Polo's Bar & Grill",
+                    autoCapitalize: 'words' as const,
+                  },
+                  {
+                    label: 'Photo URL',
+                    value: venueAssignPhotoUrl,
+                    set: setVenueAssignPhotoUrl,
+                    placeholder: 'Optional — auto-filled from Place if blank',
+                    autoCapitalize: 'none' as const,
+                  },
+                  {
+                    label: 'Address',
+                    value: venueAssignAddress,
+                    set: setVenueAssignAddress,
+                    placeholder: 'Optional — auto-filled from Place if blank',
+                    autoCapitalize: 'sentences' as const,
+                  },
+                ] as const
+              ).map(field => (
+                <View key={field.label} style={themedStyles.venueAssignField}>
+                  <Text style={themedStyles.venueAssignLabel}>{field.label}</Text>
+                  <TextInput
+                    value={field.value}
+                    onChangeText={field.set}
+                    placeholder={field.placeholder}
+                    placeholderTextColor={colors.placeholder || '#888'}
+                    autoCapitalize={field.autoCapitalize}
+                    autoCorrect={false}
+                    style={themedStyles.venueAssignInput}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={themedStyles.venueAssignFooter}>
+              <TouchableOpacity
+                disabled={venueAssignSaving}
+                activeOpacity={0.85}
+                onPress={async () => {
+                  if (
+                    !venueAssignUsername.trim() ||
+                    !venueAssignPlaceId.trim() ||
+                    !venueAssignName.trim()
+                  ) {
+                    Alert.alert(
+                      'Missing fields',
+                      'Username, Place ID, and display name are required.',
+                    );
+                    return;
+                  }
+                  setVenueAssignSaving(true);
+                  try {
+                    const placeId = venueAssignPlaceId.trim();
+                    let latitude: number | undefined;
+                    let longitude: number | undefined;
+                    let address = venueAssignAddress.trim() || undefined;
+                    let photoUrl = venueAssignPhotoUrl.trim() || undefined;
+                    try {
+                      const place = await getPlaceDetails(placeId);
+                      if (
+                        place.location?.latitude != null &&
+                        place.location?.longitude != null
+                      ) {
+                        latitude = place.location.latitude;
+                        longitude = place.location.longitude;
+                      }
+                      if (!address && place.formattedAddress) {
+                        address = place.formattedAddress;
+                      }
+                      if (!photoUrl && place.photos?.[0]?.name) {
+                        photoUrl = buildPhotoUrl(place.photos[0].name, {
+                          maxWidthPx: 600,
+                        });
+                      }
+                    } catch {
+                      // Assign still works without coords; map resolve
+                      // can fill them later from placeId on the card.
+                    }
+                    const token = await AsyncStorage.getItem('userToken');
+                    await axios.post(
+                      `${API_BASE_URL}/admin/venues/assign`,
+                      {
+                        username: venueAssignUsername.trim(),
+                        placeId,
+                        name: venueAssignName.trim(),
+                        photoUrl,
+                        address,
+                        latitude,
+                        longitude,
+                      },
+                      {
+                        headers: token
+                          ? {Authorization: `Bearer ${token}`}
+                          : undefined,
+                      },
+                    );
+                    Alert.alert(
+                      'Assigned',
+                      `${venueAssignUsername.trim()} can now post as ${venueAssignName.trim()}.`,
+                    );
+                    setVenueAssignVisible(false);
+                    setVenueAssignUsername('');
+                    setVenueAssignPlaceId('');
+                    setVenueAssignName('');
+                    setVenueAssignPhotoUrl('');
+                    setVenueAssignAddress('');
+                  } catch (err: any) {
+                    Alert.alert(
+                      'Assign failed',
+                      err?.response?.data?.message ||
+                        'Could not assign venue partner.',
+                    );
+                  } finally {
+                    setVenueAssignSaving(false);
+                  }
+                }}
+                style={[
+                  themedStyles.venueAssignButton,
+                  venueAssignSaving ? {opacity: 0.6} : null,
+                ]}>
+                {venueAssignSaving ? (
+                  <ActivityIndicator color={colors.buttonText || '#fff'} />
+                ) : (
+                  <Text style={themedStyles.venueAssignButtonText}>
+                    Assign partner
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Language Selection Modal */}
