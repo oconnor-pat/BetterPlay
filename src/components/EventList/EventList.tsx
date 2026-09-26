@@ -6731,10 +6731,25 @@ const EventList: React.FC = () => {
     }
     setJoinPromptSaving(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/events`, {
-        ...eventPayload,
-        creatorRoster: details,
-      });
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert(
+          t('common.error'),
+          t('events.createError') ||
+            'You need to be signed in to create an event.',
+        );
+        return false;
+      }
+      const response = await axios.post(
+        `${API_BASE_URL}/events`,
+        {
+          ...eventPayload,
+          creatorRoster: details,
+        },
+        {
+          headers: {Authorization: `Bearer ${token}`},
+        },
+      );
       const responseData = response.data;
       const createdEvents: Event[] = Array.isArray(responseData)
         ? responseData
@@ -6757,8 +6772,12 @@ const EventList: React.FC = () => {
       resetCreateFormState();
       setJoinPrompt(null);
       return true;
-    } catch (error) {
-      Alert.alert(t('common.error'), t('events.createError'));
+    } catch (error: any) {
+      const serverMessage =
+        error?.response?.data?.message ||
+        t('events.createError') ||
+        'Could not create event.';
+      Alert.alert(t('common.error'), serverMessage);
       return false;
     } finally {
       setJoinPromptSaving(false);
